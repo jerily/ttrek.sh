@@ -1,17 +1,16 @@
 {
-	"name":	"thtml",
-	"version":	"1.0.0",
+	"name":	"tjson",
+	"version":	"1.0.11",
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tcl": "9.0b1",
-		"tdom": "0.9.3"
+		"tcl": "9.0b1"
 	},
 	"devDependencies":	{
 	},
 	"lifecycle": {
 		"install": [
-			{ "cmd": "curl", "url": "https://github.com/jerily/thtml/archive/refs/tags/v1.0.0.tar.gz" },
+			{ "cmd": "curl", "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.11.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },

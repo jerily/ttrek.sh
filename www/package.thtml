@@ -1,0 +1,15 @@
+<import name="Master" src="master.thtml" />
+
+<Master pagetitle="$package_name - ttrek">
+    <div class="blog">
+        <h1>$package_name</h1>
+        <p>Install:</p>
+        <pre>ttrek install ${package_name}@[lindex $versions 0]</pre>
+        <p>Versions:</p>
+        <tpl foreach="version" in="$versions">
+            <div class="version">
+                <a href="/registry/$package_name/$version">$version</a>
+            </div>
+        </tpl>
+    </div>
+</Master>

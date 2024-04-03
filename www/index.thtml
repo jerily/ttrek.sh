@@ -1,8 +1,14 @@
 <import name="Master" src="master.thtml" />
 
-<Master pagetitle="thtml - HTML Templating Engine for twebserver">
+<Master pagetitle="ttrek.sh: registry, website, and command-line interface">
     <div>
         <h1>$title</h1>
-        <p>$content</p>
+        <ul>
+            <tpl foreach="package_name" in="$package_names">
+                <li>
+                    <a href="/package/$package_name">$package_name</a>
+                </li>
+            </tpl>
+        </ul>
     </div>
 </Master>
