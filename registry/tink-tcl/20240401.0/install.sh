@@ -17,7 +17,7 @@ export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
 # tink-tcl
 if true; then
   curl -L -o tink-tcl-20240401.0.tar.gz --output-dir $BUILD_DIR https://github.com/jerily/tink-tcl/archive/refs/tags/v20240401.0.tar.gz
-  tar xzvf tink-tcl-20240401.0.tar.gz -C $BUILD_DIR
+  tar xzvf $BUILD_DIR/tink-tcl-20240401.0.tar.gz -C $BUILD_DIR
   cd $BUILD_DIR/tink-tcl-20240401.0
   mkdir build
   cd build

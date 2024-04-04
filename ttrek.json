@@ -6,7 +6,8 @@
 	"dependencies":	{
 		"twebserver":	"1.47.15",
 		"tsession":	"1.0.2",
-		"thtml":	"1.0.0"
+		"thtml":	"1.0.0",
+		"tjson":	"1.0.11"
 	},
 	"devDependencies":	{
 	}

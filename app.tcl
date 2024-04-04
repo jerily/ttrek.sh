@@ -7,6 +7,7 @@ package require twebserver
 set init_script {
     package require twebserver
     package require thtml
+    package require tjson
 
     ::thtml::init [dict create \
         cache 0 \
@@ -17,7 +18,6 @@ set init_script {
     ::twebserver::add_route -strict $router GET / get_index_page_handler
     ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
     ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version get_package_spec_handler
-    ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/install.sh get_package_script_handler
     ::twebserver::add_route -strict $router GET /logo get_logo_handler
     ::twebserver::add_route $router GET "*" get_catchall_handler
 
@@ -47,25 +47,41 @@ set init_script {
         set package_name [::twebserver::get_path_param $req package_name]
         set package_version [::twebserver::get_path_param $req package_version]
         set dir [::twebserver::get_rootdir]
-        set filepath [file join $dir registry $package_name $package_version ttrek.json]
-        if {![file exists $filepath]} {
-            set res [::twebserver::build_response 404 text/plain "not found"]
-            return $res
-        }
-        set res [::twebserver::build_response -return_file 200 application/json $filepath]
-        return $res
-    }
 
-    proc get_package_script_handler {ctx req} {
-        set package_name [::twebserver::get_path_param $req package_name]
-        set package_version [::twebserver::get_path_param $req package_version]
-        set dir [::twebserver::get_rootdir]
-        set filepath [file join $dir registry $package_name $package_version install.sh]
-        if {![file exists $filepath]} {
-            set res [::twebserver::build_response 404 text/plain "not found"]
-            return $res
+        set spec_path [file join $dir registry $package_name $package_version ttrek.json]
+        set install_script_path [file join $dir registry $package_name $package_version install.sh]
+        if {![file exists $spec_path] || ![file exists $install_script_path]} {
+            return [::twebserver::build_response 404 text/plain "not found"]
         }
-        set res [::twebserver::build_response -return_file 200 text/plain $filepath]
+
+        set fp [open $spec_path]
+        set data [read $fp]
+        close $fp
+
+        ::tjson::parse $data spec_handle
+        set deps_handle [::tjson::get_object_item $spec_handle dependencies]
+        set deps_typed [::tjson::to_typed $deps_handle]
+
+        set fp [open $install_script_path]
+        set data [read $fp]
+        close $fp
+
+        set base64_install_script [::twebserver::base64_encode $data]
+
+        set patches_typed [list]
+        foreach patch_path [glob -nocomplain -type f [file join $dir registry $package_name $package_version *.diff]] {
+            set fp [open $patch_path]
+            set data [read $fp]
+            close $fp
+            lappend patches_typed [file tail $patch_path] [list S [::twebserver::base64_encode $data]]
+        }
+        ::tjson::create [list M [list dependencies $deps_typed install_script [list S $base64_install_script]]] result_handle
+
+        if { $patches_typed ne {} } {
+            ::tjson::add_item_to_object $result_handle patches [list M $patches_typed]
+        }
+
+        set res [::twebserver::build_response 200 application/json [::tjson::to_json $result_handle]]
         return $res
     }
 
