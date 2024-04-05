@@ -66,7 +66,7 @@ set init_script {
             lappend versions_typed [list S $version]
         }
         return [::twebserver::build_response 200 application/json \
-            [::tjson::typed_to_json [list M [list versions [list L $versions_typed]]]]]
+            [::tjson::typed_to_json [list L $versions_typed]]]
     }
 
     proc get_package_spec_handler {ctx req} {
