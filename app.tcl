@@ -108,7 +108,13 @@ set init_script {
             close $fp
             lappend patches_typed [file tail $patch_path] [list S [::twebserver::base64_encode $data]]
         }
-        ::tjson::create [list M [list dependencies $deps_typed install_script [list S $base64_install_script]]] result_handle
+        ::tjson::create \
+            [list M \
+                [list \
+                    version [list S $package_version] \
+                    dependencies $deps_typed \
+                    install_script [list S $base64_install_script]]] \
+            result_handle
 
         if { $patches_typed ne {} } {
             ::tjson::add_item_to_object $result_handle patches [list M $patches_typed]
