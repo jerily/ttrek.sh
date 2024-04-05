@@ -18,6 +18,7 @@ set init_script {
     ::twebserver::add_route -strict $router GET / get_index_page_handler
     ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
     ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version get_package_spec_handler
+    ::twebserver::add_route $router -strict GET /registry/:package_name get_package_versions_handler
     ::twebserver::add_route -strict $router GET /logo get_logo_handler
     ::twebserver::add_route $router GET "*" get_catchall_handler
 
@@ -43,13 +44,29 @@ set init_script {
         return $res
     }
 
-    proc get_latest_version {dir package_name} {
+    proc get_package_versions {dir package_name} {
         set versions [list]
         foreach path [glob -nocomplain -type d [file join $dir registry $package_name/*]] {
             lappend versions [file tail $path]
         }
-        set latest_version [lindex [lsort -decreasing $versions] 0]
+        return [lsort -decreasing $versions]
+    }
+
+    proc get_latest_version {dir package_name} {
+        set versions [get_package_versions $dir $package_name]
+        set latest_version [lindex $versions 0]
         return $latest_version
+    }
+
+    proc get_package_versions_handler {ctx req} {
+        set dir [::twebserver::get_rootdir]
+        set package_name [::twebserver::get_path_param $req package_name]
+        set versions_typed [list]
+        foreach version [get_package_versions $dir $package_name] {
+            lappend versions_typed [list S $version]
+        }
+        return [::twebserver::build_response 200 application/json \
+            [::tjson::typed_to_json [list M [list versions [list L $versions_typed]]]]]
     }
 
     proc get_package_spec_handler {ctx req} {
