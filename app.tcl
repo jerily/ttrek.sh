@@ -1,5 +1,5 @@
 # Copyright Jerily LTD. All Rights Reserved.
-# SPDX-FileCopyrightText: 2023 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-FileCopyrightText: 2024 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
 
 package require twebserver
@@ -43,10 +43,26 @@ set init_script {
         return $res
     }
 
+    proc get_latest_version {dir package_name} {
+        set versions [list]
+        foreach path [glob -nocomplain -type d [file join $dir registry $package_name/*]] {
+            lappend versions [file tail $path]
+        }
+        set latest_version [lindex [lsort -decreasing $versions] 0]
+        return $latest_version
+    }
+
     proc get_package_spec_handler {ctx req} {
         set package_name [::twebserver::get_path_param $req package_name]
         set package_version [::twebserver::get_path_param $req package_version]
         set dir [::twebserver::get_rootdir]
+
+        if { $package_version eq "latest" } {
+            set package_version [get_latest_version $dir $package_name]
+            if { $package_version eq {} } {
+                return [::twebserver::build_response 404 text/plain "not found"]
+            }
+        }
 
         set spec_path [file join $dir registry $package_name $package_version ttrek.json]
         set install_script_path [file join $dir registry $package_name $package_version install.sh]
