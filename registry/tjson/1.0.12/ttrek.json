@@ -1,16 +1,16 @@
 {
 	"name":	"tjson",
-	"version":	"1.0.11",
+	"version":	"1.0.12",
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tcl": "9.0b1"
+		"tcl": "9.0-beta.1"
 	},
 	"devDependencies":	{
 	},
 	"lifecycle": {
 		"install": [
-			{ "cmd": "curl", "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.11.tar.gz" },
+			{ "cmd": "curl", "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.12.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },

@@ -1,6 +1,6 @@
 {
 	"name":	"tcl",
-	"version":	"9.0b1",
+	"version":	"9.0-beta.1",
 	"scripts":	{
 	},
 	"dependencies":	{

@@ -16,8 +16,8 @@ export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
 
 # thtml
 if true; then
-  VERSION=1.0.11
-  curl -L -o tjson-$VERSION.tar.gz --output-dir $BUILD_DIR https://github.com/jerily/tjson/archive/refs/tags/v1.0.11.tar.gz
+  VERSION=1.0.12
+  curl -L -o tjson-$VERSION.tar.gz --output-dir $BUILD_DIR https://github.com/jerily/tjson/archive/refs/tags/v1.0.12.tar.gz
   tar -xzvf $BUILD_DIR/tjson-$VERSION.tar.gz -C $BUILD_DIR
   cd $BUILD_DIR/tjson-$VERSION
   mkdir build
