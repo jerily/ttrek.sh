@@ -1,6 +1,6 @@
 {
 	"name":	"openssl",
-	"version":	"3.2.1",
+	"version":	"3.0.13",
 	"scripts":	{
 	},
 	"dependencies":	{
@@ -11,8 +11,8 @@
 		"install": [
 			{
 				"cmd": "curl",
-				"url": "https://www.openssl.org/source/openssl-3.2.1.tar.gz",
-				"sha256": "83c7329fe52c850677d75e5d0b0ca245309b97e8ecbcfdc1dfdc4ab9fac35b39"
+				"url": "https://www.openssl.org/source/openssl-3.0.13.tar.gz",
+				"sha256": "88525753f79d3bec27d2fa7c66aa0b92b3aa9498dafd93d7cfa4b3780cdae313"
 			},
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
