@@ -1,0 +1,15 @@
+{
+	"name":	"example",
+	"version":	"1.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"twebserver":	"^1.47.15",
+		"tsession":	"^1.0.2",
+		"thtml":	"^1.0.0",
+		"tjson":	"^1.0.12",
+		"bcrypt-tcl":	"^2.0.0"
+	},
+	"devDependencies":	{
+	}
+}
