@@ -1,6 +1,6 @@
 {
-	"name":	"aws-sdk-tcl",
-	"version":	"1.0.3",
+	"name":	"bcrypt-tcl",
+	"version":	"2.0.0",
 	"scripts":	{
 	},
 	"dependencies":	{
@@ -10,7 +10,7 @@
 	},
 	"lifecycle": {
 		"install": [
-			{ "cmd": "curl", "url": "https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.3.tar.gz" },
+			{ "cmd": "curl", "url": "https://github.com/jerily/bcrypt-tcl/archive/refs/tags/v2.0.0.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },

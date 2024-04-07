@@ -4,8 +4,8 @@
 	"scripts": {
 	},
 	"dependencies":	{
-		"openssl": "3.2.1",
-		"curl": "8.7.1"
+		"openssl": "^3.0.13",
+		"curl": "^8.7.1"
 	},
 	"devDependencies": {
 	},

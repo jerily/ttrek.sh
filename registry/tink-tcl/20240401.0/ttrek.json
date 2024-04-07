@@ -4,8 +4,8 @@
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tink-cc":	"2.1.1",
-		"tcl": "9.0-beta.1"
+		"tink-cc":	"^2.1.1",
+		"tcl": "=9.0-beta.1"
 	},
 	"devDependencies":	{
 	},

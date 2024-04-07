@@ -4,8 +4,8 @@
 	"scripts":	{
 	},
 	"dependencies":	{
-		"openssl": "3.2.1",
-		"tcl": "9.0-beta.1"
+		"openssl": "^3.0.13",
+		"tcl": "=9.0-beta.1"
 	},
 	"devDependencies":	{
 	},
