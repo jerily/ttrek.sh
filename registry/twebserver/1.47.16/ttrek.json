@@ -1,6 +1,6 @@
 {
 	"name":	"twebserver",
-	"version":	"1.47.15",
+	"version":	"1.47.16",
 	"scripts":	{
 	},
 	"dependencies":	{
@@ -11,7 +11,7 @@
 	},
 	"lifecycle": {
 		"install": [
-			{ "cmd": "curl", "url": "https://github.com/jerily/twebserver/archive/refs/tags/v1.47.15.tar.gz" },
+			{ "cmd": "curl", "url": "https://github.com/jerily/twebserver/archive/refs/tags/v1.47.16.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },
