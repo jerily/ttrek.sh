@@ -16,8 +16,8 @@ export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
 
 # aws-sdk-tcl
 if true; then
-  VERSION=1.0.4
-  curl -L -o aws-sdk-tcl-$VERSION.tar.gz --output-dir $BUILD_DIR https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.4.tar.gz
+  VERSION=1.0.6
+  curl -L -o aws-sdk-tcl-$VERSION.tar.gz --output-dir $BUILD_DIR https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.6.tar.gz
   tar -xzf $BUILD_DIR/aws-sdk-tcl-$VERSION.tar.gz -C $BUILD_DIR
   cd $BUILD_DIR/aws-sdk-tcl-$VERSION
   mkdir build
