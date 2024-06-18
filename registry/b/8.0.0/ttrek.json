@@ -1,0 +1,13 @@
+{
+	"name":	"b",
+	"version":	"8.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+	},
+	"devDependencies":	{
+	},
+	"lifecycle": {
+		"install": []
+	}
+}

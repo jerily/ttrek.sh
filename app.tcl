@@ -52,6 +52,23 @@ set init_script {
         return [lsort -decreasing $versions]
     }
 
+    proc get_package_version_dependencies {dir package_name version} {
+        set deps [list]
+        set spec_path [file join $dir registry $package_name $version ttrek.json]
+        if {![file exists $spec_path]} {
+            error "spec file not found"
+        }
+
+        set fp [open $spec_path]
+        set data [read $fp]
+        close $fp
+
+        ::tjson::parse $data spec_handle
+        set deps_handle [::tjson::get_object_item $spec_handle dependencies]
+        set deps [::tjson::to_simple $deps_handle]
+        return $deps
+    }
+
     proc get_latest_version {dir package_name} {
         set versions [get_package_versions $dir $package_name]
         set latest_version [lindex $versions 0]
@@ -63,10 +80,16 @@ set init_script {
         set package_name [::twebserver::get_path_param $req package_name]
         set versions_typed [list]
         foreach version [get_package_versions $dir $package_name] {
-            lappend versions_typed [list S $version]
+            set deps [get_package_version_dependencies $dir $package_name $version]
+            set deps_typed [list]
+            foreach {dep_name dep_version} $deps {
+                lappend deps_typed $dep_name [list S $dep_version]
+            }
+            puts $deps_typed
+            lappend versions_typed $version [list M $deps_typed]
         }
         return [::twebserver::build_response 200 application/json \
-            [::tjson::typed_to_json [list L $versions_typed]]]
+            [::tjson::typed_to_json [list M $versions_typed]]]
     }
 
     proc get_package_spec_handler {ctx req} {

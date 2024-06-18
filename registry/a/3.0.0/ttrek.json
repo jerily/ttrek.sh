@@ -1,0 +1,14 @@
+{
+	"name":	"a",
+	"version":	"3.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"b":	">=4.0.0,<7.0.0"
+	},
+	"devDependencies":	{
+	},
+	"lifecycle": {
+		"install": []
+	}
+}
