@@ -49,7 +49,7 @@ set init_script {
         foreach path [glob -nocomplain -type d [file join $dir registry $package_name/*]] {
             lappend versions [file tail $path]
         }
-        return [lsort -decreasing $versions]
+        return [lsort -command compare_versions -decreasing $versions]
     }
 
     proc get_package_version_dependencies {dir package_name version} {
@@ -85,7 +85,6 @@ set init_script {
             foreach {dep_name dep_version} $deps {
                 lappend deps_typed $dep_name [list S $dep_version]
             }
-            puts $deps_typed
             lappend versions_typed $version [list M $deps_typed]
         }
         return [::twebserver::build_response 200 application/json \
@@ -147,13 +146,29 @@ set init_script {
         return $res
     }
 
+    proc compare_versions {a b} {
+        set a_parts [split $a .]
+        set b_parts [split $b .]
+        set len [expr {[llength $a_parts] < [llength $b_parts] ? [llength $a_parts] : [llength $b_parts]}]
+        for {set i 0} {$i < $len} {incr i} {
+            set a_part [lindex $a_parts $i]
+            set b_part [lindex $b_parts $i]
+            if {$a_part < $b_part} {
+                return -1
+            } elseif {$a_part > $b_part} {
+                return 1
+            }
+        }
+        return 0
+    }
+
     proc get_package_page_handler {ctx req} {
         set package_name [::twebserver::get_path_param $req package_name]
         set versions [list]
         foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry $package_name/*]] {
             lappend versions [file tail $path]
         }
-        set data [dict merge $req [list package_name $package_name versions [lsort -decreasing $versions]]]
+        set data [dict merge $req [list package_name $package_name versions [lsort -command compare_versions -decreasing $versions]]]
         set html [::thtml::renderfile package.thtml $data]
         set res [::twebserver::build_response 200 text/html $html]
         return $res
