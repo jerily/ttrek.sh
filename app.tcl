@@ -11,7 +11,7 @@ set init_script {
 
     ::thtml::init [dict create \
         cache 0 \
-        rootdir [file join [file dirname [info script]] www]]
+        rootdir [file dirname [info script]]]
 
     set router [::twebserver::create_router]
 
