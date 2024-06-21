@@ -1,11 +1,11 @@
 {
 	"name":	"twebserver",
-	"version":	"1.47.20",
+	"version":	"1.47.37",
 	"scripts":	{
 	},
 	"dependencies":	{
 		"openssl": "^3.0.13",
-		"tcl": "=9.0-beta.1"
+		"tcl": "=9.0-beta.2"
 	},
 	"devDependencies":	{
 	},

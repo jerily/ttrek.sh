@@ -27,7 +27,7 @@
 			"version":	"1.47.15",
 			"requires":	{
 				"openssl":	"^3.0.13",
-				"tcl":	"=9.0-beta.1"
+				"tcl":	"=9.0-beta.2"
 			}
 		},
 		"abseil-cpp":	{
@@ -52,7 +52,7 @@
 			"version":	"20240401.0",
 			"requires":	{
 				"tink-cc":	"^2.1.1",
-				"tcl":	"=9.0-beta.1"
+				"tcl":	"=9.0-beta.2"
 			}
 		},
 		"tsession":	{
@@ -60,32 +60,32 @@
 			"requires":	{
 				"tink-tcl":	">=20240401.0",
 				"twebserver":	"^1.47.15",
-				"tcl":	"=9.0-beta.1"
+				"tcl":	"=9.0-beta.2"
 			}
 		},
 		"tdom":	{
 			"version":	"0.9.3",
 			"requires":	{
-				"tcl":	"=9.0-beta.1"
+				"tcl":	"=9.0-beta.2"
 			}
 		},
 		"thtml":	{
 			"version":	"1.0.0",
 			"requires":	{
-				"tcl":	"=9.0-beta.1",
+				"tcl":	"=9.0-beta.2",
 				"tdom":	"=0.9.3"
 			}
 		},
 		"tjson":	{
 			"version":	"1.0.12",
 			"requires":	{
-				"tcl":	"=9.0-beta.1"
+				"tcl":	"=9.0-beta.2"
 			}
 		},
 		"bcrypt-tcl":	{
 			"version":	"2.0.0",
 			"requires":	{
-				"tcl":	"=9.0-beta.1"
+				"tcl":	"=9.0-beta.2"
 			}
 		}
 	}
