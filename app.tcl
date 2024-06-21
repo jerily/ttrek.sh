@@ -39,7 +39,7 @@ set init_script {
     proc get_logo_handler {ctx req} {
         set server_handle [dict get $ctx server]
         set dir [::thtml::get_rootdir]
-        set filepath [file join $dir plume.png]
+        set filepath [file join $dir www plume.png]
         set res [::twebserver::build_response -return_file 200 image/png $filepath]
         return $res
     }
