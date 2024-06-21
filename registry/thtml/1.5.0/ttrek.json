@@ -4,8 +4,8 @@
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tcl": "^9.0.0-beta.2",
-		"tdom": "^0.9.4-alpha"
+		"tcl": "^9.0.0-beta.1",
+		"tdom": "^0.9.3"
 	},
 	"devDependencies":	{
 	},
