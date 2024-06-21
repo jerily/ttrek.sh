@@ -5,7 +5,7 @@
 	},
 	"dependencies":	{
 		"openssl": "^3.0.13",
-		"tcl": "=9.0-beta.2"
+		"tcl": "^9.0.0-beta.2"
 	},
 	"devDependencies":	{
 	},

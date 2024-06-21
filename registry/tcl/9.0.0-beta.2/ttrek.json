@@ -1,6 +1,6 @@
 {
 	"name":	"tcl",
-	"version":	"9.0-beta.1",
+	"version":	"9.0.0-beta.2",
 	"scripts":	{
 	},
 	"dependencies":	{
@@ -10,7 +10,7 @@
 	},
 	"lifecycle": {
 		"install": [
-			{ "cmd": "curl", "url": "http://prdownloads.sourceforge.net/tcl/tcl9.0b1-src.tar.gz" },
+			{ "cmd": "curl", "url": "http://prdownloads.sourceforge.net/tcl/tcl9.0b2-src.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd", "dirname": "$PACKAGE_NAME/unix" },
 			{ "cmd": "configure" },
