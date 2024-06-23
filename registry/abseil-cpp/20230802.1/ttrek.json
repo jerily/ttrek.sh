@@ -7,8 +7,8 @@
 	},
 	"devDependencies": {
 	},
-	"lifecycle": {
-		"install": [
+	"build": {
+		"linux.x86_64": [
 			{ "cmd": "curl", "url": "https://github.com/abseil/abseil-cpp/archive/refs/tags/20230802.1.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

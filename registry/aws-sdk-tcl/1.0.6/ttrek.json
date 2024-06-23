@@ -9,8 +9,8 @@
 	},
 	"devDependencies":	{
 	},
-	"lifecycle": {
-		"install": [
+	"build": {
+		"linux.x86_64": [
 			{ "cmd": "curl", "url": "https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.6.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

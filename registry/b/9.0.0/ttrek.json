@@ -7,7 +7,7 @@
 	},
 	"devDependencies":	{
 	},
-	"lifecycle": {
-		"install": []
+	"build": {
+		"linux.x86_64": []
 	}
 }

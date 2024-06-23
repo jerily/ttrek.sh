@@ -10,8 +10,8 @@
 	},
 	"devDependencies":	{
 	},
-	"lifecycle": {
-		"install": [
+	"build": {
+		"linux.x86_64": [
 			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git" },
 			{ "cmd": "cd" },
 			{ "cmd": "make_install",

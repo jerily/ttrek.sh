@@ -8,8 +8,8 @@
 	},
 	"devDependencies":	{
 	},
-	"lifecycle": {
-		"install": [
+	"build": {
+		"linux.x86_64": [
 			{ "cmd": "curl", "url": "http://prdownloads.sourceforge.net/tcl/tcl9.0b1-src.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd", "dirname": "$PACKAGE_NAME/unix" },

@@ -7,8 +7,8 @@
 	},
 	"devDependencies":	{
 	},
-	"lifecycle": {
-		"install": [
+	"build": {
+		"linux.x86_64": [
 			{
 				"cmd": "curl",
 				"url": "https://www.openssl.org/source/openssl-3.2.1.tar.gz",

@@ -10,8 +10,8 @@
 	},
 	"devDependencies": {
 	},
-	"lifecycle": {
-		"install": [
+	"build": {
+		"linux.x86_64": [
 			{ "cmd": "curl", "url": "https://github.com/tink-crypto/tink-cc/archive/refs/tags/v2.1.1.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

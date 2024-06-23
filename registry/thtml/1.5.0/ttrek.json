@@ -9,8 +9,8 @@
 	},
 	"devDependencies":	{
 	},
-	"lifecycle": {
-		"install": [
+	"build": {
+		"linux.x86_64": [
 			{ "cmd": "curl", "url": "https://github.com/jerily/thtml/archive/refs/tags/v1.5.0.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
