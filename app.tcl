@@ -190,7 +190,7 @@ set config_dict [dict create \
     gzip_min_length 20]
 
 # create the server
-set server_handle [::twebserver::create_server $config_dict process_conn $init_script]
+set server_handle [::twebserver::create_server -with_router $config_dict process_conn $init_script]
 
 # listen for an HTTP connection on port 8080
 ::twebserver::listen_server -http $server_handle 8080
