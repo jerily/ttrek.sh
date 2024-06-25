@@ -1,6 +1,6 @@
 {
 	"name":	"openssl",
-	"version":	"3.0.13",
+	"version":	"3.0.14",
 	"scripts":	{
 	},
 	"dependencies":	{
@@ -11,8 +11,7 @@
 		"linux.x86_64": [
 			{
 				"cmd": "download",
-				"url": "https://www.openssl.org/source/openssl-3.0.13.tar.gz",
-				"sha256": "88525753f79d3bec27d2fa7c66aa0b92b3aa9498dafd93d7cfa4b3780cdae313"
+				"url": "https://www.openssl.org/source/openssl-3.0.14.tar.gz"
 			},
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

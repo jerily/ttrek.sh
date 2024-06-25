@@ -1,17 +1,18 @@
 {
-	"name":	"zlib",
-	"version":	"1.3.1",
+	"name":	"tcl",
+	"version":	"8.6.14",
 	"scripts":	{
 	},
 	"dependencies":	{
+		"zlib":	"^1.3.1"
 	},
 	"devDependencies":	{
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "download", "url": "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz" },
+			{ "cmd": "download", "url": "http://prdownloads.sourceforge.net/tcl/tcl8.6.14-src.tar.gz" },
 			{ "cmd": "unpack" },
-			{ "cmd": "cd" },
+			{ "cmd": "cd", "dirname": "$PACKAGE_NAME/unix" },
 			{ "cmd": "configure" },
 			{ "cmd": "make" },
 			{ "cmd": "make_install" }

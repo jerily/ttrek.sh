@@ -1,17 +1,17 @@
 {
-	"name":	"aws-sdk-tcl",
-	"version":	"1.0.6",
+	"name":	"twebserver",
+	"version":	"1.47.38",
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tcl": "^9.0.0-beta.2",
-		"aws-sdk-cpp": "=1.11.157"
+		"openssl": "==3.0.14",
+		"tcl": "^8.6.14"
 	},
 	"devDependencies":	{
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "download", "url": "https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.6.tar.gz" },
+			{ "cmd": "download", "url": "https://github.com/jerily/twebserver/archive/refs/tags/v1.47.20.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },

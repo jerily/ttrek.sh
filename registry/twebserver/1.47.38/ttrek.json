@@ -1,17 +1,17 @@
 {
 	"name":	"twebserver",
-	"version":	"1.47.37",
+	"version":	"1.47.38",
 	"scripts":	{
 	},
 	"dependencies":	{
 		"openssl": "^3.0.13",
-		"tcl": "^9.0.0-beta.2"
+		"tcl": ">=8.6.14"
 	},
 	"devDependencies":	{
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "curl", "url": "https://github.com/jerily/twebserver/archive/refs/tags/v1.47.20.tar.gz" },
+			{ "cmd": "download", "url": "https://github.com/jerily/twebserver/archive/refs/tags/v1.47.38.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },

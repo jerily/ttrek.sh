@@ -10,7 +10,7 @@
 	"build": {
 		"linux.x86_64": [
 			{
-				"cmd": "curl",
+				"cmd": "download",
 				"url": "https://www.openssl.org/source/openssl-3.2.1.tar.gz",
 				"sha256": "83c7329fe52c850677d75e5d0b0ca245309b97e8ecbcfdc1dfdc4ab9fac35b39"
 			},

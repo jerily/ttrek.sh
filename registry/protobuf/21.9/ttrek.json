@@ -9,7 +9,7 @@
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "curl", "url": "https://github.com/protocolbuffers/protobuf/archive/v21.9.zip" },
+			{ "cmd": "download", "url": "https://github.com/protocolbuffers/protobuf/archive/v21.9.zip" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{

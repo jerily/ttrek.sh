@@ -10,7 +10,7 @@
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "curl", "url": "http://prdownloads.sourceforge.net/tcl/tcl9.0b2-src.tar.gz" },
+			{ "cmd": "download", "url": "http://prdownloads.sourceforge.net/tcl/tcl9.0b2-src.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd", "dirname": "$PACKAGE_NAME/unix" },
 			{ "cmd": "configure" },

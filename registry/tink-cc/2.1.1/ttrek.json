@@ -12,7 +12,7 @@
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "curl", "url": "https://github.com/tink-crypto/tink-cc/archive/refs/tags/v2.1.1.tar.gz" },
+			{ "cmd": "download", "url": "https://github.com/tink-crypto/tink-cc/archive/refs/tags/v2.1.1.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "patch", "p_num": "1", "filename": "tink-cc-2.1.1.diff" },

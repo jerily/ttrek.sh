@@ -10,7 +10,7 @@
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "curl", "url": "http://tdom.org/downloads/tdom-0.9.3-src.tar.gz" },
+			{ "cmd": "download", "url": "http://tdom.org/downloads/tdom-0.9.3-src.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd", "dir": "$PACKAGE_NAME/unix" },
 			{
