@@ -91,6 +91,233 @@ set init_script {
             [::tjson::typed_to_json [list M $versions_typed]]]
     }
 
+    proc shell_quote {string} {
+        set string [string map [list {'} {'"'"'}] $string]
+        return "'$string'"
+    }
+    proc shell_quote_double {string} {
+        set string [string map [list "\"" "\\\"" "\\" "\\\\"] $string]
+        return "\"$string\""
+    }
+
+    proc gen_package_spec_common {package_name package_version} {
+        set result [list]
+        set package_prefix "${package_name}-${package_version}"
+        lappend result "VERSION=[shell_quote $package_version]"
+        lappend result "PACKAGE=[shell_quote $package_name]"
+        lappend result "DOWNLOAD_DIR=[shell_quote_double {$ROOT_BUILD_DIR/download}]"
+        lappend result "ARCHIVE_FILE=[shell_quote "${package_prefix}.archive"]"
+        lappend result "SOURCE_DIR=[shell_quote_double "\$ROOT_BUILD_DIR/source/${package_prefix}"]"
+        lappend result "BUILD_DIR=[shell_quote_double "\$ROOT_BUILD_DIR/build/${package_prefix}"]"
+        lappend result "PATCH_DIR=[shell_quote_double "\$ROOT_BUILD_DIR"]"
+        return $result
+    }
+
+    proc gen_package_spec_command {opts} {
+        set result [list]
+        if { ![dict exists $opts cmd] } {
+            return $result
+        }
+        switch -exact -- [dict get $opts cmd] {
+            "download" {
+                lappend result "mkdir -p [shell_quote_double {$DOWNLOAD_DIR}]"
+                lappend result "curl -L -o [shell_quote_double {$ARCHIVE_FILE}]\
+                    --output-dir [shell_quote_double {$DOWNLOAD_DIR}]\
+                    [dict get $opts url]"
+                if { [dict exists $opts sha256] } {
+                    lappend result "HASH=\"\$(sha256sum --binary [shell_quote_double {$DOWNLOAD_DIR/$ARCHIVE_FILE}]\
+                        | awk '{print \$1})\"'"
+                    lappend result "\[ \"\$HASH\" = [shell_quote [dict get $opts sha256]] \]\
+                        || { echo \"sha256 doesn't match.\"; exit 1; }"
+                }
+            }
+            "git" {
+                lappend result "rm -rf [shell_quote_double {$SOURCE_DIR}]"
+                lappend result "mkdir -p [shell_quote_double {$SOURCE_DIR}]"
+                set cmd "git -C [shell_quote_double {$SOURCE_DIR}] clone [shell_quote [dict get $opts url]]\
+                    --depth 1"
+                if { [dict exists $opts recurse-submodules] && [string is true -strict [dict get $opts recurse-submodules]] } {
+                    append cmd " --recurse-submodules"
+                }
+                if { [dict exists $opts shallow-submodules] && [string is true -strict [dict get $opts shallow-submodules]] } {
+                    append cmd " --shallow-submodules"
+                }
+                lappend result $cmd
+            }
+            "unpack" {
+                if { ![dict exists $opts format] } {
+                    dict set opts format tar.gz
+                }
+                lappend result "rm -rf [shell_quote_double {$SOURCE_DIR}]"
+                lappend result "mkdir -p [shell_quote_double {$SOURCE_DIR}]"
+                switch -exact -- [dict get $opts format] {
+                    "zip" {
+                        lappend result "unzip [shell_quote_double {$DOWNLOAD_DIR/$ARCHIVE_FILE}]\
+                            -d [shell_quote_double {$SOURCE_DIR}]"
+                        lappend result "TEMP=\"\$(echo [shell_quote_double {$SOURCE_DIR}]/*)\""
+                        # This will not move hidden files from subdirectory to
+                        # the build directory. But it shouldn't matter.
+                        lappend result "mv [shell_quote_double {$TEMP}]/* [shell_quote_double {$SOURCE_DIR}]"
+                        lappend result "rm -rf [shell_quote_double {$TEMP}]"
+                    }
+                    default {
+                        lappend result "tar -xzf [shell_quote_double {$DOWNLOAD_DIR/$ARCHIVE_FILE}]\
+                            --strip-components=1 -C [shell_quote_double {$SOURCE_DIR}]"
+                    }
+                }
+            }
+            "patch" {
+                lappend result "cd [shell_quote_double {$SOURCE_DIR}]"
+                set cmd "cat [shell_quote_double "\$PATCH_DIR/[dict get $opts filename]"] |\
+                    patch"
+                if { [dict exists $opts p_num] } {
+                    append cmd " [shell_quote "-p[dict get $opts p_num]"]"
+                }
+                append cmd " >[shell_quote_double "\$BUILD_LOG_DIR/\${PACKAGE}-\${VERSION}-patch-[dict get $opts filename].log"] 2>&1"
+                lappend result $cmd
+            }
+            "cd" {
+                if { ![dict exists $opts dirname] } {
+                    set dirname {$BUILD_DIR}
+                } else {
+                    set dirname [dict get $opts dirname]
+                }
+                lappend result "mkdir -p [shell_quote_double $dirname]"
+                lappend result "cd [shell_quote_double $dirname]"
+            }
+            "configure" {
+
+                if { ![dict exists $opts options] } {
+                    set options [list]
+                } else {
+                    set options [dict get $opts options]
+                }
+                # set default configure options
+                foreach { k v } {
+                    prefix $INSTALL_DIR
+                } {
+                    set found 0
+                    # Check to see if we already have that option defined in spec
+                    foreach opt $options {
+                        if { [dict exists $opt name] && [dict get $opt name] eq $k } {
+                            set found 1
+                            break
+                        }
+                    }
+                    if { !$found } {
+                        lappend options [dict create {*}[list name $k value $v]]
+                    }
+                }
+
+                if { [dict exists $opts path] } {
+                    set cmd "[shell_quote_double [dict get $opts path]]"
+                } else {
+                    set cmd "./configure"
+                }
+                foreach opt $options {
+                    if { [dict exists $opt name] } {
+                        if { [dict exists $opt value] } {
+                            append cmd " \\\n    [shell_quote "--[dict get $opt name]"]=[shell_quote_double [dict get $opt value]]"
+                        } else {
+                            append cmd " \\\n    [shell_quote_double [dict get $opt name]]"
+                        }
+                    }
+                }
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-configure.log}] 2>&1"
+                lappend result $cmd
+
+            }
+            "cmake_config" {
+
+                if { ![dict exists $opts options] } {
+                    set options [list]
+                } else {
+                    set options [dict get $opts options]
+                }
+                # set default cmake options
+                foreach { k v } {
+                    CMAKE_INSTALL_PREFIX $INSTALL_DIR
+                    CMAKE_PREFIX_PATH    $INSTALL_DIR/
+                } {
+                    set found 0
+                    # Check to see if we already have that option defined in spec
+                    foreach opt $options {
+                        if { [dict exists $opt name] && [dict get $opt name] eq $k } {
+                            set found 1
+                            break
+                        }
+                    }
+                    if { !$found } {
+                        lappend options [dict create {*}[list name $k value $v]]
+                    }
+                }
+
+                set cmd "cmake [shell_quote_double {$SOURCE_DIR}]"
+                foreach opt $options {
+                    if { [dict exists $opt name] } {
+                        if { [dict exists $opt value] } {
+                            append cmd " \\\n    [shell_quote "-D[dict get $opt name]"]=[shell_quote_double [dict get $opt value]]"
+                        } else {
+                            append cmd " \\\n    [shell_quote_double [dict get $opt name]]"
+                        }
+                    }
+                }
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-configure.log}] 2>&1"
+                lappend result $cmd
+
+            }
+            "make" {
+                set cmd "make"
+                if { [dict exists $opts options] } {
+                    foreach opt [dict get $opts options] {
+                        if { [dict exists $opt name] } {
+                            if { [dict exists $opt value] } {
+                                append cmd " \\\n    [shell_quote [dict get $opt name]]=[shell_quote_double [dict get $opt value]]"
+                            } else {
+                                append cmd " \\\n    [shell_quote_double [dict get $opt name]]"
+                            }
+                        }
+                    }
+                }
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-build.log}] 2>&1"
+                lappend result $cmd
+            }
+            "cmake_make" {
+                set cmd "cmake --build [shell_quote_double {$BUILD_DIR}]"
+                if { [dict exists $opts config] } {
+                    append cmp " --config=[shell_quote [dict get $opts config]]"
+                }
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-build.log}] 2>&1"
+                lappend result $cmd
+            }
+            "install" {
+                set cmd "make install"
+                if { [dict exists $opts options] } {
+                    foreach opt [dict get $opts options] {
+                        if { [dict exists $opt name] } {
+                            if { [dict exists $opt value] } {
+                                append cmd " \\\n    [shell_quote [dict get $opt name]]=[shell_quote_double [dict get $opt value]]"
+                            } else {
+                                append cmd " \\\n    [shell_quote_double [dict get $opt name]]"
+                            }
+                        }
+                    }
+                }
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-install.log}] 2>&1"
+                lappend result $cmd
+            }
+            "cmake_install" {
+                set cmd "cmake --install [shell_quote_double {$BUILD_DIR}]"
+                if { [dict exists $opts config] } {
+                    append cmp " --config=[shell_quote [dict get $opts config]]"
+                }
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-install.log}] 2>&1"
+                lappend result $cmd
+            }
+        }
+        return $result
+    }
+
     proc get_package_spec_handler {ctx req} {
         set package_name [::twebserver::get_path_param $req package_name]
         set package_version [::twebserver::get_path_param $req package_version]
@@ -104,8 +331,7 @@ set init_script {
         }
 
         set spec_path [file join $dir registry $package_name $package_version ttrek.json]
-        set install_script_path [file join $dir registry $package_name $package_version install.sh]
-        if {![file exists $spec_path] || ![file exists $install_script_path]} {
+        if {![file exists $spec_path]} {
             return [::twebserver::build_response 404 text/plain "not found"]
         }
 
@@ -117,11 +343,24 @@ set init_script {
         set deps_handle [::tjson::get_object_item $spec_handle dependencies]
         set deps_typed [::tjson::to_typed $deps_handle]
 
-        set fp [open $install_script_path]
-        set data [read $fp]
-        close $fp
+        set spec_build_handle [::tjson::get_object_item $spec_handle build]
+        # Select the target platform here. As for now, it is hardcoded as Linux x86_64.
+        set spec_build_handle [::tjson::get_object_item $spec_build_handle "linux.x86_64"]
+        set spec_build [::tjson::to_simple $spec_build_handle]
 
-        set base64_install_script [::twebserver::base64_encode $data]
+        set install_script [gen_package_spec_common $package_name $package_version]
+        foreach cmd $spec_build {
+            set cmd_list [gen_package_spec_command $cmd]
+            if {![llength $cmd_list]} {
+                return -code error "don't know how to render command: $cmd"
+            }
+            lappend install_script {*}$cmd_list
+        }
+        # ensure that shell script has trailing new line
+        lappend install_script \n
+        set install_script [join $install_script \n]
+
+        set base64_install_script [::twebserver::base64_encode $install_script]
 
         set patches_typed [list]
         foreach patch_path [glob -nocomplain -type f [file join $dir registry $package_name $package_version *.diff]] {

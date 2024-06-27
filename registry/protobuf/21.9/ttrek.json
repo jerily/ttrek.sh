@@ -10,7 +10,7 @@
 	"build": {
 		"linux.x86_64": [
 			{ "cmd": "download", "url": "https://github.com/protocolbuffers/protobuf/archive/v21.9.zip" },
-			{ "cmd": "unpack" },
+			{ "cmd": "unpack", "format": "zip" },
 			{ "cmd": "cd" },
 			{
 				"cmd": "cmake_config",
@@ -23,7 +23,8 @@
 					{ "name": "protobuf_BUILD_SHARED_LIBS", "value": "ON" }
 				]
 			},
-			{ "cmd": "make_install" }
+			{ "cmd": "make" },
+			{ "cmd": "install" }
 		]
 	}
 }

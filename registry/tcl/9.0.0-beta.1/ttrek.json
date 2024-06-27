@@ -15,7 +15,7 @@
 			{ "cmd": "cd", "dirname": "$PACKAGE_NAME/unix" },
 			{ "cmd": "configure" },
 			{ "cmd": "make" },
-			{ "cmd": "make_install" }
+			{ "cmd": "install" }
 		]
 	}
 }

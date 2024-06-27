@@ -15,7 +15,8 @@
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },
-			{ "cmd": "make_install" }
+			{ "cmd": "make" },
+			{ "cmd": "install" }
 		]
 	}
 }

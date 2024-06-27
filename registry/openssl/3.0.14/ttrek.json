@@ -16,7 +16,8 @@
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "configure", "path": "./Configure" },
-			{ "cmd": "make_install" }
+			{ "cmd": "make" },
+			{ "cmd": "install" }
 		]
 	}
 }

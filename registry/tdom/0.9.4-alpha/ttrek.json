@@ -10,7 +10,7 @@
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "download", "url": "http://tdom.org/downloads/tdom-0.9.3-src.tar.gz" },
+			{ "cmd": "download", "url": "http://tdom.org/index.html/tarball/trunk/tdom-trunk.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd", "dir": "$PACKAGE_NAME/unix" },
 			{
@@ -19,7 +19,7 @@
 				"options": [{"name": "with-tcl", "value": "$INSTALL_DIR/lib"}]
 			},
 			{ "cmd": "make" },
-			{ "cmd": "make_install" }
+			{ "cmd": "install" }
 		]
 	}
 }
