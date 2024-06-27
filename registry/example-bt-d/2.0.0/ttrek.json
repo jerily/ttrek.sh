@@ -1,0 +1,13 @@
+{
+	"name":	"example-bt-d",
+	"version":	"2.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"linux.x86_64": []
+	}
+}
