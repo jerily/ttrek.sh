@@ -1,0 +1,14 @@
+{
+	"name":	"menu",
+	"version":	"1.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"dropdown":	">=1.0.0,<2.0.0"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"linux.x86_64": []
+	}
+}

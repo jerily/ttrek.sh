@@ -1,0 +1,13 @@
+{
+	"name":	"intl",
+	"version":	"3.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"linux.x86_64": []
+	}
+}

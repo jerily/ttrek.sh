@@ -1,0 +1,14 @@
+{
+	"name":	"example-bt-b",
+	"version":	"6.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"example-bt-d":	"1.0.0"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"linux.x86_64": []
+	}
+}
