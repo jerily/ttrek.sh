@@ -19,7 +19,7 @@
 				"cmd": "configure",
 				"path": "./Configure",
 				"options": [
-					{ "name": "no-docs" },
+					{ "name": "no-doc" },
 					{ "name": "libdir", "value": "lib" }
 				]
 			},
