@@ -14,7 +14,12 @@
 			{ "cmd": "download", "url": "https://github.com/jerily/tink-tcl/archive/refs/tags/v20240401.0.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
-			{ "cmd": "cmake_config" },
+			{ "cmd": "cmake_config",
+				"options": [
+					{"name": "TCL_LIBRARY_DIR", "value":  "$INSTALL_DIR/lib"},
+					{"name": "TCL_INCLUDE_DIR", "value":  "$INSTALL_DIR/include"}
+				]
+			},
 			{ "cmd": "make" },
 			{ "cmd": "make_install" }
 		]
