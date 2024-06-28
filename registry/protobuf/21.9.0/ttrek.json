@@ -1,6 +1,6 @@
 {
 	"name": "protobuf",
-	"version": "21.9",
+	"version": "21.9.0",
 	"scripts": {
 	},
 	"dependencies":	{
