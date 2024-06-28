@@ -210,7 +210,7 @@ set init_script {
                         if { [dict exists $opt value] } {
                             append cmd " \\\n    [shell_quote "--[dict get $opt name]"]=[shell_quote_double [dict get $opt value]]"
                         } else {
-                            append cmd " \\\n    [shell_quote_double [dict get $opt name]]"
+                            append cmd " \\\n    [shell_quote "--[dict get $opt name]"]"
                         }
                     }
                 }
