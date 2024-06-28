@@ -1,0 +1,14 @@
+{
+	"name":	"dropdown",
+	"version":	"2.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"icons":	"2.0.0"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"linux.x86_64": []
+	}
+}

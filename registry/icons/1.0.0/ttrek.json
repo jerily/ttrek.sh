@@ -1,0 +1,13 @@
+{
+	"name":	"icons",
+	"version":	"1.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"linux.x86_64": []
+	}
+}
