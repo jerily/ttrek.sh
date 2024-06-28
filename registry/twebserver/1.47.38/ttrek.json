@@ -16,7 +16,7 @@
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config" },
 			{ "cmd": "make" },
-			{ "cmd": "install" }
+			{ "cmd": "make_install" }
 		]
 	}
 }

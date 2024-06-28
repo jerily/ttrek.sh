@@ -14,7 +14,7 @@
 			{ "cmd": "cd" },
 			{ "cmd": "configure" },
 			{ "cmd": "make" },
-			{ "cmd": "install" }
+			{ "cmd": "make_install" }
 		]
 	}
 }

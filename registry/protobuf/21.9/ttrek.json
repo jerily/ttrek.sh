@@ -24,7 +24,7 @@
 				]
 			},
 			{ "cmd": "make" },
-			{ "cmd": "install" }
+			{ "cmd": "make_install" }
 		]
 	}
 }

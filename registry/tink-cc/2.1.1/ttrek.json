@@ -14,7 +14,7 @@
 		"linux.x86_64": [
 			{ "cmd": "download", "url": "https://github.com/tink-crypto/tink-cc/archive/refs/tags/v2.1.1.tar.gz" },
 			{ "cmd": "unpack" },
-			{ "cmd": "patch", "p_num": "1", "filename": "tink-cc-2.1.1.diff" },
+			{ "cmd": "patch", "p_num": "1", "filename": "fix-configure.diff" },
 			{ "cmd": "cd" },
 			{
 				"cmd": "cmake_config",
@@ -30,7 +30,7 @@
 				]
 			},
 			{ "cmd": "make" },
-			{ "cmd": "install" }
+			{ "cmd": "make_install" }
 		]
 	}
 }

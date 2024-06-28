@@ -100,19 +100,6 @@ set init_script {
         return "\"$string\""
     }
 
-    proc gen_package_spec_common {package_name package_version} {
-        set result [list]
-        set package_prefix "${package_name}-${package_version}"
-        lappend result "VERSION=[shell_quote $package_version]"
-        lappend result "PACKAGE=[shell_quote $package_name]"
-        lappend result "DOWNLOAD_DIR=[shell_quote_double {$ROOT_BUILD_DIR/download}]"
-        lappend result "ARCHIVE_FILE=[shell_quote "${package_prefix}.archive"]"
-        lappend result "SOURCE_DIR=[shell_quote_double "\$ROOT_BUILD_DIR/source/${package_prefix}"]"
-        lappend result "BUILD_DIR=[shell_quote_double "\$ROOT_BUILD_DIR/build/${package_prefix}"]"
-        lappend result "PATCH_DIR=[shell_quote_double "\$ROOT_BUILD_DIR"]"
-        return $result
-    }
-
     proc gen_package_spec_command {opts} {
         set result [list]
         if { ![dict exists $opts cmd] } {
@@ -120,13 +107,13 @@ set init_script {
         }
         switch -exact -- [dict get $opts cmd] {
             "download" {
-                lappend result "mkdir -p [shell_quote_double {$DOWNLOAD_DIR}]"
-                lappend result "curl -L -o [shell_quote_double {$ARCHIVE_FILE}]\
+                lappend result "LD_LIBRARY_PATH= curl --fail --silent --show-error -L\
+                    -o [shell_quote_double {$ARCHIVE_FILE}]\
                     --output-dir [shell_quote_double {$DOWNLOAD_DIR}]\
                     [dict get $opts url]"
                 if { [dict exists $opts sha256] } {
                     lappend result "HASH=\"\$(sha256sum --binary [shell_quote_double {$DOWNLOAD_DIR/$ARCHIVE_FILE}]\
-                        | awk '{print \$1})\"'"
+                        | awk '{print \$1}')\""
                     lappend result "\[ \"\$HASH\" = [shell_quote [dict get $opts sha256]] \]\
                         || { echo \"sha256 doesn't match.\"; exit 1; }"
                 }
@@ -136,12 +123,16 @@ set init_script {
                 lappend result "mkdir -p [shell_quote_double {$SOURCE_DIR}]"
                 set cmd "git -C [shell_quote_double {$SOURCE_DIR}] clone [shell_quote [dict get $opts url]]\
                     --depth 1"
+                if { [dict exists $opts branch] } {
+                    append cmd " --branch [shell_quote [dict get $opts branch]]"
+                }
                 if { [dict exists $opts recurse-submodules] && [string is true -strict [dict get $opts recurse-submodules]] } {
                     append cmd " --recurse-submodules"
                 }
                 if { [dict exists $opts shallow-submodules] && [string is true -strict [dict get $opts shallow-submodules]] } {
                     append cmd " --shallow-submodules"
                 }
+                append cmd " ."
                 lappend result $cmd
             }
             "unpack" {
@@ -168,12 +159,12 @@ set init_script {
             }
             "patch" {
                 lappend result "cd [shell_quote_double {$SOURCE_DIR}]"
-                set cmd "cat [shell_quote_double "\$PATCH_DIR/[dict get $opts filename]"] |\
+                set cmd "cat [shell_quote_double "\$PATCH_DIR/patch-\${PACKAGE}-\${VERSION}-[dict get $opts filename]"] |\
                     patch"
                 if { [dict exists $opts p_num] } {
                     append cmd " [shell_quote "-p[dict get $opts p_num]"]"
                 }
-                append cmd " >[shell_quote_double "\$BUILD_LOG_DIR/\${PACKAGE}-\${VERSION}-patch-[dict get $opts filename].log"] 2>&1"
+                append cmd " >[shell_quote_double "\$BUILD_LOG_DIR/patch-[dict get $opts filename].log"] 2>&1"
                 lappend result $cmd
             }
             "cd" {
@@ -212,7 +203,7 @@ set init_script {
                 if { [dict exists $opts path] } {
                     set cmd "[shell_quote_double [dict get $opts path]]"
                 } else {
-                    set cmd "./configure"
+                    set cmd {$SOURCE_DIR/configure}
                 }
                 foreach opt $options {
                     if { [dict exists $opt name] } {
@@ -223,7 +214,7 @@ set init_script {
                         }
                     }
                 }
-                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-configure.log}] 2>&1"
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/configure.log}] 2>&1"
                 lappend result $cmd
 
             }
@@ -262,7 +253,7 @@ set init_script {
                         }
                     }
                 }
-                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-configure.log}] 2>&1"
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/configure.log}] 2>&1"
                 lappend result $cmd
 
             }
@@ -279,7 +270,7 @@ set init_script {
                         }
                     }
                 }
-                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-build.log}] 2>&1"
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/build.log}] 2>&1"
                 lappend result $cmd
             }
             "cmake_make" {
@@ -287,10 +278,10 @@ set init_script {
                 if { [dict exists $opts config] } {
                     append cmp " --config=[shell_quote [dict get $opts config]]"
                 }
-                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-build.log}] 2>&1"
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/build.log}] 2>&1"
                 lappend result $cmd
             }
-            "install" {
+            "make_install" {
                 set cmd "make install"
                 if { [dict exists $opts options] } {
                     foreach opt [dict get $opts options] {
@@ -303,7 +294,7 @@ set init_script {
                         }
                     }
                 }
-                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-install.log}] 2>&1"
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/install.log}] 2>&1"
                 lappend result $cmd
             }
             "cmake_install" {
@@ -311,7 +302,7 @@ set init_script {
                 if { [dict exists $opts config] } {
                     append cmp " --config=[shell_quote [dict get $opts config]]"
                 }
-                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/${PACKAGE}-${VERSION}-install.log}] 2>&1"
+                append cmd " >[shell_quote_double {$BUILD_LOG_DIR/install.log}] 2>&1"
                 lappend result $cmd
             }
         }
@@ -348,7 +339,7 @@ set init_script {
         set spec_build_handle [::tjson::get_object_item $spec_build_handle "linux.x86_64"]
         set spec_build [::tjson::to_simple $spec_build_handle]
 
-        set install_script [gen_package_spec_common $package_name $package_version]
+        set install_script [list]
         foreach cmd $spec_build {
             set cmd_list [gen_package_spec_command $cmd]
             if {![llength $cmd_list]} {

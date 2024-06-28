@@ -12,10 +12,10 @@
 		"linux.x86_64": [
 			{ "cmd": "download", "url": "http://prdownloads.sourceforge.net/tcl/tcl8.6.14-src.tar.gz" },
 			{ "cmd": "unpack" },
-			{ "cmd": "cd", "dirname": "$PACKAGE_NAME/unix" },
-			{ "cmd": "configure" },
+			{ "cmd": "cd" },
+			{ "cmd": "configure", "path": "$SOURCE_DIR/unix/configure" },
 			{ "cmd": "make" },
-			{ "cmd": "install" }
+			{ "cmd": "make_install" }
 		]
 	}
 }
