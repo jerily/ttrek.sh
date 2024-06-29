@@ -10,7 +10,7 @@
 	},
 	"build": {
 		"linux.x86_64": [
-			{ "cmd": "download", "url": "http://prdownloads.sourceforge.net/tcl/tcl9.0b2-src.tar.gz" },
+			{ "cmd": "download", "url": "https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b2.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "configure", "path": "$SOURCE_DIR/unix/configure" },

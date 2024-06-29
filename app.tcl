@@ -119,8 +119,6 @@ set init_script {
                 }
             }
             "git" {
-                lappend result "rm -rf [shell_quote_double {$SOURCE_DIR}]"
-                lappend result "mkdir -p [shell_quote_double {$SOURCE_DIR}]"
                 set cmd "git -C [shell_quote_double {$SOURCE_DIR}] clone [shell_quote [dict get $opts url]]\
                     --depth 1"
                 if { [dict exists $opts branch] } {
@@ -139,8 +137,6 @@ set init_script {
                 if { ![dict exists $opts format] } {
                     dict set opts format tar.gz
                 }
-                lappend result "rm -rf [shell_quote_double {$SOURCE_DIR}]"
-                lappend result "mkdir -p [shell_quote_double {$SOURCE_DIR}]"
                 switch -exact -- [dict get $opts format] {
                     "zip" {
                         lappend result "unzip [shell_quote_double {$DOWNLOAD_DIR/$ARCHIVE_FILE}]\
@@ -173,7 +169,6 @@ set init_script {
                 } else {
                     set dirname [dict get $opts dirname]
                 }
-                lappend result "mkdir -p [shell_quote_double $dirname]"
                 lappend result "cd [shell_quote_double $dirname]"
             }
             "configure" {
