@@ -5,7 +5,7 @@
 	},
 	"dependencies":	{
 		"tink-tcl": ">=20240401.0",
-		"twebserver": "^1.47.15",
+		"twebserver": "^1.47.38",
 		"tcl": "^9.0.0-beta.2"
 	},
 	"devDependencies":	{
