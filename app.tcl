@@ -17,7 +17,7 @@ set init_script {
 
     ::twebserver::add_route -strict $router GET / get_index_page_handler
     ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
-    ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version get_package_spec_handler
+    ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
     ::twebserver::add_route $router -strict GET /registry/:package_name get_package_versions_handler
     ::twebserver::add_route -strict $router GET /logo get_logo_handler
     ::twebserver::add_route $router GET "*" get_catchall_handler
@@ -307,7 +307,11 @@ set init_script {
     proc get_package_spec_handler {ctx req} {
         set package_name [::twebserver::get_path_param $req package_name]
         set package_version [::twebserver::get_path_param $req package_version]
+        set os [::twebserver::get_path_param $req os]
+        set machine [::twebserver::get_path_param $req machine]
         set dir [::twebserver::get_rootdir]
+
+        puts "package_name: $package_name package_version: $package_version os: $os machine: $machine"
 
         if { $package_version eq "latest" } {
             set package_version [get_latest_version $dir $package_name]
@@ -330,8 +334,14 @@ set init_script {
         set deps_typed [::tjson::to_typed $deps_handle]
 
         set spec_build_handle [::tjson::get_object_item $spec_handle build]
-        # Select the target platform here. As for now, it is hardcoded as Linux x86_64.
-        set spec_build_handle [::tjson::get_object_item $spec_build_handle "linux.x86_64"]
+        set platform [string tolower "$os.$machine"]
+        if { [::tjson::has_object_item $spec_build_handle $platform] } {
+            set spec_build_handle [::tjson::get_object_item $spec_build_handle $platform]
+        } else if { [::tjson::has_object_item $spec_build_handle "default"] } {
+            set spec_build_handle [::tjson::get_object_item $spec_build_handle "default"]
+        } else {
+            return [::twebserver::build_response 404 text/plain "not found"]
+        }
         set spec_build [::tjson::to_simple $spec_build_handle]
 
         set install_script [list]

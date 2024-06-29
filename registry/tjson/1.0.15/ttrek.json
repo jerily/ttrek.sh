@@ -1,6 +1,6 @@
 {
 	"name":	"tjson",
-	"version":	"1.0.14",
+	"version":	"1.0.15",
 	"scripts":	{
 	},
 	"dependencies":	{
@@ -9,8 +9,8 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
-			{ "cmd": "download", "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.14.tar.gz" },
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/jerily/tjson/archive/refs/tags/v1.0.15.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config",
