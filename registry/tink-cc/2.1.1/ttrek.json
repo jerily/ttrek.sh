@@ -5,8 +5,8 @@
 	},
 	"dependencies":	{
 		"openssl": "^3.0.13",
-		"abseil-cpp": "=20230802.1",
-		"protobuf":	"=21.9"
+		"abseil-cpp": "=20230802.1.0",
+		"protobuf":	"=21.9.0"
 	},
 	"devDependencies": {
 	},
@@ -14,8 +14,8 @@
 		"linux.x86_64": [
 			{ "cmd": "download", "url": "https://github.com/tink-crypto/tink-cc/archive/refs/tags/v2.1.1.tar.gz" },
 			{ "cmd": "unpack" },
+			{ "cmd": "patch", "p_num": "1", "filename": "fix-configure.diff" },
 			{ "cmd": "cd" },
-			{ "cmd": "patch", "p_num": "1", "filename": "tink-cc-2.1.1.diff" },
 			{
 				"cmd": "cmake_config",
 				"options": [
@@ -29,6 +29,7 @@
 					{ "name": "CMAKE_BUILD_TYPE", "value": "Release" }
 				]
 			},
+			{ "cmd": "make" },
 			{ "cmd": "make_install" }
 		]
 	}

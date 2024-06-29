@@ -1,6 +1,6 @@
 {
 	"name": "abseil-cpp",
-	"version": "20230802.1",
+	"version": "20230802.1.0",
 	"scripts": {
 	},
 	"dependencies":	{
@@ -21,6 +21,7 @@
 					{ "name": "ABSL_PROPAGATE_CXX_STD", "value": "ON" }
 				]
 			},
+			{ "cmd": "make" },
 			{ "cmd": "make_install" }
 		]
 	}

@@ -7,10 +7,10 @@ SOURCE_DIR="$SELF_DIR/build/source"
 INSTALL_DIR="$SELF_DIR/build/install"
 BUILD_DIR="$SELF_DIR/build/build"
 
-DEBUG=0
+DEBUG=1
 
 if [ "$DEBUG" != 0 ]; then
-    CFLAGS="-DPURIFY -fsanitize=address"
+    CFLAGS="-DPURIFY -fsanitize=address -g"
     LDFLAGS="-fsanitize=address"
     export CFLAGS
     export LDFLAGS

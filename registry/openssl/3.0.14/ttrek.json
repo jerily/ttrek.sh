@@ -14,8 +14,16 @@
 				"url": "https://www.openssl.org/source/openssl-3.0.14.tar.gz"
 			},
 			{ "cmd": "unpack" },
-			{ "cmd": "cd" },
-			{ "cmd": "configure", "path": "./Configure" },
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{
+				"cmd": "configure",
+				"path": "./Configure",
+				"options": [
+					{ "name": "no-doc" },
+					{ "name": "libdir", "value": "lib" }
+				]
+			},
+			{ "cmd": "make" },
 			{ "cmd": "make_install" }
 		]
 	}
