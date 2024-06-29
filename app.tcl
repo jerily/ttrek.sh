@@ -6,11 +6,10 @@ package require twebserver
 
 # use threads and gzip compression
 set config_dict [dict create \
-    num_threads 10 \
     rootdir [file dirname [info script]] \
     gzip on \
     gzip_types [list text/plain application/json] \
-    gzip_min_length 20]
+    gzip_min_length 8192]
 
 # create the server
 set dir [file dirname [info script]]
