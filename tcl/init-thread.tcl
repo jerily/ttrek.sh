@@ -27,7 +27,7 @@ proc get_dist_handler {ctx req} {
     set arch [::twebserver::get_path_param $req arch]
     set ext [::twebserver::get_path_param $req ext]
     # hardcode for alpine
-    set arch "alpine"
+    # set arch "alpine"
     set dir [::twebserver::get_rootdir]
     set filename "ttrek-$arch$ext"
     set filepath [file normalize [file join $dir dist $filename]]
