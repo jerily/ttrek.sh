@@ -104,5 +104,17 @@ if [ ! -e "$INSTALL_DIR"/lib/twebserver*/pkgIndex.tcl ]; then
     make install
 fi
 
+export LD_LIBRARY_PATH="$INSTALL_DIR"/lib
+mkdir -p $SELF_DIR/certs/
+cd $SELF_DIR/certs/
+$INSTALL_DIR/bin/openssl req -x509 \
+        -newkey rsa:4096 \
+        -keyout key.pem \
+        -out cert.pem \
+        -sha256 \
+        -days 3650 \
+        -nodes \
+        -subj "/C=CY/ST=Cyprus/L=Home/O=none/OU=CompanySectionName/CN=ttrek.sh/CN=get.ttrek.sh"
+
 echo
 echo "All done."

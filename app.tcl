@@ -16,6 +16,7 @@ set init_script {
     set router [::twebserver::create_router]
 
     ::twebserver::add_route -strict $router GET / get_index_page_handler
+    ::twebserver::add_route -strict $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
     ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
     ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
     ::twebserver::add_route $router -strict GET /registry/:package_name get_package_versions_handler
@@ -25,7 +26,25 @@ set init_script {
     # make sure that the router will be called when the server receives a connection
     interp alias {} process_conn {} $router
 
+    proc get_dist_handler {ctx req} {
+        set arch [::twebserver::get_path_param $req arch]
+        set ext [::twebserver::get_path_param $req ext]
+        set dir [::twebserver::get_rootdir]
+        # hardcode for alpine
+        set arch "alpine"
+        set filepath [file join $dir dist ttrek-$arch$ext]
+        return [::twebserver::build_response -return_file 200 application/octet-stream $filepath]
+    }
+
     proc get_index_page_handler {ctx req} {
+        set host [::twebserver::get_header $req host]
+        if { $host ne {} } {
+            lassign [split $host {:}] hostname port
+            if { $hostname eq {get.ttrek.sh} } {
+                return [::twebserver::build_response -return_file 200 application/octet-stream [::twebserver::get_rootdir]/public/ttrek-init]
+            }
+        }
+
         set package_names [list]
         foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry/*]] {
             lappend package_names [file tail $path]
@@ -427,11 +446,19 @@ set config_dict [dict create \
 # create the server
 set server_handle [::twebserver::create_server -with_router $config_dict process_conn $init_script]
 
+set dir [file dirname [info script]]
+set ttrek_sh_key [file normalize [file join $dir "certs/key.pem"]]
+set ttrek_sh_cert [file normalize [file join $dir "certs/cert.pem"]]
+::twebserver::add_context $server_handle ttrek.sh $ttrek_sh_key $ttrek_sh_cert
+
+# listen for an HTTPS connection on port 4433
+::twebserver::listen_server -num_threads 8 $server_handle 4433
+
 # listen for an HTTP connection on port 8080
 ::twebserver::listen_server -http $server_handle 8080
 
 # print that the server is running
-puts "server is running. go to http://localhost:8080/"
+puts "server is running. go to http://ttrek.sh:8080/ or https://ttrek.sh:4433/"
 
 # wait forever
 vwait forever
