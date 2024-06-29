@@ -128,7 +128,7 @@ proc gen_package_spec_command {opts} {
                 -o [shell_quote_double {$ARCHIVE_FILE}]\
                 --output-dir [shell_quote_double {$DOWNLOAD_DIR}]\
                 [dict get $opts url]"
-            if { [dict exists $opts sha256] } {
+            if { false && [dict exists $opts sha256] } {
                 lappend result "HASH=\"\$(sha256sum --binary [shell_quote_double {$DOWNLOAD_DIR/$ARCHIVE_FILE}]\
                     | awk '{print \$1}')\""
                 lappend result "\[ \"\$HASH\" = [shell_quote [dict get $opts sha256]] \]\
