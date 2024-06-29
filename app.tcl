@@ -337,7 +337,7 @@ set init_script {
         set platform [string tolower "$os.$machine"]
         if { [::tjson::has_object_item $spec_build_handle $platform] } {
             set spec_build_handle [::tjson::get_object_item $spec_build_handle $platform]
-        } else if { [::tjson::has_object_item $spec_build_handle "default"] } {
+        } elseif { [::tjson::has_object_item $spec_build_handle "default"] } {
             set spec_build_handle [::tjson::get_object_item $spec_build_handle "default"]
         } else {
             return [::twebserver::build_response 404 text/plain "not found"]
