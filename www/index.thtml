@@ -14,7 +14,7 @@
     </style>
     <div>
         <h1>Install ttrek</h1>
-        <code class="bash">curl -k --proto '=https' --tlsv1.2 -sSf https://get.ttrek.sh | sh</code>
+        <code class="bash">curl -k --proto '=https' --tlsv1.2 -sSf https://get.ttrek.sh:4433 | sh</code>
         <h1>$title</h1>
         <ul>
             <tpl foreach="package_name" in="$package_names">
