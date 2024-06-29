@@ -20,6 +20,7 @@ set server_handle [::twebserver::create_server -with_router $config_dict process
 set ttrek_sh_key [file normalize [file join $dir "certs/key.pem"]]
 set ttrek_sh_cert [file normalize [file join $dir "certs/cert.pem"]]
 ::twebserver::add_context $server_handle ttrek.sh $ttrek_sh_key $ttrek_sh_cert
+::twebserver::add_context $server_handle get.ttrek.sh $ttrek_sh_key $ttrek_sh_cert
 
 # listen for an HTTPS connection on port 4433
 ::twebserver::listen_server -num_threads 8 $server_handle 4433
