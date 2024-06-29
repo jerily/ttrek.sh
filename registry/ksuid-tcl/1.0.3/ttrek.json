@@ -9,7 +9,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "download", "url": "https://github.com/jerily/ksuid-tcl/archive/refs/tags/v1.0.3.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

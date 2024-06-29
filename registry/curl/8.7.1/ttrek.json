@@ -10,7 +10,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "download", "url": "https://curl.se/download/curl-8.7.1.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

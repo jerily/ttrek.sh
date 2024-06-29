@@ -8,6 +8,6 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": []
+		"default": []
 	}
 }

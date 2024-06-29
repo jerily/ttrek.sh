@@ -8,7 +8,7 @@
 	"devDependencies": {
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "download", "url": "https://github.com/protocolbuffers/protobuf/archive/v21.9.zip" },
 			{ "cmd": "unpack", "format": "zip" },
 			{ "cmd": "cd" },

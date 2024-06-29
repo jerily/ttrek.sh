@@ -11,7 +11,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git" },
 			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
 			{ "cmd": "make_install",

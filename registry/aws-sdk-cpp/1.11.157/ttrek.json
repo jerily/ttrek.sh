@@ -10,7 +10,7 @@
 	"devDependencies": {
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{
 				"cmd": "git",
 				"url": "https://github.com/aws/aws-sdk-cpp",

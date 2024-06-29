@@ -9,7 +9,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "download", "url": "http://tdom.org/index.html/tarball/trunk/tdom-trunk.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd", "dirname": "$SOURCE_DIR/unix" },

@@ -10,7 +10,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "download", "url": "https://github.com/jerily/thtml/archive/refs/tags/v1.0.0.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

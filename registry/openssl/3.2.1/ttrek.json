@@ -8,7 +8,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{
 				"cmd": "download",
 				"url": "https://www.openssl.org/source/openssl-3.2.1.tar.gz",

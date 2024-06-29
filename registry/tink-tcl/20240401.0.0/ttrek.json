@@ -10,7 +10,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "download", "url": "https://github.com/jerily/tink-tcl/archive/refs/tags/v20240401.0.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },

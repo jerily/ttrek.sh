@@ -9,7 +9,7 @@
 	"devDependencies":	{
 	},
 	"build": {
-		"linux.x86_64": [
+		"default": [
 			{ "cmd": "download", "url": "https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b1.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
