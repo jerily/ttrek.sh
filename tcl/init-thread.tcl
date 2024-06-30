@@ -80,7 +80,12 @@ proc get_package_version_dependencies {dir package_name version} {
     set data [read $fp]
     close $fp
 
-    ::tjson::parse $data spec_handle
+    if { [catch {
+        ::tjson::parse $data spec_handle
+    } err] } {
+        return -code error "Error while parsing json file for \"$package_name\"\
+            version \"$version\": $err"
+    }
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
     set deps [::tjson::to_simple $deps_handle]
     return $deps
@@ -346,7 +351,12 @@ proc get_package_spec_handler {ctx req} {
     set data [read $fp]
     close $fp
 
-    ::tjson::parse $data spec_handle
+    if { [catch {
+        ::tjson::parse $data spec_handle
+    } err] } {
+        return -code error "Error while parsing json file for \"$package_name\"\
+            version \"$package_version\": $err"
+    }
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
     set deps_typed [::tjson::to_typed $deps_handle]
 

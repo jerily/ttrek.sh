@@ -1,0 +1,24 @@
+{
+	"name":	"thread",
+	"version":	"2.8.9",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"tcl": "=8.6.14"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/8.6.14/thread2.8.9.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{
+				"cmd": "configure",
+				"options": [{"name": "with-tcl", "value": "$INSTALL_DIR/lib"}]
+			},
+			{ "cmd": "make" },
+			{ "cmd": "make_install" }
+		]
+	}
+}
