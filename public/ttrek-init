@@ -159,9 +159,26 @@ main() {
     ensure mkdir -p "$_dir"
     ensure downloader "$_url" "$_file" "$_arch"
     ensure chmod u+x "$_file"
-    local _ttrek_dir="${TTREK_HOME:-$HOME/.ttrek}/bin"
+    local _ttrek_dir="${TTREK_HOME:-$HOME/.ttrek}"
     ensure mkdir -p "$_ttrek_dir"
-    ensure cp "$_file" "${_ttrek_dir}/ttrek${_ext}"
+    ensure cp "$_file" "${_ttrek_dir}/bin/ttrek${_ext}"
+
+    ensure echo "export PATH=$PATH:${_ttrek_dir}" > "{_ttrek_dir}/env"
+
+    # check if ".profile" file exists
+    if [ -f "$HOME/.profile" ]; then
+        # check if the line is already in the file
+        if ! grep -q ". ${_ttrek_dir}/env" "$HOME/.profile"; then
+            ensure echo ". ${_ttrek_dir}/env" >> "$HOME/.profile"
+        fi
+    fi
+
+    ensure echo "ttrek has been installed successfully"
+    ensure echo "You can now run ttrek by executing the following command:"
+    ensure echo "    {_ttrek_dir}/bin/ttrek${_ext}"
+    ensure echo "or, if you have added the environment variable to your PATH, you can run it by executing:"
+    ensure echo "    ttrek${_ext}"
+
 
 #    if [ ! -x "$_file" ]; then
 #        printf '%s\n' "Cannot execute $_file (likely because of mounting /tmp as noexec)." 1>&2
