@@ -168,8 +168,8 @@ main() {
     # check if ".profile" file exists
     if [ -f "$HOME/.profile" ]; then
         # check if the line is already in the file
-        if ! grep -q ". ${_ttrek_dir}/env" "$HOME/.profile"; then
-            ensure echo ". ${_ttrek_dir}/env" >> "$HOME/.profile"
+        if ! grep -q ". \$HOME/.ttrek/env" "$HOME/.profile"; then
+            ensure echo ". \$HOME/.ttrek/env" >> "$HOME/.profile"
         fi
     fi
 
