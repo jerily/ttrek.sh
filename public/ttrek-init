@@ -163,7 +163,7 @@ main() {
     ensure mkdir -p "$_ttrek_dir"
     ensure cp "$_file" "${_ttrek_dir}/bin/ttrek${_ext}"
 
-    ensure echo "export PATH=\$PATH:\$HOME/.ttrek/bin" > "${_ttrek_dir}/env"
+    ensure echo "export PATH=\"\$HOME/.ttrek/bin:\$PATH\"" > "${_ttrek_dir}/env"
 
     # check if ".profile" file exists
     if [ -f "$HOME/.profile" ]; then
