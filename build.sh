@@ -104,10 +104,12 @@ if [ ! -e "$INSTALL_DIR"/lib/twebserver*/pkgIndex.tcl ]; then
     make install
 fi
 
-export LD_LIBRARY_PATH="$INSTALL_DIR"/lib
-mkdir -p $SELF_DIR/certs/
-cd $SELF_DIR/certs/
-$INSTALL_DIR/bin/openssl req -x509 \
+if [ ! -e "$SELF_DIR/certs/cert.pem" ]; then
+    echo "Generate certificates ..."
+    export LD_LIBRARY_PATH="$INSTALL_DIR/lib:$INSTALL_DIR/lib64"
+    mkdir -p $SELF_DIR/certs
+    cd $SELF_DIR/certs
+    $INSTALL_DIR/bin/openssl req -x509 \
         -newkey rsa:4096 \
         -keyout key.pem \
         -out cert.pem \
@@ -115,6 +117,7 @@ $INSTALL_DIR/bin/openssl req -x509 \
         -days 3650 \
         -nodes \
         -subj "/C=CY/ST=Cyprus/L=Home/O=none/OU=CompanySectionName/CN=ttrek.sh/CN=get.ttrek.sh"
+fi
 
 echo
 echo "All done."

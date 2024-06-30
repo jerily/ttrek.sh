@@ -1,0 +1,24 @@
+{
+	"name":	"thread",
+	"version":	"3.0.0-beta.2",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"tcl": "=9.0.0-beta.2"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/9.0b2/thread3.0b2.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{
+				"cmd": "configure",
+				"options": [{"name": "with-tcl", "value": "$INSTALL_DIR/lib"}]
+			},
+			{ "cmd": "make" },
+			{ "cmd": "make_install" }
+		]
+	}
+}
