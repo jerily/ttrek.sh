@@ -1,5 +1,5 @@
 <tpl val="tabs">
-    return {{url / title Home} {url /blog title Blog}}
+    return {{url / title Home} {url /packages title Packages}}
 </tpl>
 <div>
     <h2>$heading</h2>

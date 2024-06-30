@@ -14,6 +14,12 @@
     </style>
     <div>
         <h1>$title</h1>
-        <code class="bash">curl -k --proto '=https' --tlsv1.2 -sSf https://get.ttrek.sh:4433 | sh</code>
+        <ul>
+            <tpl foreach="package_name" in="$package_names">
+                <li>
+                    <a href="/package/$package_name">$package_name</a>
+                </li>
+            </tpl>
+        </ul>
     </div>
 </Master>

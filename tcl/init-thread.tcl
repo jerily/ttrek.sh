@@ -13,6 +13,7 @@ package require tjson
 set router [::twebserver::create_router]
 
 ::twebserver::add_route -strict $router GET / get_index_page_handler
+::twebserver::add_route -strict $router GET /packages get_packages_page_handler
 ::twebserver::add_route -strict $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
 ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
 ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
@@ -42,13 +43,19 @@ proc get_index_page_handler {ctx req} {
             return [::twebserver::build_response -return_file 200 application/octet-stream [::twebserver::get_rootdir]/public/ttrek-init]
         }
     }
+    set data [dict merge $req [list title "Install ttrek"]]
+    set html [::thtml::renderfile index.thtml $data]
+    set res [::twebserver::build_response 200 text/html $html]
+    return $res
+}
 
+proc get_packages_page_handler {ctx req} {
     set package_names [list]
     foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry/*]] {
         lappend package_names [file tail $path]
     }
     set data [dict merge $req [list title "Packages" package_names [lsort $package_names]]]
-    set html [::thtml::renderfile index.thtml $data]
+    set html [::thtml::renderfile packages.thtml $data]
     set res [::twebserver::build_response 200 text/html $html]
     return $res
 }
