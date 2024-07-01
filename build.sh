@@ -104,6 +104,32 @@ if [ ! -e "$INSTALL_DIR"/lib/twebserver*/pkgIndex.tcl ]; then
     make install
 fi
 
+if [ ! -e "$INSTALL_DIR"/lib/thread*/pkgIndex.tcl ]; then
+    echo "Build threads ..."
+    if [ ! -e "$SOURCE_DIR"/thread* ]; then
+        cd "$SOURCE_DIR"
+        curl -sL https://sourceforge.net/projects/tcl/files/Tcl/9.0b2/thread3.0b2.tar.gz | tar zx
+    fi
+    mkdir -p "$BUILD_DIR"/thread
+    cd "$BUILD_DIR"/thread
+    "$SOURCE_DIR"/thread*/configure $SYMBOL_FLAG --with-tcl="$INSTALL_DIR"/lib --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR"
+    make -j
+    make install
+fi
+
+if [ ! -e "$INSTALL_DIR"/lib/sqlite*/pkgIndex.tcl ]; then
+    echo "Build sqlite3 ..."
+    if [ ! -e "$SOURCE_DIR"/sqlite* ]; then
+        cd "$SOURCE_DIR"
+        curl -sL https://sourceforge.net/projects/tcl/files/Tcl/9.0b2/sqlite3.45.3.tar.gz | tar zx
+    fi
+    mkdir -p "$BUILD_DIR"/sqlite3
+    cd "$BUILD_DIR"/sqlite3
+    "$SOURCE_DIR"/sqlite*/configure $SYMBOL_FLAG --with-tcl="$INSTALL_DIR"/lib --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR"
+    make -j
+    make install
+fi
+
 if [ ! -e "$SELF_DIR/certs/cert.pem" ]; then
     echo "Generate certificates ..."
     export LD_LIBRARY_PATH="$INSTALL_DIR/lib:$INSTALL_DIR/lib64"

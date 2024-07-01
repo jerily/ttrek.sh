@@ -5,6 +5,7 @@
 package require twebserver
 package require thtml
 package require tjson
+package require thread
 
 ::thtml::init [dict create \
     cache 0 \
@@ -18,14 +19,34 @@ set router [::twebserver::create_router]
 ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
 ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
 ::twebserver::add_route $router -strict GET /registry/:package_name get_package_versions_handler
+::twebserver::add_route $router -strict POST /telemetry/:environment_id register_environment
 ::twebserver::add_route -strict $router GET /logo get_logo_handler
 ::twebserver::add_route $router GET "*" get_catchall_handler
 
 # make sure that the router will be called when the server receives a connection
 interp alias {} process_conn {} $router
 
+proc telemetry_event { event_type args } {
+    thread::send -async [dict get [::twebserver::get_config_dict] telemetry_thread_id] \
+        [list ::telemetry::event $event_type {*}$args]
+}
+
+proc telemetry_event_common { event_type args } {
+    upvar 1 req req
+    if { ![dict exists [dict get $req headers] ttrek-environment-id] } {
+        puts "WARNING: telemetry_event_common: no ttrek-environment-id"
+        return
+    }
+    set environment_id [dict get $req headers ttrek-environment-id]
+    if { ![validate_environment_id $environment_id] } {
+        return
+    }
+    telemetry_event $event_type -env $environment_id {*}$args
+}
+
 proc get_dist_handler {ctx req} {
     set arch [::twebserver::get_path_param $req arch]
+    telemetry_event_common req_dist_get -os linux -arch $arch
     set ext [::twebserver::get_path_param $req ext]
     # hardcode for alpine
     # set arch "alpine"
@@ -61,7 +82,7 @@ proc get_packages_page_handler {ctx req} {
 }
 
 proc get_logo_handler {ctx req} {
-    set server_handle [dict get $ctx server]
+    telemetry_event_common req_logo_get
     set dir [::thtml::get_rootdir]
     set filepath [file join $dir www plume.png]
     set res [::twebserver::build_response -return_file 200 image/png $filepath]
@@ -104,9 +125,36 @@ proc get_latest_version {dir package_name} {
     return $latest_version
 }
 
+proc validate_environment_id {environment_id} {
+    # Check that environment_id consists of 32 characters in
+    # the range [1-9a-f] (hexadecimal characters)
+    set valid [regexp -nocase {^[0-9a-f]{32}$} $environment_id]
+    if { !$valid } {
+        puts "WARNING: invalid environment_id \"$environment_id\""
+    }
+    return $valid
+}
+
+proc register_environment {ctx req} {
+    set environment_id [::twebserver::get_path_param $req environment_id]
+    if { [validate_environment_id $environment_id] } {
+        set body [dict get $req body]
+        set size [string length $body]
+        # Prohibit body size larger than 4096 bytes to avoid database denial of service
+        # or empty data.
+        if { $size > 4096 || !$size } {
+            puts "WARNING: register_environment: blocked body size [string length $body]"
+        } else {
+            telemetry_event register_environment -env $environment_id -description $body
+        }
+    }
+    return [::twebserver::build_response 200 text/plain "ok"]
+}
+
 proc get_package_versions_handler {ctx req} {
     set dir [::twebserver::get_rootdir]
     set package_name [::twebserver::get_path_param $req package_name]
+    telemetry_event_common req_reg_get_pkg -pkg_name $package_name
     set versions_typed [list]
     foreach version [get_package_versions $dir $package_name] {
         set deps [get_package_version_dependencies $dir $package_name $version]
@@ -386,6 +434,11 @@ proc get_package_spec_handler {ctx req} {
     set package_version [::twebserver::get_path_param $req package_version]
     set os [::twebserver::get_path_param $req os]
     set machine [::twebserver::get_path_param $req machine]
+
+    telemetry_event_common req_reg_get_pkg_spec \
+        -pkg_name $package_name -pkg_version $package_version \
+        -os $os -arch $machine
+
     set dir [::twebserver::get_rootdir]
 
     puts "package_name: $package_name package_version: $package_version os: $os machine: $machine"
@@ -481,6 +534,7 @@ proc compare_versions {a b} {
 
 proc get_package_page_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
+    telemetry_event_common req_pkg_get -pkg_name $package_name
     set versions [list]
     foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry $package_name/*]] {
         lappend versions [file tail $path]
