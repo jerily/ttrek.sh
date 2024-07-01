@@ -13,7 +13,13 @@
 			{ "cmd": "download", "url": "https://github.com/tcltk/tcl/archive/refs/tags/core-8-6-14.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
-			{ "cmd": "configure", "path": "$SOURCE_DIR/unix/configure" },
+			{
+				"cmd": "configure",
+				"path": "$SOURCE_DIR/unix/configure",
+				"options": [
+					{ "name": "enable-threads" }
+				]
+			},
 			{ "cmd": "make" },
 			{ "cmd": "make_install" }
 		]

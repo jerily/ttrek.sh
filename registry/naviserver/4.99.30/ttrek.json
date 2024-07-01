@@ -1,0 +1,29 @@
+{
+	"name": "naviserver",
+	"version": "4.99.30",
+	"scripts": {
+	},
+	"dependencies":	{
+		"tcl": ">=8.6.14",
+		"openssl": "^3.0.13"
+	},
+	"devDependencies": {
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://downloads.sourceforge.net/sourceforge/naviserver/naviserver-4.99.30.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{
+				"cmd": "configure",
+				"options": [
+					{ "name": "prefix", "value": "$INSTALL_DIR" },
+					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },
+					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
+				]
+			},
+			{ "cmd": "make" },
+			{ "cmd": "make_install" }
+		]
+	}
+}
