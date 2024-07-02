@@ -1,0 +1,41 @@
+{
+	"name": "naviserver",
+	"version": "5.0.0-alpha",
+	"scripts": {
+	},
+	"dependencies":	{
+		"tcl": ">=8.6.14",
+		"openssl": "^3.0.13"
+	},
+	"devDependencies": {
+	},
+	"build": {
+		"default": [
+			{
+				"cmd": "git",
+				"url": "https://github.com/naviserver-project/naviserver"
+			},
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{
+				"cmd":  "autogen",
+				"path": "./autogen.sh",
+				"options": [
+					{ "name": "prefix", "value": "$INSTALL_DIR" },
+					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },
+					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
+				]
+			},
+			{ "cmd": "cd" },
+			{
+				"cmd": "configure",
+				"options": [
+					{ "name": "prefix", "value": "$INSTALL_DIR" },
+					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },
+					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
+				]
+			},
+			{ "cmd": "make" },
+			{ "cmd": "make_install" }
+		]
+	}
+}
