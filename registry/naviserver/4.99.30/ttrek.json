@@ -29,6 +29,7 @@
 			{ "cmd": "cd" },
 			{
 				"cmd": "configure",
+				"ld_library_path": "",
 				"options": [
 					{ "name": "prefix", "value": "$INSTALL_DIR" },
 					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },

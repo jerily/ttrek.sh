@@ -256,11 +256,16 @@ proc gen_package_spec_command {opts} {
                 }
             }
 
+            set cmd ""
+            if { [dict exists $opts ld_library_path] } {
+                set cmd "LD_LIBRARY_PATH=[dict get $opts ld_library_path] "
+            }
+
             if { [dict exists $opts path] } {
                 # todo: make sure the path is under $SOURCE_DIR
-                set cmd "[shell_quote_double [dict get $opts path]]"
+                append cmd "[shell_quote_double [dict get $opts path]]"
             } else {
-                set cmd {$SOURCE_DIR/configure}
+                append cmd {$SOURCE_DIR/configure}
             }
 
             foreach opt $options {
