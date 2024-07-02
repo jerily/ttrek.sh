@@ -128,7 +128,7 @@ proc get_latest_version {dir package_name} {
 proc validate_environment_id {environment_id} {
     # Check that environment_id consists of 32 characters in
     # the range [1-9a-f] (hexadecimal characters)
-    set valid [regexp -nocase {^[0-9a-f]{32}$} $environment_id]
+    set valid [regexp -nocase {^[0-9a-f]{64}$} $environment_id]
     if { !$valid } {
         puts "WARNING: invalid environment_id \"$environment_id\""
     }
