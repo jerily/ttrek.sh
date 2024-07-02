@@ -19,7 +19,7 @@
 				]
 			},
 			{ "cmd": "make" },
-			{ "cmd": "make_install" }
+			{ "cmd": "make_install", "no_ld_library_path": true }
 		]
 	}
 }
