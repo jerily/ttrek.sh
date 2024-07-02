@@ -21,7 +21,7 @@
 			{ "cmd": "make" },
 			{
 				"cmd": "make_install",
-				"ld_library_path": "",
+				"ld_library_path": ""
 			}
 		]
 	}
