@@ -313,8 +313,8 @@ proc gen_package_spec_command {opts} {
         }
         "make_install" {
             set cmd ""
-            if { [dict exists $opts no_ld_library_path] && [string is true -strict [dict get $opts no_ld_library_path]] } {
-                set cmd "LD_LIBRARY_PATH= "
+            if { [dict exists $opts ld_library_path] } {
+                set cmd "LD_LIBRARY_PATH=[dict get $opts ld_library_path] "
             }
             append cmd "make install"
             if { [dict exists $opts options] } {
