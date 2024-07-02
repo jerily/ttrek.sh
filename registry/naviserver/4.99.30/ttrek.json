@@ -5,8 +5,7 @@
 	},
 	"dependencies":	{
 		"tcl": ">=8.6.14",
-		"openssl": "^3.0.13",
-		"glibc": "^2.39.0"
+		"openssl": "^3.0.13"
 	},
 	"devDependencies": {
 	},
