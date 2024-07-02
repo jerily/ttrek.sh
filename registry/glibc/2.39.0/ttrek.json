@@ -15,16 +15,13 @@
 			{
 				"cmd": "configure",
 				"options": [
-					{ "name": "prefix", "value": "$INSTALL_DIR" }
+					{ "name": "prefix", "value": "$INSTALL_DIR/glibc" }
 				]
 			},
 			{ "cmd": "make" },
 			{
 				"cmd": "make_install",
-				"ld_library_path": true,
-				"options": [
-					{ "name": "DESTDIR", "value": "glibc" }
-				]
+				"ld_library_path": "",
 			}
 		]
 	}
