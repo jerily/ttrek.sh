@@ -20,7 +20,8 @@
 				"cmd": "configure",
 				"path": "./Configure",
 				"options": [
-					{ "name": "libdir", "value": "lib" }
+					{ "name": "libdir", "value": "lib" },
+					{ "name":  "no-docs", "option_prefix":  "" }
 				]
 			},
 			{ "cmd": "make" },

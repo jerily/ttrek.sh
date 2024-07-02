@@ -225,16 +225,22 @@ proc gen_package_spec_command {opts} {
             }
 
             if { [dict exists $opts path] } {
+                # todo: make sure the path is under $SOURCE_DIR
                 set cmd "[shell_quote_double [dict get $opts path]]"
             } else {
                 set cmd {$SOURCE_DIR/configure}
             }
+
             foreach opt $options {
+                set option_prefix "--"
+                if { [dict exists $opt option_prefix] } {
+                    set option_prefix [dict get $opt option_prefix]
+                }
                 if { [dict exists $opt name] } {
                     if { [dict exists $opt value] } {
-                        append cmd " \\\n    [shell_quote "--[dict get $opt name]"]=[shell_quote_double [dict get $opt value]]"
+                        append cmd " \\\n    [shell_quote "${option_prefix}[dict get $opt name]"]=[shell_quote_double [dict get $opt value]]"
                     } else {
-                        append cmd " \\\n    [shell_quote "--[dict get $opt name]"]"
+                        append cmd " \\\n    [shell_quote "${option_prefix}[dict get $opt name]"]"
                     }
                 }
             }
@@ -306,7 +312,11 @@ proc gen_package_spec_command {opts} {
             lappend result $cmd
         }
         "make_install" {
-            set cmd "make install"
+            set cmd ""
+            if { [dict exists $opts no_ld_library_path] && [string is true -strict [dict get $opts no_ld_library_path]] } {
+                set cmd "LD_LIBRARY_PATH= "
+            }
+            append cmd "make install"
             if { [dict exists $opts options] } {
                 foreach opt [dict get $opts options] {
                     if { [dict exists $opt name] } {
