@@ -26,7 +26,6 @@
 					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
 				]
 			},
-			{ "cmd": "cd" },
 			{
 				"cmd": "configure",
 				"path": "./configure",
