@@ -8,3 +8,4 @@ install
 local
 certs
 dist
+/ttrek-venv
