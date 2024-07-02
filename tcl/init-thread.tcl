@@ -161,6 +161,7 @@ proc gen_package_spec_command {opts} {
             }
             append cmd " ."
             lappend result $cmd
+            lappend result "find [shell_quote_double $SOURCE_DIR] -name '.git' | xargs rm -rf"
         }
         "unpack" {
             if { ![dict exists $opts format] } {
