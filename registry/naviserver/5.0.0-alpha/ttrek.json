@@ -25,9 +25,9 @@
 					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
 				]
 			},
-			{ "cmd": "cd" },
 			{
 				"cmd": "configure",
+				"path": "./configure",
 				"options": [
 					{ "name": "prefix", "value": "$INSTALL_DIR" },
 					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },
