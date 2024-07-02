@@ -149,7 +149,7 @@ proc gen_package_spec_command {opts} {
         }
         "git" {
             set cmd "git -C [shell_quote_double {$SOURCE_DIR}] clone [shell_quote [dict get $opts url]]\
-                --depth 1"
+                --depth 1 --single-branch"
             if { [dict exists $opts branch] } {
                 append cmd " --branch [shell_quote [dict get $opts branch]]"
             }
@@ -199,6 +199,38 @@ proc gen_package_spec_command {opts} {
                 set dirname [dict get $opts dirname]
             }
             lappend result "cd [shell_quote_double $dirname]"
+        }
+        "autogen" {
+
+            if { ![dict exists $opts options] } {
+                set options [list]
+            } else {
+                set options [dict get $opts options]
+            }
+
+            if { [dict exists $opts path] } {
+                # todo: make sure the path is under $SOURCE_DIR
+                set cmd "[shell_quote_double [dict get $opts path]]"
+            } else {
+                set cmd {autogen}
+            }
+
+            foreach opt $options {
+                set option_prefix "--"
+                if { [dict exists $opt option_prefix] } {
+                    set option_prefix [dict get $opt option_prefix]
+                }
+                if { [dict exists $opt name] } {
+                    if { [dict exists $opt value] } {
+                        append cmd " \\\n    [shell_quote "${option_prefix}[dict get $opt name]"]=[shell_quote_double [dict get $opt value]]"
+                    } else {
+                        append cmd " \\\n    [shell_quote "${option_prefix}[dict get $opt name]"]"
+                    }
+                }
+            }
+            append cmd " >[shell_quote_double {$BUILD_LOG_DIR/configure.log}] 2>&1"
+            lappend result $cmd
+
         }
         "configure" {
 

@@ -4,15 +4,28 @@
 	"scripts": {
 	},
 	"dependencies":	{
-		"tcl": ">=8.6.14",
+		"tcl": "^8.6.14",
 		"openssl": "^3.0.13"
 	},
 	"devDependencies": {
 	},
 	"build": {
 		"default": [
-			{ "cmd": "download", "url": "https://downloads.sourceforge.net/sourceforge/naviserver/naviserver-4.99.30.tar.gz" },
-			{ "cmd": "unpack" },
+			{
+				"cmd": "git",
+				"url": "https://github.com/naviserver-project/naviserver",
+				"branch": "naviserver-4.99.30"
+			},
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{
+				"cmd":  "autogen",
+				"path": "./autogen.sh",
+				"options": [
+					{ "name": "prefix", "value": "$INSTALL_DIR" },
+					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },
+					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
+				]
+			},
 			{ "cmd": "cd" },
 			{
 				"cmd": "configure",
