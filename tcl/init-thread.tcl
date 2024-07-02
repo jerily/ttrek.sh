@@ -140,9 +140,9 @@ proc register_environment {ctx req} {
     if { [validate_environment_id $environment_id] } {
         set body [dict get $req body]
         set size [string length $body]
-        # Prohibit body size larger than 4096 bytes to avoid database denial of service
+        # Prohibit body size larger than 65535 bytes to avoid database denial of service
         # or empty data.
-        if { $size > 4096 || !$size } {
+        if { $size > 0xffff || !$size } {
             puts "WARNING: register_environment: blocked body size [string length $body]"
         } else {
             telemetry_event register_environment -env $environment_id -description $body
