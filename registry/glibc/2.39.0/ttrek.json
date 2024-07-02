@@ -19,7 +19,13 @@
 				]
 			},
 			{ "cmd": "make" },
-			{ "cmd": "make_install", "no_ld_library_path": true }
+			{
+				"cmd": "make_install",
+				"ld_library_path": true,
+				"options": [
+					{ "name": "DESTDIR", "value": "glibc" }
+				]
+			}
 		]
 	}
 }
