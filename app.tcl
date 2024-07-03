@@ -3,16 +3,29 @@
 # SPDX-License-Identifier: MIT.
 
 package require twebserver
+package require thread
+
+# Create telemetry thread
+set telemetry_thread_id [thread::create thread::wait]
 
 # use threads and gzip compression
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
     gzip on \
     gzip_types [list text/plain application/json] \
-    gzip_min_length 8192]
+    gzip_min_length 8192 \
+    telemetry_thread_id $telemetry_thread_id]
 
 # create the server
 set dir [file dirname [info script]]
+
+# Initialize the telemetry thread
+if { ![file exists [file join $dir data]] } {
+    file mkdir [file join $dir data]
+}
+thread::send $telemetry_thread_id [list source [file normalize [file join $dir tcl telemetry.tcl]]]
+thread::send $telemetry_thread_id [list ::telemetry::init \
+    -file [file normalize [file join $dir data telemetry.sqlite3]]]
 
 set init_script "source [file normalize [file join $dir tcl init-thread.tcl]]"
 set server_handle [::twebserver::create_server -with_router $config_dict process_conn $init_script]
