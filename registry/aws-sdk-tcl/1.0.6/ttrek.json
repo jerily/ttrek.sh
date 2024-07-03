@@ -17,7 +17,8 @@
 			{ "cmd": "cmake_config",
 				"options": [
 					{"name": "TCL_LIBRARY_DIR", "value":  "$INSTALL_DIR/lib"},
-					{"name": "TCL_INCLUDE_DIR", "value":  "$INSTALL_DIR/include"}
+					{"name": "TCL_INCLUDE_DIR", "value":  "$INSTALL_DIR/include"},
+					{"name": "AWS_SDK_CPP_DIR", "value":  "$INSTALL_DIR/lib"}
 				]
 			},
 			{ "cmd": "make" },
