@@ -17,9 +17,10 @@ set router [::twebserver::create_router]
 ::twebserver::add_route -strict $router GET /packages get_packages_page_handler
 ::twebserver::add_route -strict $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
 ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
+::twebserver::add_route $router -strict POST /package/:package_name/:package_version post_package_handler
 ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
 ::twebserver::add_route $router -strict GET /registry/:package_name get_package_versions_handler
-::twebserver::add_route $router -strict POST /telemetry/:environment_id register_environment
+::twebserver::add_route $router -strict POST /telemetry/:environment_id post_register_environment_handler
 ::twebserver::add_route -strict $router GET /logo get_logo_handler
 ::twebserver::add_route $router GET "*" get_catchall_handler
 
@@ -29,6 +30,22 @@ interp alias {} process_conn {} $router
 proc telemetry_event { event_type args } {
     thread::send -async [dict get [::twebserver::get_config_dict] telemetry_thread_id] \
         [list ::telemetry::event $event_type {*}$args]
+}
+
+proc telemetry_sql { sql args } {
+    if { [llength $args] == 1 } {
+        set args [lindex $args 0]
+    }
+    # Don't throw errors in case of any telemetry db issues so as not to break
+    # HTTP queries. Return an empty response and log the error to stdout.
+    if { [catch {
+        thread::send [dict get [::twebserver::get_config_dict] telemetry_thread_id] \
+            [list ::telemetry::sql $sql $args]
+    } result] } {
+        puts "Error while accessing telemetry db: $result\nSQL: $sql\nVariables: $args"
+        set result ""
+    }
+    return $result
 }
 
 proc telemetry_event_common { event_type args } {
@@ -42,6 +59,88 @@ proc telemetry_event_common { event_type args } {
         return
     }
     telemetry_event $event_type -env $environment_id {*}$args
+}
+
+proc post_package_handler {ctx req} {
+    set package_name [::twebserver::get_path_param $req package_name]
+    set package_version [::twebserver::get_path_param $req package_version]
+
+    set data [dict get $req body]
+    if { [catch {
+        ::tjson::parse $data data_handle
+    } err] } {
+        return -code error "post_package_handler: ERROR while parsing json\
+            data for \"$package_name\" version \"$package_version\": $err"
+    }
+
+    if { [catch {
+        set action [::tjson::to_simple [::tjson::get_object_item \
+            $data_handle action]]
+    } err] } {
+        return -code error "post_package_handler: ERROR: no action field in\
+            json data for \"$package_name\" version \"$package_version\": $err"
+    }
+    if { $action ne "install" } {
+        return -code error "post_package_handler: ERROR: unsupported action\
+            \"$action\" in\ json data for \"$package_name\" version\
+            \"$package_version\""
+    }
+
+    if { [catch {
+        set outcome [::tjson::to_simple [::tjson::get_object_item \
+            $data_handle outcome]]
+    } err] } {
+        return -code error "post_package_handler: ERROR: no outcome field\
+            for install action in json data for \"$package_name\" version\
+            \"$package_version\": $err"
+    }
+    if { $outcome ni {success failure} } {
+        return -code error "post_package_handler: ERROR: unsupported outcome\
+            \"$outcome\" for install action in json data for \"$package_name\"\
+            version \"$package_version\""
+    }
+
+    set outcome [expr { $outcome eq "success" ? 1 : 0 }]
+
+    if { [catch {
+        set is_toplevel [::tjson::to_simple [::tjson::get_object_item \
+            $data_handle is_toplevel]]
+    } err] } {
+        return -code error "post_package_handler: ERROR: no is_toplevel field\
+            for install action in json data for \"$package_name\" version\
+            \"$package_version\": $err"
+    }
+    if { ![string is boolean -strict $is_toplevel] } {
+        return -code error "post_package_handler: ERROR: unsupported\
+            is_toplevel \"$is_toplevel\" for install action in json data for\
+            \"$package_name\" version \"$package_version\""
+    }
+
+    set is_toplevel [expr { [string is true -strict $is_toplevel] ? 1 : 0 }]
+
+    if { [catch {
+        set os [::tjson::to_simple [::tjson::get_object_item \
+            $data_handle os]]
+    } err] } {
+        return -code error "post_package_handler: ERROR: no os field\
+            for install action in json data for \"$package_name\" version\
+            \"$package_version\": $err"
+    }
+
+    if { [catch {
+        set arch [::tjson::to_simple [::tjson::get_object_item \
+            $data_handle arch]]
+    } err] } {
+        return -code error "post_package_handler: ERROR: no arch field\
+            for install action in json data for \"$package_name\" version\
+            \"$package_version\": $err"
+    }
+
+    telemetry_event_common req_pkg_install_event -pkg_name $package_name \
+        -pkg_version $package_version -install_outcome $outcome \
+        -install_is_toplevel $is_toplevel -os $os -arch $arch
+
+    return [::twebserver::build_response 200 text/plain "ok"]
 }
 
 proc get_dist_handler {ctx req} {
@@ -135,7 +234,7 @@ proc validate_environment_id {environment_id} {
     return $valid
 }
 
-proc register_environment {ctx req} {
+proc post_register_environment_handler {ctx req} {
     set environment_id [::twebserver::get_path_param $req environment_id]
     if { [validate_environment_id $environment_id] } {
         set body [dict get $req body]
@@ -539,7 +638,31 @@ proc get_package_page_handler {ctx req} {
     foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry $package_name/*]] {
         lappend versions [file tail $path]
     }
-    set data [dict merge $req [list package_name $package_name versions [lsort -command compare_versions -decreasing $versions]]]
+    set stat_platforms [telemetry_sql {
+        SELECT
+            pl.os || " " || pl.arch,
+            COUNT(*),
+            COUNT(CASE WHEN install_outcome = 1 THEN 1 END),
+            COUNT(CASE WHEN install_outcome = 0 THEN 1 END)
+        FROM req_pkg_install_event ev
+        INNER JOIN packages p USING (pkg_id)
+        INNER JOIN package_names n USING (pkg_name_id)
+        INNER JOIN platforms pl USING (platform_id)
+        WHERE n.name = $package_name
+        GROUP BY pl.os || pl.arch
+    } package_name $package_name]
+    # Convert from:
+    #     platform1 total1 success1 failure1 platform2 total2 success2 failure2 ...
+    # to:
+    #     {platform1 total1 success1 failure1} {platform2 total2 success2 failure2} ...
+    set stat_platforms [lmap { a b c d } $stat_platforms { list $a $b $c $d }]
+    set data [dict merge $req \
+        [list \
+            package_name   $package_name \
+            versions       [lsort -command compare_versions -decreasing $versions] \
+            stat_platforms $stat_platforms \
+        ] \
+    ]
     set html [::thtml::renderfile package.thtml $data]
     set res [::twebserver::build_response 200 text/html $html]
     return $res
