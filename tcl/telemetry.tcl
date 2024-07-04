@@ -9,12 +9,13 @@ namespace eval ::telemetry {
     # Define a list of known events and their parameters. This will be used
     # to validate arguments.
     variable event_list {
-        register_environment {-env -description}
-        req_dist_get         {-env -os -arch}
-        req_pkg_get          {-env -pkg_name}
-        req_reg_get_pkg_spec {-env -pkg_name -pkg_version -os -arch}
-        req_reg_get_pkg      {-env -pkg_name}
-        req_logo_get         {-env}
+        register_environment  {-env -description}
+        req_dist_get          {-env -os -arch}
+        req_pkg_get           {-env -pkg_name}
+        req_pkg_install_event {-env -pkg_name -pkg_version -install_outcome -install_is_toplevel -os -arch}
+        req_reg_get_pkg_spec  {-env -pkg_name -pkg_version -os -arch}
+        req_reg_get_pkg       {-env -pkg_name}
+        req_logo_get          {-env}
     }
 
     variable event_statements {
@@ -25,6 +26,10 @@ namespace eval ::telemetry {
         req_pkg_get {
             INSERT INTO req_pkg_get (env_id, pkg_name_id)
             VALUES ($env_id, $pkg_name_id)
+        }
+        req_pkg_install_event {
+            INSERT INTO req_pkg_install_event (env_id, pkg_id, platform_id, install_outcome, install_is_toplevel)
+            VALUES ($env_id, $pkg_id, $platform_id, $install_outcome, $install_is_toplevel)
         }
         req_reg_get_pkg_spec {
             INSERT INTO req_reg_get_pkg_spec (env_id, pkg_id, platform_id)
@@ -38,6 +43,19 @@ namespace eval ::telemetry {
             INSERT INTO req_logo_get (env_id)
             VALUES ($env_id)
         }
+    }
+
+    variable known_os {
+        {Linux}       {Linux}
+        {Darwin}      {MacOS}
+        {CYGWIN_NT-*} {Cygwin}
+    }
+
+    variable known_arch {
+        aarch64 alpha arc arm i386 i486 i686 ia64
+        m68k mips mips64 parisc ppc ppc64 ppc64le
+        ppcle riscv64 s390 s390x sh sparc sparc64
+        x86_64
     }
 
 }
@@ -74,7 +92,7 @@ proc ::telemetry::init { args } {
         PRAGMA foreign_keys = ON;
     }
 
-    set actual_schema_version 1
+    set actual_schema_version 2
 
     while { [set current_schema_version [db eval "PRAGMA user_version"]] < $actual_schema_version } {
 
@@ -154,14 +172,41 @@ proc ::telemetry::init { args } {
             }
         }
 
+        if { $current_schema_version == 1 } {
+            db eval {
+                CREATE TABLE req_pkg_install_event (
+                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
+                    env_id INTEGER NOT NULL,
+                    platform_id INTEGER NOT NULL,
+                    pkg_id INTEGER NOT NULL,
+                    install_outcome INTEGER NOT NULL,
+                    install_is_toplevel INTEGER NOT NULL,
+                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
+                    FOREIGN KEY(pkg_id) REFERENCES packages(pkg_id)
+                    FOREIGN KEY(platform_id) REFERENCES platforms(platform_id)
+                ) STRICT;
+
+                PRAGMA user_version = 2;
+            }
+        }
+
     }
 
+}
+
+proc ::telemetry::sql { sql vars } {
+    dict for { k v } $vars {
+        set $k $v
+    }
+    db eval $sql
 }
 
 proc ::telemetry::event { event_type args } {
 
     variable event_list
     variable event_statements
+    variable known_arch
+    variable known_os
 
     if { $event_type ni [dict keys $event_list] } {
         return -code error "::telemetry::event error: unknown event \"$event_type\""
@@ -239,6 +284,27 @@ proc ::telemetry::event { event_type args } {
 
     # If event uses os/arch then convert them to platform_id from the table platforms
     if { [info exists os] && [info exists arch] } {
+
+        if { $arch ni $known_arch } {
+            return -code error "::telemetry::event error: unknown arch \"$arch\""
+        }
+
+        if { $os in [dict keys $known_os] } {
+            set os [dict get $known_os $os]
+        } else {
+            set found 0
+            dict for { k v } $known_os {
+                if { [string match $k $os] } {
+                    set os $v
+                    set found 1
+                    break
+                }
+            }
+            if { !$found } {
+                return -code error "::telemetry::event error: unknown os \"$os\""
+            }
+        }
+
         set platform_id [db eval {
             INSERT INTO platforms (os, arch) VALUES ($os, $arch)
             ON CONFLICT(os, arch) DO UPDATE SET os=os
@@ -247,6 +313,11 @@ proc ::telemetry::event { event_type args } {
         if { ![string length $platform_id] } {
             return -code error "::telemetry::event error: failed to get platform_id"
         }
+    } else {
+        # Both os and arch must be specified. Do not allow just one of these variables
+        # to be specified, as that value will not be filtered. So make sure we
+        # don't have these variables by unsetting them.
+        unset -nocomplain os arch
     }
 
     db eval [dict get $event_statements $event_type]
