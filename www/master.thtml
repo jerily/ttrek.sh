@@ -9,10 +9,9 @@
                 <img src="/logo" />
                 <h1>$pagetitle</h1>
             </div>
-            <Tabs heading="top bar tabs"/>
+            <Tabs heading=""/>
             <slave />
-            <Tabs heading="bottom bar tabs"/>
-            <p>Your footer here</p>
+            <Tabs heading=""/>
         </div>
     </body>
 </html>

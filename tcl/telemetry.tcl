@@ -12,6 +12,7 @@ namespace eval ::telemetry {
         register_environment  {-env -description}
         req_dist_get          {-env -os -arch}
         req_pkg_get           {-env -pkg_name}
+        req_pkg_version_get   {-env -pkg_name -pkg_version}
         req_pkg_install_event {-env -pkg_name -pkg_version -install_outcome -install_is_toplevel -os -arch}
         req_reg_get_pkg_spec  {-env -pkg_name -pkg_version -os -arch}
         req_reg_get_pkg       {-env -pkg_name}
@@ -26,6 +27,10 @@ namespace eval ::telemetry {
         req_pkg_get {
             INSERT INTO req_pkg_get (env_id, pkg_name_id)
             VALUES ($env_id, $pkg_name_id)
+        }
+        req_pkg_version_get {
+            INSERT INTO req_pkg_version_get (env_id, pkg_id)
+            VALUES ($env_id, $pkg_id)
         }
         req_pkg_install_event {
             INSERT INTO req_pkg_install_event (env_id, pkg_id, platform_id, install_outcome, install_is_toplevel)
@@ -92,7 +97,7 @@ proc ::telemetry::init { args } {
         PRAGMA foreign_keys = ON;
     }
 
-    set actual_schema_version 2
+    set actual_schema_version 3
 
     while { [set current_schema_version [db eval "PRAGMA user_version"]] < $actual_schema_version } {
 
@@ -190,8 +195,21 @@ proc ::telemetry::init { args } {
             }
         }
 
-    }
+        if { $current_schema_version == 2 } {
 
+            db eval {
+                CREATE TABLE req_pkg_version_get (
+                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
+                    env_id INTEGER NOT NULL,
+                    pkg_id INTEGER NOT NULL,
+                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
+                    FOREIGN KEY(pkg_id) REFERENCES packages(pkg_id)
+                ) STRICT;
+
+                PRAGMA user_version = 3;
+            }
+        }
+    }
 }
 
 proc ::telemetry::sql { sql vars } {

@@ -17,10 +17,11 @@ set router [::twebserver::create_router]
 ::twebserver::add_route -strict $router GET /packages get_packages_page_handler
 ::twebserver::add_route -strict $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
 ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
-::twebserver::add_route $router -strict POST /package/:package_name/:package_version post_package_handler
+::twebserver::add_route $router -strict GET /package/:package_name/:package_version get_package_version_page_handler
 ::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
 ::twebserver::add_route $router -strict GET /registry/:package_name get_package_versions_handler
-::twebserver::add_route $router -strict POST /telemetry/:environment_id post_register_environment_handler
+::twebserver::add_route $router -strict POST /telemetry/register/:environment_id post_telemetry_register_handler
+::twebserver::add_route $router -strict POST /telemetry/collect/:package_name/:package_version post_telemetry_collect_handler
 ::twebserver::add_route -strict $router GET /logo get_logo_handler
 ::twebserver::add_route $router GET "*" get_catchall_handler
 
@@ -61,7 +62,7 @@ proc telemetry_event_common { event_type args } {
     telemetry_event $event_type -env $environment_id {*}$args
 }
 
-proc post_package_handler {ctx req} {
+proc post_telemetry_collect_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
 
@@ -234,7 +235,7 @@ proc validate_environment_id {environment_id} {
     return $valid
 }
 
-proc post_register_environment_handler {ctx req} {
+proc post_telemetry_register_handler {ctx req} {
     set environment_id [::twebserver::get_path_param $req environment_id]
     if { [validate_environment_id $environment_id] } {
         set body [dict get $req body]
@@ -638,6 +639,66 @@ proc get_package_page_handler {ctx req} {
     foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry $package_name/*]] {
         lappend versions [file tail $path]
     }
+
+    set stat_platforms [get_package_stats $package_name]
+
+    set data [dict merge $req \
+        [list \
+            package_name   $package_name \
+            versions       [lsort -command compare_versions -decreasing $versions] \
+            stat_platforms $stat_platforms \
+        ] \
+    ]
+    set html [::thtml::renderfile package.thtml $data]
+    set res [::twebserver::build_response 200 text/html $html]
+    return $res
+}
+
+proc get_package_version_page_handler {ctx req} {
+    set package_name [::twebserver::get_path_param $req package_name]
+    set package_version [::twebserver::get_path_param $req package_version]
+    telemetry_event_common req_pkg_version_get -pkg_name $package_name -pkg_version $package_version
+
+    set dir [::twebserver::get_rootdir]
+
+    set spec_path [file join $dir registry $package_name $package_version ttrek.json]
+    if {![file exists $spec_path]} {
+        return [::twebserver::build_response 404 text/plain "not found"]
+    }
+
+    set fp [open $spec_path]
+    set data [read $fp]
+    close $fp
+
+    if { [catch {
+        ::tjson::parse $data spec_handle
+    } err] } {
+        return -code error "Error while parsing json file for \"$package_name\"\
+            version \"$package_version\": $err"
+    }
+    set deps_handle [::tjson::get_object_item $spec_handle dependencies]
+    set deps_simple [::tjson::to_simple $deps_handle]
+    set deps [list]
+    foreach {dep_name dep_version} $deps_simple {
+        lappend deps [list name $dep_name version $dep_version]
+    }
+
+    set stat_platforms [get_package_version_stats $package_name $package_version]
+
+    set data [dict merge $req \
+        [list \
+            package_name $package_name \
+            package_version $package_version \
+            deps $deps \
+            stat_platforms $stat_platforms]]
+
+    set html [::thtml::renderfile package-version.thtml $data]
+    set res [::twebserver::build_response 200 text/html $html]
+    return $res
+
+}
+
+proc get_package_stats {package_name} {
     set stat_platforms [telemetry_sql {
         SELECT
             pl.os || " " || pl.arch,
@@ -656,16 +717,29 @@ proc get_package_page_handler {ctx req} {
     # to:
     #     {platform1 total1 success1 failure1} {platform2 total2 success2 failure2} ...
     set stat_platforms [lmap { a b c d } $stat_platforms { list $a $b $c $d }]
-    set data [dict merge $req \
-        [list \
-            package_name   $package_name \
-            versions       [lsort -command compare_versions -decreasing $versions] \
-            stat_platforms $stat_platforms \
-        ] \
-    ]
-    set html [::thtml::renderfile package.thtml $data]
-    set res [::twebserver::build_response 200 text/html $html]
-    return $res
+    return $stat_platforms
+}
+
+proc get_package_version_stats {package_name package_version} {
+    set stat_platforms [telemetry_sql {
+        SELECT
+            pl.os || " " || pl.arch,
+            COUNT(*),
+            COUNT(CASE WHEN install_outcome = 1 THEN 1 END),
+            COUNT(CASE WHEN install_outcome = 0 THEN 1 END)
+        FROM req_pkg_install_event ev
+        INNER JOIN packages p USING (pkg_id)
+        INNER JOIN package_names n USING (pkg_name_id)
+        INNER JOIN platforms pl USING (platform_id)
+        WHERE n.name = $package_name and p.version = $package_version
+        GROUP BY pl.os || pl.arch
+    } package_name $package_name package_version $package_version]
+    # Convert from:
+    #     platform1 total1 success1 failure1 platform2 total2 success2 failure2 ...
+    # to:
+    #     {platform1 total1 success1 failure1} {platform2 total2 success2 failure2} ...
+    set stat_platforms [lmap { a b c d } $stat_platforms { list $a $b $c $d }]
+    return $stat_platforms
 }
 
 proc get_catchall_handler {ctx req} {

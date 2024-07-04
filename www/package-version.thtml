@@ -2,15 +2,20 @@
 
 <Master pagetitle="$package_name - ttrek">
     <div class="blog">
-        <h1>$package_name</h1>
+        <h1>${package_name}@${package_version}</h1>
         <p>Install:</p>
-        <pre>ttrek install ${package_name}@[lindex $versions 0]</pre>
-        <p>Versions:</p>
-        <tpl foreach="version" in="$versions">
-            <div class="version">
-                <a href="/package/$package_name/$version">$version</a>
-            </div>
-        </tpl>
+        <pre>ttrek install ${package_name}@${package_version}</pre>
+        <p>Dependencies:</p>
+        <table class="dependency" style="border: 1px solid black; border-spacing: 20px 5px;">
+            <tr><th>Name</th><th>Version Requirement</th></tr>
+            <tpl foreach="dep" in="$deps">
+                <tr>
+                    <td>${dep.name}</td>
+                    <td>${dep.version}</td>
+                </tr>
+            </tpl>
+        </table>
+
         <tpl if='[llength $stat_platforms]'>
             <p>Statistics (installations):</p>
             <table style="border: 1px solid black; border-spacing: 20px 5px;">
