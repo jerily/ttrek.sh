@@ -57,7 +57,7 @@ namespace eval ::telemetry {
     }
 
     variable known_arch {
-        aarch64 alpha arc arm i386 i486 i686 ia64
+        aarch64 alpha arc arm arm64 i386 i486 i686 ia64
         m68k mips mips64 parisc ppc ppc64 ppc64le
         ppcle riscv64 s390 s390x sh sparc sparc64
         x86_64
