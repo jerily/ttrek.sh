@@ -1,19 +1,15 @@
 <import name="Master" src="master.thtml" />
 
-<Master pagetitle="ttrek.sh: registry, website, and command-line interface">
-    <style>
-        code {
-            padding: 0.2rem 0.5rem;
-            margin: 0 0.2rem;
-            font-size: 90%;
-            white-space: nowrap;
-            border: 1px solid #e1e1e1;
-            border-radius: 4px;
-            overflow: auto;
-        }
-    </style>
-    <div>
-        <h1>$title</h1>
-        <code class="bash">curl -k --proto '=https' --tlsv1.2 -sSf https://get.ttrek.sh:4433 | sh</code>
+<Master pagetitle="ttrek: registry, website, and command-line interface">
+    <div class="splash-container">
+        <div class="splash">
+            <h1 class="splash-head">$title</h1>
+            <p class="splash-subhead">
+                <code class="bash">curl -k --proto '=https' --tlsv1.2 -sSf https://ttrek.sh:4433/init | sh</code>
+            </p>
+            <p class="text-normal">
+                <a href="/packages" class="pure-button pure-button-primary">See all packages</a>
+            </p>
+        </div>
     </div>
 </Master>

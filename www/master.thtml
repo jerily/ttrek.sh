@@ -2,20 +2,27 @@
 <html>
     <head>
         <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="stylesheet" href="/css/pure/pure-min.css" />
+        <link rel="stylesheet" href="/css/pure/grids-responsive-min.css" />
+        <link rel="stylesheet" href="/css/styles.css" />
         <title>$pagetitle</title>
     </head>
     <body>
-        <div>
-            <div style="display: flex">
-                <img src="/logo" />
-                <h1>$pagetitle</h1>
+        <div class="header">
+            <div class="home-menu pure-menu pure-menu-horizontal pure-menu-fixed">
+                <a class="pure-menu-heading text-normal" href="">$pagetitle</a>
+
+                <ul class="pure-menu-list">
+                    <li class="pure-menu-item pure-menu-selected"><a href="/" class="pure-menu-link">Home</a></li>
+                    <li class="pure-menu-item"><a href="#" class="pure-menu-link">Documentation</a></li>
+                    <li class="pure-menu-item"><a href="#" class="pure-menu-link">Sign Up</a></li>
+                </ul>
             </div>
-            <Tabs heading=""/>
-            <slave />
-            <Tabs heading=""/>
-            <div class="footer">
-                &#169; 2024 JERILY LTD
-            </div>
+        </div>
+        <slave />
+        <div class="footer l-box is-center">
+            &#169; 2024 JERILY LTD - View the source code on <a href="https://github.com/jerily/ttrek">github</a>.
         </div>
     </body>
 </html>

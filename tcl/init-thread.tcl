@@ -14,7 +14,9 @@ package require thread
 set router [::twebserver::create_router]
 
 ::twebserver::add_route -strict $router GET / get_index_page_handler
+::twebserver::add_route -strict $router GET /init get_ttrek_init_handler
 ::twebserver::add_route -strict $router GET /packages get_packages_page_handler
+::twebserver::add_route -prefix $router GET /css/ get_css_handler
 ::twebserver::add_route -strict $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
 ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
 ::twebserver::add_route $router -strict GET /package/:package_name/:package_version get_package_version_page_handler
@@ -156,14 +158,48 @@ proc get_dist_handler {ctx req} {
     return [::twebserver::build_response -return_file 200 application/octet-stream $filepath]
 }
 
-proc get_index_page_handler {ctx req} {
-    set host [::twebserver::get_header $req host]
-    if { $host ne {} } {
-        lassign [split $host {:}] hostname port
-        if { $hostname eq {get.ttrek.sh} } {
-            return [::twebserver::build_response -return_file 200 application/octet-stream [::twebserver::get_rootdir]/public/ttrek-init]
+proc path_join {args} {
+    set rootdir [file normalize [::twebserver::get_rootdir]]
+    set path ""
+    foreach arg $args {
+        set parts [file split $arg]
+        foreach part $parts {
+            if { $part eq {..} } {
+                error "path_join: path \"$arg\" contains \"..\""
+            }
+            append path "/" $part
         }
     }
+    set normalized_path [file normalize $path]
+    if { [string range $normalized_path 0 [expr { [string length $rootdir] - 1}]] ne $rootdir } {
+        error "path_join: path \"$normalized_path\" is not under rootdir \"$rootdir\""
+    }
+    return $normalized_path
+}
+
+proc get_css_handler {ctx req} {
+    set path [dict get $req path]
+    set dir [file normalize [::thtml::get_rootdir]]
+    set filepath [path_join $dir public $path]
+#    puts filepath=$filepath
+    set res [::twebserver::build_response -return_file 200 text/css $filepath]
+    return $res
+}
+
+proc get_ttrek_init_handler {ctx req} {
+    set dir [file normalize [::thtml::get_rootdir]]
+    return [::twebserver::build_response -return_file 200 application/octet-stream $dir/public/ttrek-init]
+    return $res
+}
+
+proc get_index_page_handler {ctx req} {
+#    set host [::twebserver::get_header $req host]
+#    if { $host ne {} } {
+#        lassign [split $host {:}] hostname port
+#        if { $hostname eq {get.ttrek.sh} } {
+#            return [::twebserver::build_response -return_file 200 application/octet-stream [::twebserver::get_rootdir]/public/ttrek-init]
+#        }
+#    }
     set data [dict merge $req [list title "Install ttrek"]]
     set html [::thtml::renderfile index.thtml $data]
     set res [::twebserver::build_response 200 text/html $html]
@@ -182,9 +218,8 @@ proc get_packages_page_handler {ctx req} {
 }
 
 proc get_logo_handler {ctx req} {
-    telemetry_event_common req_logo_get
-    set dir [::thtml::get_rootdir]
-    set filepath [file join $dir www plume.png]
+    set dir [file normalize [::thtml::get_rootdir]]
+    set filepath [path_join $dir www plume.png]
     set res [::twebserver::build_response -return_file 200 image/png $filepath]
     return $res
 }
