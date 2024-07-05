@@ -246,15 +246,36 @@ a.pure-button-primary {
 .bash {
     display:block;
     padding: 0.5rem 0.5rem;
-    margin: auto;
+    margin: auto 0;
     font-size: 90%;
     white-space: nowrap;
     border: 1px solid #e1e1e1;
     border-radius: 4px;
     overflow: auto;
     text-transform: none;
+    text-align: center;
 }
 
+.bash-wrapper {
+    display: flex;
+    color:white;
+    margin: auto;
+    justify-content: center;
+}
+
+.clipboard {
+    height: 45px;
+    background:none;
+    cursor: pointer;
+    border: 0;
+}
+
+.clipboard-image {
+    width: inherit;
+    height: inherit;
+    padding: 0.5rem 0.5rem;
+    margin: auto 0;
+}
 /*
  * -- TABLET (AND UP) MEDIA QUERIES --
  * On tablets and other medium-sized devices, we want to customize some

@@ -16,7 +16,7 @@ set router [::twebserver::create_router]
 ::twebserver::add_route -strict $router GET / get_index_page_handler
 ::twebserver::add_route -strict $router GET /init get_ttrek_init_handler
 ::twebserver::add_route -strict $router GET /packages get_packages_page_handler
-::twebserver::add_route -prefix $router GET /css/ get_css_handler
+::twebserver::add_route -prefix $router GET /(css|js|assets)/ get_css_or_js_or_assets_handler
 ::twebserver::add_route -strict $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
 ::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
 ::twebserver::add_route $router -strict GET /package/:package_name/:package_version get_package_version_page_handler
@@ -177,12 +177,22 @@ proc path_join {args} {
     return $normalized_path
 }
 
-proc get_css_handler {ctx req} {
+proc get_css_or_js_or_assets_handler {ctx req} {
     set path [dict get $req path]
     set dir [file normalize [::thtml::get_rootdir]]
     set filepath [path_join $dir public $path]
 #    puts filepath=$filepath
-    set res [::twebserver::build_response -return_file 200 text/css $filepath]
+    set ext [file extension $filepath]
+    if { $ext eq {.css} } {
+        set mimetype text/css
+    } elseif { $ext eq {.js} } {
+        set mimetype application/javascript
+    } elseif { $ext eq {.svg} } {
+        set mimetype image/svg+xml
+    } else {
+        error "get_css_or_js_handler: unsupported extension \"$ext\""
+    }
+    set res [::twebserver::build_response -return_file 200 $mimetype $filepath]
     return $res
 }
 

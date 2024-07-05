@@ -24,5 +24,7 @@
         <div class="footer l-box is-center">
             &#169; 2024 JERILY LTD - View the source code on <a href="https://github.com/jerily/ttrek">github</a>.
         </div>
+        <script src="/js/clipboard.min.js"></script>
+        <script>new ClipboardJS(".clipboard");</script>
     </body>
 </html>
