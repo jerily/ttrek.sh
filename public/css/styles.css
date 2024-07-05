@@ -267,18 +267,15 @@ a.pure-button-primary {
 }
 
 .clipboard {
-    height: 45px;
+    height: 32px;
+    margin: auto 0;
+    padding: 0.5rem 0.5rem;
     background:none;
     cursor: pointer;
     border: 0;
+    color: inherit;
 }
 
-.clipboard-image {
-    width: inherit;
-    height: inherit;
-    padding: 0.5rem 0.5rem;
-    margin: auto 0;
-}
 /*
  * -- TABLET (AND UP) MEDIA QUERIES --
  * On tablets and other medium-sized devices, we want to customize some
