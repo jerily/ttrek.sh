@@ -267,6 +267,7 @@ a.pure-button-primary {
 }
 
 .clipboard {
+    width: 32px;
     height: 32px;
     margin: auto 0;
     padding: 0.5rem 0.5rem;
