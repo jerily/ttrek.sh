@@ -1,34 +1,42 @@
 <import name="Master" src="master.thtml" />
 
-<Master pagetitle="$package_name - ttrek">
-    <div class="blog">
-        <h1>${package_name}@${package_version}</h1>
-        <p>Install:</p>
-        <pre>ttrek install ${package_name}@${package_version}</pre>
-        <p>Dependencies:</p>
-        <table class="dependency" style="border: 1px solid black; border-spacing: 20px 5px;">
-            <tr><th>Name</th><th>Version Requirement</th></tr>
-            <tpl foreach="dep" in="$deps">
-                <tr>
-                    <td>${dep.name}</td>
-                    <td>${dep.version}</td>
-                </tr>
+<Master pagetitle="ttrek: registry, website, and command-line interface">
+    <div class="content-wrapper">
+        <div class="content">
+            <h2 class="content-head is-center text-normal">${package_name}@${package_version}</h2>
+            <p class="content-subhead">Install:</p>
+            <code class="bash">ttrek install ${package_name}@${package_version}</code>
+            <tpl if="$deps ne {}">
+                <p class="content-subhead">Dependencies:</p>
+                <table class="pure-table" style="border: 1px solid black; border-spacing: 20px 5px;">
+                    <thead><tr><th>Name</th><th>Version Requirement</th></tr></thead>
+                    <tbody>
+                        <tpl foreach="dep" in="$deps">
+                            <tr>
+                                <td>${dep.name}</td>
+                                <td>${dep.version}</td>
+                            </tr>
+                        </tpl>
+                    </tbody>
+                </table>
             </tpl>
-        </table>
 
-        <tpl if='[llength $stat_platforms]'>
-            <p>Statistics (installations):</p>
-            <table style="border: 1px solid black; border-spacing: 20px 5px;">
-                <tr><th>Platform</th><th>Total</th><th>Success</th><th>Failure</th></tr>
-                <tpl foreach="stat_platform" in="$stat_platforms">
-                    <tr>
-                        <td>[lindex $stat_platform 0]</td>
-                        <td>[lindex $stat_platform 1]</td>
-                        <td>[lindex $stat_platform 2]</td>
-                        <td>[lindex $stat_platform 3]</td>
-                    </tr>
-                </tpl>
-            </table>
-        </tpl>
+            <tpl if='[llength $stat_platforms]'>
+                <p class="content-subhead">Statistics (installations):</p>
+                <table class="pure-table">
+                    <thead><tr><th>Platform</th><th>Total</th><th>Success</th><th>Failure</th></tr></thead>
+                    <tbody>
+                        <tpl foreach="stat_platform" in="$stat_platforms">
+                            <tr>
+                                <td>[lindex $stat_platform 0]</td>
+                                <td>[lindex $stat_platform 1]</td>
+                                <td>[lindex $stat_platform 2]</td>
+                                <td>[lindex $stat_platform 3]</td>
+                            </tr>
+                        </tpl>
+                    </tbody>
+                </table>
+            </tpl>
+        </div>
     </div>
 </Master>

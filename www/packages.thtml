@@ -1,25 +1,16 @@
 <import name="Master" src="master.thtml" />
 
-<Master pagetitle="ttrek.sh: registry, website, and command-line interface">
-    <style>
-        code {
-            padding: 0.2rem 0.5rem;
-            margin: 0 0.2rem;
-            font-size: 90%;
-            white-space: nowrap;
-            border: 1px solid #e1e1e1;
-            border-radius: 4px;
-            overflow: auto;
-        }
-    </style>
-    <div>
-        <h1>$title</h1>
-        <ul>
-            <tpl foreach="package_name" in="$package_names">
-                <li>
-                    <a href="/package/$package_name">$package_name</a>
-                </li>
-            </tpl>
-        </ul>
+<Master pagetitle="ttrek: registry, website, and command-line interface">
+    <div class="content-wrapper">
+        <div class="content">
+            <h2 class="content-head is-center">$title</h2>
+            <ul>
+                <tpl foreach="package_name" in="$package_names">
+                    <li>
+                        <a href="/package/$package_name">$package_name</a>
+                    </li>
+                </tpl>
+            </ul>
+        </div>
     </div>
 </Master>
