@@ -1,6 +1,7 @@
 <import name="Tabs" src="tabs.thtml" />
 <html>
     <head>
+        <meta charset="UTF-8" />
         <title>$pagetitle</title>
     </head>
     <body>
@@ -12,6 +13,9 @@
             <Tabs heading=""/>
             <slave />
             <Tabs heading=""/>
+            <div class="footer">
+                &#169; 2024 JERILY LTD
+            </div>
         </div>
     </body>
 </html>
