@@ -212,7 +212,8 @@ proc get_index_page_handler {ctx req} {
 #    }
     set data [dict merge $req [list title "Install ttrek"]]
     set html [::thtml::renderfile index.thtml $data]
-    set res [::twebserver::build_response 200 text/html $html]
+    set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
+    set res [::twebserver::add_header $res "Content-Type" "text/html; charset=utf-8"]
     return $res
 }
 
