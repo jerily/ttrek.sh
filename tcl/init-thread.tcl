@@ -223,7 +223,7 @@ proc get_packages_page_handler {ctx req} {
     }
     set data [dict merge $req [list title "Packages" package_names [lsort $package_names]]]
     set html [::thtml::renderfile packages.thtml $data]
-    set res [::twebserver::build_response 200 text/html $html]
+    set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 }
 
@@ -421,7 +421,7 @@ proc get_package_page_handler {ctx req} {
         ] \
     ]
     set html [::thtml::renderfile package.thtml $data]
-    set res [::twebserver::build_response 200 text/html $html]
+    set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 }
 
@@ -464,7 +464,7 @@ proc get_package_version_page_handler {ctx req} {
             stat_platforms $stat_platforms]]
 
     set html [::thtml::renderfile package-version.thtml $data]
-    set res [::twebserver::build_response 200 text/html $html]
+    set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 
 }
