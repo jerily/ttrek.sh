@@ -15,19 +15,17 @@
 				"cmd": "git",
 				"url": "https://github.com/naviserver-project/naviserver"
 			},
-			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
 			{
 				"cmd":  "autogen",
-				"path": "./autogen.sh",
 				"options": [
 					{ "name": "prefix", "value": "$INSTALL_DIR" },
 					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },
 					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
 				]
 			},
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
 			{
 				"cmd": "configure",
-				"path": "./configure",
 				"options": [
 					{ "name": "prefix", "value": "$INSTALL_DIR" },
 					{ "name": "with-tcl", "value": "$INSTALL_DIR/lib" },
