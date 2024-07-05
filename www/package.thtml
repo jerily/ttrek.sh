@@ -1,11 +1,12 @@
 <import name="Master" src="master.thtml" />
+<import name="BashLine" src="bashline.thtml" />
 
 <Master pagetitle="ttrek: registry, website, and command-line interface">
     <div class="content-wrapper">
         <div class="content">
             <h2 class="content-head is-center text-normal">$package_name</h2>
             <p class="content-subhead">Install:</p>
-            <code class="bash">ttrek install ${package_name}</code>
+            <BashLine style="" text="ttrek install ${package_name}" />
             <p class="content-subhead">Versions:</p>
             <tpl foreach="version" in="$versions">
                 <div class="version">

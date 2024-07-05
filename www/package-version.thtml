@@ -1,11 +1,12 @@
 <import name="Master" src="master.thtml" />
+<import name="BashLine" src="bashline.thtml" />
 
 <Master pagetitle="ttrek: registry, website, and command-line interface">
     <div class="content-wrapper">
         <div class="content">
             <h2 class="content-head is-center text-normal">${package_name}@${package_version}</h2>
             <p class="content-subhead">Install:</p>
-            <code class="bash">ttrek install ${package_name}@${package_version}</code>
+            <BashLine style="" text="ttrek install ${package_name}@${package_version}" />
             <tpl if="$deps ne {}">
                 <p class="content-subhead">Dependencies:</p>
                 <table class="pure-table" style="border: 1px solid black; border-spacing: 20px 5px;">

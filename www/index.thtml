@@ -1,16 +1,12 @@
 <import name="Master" src="master.thtml" />
+<import name="BashLine" src="bashline.thtml" />
 
 <Master pagetitle="ttrek: registry, website, and command-line interface">
     <div class="splash-container">
         <div class="splash">
             <h1 class="splash-head">$title</h1>
             <p class="splash-subhead">
-                <div class="bash-wrapper">
-                    <code class="bash">curl -k --proto '=https' --tlsv1.2 -sSf https://ttrek.sh:4433/init | sh</code>
-                    <button class="clipboard" data-clipboard-text="curl -k --proto '=https' --tlsv1.2 -sSf https://ttrek.sh:4433/init | sh">
-                        <img class="clipboard-image" src="/assets/clippy.svg" alt="Copy to clipboard" />
-                    </button>
-                </div>
+                <BashLine style="justify-content: center" text="curl -k --proto '=https' --tlsv1.2 -sSf https://ttrek.sh:4433/init | sh" />
             </p>
             <p class="text-normal">
                 <a href="/packages" class="pure-button pure-button-primary">See all packages</a>

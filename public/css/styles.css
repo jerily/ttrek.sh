@@ -152,6 +152,7 @@ a.pure-button-primary {
     top: 100px; left: 0; bottom: 0; right: 0;
     text-align: center;
     text-transform: uppercase;
+    color:white;
 }
 
 /* This is the main heading that appears on the blue section */
@@ -258,8 +259,10 @@ a.pure-button-primary {
 
 .bash-wrapper {
     display: flex;
-    color:white;
     margin: auto;
+}
+
+.bash-wrapper-center {
     justify-content: center;
 }
 
