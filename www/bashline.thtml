@@ -1,6 +1,6 @@
 <div class="bash-wrapper" style="$style">
     <code class="bash">$text</code>
     <button class="clipboard" data-clipboard-text="$text">
-        <img class="clipboard-image" src="/assets/clippy.svg" alt="Copy to clipboard" />
+        <img class="clipboard-image" src="/assets/clippy.svg" alt="copy to clipboard" title="copy to clipboard" />
     </button>
 </div>
