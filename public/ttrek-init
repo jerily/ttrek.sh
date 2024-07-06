@@ -160,7 +160,7 @@ main() {
     ensure downloader "$_url" "$_file" "$_arch"
     ensure chmod u+x "$_file"
     local _ttrek_dir="${TTREK_HOME:-$HOME/.ttrek}"
-    ensure mkdir -p "$_ttrek_dir"
+    ensure mkdir -p "${_ttrek_dir}/bin"
     ensure cp "$_file" "${_ttrek_dir}/bin/ttrek${_ext}"
 
     ensure echo "#!/bin/sh\nexport PATH=\"\$HOME/.ttrek/bin:\$PATH\"" > "${_ttrek_dir}/env"
