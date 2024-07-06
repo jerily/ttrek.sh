@@ -22,7 +22,7 @@
 					{ "name": "libdir", "value": "lib" }
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

@@ -23,7 +23,7 @@
 					{ "name": "protobuf_BUILD_SHARED_LIBS", "value": "ON" }
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

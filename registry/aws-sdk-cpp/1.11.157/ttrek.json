@@ -29,7 +29,7 @@
 					{ "name": "AUTORUN_UNIT_TESTS", "value": "OFF" }
 				]
 			},
-			{ "cmd": "cmake_make", "config": "Release" },
+			{ "cmd": "cmake_make", "config": "Release", "parallel": true },
 			{ "cmd": "cmake_install", "config": "Release" }
 		]
 	}

@@ -29,7 +29,7 @@
 					{ "name": "CMAKE_BUILD_TYPE", "value": "Release" }
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

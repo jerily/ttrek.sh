@@ -21,7 +21,7 @@
 					{"name": "AWS_SDK_CPP_DIR", "value":  "$INSTALL_DIR"}
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

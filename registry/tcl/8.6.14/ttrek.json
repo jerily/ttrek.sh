@@ -20,7 +20,7 @@
 					{ "name": "enable-threads" }
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

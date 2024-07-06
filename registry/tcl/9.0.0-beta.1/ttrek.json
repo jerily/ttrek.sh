@@ -14,7 +14,7 @@
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "configure", "path": "$SOURCE_DIR/unix/configure" },
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

@@ -19,7 +19,7 @@
 					{"name": "TCL_INCLUDE_DIR", "value":  "$INSTALL_DIR/include"}
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

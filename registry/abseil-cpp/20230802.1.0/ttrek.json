@@ -21,7 +21,7 @@
 					{ "name": "ABSL_PROPAGATE_CXX_STD", "value": "ON" }
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}
