@@ -33,7 +33,7 @@
 					{ "name": "with-openssl", "value": "$INSTALL_DIR"}
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

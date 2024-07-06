@@ -17,7 +17,7 @@
 				"cmd": "configure",
 				"options": [{"name": "with-tcl", "value": "$INSTALL_DIR/lib"}]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

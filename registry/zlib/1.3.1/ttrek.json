@@ -13,7 +13,7 @@
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "configure" },
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}

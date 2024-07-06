@@ -21,10 +21,10 @@
 				"path": "./Configure",
 				"options": [
 					{ "name": "libdir", "value": "lib" },
-					{ "name":  "no-docs", "option_prefix":  "" }
+					{ "name": "no-docs" }
 				]
 			},
-			{ "cmd": "make" },
+			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
 	}
