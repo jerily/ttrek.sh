@@ -4,7 +4,7 @@
 	"scripts":	{
 	},
 	"dependencies":	{
-		"dropdown": { "version": ">=1.0.0,<2.0.0", "if": "+hello" }
+		"dropdown": { "version": ">=1.0.0,<3.0.0", "if": "+hello" }
 	},
 	"devDependencies":	{
 	},
