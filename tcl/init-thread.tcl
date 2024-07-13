@@ -260,8 +260,7 @@ proc get_package_version_dependencies {dir package_name version} {
             version \"$version\": $err"
     }
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
-    set deps [::tjson::to_simple $deps_handle]
-    return $deps
+    return [::tjson::to_typed $deps_handle]
 }
 
 proc get_latest_version {dir package_name} {
@@ -302,12 +301,8 @@ proc get_package_versions_handler {ctx req} {
     telemetry_event_common req_reg_get_pkg -pkg_name $package_name
     set versions_typed [list]
     foreach version [get_package_versions $dir $package_name] {
-        set deps [get_package_version_dependencies $dir $package_name $version]
-        set deps_typed [list]
-        foreach {dep_name dep_version} $deps {
-            lappend deps_typed $dep_name [list S $dep_version]
-        }
-        lappend versions_typed $version [list M $deps_typed]
+        set deps_typed [get_package_version_dependencies $dir $package_name $version]
+        lappend versions_typed $version $deps_typed
     }
     return [::twebserver::build_response 200 application/json \
         [::tjson::typed_to_json [list M $versions_typed]]]
