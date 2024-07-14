@@ -308,6 +308,17 @@ proc get_package_versions_handler {ctx req} {
         [::tjson::typed_to_json [list M $versions_typed]]]
 }
 
+proc compute_iuse_flags {spec_handle} {
+    set if_use_nodes [::tjson::query $spec_handle {$..if}]
+
+    set iuse_list [list]
+    foreach if_use_node $if_use_nodes {
+        lappend iuse_list [::tjson::get_valuestring $if_use_node]
+    }
+    set iuse_unique [lsort -unique $iuse_list]
+    return $iuse_unique
+}
+
 proc get_package_spec_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
@@ -366,10 +377,19 @@ proc get_package_spec_handler {ctx req} {
         close $fp
         lappend patches_typed [file tail $patch_path] [list S [::twebserver::base64_encode $data]]
     }
+
+    set iuse_unique [compute_iuse_flags $spec_handle]
+
+    set iuse_typed [list]
+    foreach iuse_flag $iuse_unique {
+        lappend iuse_typed [list S $iuse_flag]
+    }
+
     ::tjson::create \
         [list M \
             [list \
                 version [list S $package_version] \
+                iuse [list L $iuse_typed] \
                 dependencies $deps_typed \
                 install_script $spec_build_typed]] \
         result_handle
