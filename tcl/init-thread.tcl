@@ -443,10 +443,20 @@ proc get_package_version_page_handler {ctx req} {
             version \"$package_version\": $err"
     }
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
-    set deps_simple [::tjson::to_simple $deps_handle]
+    set deps_size [::tjson::size $deps_handle]
     set deps [list]
-    foreach {dep_name dep_version} $deps_simple {
-        lappend deps [list name $dep_name version $dep_version]
+    for {set i 0} {$i < $deps_size} {incr i} {
+        set item [::tjson::get_array_item $deps_handle $i]
+        #puts [::tjson::to_simple $item]
+        set dep_name [::tjson::get_string $item]
+        if { [::tjson::is_object $item] && [::tjson::has_object_item $item version] } {
+            set dep_version [::tjson::get_valuestring [::tjson::get_object_item $item "version"]]
+            set dep_if_use_flags [::tjson::get_valuestring [::tjson::get_object_item $item "if"]]
+        } else {
+            set dep_version [::tjson::get_valuestring $item]
+            set dep_if_use_flags ""
+        }
+        lappend deps [list name $dep_name version $dep_version condition $dep_if_use_flags]
     }
 
     set stat_platforms [get_package_version_stats $package_name $package_version]
