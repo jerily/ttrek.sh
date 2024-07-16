@@ -19,19 +19,19 @@
 			},
 			{
 				"cmd": "env_variable",
-				"if": "+asan", "name": "CFLAGS", "value": "-fsanitize=address"
+				"if": "+sanitize", "name": "CFLAGS", "value": "-fsanitize=address"
 			},
 			{
 				"cmd": "env_variable",
-				"if": "+asan", "name": "LDFLAGS", "value": "-fsanitize=address"
+				"if": "+sanitize", "name": "LDFLAGS", "value": "-fsanitize=address"
 			},
 			{
 				"cmd": "env_variable",
-				"if": "+ubsan", "name": "CFLAGS", "value": "-fsanitize=undefined"
+				"if": "+sanitize", "name": "CFLAGS", "value": "-fsanitize=undefined"
 			},
 			{
 				"cmd": "env_variable",
-				"if": "+ubsan", "name": "LDFLAGS", "value": "-fsanitize=undefined"
+				"if": "+sanitize", "name": "LDFLAGS", "value": "-fsanitize=undefined"
 			},
 			{
 				"cmd": "configure",
