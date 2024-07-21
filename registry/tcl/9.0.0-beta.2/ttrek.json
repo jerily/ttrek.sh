@@ -13,7 +13,33 @@
 			{ "cmd": "download", "url": "https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b2.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
-			{ "cmd": "configure", "path": "$SOURCE_DIR/unix/configure" },
+			{
+				"cmd": "env_variable",
+				"if": "+debug", "name": "CFLAGS", "value": "-DPURIFY"
+			},
+			{
+				"cmd": "env_variable",
+				"if": "+sanitize", "name": "CFLAGS", "value": "-fsanitize=address"
+			},
+			{
+				"cmd": "env_variable",
+				"if": "+sanitize", "name": "LDFLAGS", "value": "-fsanitize=address"
+			},
+			{
+				"cmd": "env_variable",
+				"if": "+sanitize", "name": "CFLAGS", "value": "-fsanitize=undefined"
+			},
+			{
+				"cmd": "env_variable",
+				"if": "+sanitize", "name": "LDFLAGS", "value": "-fsanitize=undefined"
+			},
+			{
+				"cmd": "configure",
+				"path": "$SOURCE_DIR/unix/configure",
+				"options": [
+					{ "name": "enable-symbols", "value": "all", "if": "+debug" }
+				]
+			},
 			{ "cmd": "make", "parallel": true },
 			{ "cmd": "make_install" }
 		]
