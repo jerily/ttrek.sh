@@ -21,7 +21,7 @@
 				"path": "./Configure",
 				"options": [
 					{ "name": "libdir", "value": "lib" },
-					{ "name": "no-docs" }
+					{ "name": "no-docs", "if": "-docs" }
 				]
 			},
 			{ "cmd": "make", "parallel": true },
