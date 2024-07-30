@@ -1,6 +1,6 @@
 {
 	"name":	"aws-sdk-tcl",
-	"version":	"1.0.8",
+	"version":	"1.0.9",
 	"scripts":	{
 	},
 	"dependencies":	{
@@ -11,7 +11,7 @@
 	},
 	"build": {
 		"default": [
-			{ "cmd": "download", "url": "https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.8.tar.gz" },
+			{ "cmd": "download", "url": "https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.9.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{ "cmd": "cmake_config",
