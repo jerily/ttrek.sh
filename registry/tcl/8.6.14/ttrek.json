@@ -17,7 +17,8 @@
 				"cmd": "configure",
 				"path": "$SOURCE_DIR/unix/configure",
 				"options": [
-					{ "name": "enable-threads" }
+					{ "name": "enable-threads" },
+					{ "name": "disable-shared", "if": "+static" }
 				]
 			},
 			{ "cmd": "make", "parallel": true },

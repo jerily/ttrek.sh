@@ -37,7 +37,8 @@
 				"cmd": "configure",
 				"path": "$SOURCE_DIR/unix/configure",
 				"options": [
-					{ "name": "enable-symbols", "value": "all", "if": "+debug" }
+					{ "name": "enable-symbols", "value": "all", "if": "+debug" },
+					{ "name": "disable-shared", "if": "+static" }
 				]
 			},
 			{ "cmd": "make", "parallel": true },

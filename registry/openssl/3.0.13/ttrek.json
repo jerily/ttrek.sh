@@ -20,7 +20,9 @@
 				"cmd": "configure",
 				"path": "./Configure",
 				"options": [
-					{ "name": "libdir", "value": "lib" }
+					{ "name": "libdir", "value": "lib" },
+					{ "name": "no-shared", "if": "+static" },
+					{ "name": "no-pinshared", "if": "+static" }
 				]
 			},
 			{ "cmd": "make", "parallel": true },

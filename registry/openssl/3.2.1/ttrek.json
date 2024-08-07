@@ -21,7 +21,9 @@
 				"path": "./Configure",
 				"options": [
 					{ "name": "libdir", "value": "lib" },
-					{ "name": "no-docs", "if": "-docs" }
+					{ "name": "no-shared", "if": "+static", "option_prefix": "" },
+					{ "name": "no-pinshared", "if": "+static", "option_prefix": "" },
+					{ "name": "no-docs", "if": "-docs", "option_prefix": "" }
 				]
 			},
 			{ "cmd": "make", "parallel": true },
