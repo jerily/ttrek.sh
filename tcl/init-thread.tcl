@@ -11,7 +11,7 @@ package require thread
     cache 0 \
     rootdir [::twebserver::get_rootdir]]
 
-set router [::twebserver::create_router]
+::twebserver::create_router -command_name process_conn router
 
 ::twebserver::add_route -strict $router GET / get_index_page_handler
 ::twebserver::add_route -strict $router GET /init get_ttrek_init_handler
@@ -27,8 +27,6 @@ set router [::twebserver::create_router]
 ::twebserver::add_route -strict $router GET /logo get_logo_handler
 ::twebserver::add_route $router GET "*" get_catchall_handler
 
-# make sure that the router will be called when the server receives a connection
-interp alias {} process_conn {} $router
 
 proc telemetry_event { event_type args } {
     thread::send -async [dict get [::twebserver::get_config_dict] telemetry_thread_id] \
