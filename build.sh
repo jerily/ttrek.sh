@@ -28,8 +28,7 @@ if [ ! -e "$INSTALL_DIR"/bin/tclsh* ]; then
     echo "Build Tcl ..."
     if [ ! -e "$SOURCE_DIR"/tcl-* ]; then
         cd "$SOURCE_DIR"
-        #curl -sL https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b1.tar.gz | tar zx
-        curl -sL https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b2.tar.gz | tar zx
+        curl -sL https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b3.tar.gz | tar zx
     fi
     mkdir -p "$BUILD_DIR"/tcl
     cd "$BUILD_DIR"/tcl
@@ -42,8 +41,8 @@ if [ ! -e "$INSTALL_DIR"/lib/tdom*/pkgIndex.tcl ]; then
     echo "Build tdom ..."
     if [ ! -e "$SOURCE_DIR"/tdom-* ]; then
         cd "$SOURCE_DIR"
-        curl -sL http://tdom.org/index.html/tarball/trunk/tdom-trunk.tar.gz | tar zx
-        #curl -sL http://tdom.org/downloads/tdom-0.9.3-src.tar.gz | tar zx
+#        curl -sL http://tdom.org/index.html/tarball/trunk/tdom-trunk.tar.gz | tar zx
+        curl -sL http://tdom.org/downloads/tdom-0.9.4-src.tar.gz | tar zx
     fi
     mkdir -p "$BUILD_DIR"/tdom
     cd "$BUILD_DIR"/tdom
