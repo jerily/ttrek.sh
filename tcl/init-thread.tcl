@@ -246,7 +246,7 @@ proc get_package_version_dependencies {dir package_name version} {
     set deps [list]
     set spec_path [file join $dir registry $package_name $version ttrek.json]
     if {![file exists $spec_path]} {
-        error "spec file not found"
+        error "spec file not found: $package_name $version"
     }
 
     set fp [open $spec_path]
