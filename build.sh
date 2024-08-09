@@ -107,7 +107,7 @@ if [ ! -e "$INSTALL_DIR"/lib/thread*/pkgIndex.tcl ]; then
     echo "Build threads ..."
     if [ ! -e "$SOURCE_DIR"/thread* ]; then
         cd "$SOURCE_DIR"
-        curl -sL https://sourceforge.net/projects/tcl/files/Tcl/9.0b2/thread3.0b2.tar.gz | tar zx
+        curl -sL https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/thread3.0b4.tar.gz | tar zx
     fi
     mkdir -p "$BUILD_DIR"/thread
     cd "$BUILD_DIR"/thread
