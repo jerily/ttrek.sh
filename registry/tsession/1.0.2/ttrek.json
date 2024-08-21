@@ -6,7 +6,7 @@
 	"dependencies":	{
 		"tink-tcl": ">=20240401.0",
 		"twebserver": "^1.47.51",
-		"tcl": "^9.0.0-beta.3"
+		"tcl": ">=8.6.14"
 	},
 	"devDependencies":	{
 	},
