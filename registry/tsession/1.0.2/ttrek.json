@@ -12,7 +12,7 @@
 	},
 	"build": {
 		"default": [
-			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git", "if": "+unstable" },
+			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git" },
 			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
 			{ "cmd": "make_install",
 				"options": [
