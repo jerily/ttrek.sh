@@ -4,15 +4,15 @@
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tink-tcl": ">=20240401.0",
-		"twebserver": "^1.47.51",
+		"tink-tcl": ">=20240704.0.0",
+		"twebserver": ">=1.47.51",
 		"tcl": ">=8.6.14"
 	},
 	"devDependencies":	{
 	},
 	"build": {
 		"default": [
-			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git" },
+			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git", "if": "+unstable" },
 			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
 			{ "cmd": "make_install",
 				"options": [
