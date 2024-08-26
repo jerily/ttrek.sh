@@ -93,6 +93,7 @@ if [ ! -e "$INSTALL_DIR"/bin/openssl* ]; then
     CFLAGS= LDFLAGS= ./Configure --prefix="$INSTALL_DIR" no-docs
     make
     make install
+    make install_dev
 fi
 
 if [ ! -e "$INSTALL_DIR"/lib/twebserver*/pkgIndex.tcl ]; then
