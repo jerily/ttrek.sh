@@ -26,7 +26,8 @@
 				]
 			},
 			{ "cmd": "make", "parallel": true },
-			{ "cmd": "make_install" }
+			{ "cmd": "make_install" },
+			{ "cmd": "make_install", "target": "install_dev" }
 		]
 	}
 }
