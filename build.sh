@@ -90,7 +90,7 @@ if [ ! -e "$INSTALL_DIR"/bin/openssl* ]; then
         curl -sL https://www.openssl.org/source/openssl-3.2.1.tar.gz | tar zx
     fi
     cd "$SOURCE_DIR"/openssl-*
-    CFLAGS= LDFLAGS= ./Configure --prefix="$INSTALL_DIR" no-docs
+    CFLAGS= LDFLAGS= ./Configure --prefix="$INSTALL_DIR" --libdir="lib" no-docs
     make
     make install
     make install_dev
