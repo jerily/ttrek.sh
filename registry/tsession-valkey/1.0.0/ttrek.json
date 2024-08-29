@@ -1,0 +1,23 @@
+{
+	"name":	"tsession-valkey",
+	"version":	"1.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"valkey-tcl": "^1.0.0",
+		"tsession": "^1.0.3"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "git", "url": "https://github.com/jerily/tsession-valkey.git" },
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{ "cmd": "make_install",
+				"options": [
+					{ "name": "PREFIX", "value": "$INSTALL_DIR" }
+				]
+			}
+		]
+	}
+}
