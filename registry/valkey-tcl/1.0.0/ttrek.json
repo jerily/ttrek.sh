@@ -1,0 +1,28 @@
+{
+	"name":	"valkey-tcl",
+	"version":	"1.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"tcl": ">=8.6.14",
+		"libvalkey": "=0.1.0"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/jerily/valkey-tcl/archive/refs/tags/v1.0.0.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{ "cmd": "cmake_config",
+				"options": [
+					{"name": "TCL_LIBRARY_DIR", "value":  "$INSTALL_DIR/lib"},
+					{"name": "TCL_INCLUDE_DIR", "value":  "$INSTALL_DIR/include"},
+					{ "name": "ENABLE_SSL", "value": "ON", "if": "+ssl" }
+				]
+			},
+			{ "cmd": "make", "parallel": true },
+			{ "cmd": "make_install" }
+		]
+	}
+}

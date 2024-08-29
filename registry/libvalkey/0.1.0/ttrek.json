@@ -1,0 +1,29 @@
+{
+	"name": "libvalkey",
+	"version": "0.1.0",
+	"scripts": {
+	},
+	"dependencies":	{
+		"openssl": { "version": "^3.0.13", "if": "+ssl" }
+	},
+	"devDependencies": {
+	},
+	"build": {
+		"default": [
+			{
+				"cmd": "download",
+				"url": "https://github.com/valkey-io/libvalkey/archive/1ce574c28ecf137329a410381ce03c453616a9f9.tar.gz"
+			},
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{
+				"cmd": "cmake_config",
+				"options": [
+					{ "name": "ENABLE_SSL", "value": "ON", "if": "+ssl" }
+				]
+			},
+			{ "cmd": "make", "parallel": true },
+			{ "cmd": "make_install" }
+		]
+	}
+}
