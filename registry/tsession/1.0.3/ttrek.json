@@ -5,7 +5,7 @@
 	},
 	"dependencies":	{
 		"tink-tcl": ">=20240704.0.0",
-		"twebserver": ">=1.47.51",
+		"twebserver": ">=1.47.53",
 		"tcl": ">=8.6.14",
 		"thread": ">=2.8.0"
 	},
@@ -13,7 +13,8 @@
 	},
 	"build": {
 		"default": [
-			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git" },
+			{ "cmd": "download", "url": "https://github.com/jerily/tsession/archive/refs/tags/v1.0.3.tar.gz" },
+			{ "cmd":  "unpack" },
 			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
 			{ "cmd": "make_install",
 				"options": [
