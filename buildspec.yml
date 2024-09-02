@@ -18,9 +18,10 @@ phases:
       - chmod 755 -R build.sh
       - mkdir -p ../ttrek-app/artifacts/
       - cp -R ../ttrek.sh/codedeploy-scripts/ ../ttrek-app/artifacts/
-      - cp -R ../ttrek.sh/* ../ttrek-app/
+      - cp -R ../ttrek.sh/. ../ttrek-app/artifacts/ttrek-app
       - apt-get update && apt-get install cmake -y
       - ./build.sh
+      - cp -R build ../ttrek-app/
       - echo Build started on `date`
       - echo Building the Docker image...
       - echo `pwd`
