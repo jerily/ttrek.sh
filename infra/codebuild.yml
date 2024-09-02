@@ -149,6 +149,12 @@ Resources:
           - Name: AppName
             Type: PLAINTEXT
             Value: !Ref AppName
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::AccountId}
+          - Name: AWS_DEFAULT_REGION
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::Region}
 
       Source:
         Type: GITHUB
