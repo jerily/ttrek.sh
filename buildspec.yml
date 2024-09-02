@@ -25,7 +25,7 @@ phases:
       - echo Building the Docker image...
       - echo `pwd`
       - ls -la
-      - cd ../ttrek.sh
+      - cd ../ttrek-app
       - docker build -t $REPOSITORY_URI:latest -f ../ttrek.sh/Dockerfile .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   post_build:
