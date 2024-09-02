@@ -128,7 +128,7 @@ Resources:
             Action:
               - ecr:*
             Resource:
-              - !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/ttrek-app
+              - !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/ttrek-app-repo
       Roles:
         - !Ref CodeBuildRole
 
