@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "KMS Key, ECR Repository, S3 Bucket, and VPC for TTrek"
+
+Metadata:
+  StackName: "Infra-DevOps-TTREK-Base"
+
+Parameters:
+  S3Prefix:
+    Type: String
+    Default: "jrl"
+  AppName:
+    Type: String
+    Default: "ttrek-app"
+  Vpc0CIDR:
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnetCIDR:
+    Type: String
+    Default: 10.0.1.0/24
+
+Resources:
+  TTrekKMSMasterKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "KMS Key for TTrek"
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:user/jrl_neo_dev"
+            Action:
+              - "kms:*"
+            Resource: "*"
+  TTrekKMSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub "alias/${AppName}-KMSKey"
+      TargetKeyId: !Ref TTrekKMSMasterKey
+
+
+Outputs:
+  TTrekKMSMasterKeyArn:
+    Description: "TTrek KMS Key"
+    Value: !GetAtt TTrekKMSMasterKey.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-KMSMasterKeyArn"

@@ -1,0 +1,17 @@
+version: 0.0
+os: linux
+
+files:
+  - source: ttrek-app
+    destination: /var/www/ttrek-app
+
+file_exists_behavior: OVERWRITE
+
+hooks:
+  BeforeInstall:
+    - location: codedeploy-scripts/BeforeInstallPerms.sh
+  AfterInstall:
+    - location: codedeploy-scripts/AfterInstallPerms.sh
+    - location: codedeploy-scripts/AfterInstall.sh
+      runas: webapp
+

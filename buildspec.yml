@@ -1,0 +1,45 @@
+version: 0.2
+
+env:
+  shell: bash
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/ttrek-app
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+  build:
+    on-failure: ABORT
+    commands:
+      - export APP_NAME=ttrek-app
+      - chmod 755 -R build.sh
+      - ./build.sh
+      - echo Build started on `date`
+      - echo Building the Docker image...
+      - echo `pwd`
+      - ls -la
+      - cd ../ttrek.sh
+      - docker build -t $REPOSITORY_URI:latest -f ../ttrek.sh/Dockerfile .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - printf '[{"name":"%s","imageUri":"%s"}]' $APP_NAME $REPOSITORY_URI:$IMAGE_TAG > $CODEBUILD_SRC_DIR/imagedefinitions.json
+      - |
+        CLUSTER_STATUS=`aws ecs describe-clusters --clusters ttrek-app-Cluster --query "clusters[0].status" --output text`
+
+        if [ "$CLUSTER_STATUS" == "ACTIVE" ]; then
+            echo "TTrek Cluster is ACTIVE. Force new deployment"
+            aws ecs update-service --cluster ttrek-app-Cluster --service TTrekFargateService --force-new-deployment
+        fi
+
+artifacts:
+  files: $CODEBUILD_SRC_DIR/imagedefinitions.json
+  discard-paths: yes

@@ -1,0 +1,217 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "FarGate Cluster and Service for TTrek"
+
+Metadata:
+  StackName: "Infra-DevOps-TTREK-App"
+
+Parameters:
+  S3Prefix:
+    Type: String
+    Default: "jrl"
+  AppName:
+    Type: String
+    Default: "ttrek-app"
+
+Resources:
+  TTrekLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/${AppName}
+      KmsKeyId: !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
+
+  TTrekNetworkLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: TTrekNetworkLoadBalancer
+      Scheme: internet-facing
+      Type: network
+      IpAddressType: dualstack
+      SecurityGroups:
+        - !Ref TTrekNetworkLoadBalancerSecurityGroup
+      Subnets:
+        - !ImportValue 'Infra-DevOps-TTREK-Base-PublicSubnetId'
+
+  TTrekNetworkLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "TTrek-NLB-SecurityGroup"
+      VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 10080
+          SourceSecurityGroupId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0SecurityGroupId'
+
+  TTrekLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
+      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
+      Port: 10080
+      Protocol: HTTP
+
+  TTrekLoadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AppName}-TargetGroup"
+      VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
+      Port: 10080
+      Protocol: HTTP
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckPath: /health-check
+      HealthCheckIntervalSeconds: 60
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+
+  TTrekCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AppName}-cluster"
+
+
+  TTrekFargateService:
+    Type: AWS::ECS::Service
+    DependsOn: TTrekLoadBalancerListener
+    Properties:
+      ServiceName: "TTrekFargateService"
+      Cluster: !Ref TTrekCluster
+      LaunchType: FARGATE
+      TaskDefinition: !Ref EcsTaskDefinition
+      DesiredCount: 2
+      HealthCheckGracePeriodSeconds: 30
+      LoadBalancers:
+        - ContainerName: "TTrekContainerDefinition"
+          ContainerPort: 10080
+          TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - !ImportValue "Infra-DevOps-TTREK-Base-PublicSubnetId"
+          SecurityGroups:
+            - !Ref TTrekServiceSecurityGroup
+      Tags:
+        - Key: App
+          Value: !Ref AppName
+      PropagateTags: SERVICE
+
+  TTrekServiceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "TTrek-FargateService-SecurityGroup"
+      VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
+      Tags:
+        - Key: Name
+          Value: "TTrek-FargateService-SecurityGroup"
+
+  HttpRequestInboundRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 10080
+      ToPort: 10080
+      GroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
+      SourceSecurityGroupId: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
+
+#  RedisInboundRule:
+#    Type: AWS::EC2::SecurityGroupIngress
+#    Properties:
+#      IpProtocol: tcp
+#      FromPort: 6379
+#      ToPort: 6379
+#      SourceSecurityGroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
+#      GroupId: !ImportValue 'Infra-DevOps-TTREK-Base-RedisSecurityGroupId'
+#      Description: "Access from TTrek Fargate"
+
+  EcsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: "ecs-tasks.amazonaws.com"
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/*
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:Encrypt
+                  - kms:GenerateDataKey
+                Resource:
+                  - !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
+              - Effect: Allow
+                Action:
+                  - s3:DeleteObject
+                  - s3:DeleteObjectVersion
+                  - s3:GetBucketWebsite
+                  - s3:GetObject*
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:ListBucketVersions
+                  - s3:PutObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3Prefix}-${AppName}'
+                  - !Sub 'arn:aws:s3:::${S3Prefix}-${AppName}/*'
+
+  EcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${AWS::StackName}-EcsTaskDefinition
+      ContainerDefinitions:
+        - Name: "TTrekContainerDefinition"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}:latest"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref TTrekLogGroup
+              awslogs-stream-prefix: ecs
+          PortMappings:
+            - ContainerPort: 10080
+              HostPort: 10080
+              Protocol: tcp
+      Cpu: 1024
+      Memory: 2048
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !GetAtt "EcsExecutionRole.Arn"
+      TaskRoleArn: !GetAtt "EcsTaskRole.Arn"
+      EphemeralStorage:
+        SizeInGiB: 40
+      RequiresCompatibilities:
+        - FARGATE
+
+Outputs:
+  TTrekNetworkLoadBalancerDNSName:
+    Value: !GetAtt TTrekNetworkLoadBalancer.DNSName
+    Export:
+      Name: "TTrekNLB-DNSName"
+  TTrekNetworkLoadBalancerSecurityGroupId:
+    Value: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
+    Export:
+      Name: "TTrekNLB-SecurityGroupId"

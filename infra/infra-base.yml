@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "KMS Key, ECR Repository, S3 Bucket, and VPC for TTrek"
+
+Metadata:
+  StackName: "Infra-DevOps-TTREK-Base"
+
+Parameters:
+  S3Prefix:
+    Type: String
+    Default: "jrl"
+  AppName:
+    Type: String
+    Default: "ttrek-app"
+  Vpc0CIDR:
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnetCIDR:
+    Type: String
+    Default: 10.0.1.0/24
+
+Resources:
+  TTrekRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AppName}-repo"
+      LifecyclePolicy:
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep at most 3 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":3},\"action\":{\"type\":\"expire\"}}]}"
+
+  TTrekBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${S3Prefix}-${AppName}"
+      AccessControl: Private
+      Tags:
+        - Key: Name
+          Value: !Ref AppName
+
+  TTrekVpc0:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref Vpc0CIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-vpc0"
+
+  TTrekVpc0SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "TTrek-Vpc0-SecurityGroup"
+      VpcId: !Ref TTrekVpc0
+
+  TTrekPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !Ref PublicSubnetCIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-subnet"
+
+  TTrekPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-route-table"
+
+  TTrekPublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref TTrekPublicRouteTable
+      SubnetId: !Ref TTrekPublicSubnet
+
+  TTrekInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  TTrekInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref TTrekInternetGateway
+      VpcId: !Ref TTrekVpc0
+
+  TTrekDefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: TTrekInternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref TTrekPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref TTrekInternetGateway
+
+Outputs:
+  TTrekRepositoryArn:
+    Description: "TTrek ECR Repository"
+    Value: !GetAtt TTrekRepository.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-RepositoryArn"
+
+  TTrekBucketArn:
+    Description: "TTrek S3 Bucket"
+    Value: !GetAtt TTrekBucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketArn"
+
+  TTrekVpc0Id:
+    Description: "TTrek Vpc0"
+    Value: !Ref TTrekVpc0
+    Export:
+      Name: !Sub "${AWS::StackName}-Vpc0Id"
+
+  TTrekPublicSubnetId:
+    Description: "TTrek Public Subnet"
+    Value: !Ref TTrekPublicSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnetId"
+
+  TTrekVpc0SecurityGroupId:
+    Description: "TTrek Vpc0 Security Group"
+    Value: !GetAtt TTrekVpc0SecurityGroup.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-Vpc0SecurityGroupId"
