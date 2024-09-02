@@ -16,7 +16,7 @@ phases:
     commands:
       - export APP_NAME=ttrek-app
       - chmod 755 -R build.sh
-      - dnf install cmake -y
+      - apt-get update && apt-get install cmake -y
       - ./build.sh
       - echo Build started on `date`
       - echo Building the Docker image...
