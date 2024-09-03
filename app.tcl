@@ -39,10 +39,10 @@ set ttrek_sh_cert [file normalize [file join $dir "certs/cert.pem"]]
 ::twebserver::listen_server -num_threads 8 $server_handle 4433
 
 # listen for an HTTP connection on port 8080
-::twebserver::listen_server -http $server_handle 10080
+::twebserver::listen_server -http $server_handle 8080
 
 # print that the server is running
-puts "server is running. go to http://ttrek.sh:10080/ or https://ttrek.sh:4433/"
+puts "server is running. go to http://ttrek.sh:8080/ or https://ttrek.sh:4433/"
 
 # wait forever
 vwait forever
