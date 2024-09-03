@@ -17,6 +17,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /ecs/${AppName}
+      RetentionInDays: 7
       KmsKeyId: !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
 
   TTrekNetworkLoadBalancer:
@@ -25,7 +26,7 @@ Resources:
       Name: TTrekNetworkLoadBalancer
       Scheme: internet-facing
       Type: network
-      IpAddressType: dualstack
+      IpAddressType: ipv4
       SecurityGroups:
         - !Ref TTrekNetworkLoadBalancerSecurityGroup
       Subnets:
@@ -50,7 +51,7 @@ Resources:
           TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
       LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
       Port: 10080
-      Protocol: HTTP
+      Protocol: TCP
 
   TTrekLoadBalancerTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -58,19 +59,30 @@ Resources:
       Name: !Sub "${AppName}-TargetGroup"
       VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
       Port: 10080
-      Protocol: HTTP
+      Protocol: TCP
       TargetType: ip
       HealthCheckEnabled: true
-      HealthCheckPath: /health-check
       HealthCheckIntervalSeconds: 60
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 5
+      UnhealthyThresholdCount: 3
+
+
+  TTrekElasticIP:
+      Type: AWS::EC2::EIP
+      Properties:
+        Domain: vpc
+
+#  TTrekElasticIPAssociation:
+#      Type: AWS::EC2::EIPAssociation
+#      Properties:
+#        AllocationId: !GetAtt TTrekElasticIP.AllocationId
+#        NetworkInterfaceId:
 
   TTrekCluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub "${AppName}-cluster"
+      ClusterName: !Sub "${AppName}-Cluster"
 
 
   TTrekFargateService:
@@ -215,3 +227,7 @@ Outputs:
     Value: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
     Export:
       Name: "TTrekNLB-SecurityGroupId"
+  TTrekElasticPublicIp:
+    Value: !GetAtt TTrekElasticIP.PublicIp
+    Export:
+      Name: "TTrekElasticPublicIp"
