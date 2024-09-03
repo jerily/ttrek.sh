@@ -61,8 +61,8 @@ Resources:
       Port: 8080
       Protocol: TCP
       TargetType: ip
-      HealthCheckEnabled: false
-      HealthCheckIntervalSeconds: 60
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
