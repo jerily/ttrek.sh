@@ -197,7 +197,7 @@ Resources:
       Family: !Sub ${AWS::StackName}-EcsTaskDefinition
       ContainerDefinitions:
         - Name: "TTrekContainerDefinition"
-          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}:latest"
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AppName}-repo:latest"
           LogConfiguration:
             LogDriver: awslogs
             Options:
