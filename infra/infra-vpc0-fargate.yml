@@ -40,7 +40,7 @@ Resources:
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
-          ToPort: 10080
+          ToPort: 8080
           SourceSecurityGroupId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0SecurityGroupId'
 
   TTrekLoadBalancerListener:
@@ -50,7 +50,7 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
       LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
-      Port: 10080
+      Port: 8080
       Protocol: TCP
 
   TTrekLoadBalancerTargetGroup:
@@ -58,10 +58,10 @@ Resources:
     Properties:
       Name: !Sub "${AppName}-TargetGroup"
       VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
-      Port: 10080
+      Port: 8080
       Protocol: TCP
       TargetType: ip
-      HealthCheckEnabled: true
+      HealthCheckEnabled: false
       HealthCheckIntervalSeconds: 60
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
@@ -97,7 +97,7 @@ Resources:
       HealthCheckGracePeriodSeconds: 30
       LoadBalancers:
         - ContainerName: "TTrekContainerDefinition"
-          ContainerPort: 10080
+          ContainerPort: 8080
           TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
@@ -123,8 +123,8 @@ Resources:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       IpProtocol: tcp
-      FromPort: 10080
-      ToPort: 10080
+      FromPort: 80
+      ToPort: 8080
       GroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
       SourceSecurityGroupId: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
 
@@ -205,8 +205,8 @@ Resources:
               awslogs-group: !Ref TTrekLogGroup
               awslogs-stream-prefix: ecs
           PortMappings:
-            - ContainerPort: 10080
-              HostPort: 10080
+            - ContainerPort: 8080
+              HostPort: 8080
               Protocol: tcp
       Cpu: 1024
       Memory: 2048
