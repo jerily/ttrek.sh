@@ -54,6 +54,16 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-vpc0"
 
+  TTrekVpc0EndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+          - !Ref TTrekPrivateRouteTable
+          - !Ref TTrekPublicRouteTable
+
   TTrekVpc0EndpointEcrDkr:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -98,6 +108,16 @@ Resources:
     Properties:
       GroupDescription: "TTrek-Vpc0-SecurityGroup"
       VpcId: !Ref TTrekVpc0
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
       Tags:
           - Key: Name
             Value: "TTrek-Vpc0-SecurityGroup"
