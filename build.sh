@@ -7,7 +7,7 @@ SOURCE_DIR="$SELF_DIR/build/source"
 INSTALL_DIR="$SELF_DIR/build/install"
 BUILD_DIR="$SELF_DIR/build/build"
 
-DEBUG=1
+DEBUG=0
 
 if [ "$DEBUG" != 0 ]; then
     CFLAGS="-DPURIFY -fsanitize=address -g"
