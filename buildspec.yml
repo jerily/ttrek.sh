@@ -23,6 +23,7 @@ phases:
       - ./build.sh
       - cp -R ../ttrek.sh/build ../ttrek-app/artifacts/ttrek-app/
       - mkdir -p ../ttrek-app/artifacts/ttrek-app/certs
+      - cd ../ttrek-app/artifacts/ttrek-app/certs
       - ../build/install/bin/openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -sha256 -days 3650 -nodes -subj "/C=CY/ST=Cyprus/L=Home/O=none/OU=CompanySectionName/CN=localhost/CN=www.example.com"
       - cd ../../../../ttrek-app
       - ls -la ../ttrek-app/artifacts/ttrek-app/
