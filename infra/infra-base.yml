@@ -17,6 +17,9 @@ Parameters:
   PublicSubnetCIDR:
     Type: String
     Default: 10.0.1.0/24
+  PrivateSubnetCIDR:
+    Type: String
+    Default: 10.0.2.0/24
 
 Resources:
   TTrekRepository:
@@ -45,11 +48,63 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-vpc0"
 
+  TTrekVPCEndpointEcrDkr:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
+  TTrekVPCEndpointEcrApi:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
+  TTrekVPCEndpointLogs:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
   TTrekVpc0SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: "TTrek-Vpc0-SecurityGroup"
       VpcId: !Ref TTrekVpc0
+      Tags:
+          - Key: Name
+            Value: "TTrek-Vpc0-SecurityGroup"
+
+  TTrekPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !Ref PrivateSubnetCIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-private-subnet"
 
   TTrekPublicSubnet:
     Type: AWS::EC2::Subnet
@@ -59,7 +114,7 @@ Resources:
         - 1
         - Fn::GetAZs: !Ref AWS::Region
       CidrBlock: !Ref PublicSubnetCIDR
-      MapPublicIpOnLaunch: true
+      MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-public-subnet"
@@ -119,6 +174,12 @@ Outputs:
     Value: !Ref TTrekPublicSubnet
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnetId"
+
+  TTrekPrivateSubnetId:
+    Description: "TTrek Private Subnet"
+    Value: !Ref TTrekPrivateSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnetId"
 
   TTrekVpc0SecurityGroupId:
     Description: "TTrek Vpc0 Security Group"

@@ -20,6 +20,11 @@ Resources:
       RetentionInDays: 7
       KmsKeyId: !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
 
+  TTrekElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
   TTrekNetworkLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -29,8 +34,9 @@ Resources:
       IpAddressType: ipv4
       SecurityGroups:
         - !Ref TTrekNetworkLoadBalancerSecurityGroup
-      Subnets:
-        - !ImportValue 'Infra-DevOps-TTREK-Base-PublicSubnetId'
+      SubnetMappings:
+        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PublicSubnetId'
+          AllocationId: !GetAtt TTrekElasticIP.AllocationId
 
   TTrekNetworkLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -39,7 +45,7 @@ Resources:
       VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 80
+          FromPort: 8080
           ToPort: 8080
           SourceSecurityGroupId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0SecurityGroupId'
 
@@ -67,18 +73,6 @@ Resources:
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
 
-
-  TTrekElasticIP:
-      Type: AWS::EC2::EIP
-      Properties:
-        Domain: vpc
-
-#  TTrekElasticIPAssociation:
-#      Type: AWS::EC2::EIPAssociation
-#      Properties:
-#        AllocationId: !GetAtt TTrekElasticIP.AllocationId
-#        NetworkInterfaceId:
-
   TTrekCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -102,7 +96,7 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           Subnets:
-            - !ImportValue "Infra-DevOps-TTREK-Base-PublicSubnetId"
+            - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnetId"
           SecurityGroups:
             - !Ref TTrekServiceSecurityGroup
       Tags:
@@ -123,7 +117,7 @@ Resources:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       IpProtocol: tcp
-      FromPort: 80
+      FromPort: 8080
       ToPort: 8080
       GroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
       SourceSecurityGroupId: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
@@ -227,7 +221,7 @@ Outputs:
     Value: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
     Export:
       Name: "TTrekNLB-SecurityGroupId"
-  TTrekElasticPublicIp:
-    Value: !GetAtt TTrekElasticIP.PublicIp
-    Export:
-      Name: "TTrekElasticPublicIp"
+#  TTrekElasticPublicIp:
+#    Value: !GetAtt TTrekElasticIP.PublicIp
+#    Export:
+#      Name: "TTrekElasticPublicIp"
