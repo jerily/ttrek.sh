@@ -22,7 +22,7 @@ phases:
       - apt-get update && apt-get install cmake -y
       - ./build.sh
       - cp -R ../ttrek.sh/build ../ttrek-app/artifacts/ttrek-app/
-      - ls -la ../ttrek-app
+      - ls -la ../ttrek-app/artifacts/ttrek-app/
       - echo Build started on `date`
       - echo Building the Docker image...
       - echo `pwd`
