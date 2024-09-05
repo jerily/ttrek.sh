@@ -50,24 +50,52 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
 
 
-  TTrekLoadBalancerListener:
+  TTrekLoadBalancerHttpListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
-          TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
+          TargetGroupArn: !Ref TTrekLoadBalancerHttpTargetGroup
       LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
       Port: 80
       Protocol: TCP
 
-  TTrekLoadBalancerTargetGroup:
+  TTrekLoadBalancerHttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TTrekLoadBalancerHttpsTargetGroup
+      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
+      Port: 443
+      Protocol: TCP
+
+  TTrekLoadBalancerHttpTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub "${AppName}-TargetGroup"
+      Name: !Sub "${AppName}-HTTP-TargetGroup"
       VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
       Port: 8080
+      Protocol: TCP
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+
+  TTrekLoadBalancerHttpsTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AppName}-HTTPS-TargetGroup"
+      VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
+      Port: 4433
       Protocol: TCP
       TargetType: ip
       HealthCheckEnabled: true
@@ -84,7 +112,7 @@ Resources:
 
   TTrekFargateService:
     Type: AWS::ECS::Service
-    DependsOn: TTrekLoadBalancerListener
+    DependsOn: TTrekLoadBalancerHttpListener
     Properties:
       ServiceName: "TTrekFargateService"
       Cluster: !Ref TTrekCluster
@@ -95,7 +123,10 @@ Resources:
       LoadBalancers:
         - ContainerName: "TTrekContainerDefinition"
           ContainerPort: 8080
-          TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
+          TargetGroupArn: !Ref TTrekLoadBalancerHttpTargetGroup
+        - ContainerName: "TTrekContainerDefinition"
+          ContainerPort: 4433
+          TargetGroupArn: !Ref TTrekLoadBalancerHttpsTargetGroup
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -206,6 +237,9 @@ Resources:
           PortMappings:
             - ContainerPort: 8080
               HostPort: 8080
+              Protocol: tcp
+            - ContainerPort: 4433
+              HostPort: 4433
               Protocol: tcp
       Cpu: 1024
       Memory: 2048
