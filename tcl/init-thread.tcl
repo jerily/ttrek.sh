@@ -11,7 +11,7 @@ package require thread
     cache 0 \
     rootdir [::twebserver::get_rootdir]]
 
-set router [::twebserver::create_router]
+::twebserver::create_router -command_name process_conn router
 
 ::twebserver::add_route -strict $router GET / get_index_page_handler
 ::twebserver::add_route -strict $router GET /init get_ttrek_init_handler
@@ -27,8 +27,6 @@ set router [::twebserver::create_router]
 ::twebserver::add_route -strict $router GET /logo get_logo_handler
 ::twebserver::add_route $router GET "*" get_catchall_handler
 
-# make sure that the router will be called when the server receives a connection
-interp alias {} process_conn {} $router
 
 proc telemetry_event { event_type args } {
     thread::send -async [dict get [::twebserver::get_config_dict] telemetry_thread_id] \
@@ -246,7 +244,7 @@ proc get_package_version_dependencies {dir package_name version} {
     set deps [list]
     set spec_path [file join $dir registry $package_name $version ttrek.json]
     if {![file exists $spec_path]} {
-        error "spec file not found"
+        error "spec file not found: $package_name $version"
     }
 
     set fp [open $spec_path]
@@ -260,8 +258,7 @@ proc get_package_version_dependencies {dir package_name version} {
             version \"$version\": $err"
     }
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
-    set deps [::tjson::to_simple $deps_handle]
-    return $deps
+    return [::tjson::to_typed $deps_handle]
 }
 
 proc get_latest_version {dir package_name} {
@@ -302,15 +299,22 @@ proc get_package_versions_handler {ctx req} {
     telemetry_event_common req_reg_get_pkg -pkg_name $package_name
     set versions_typed [list]
     foreach version [get_package_versions $dir $package_name] {
-        set deps [get_package_version_dependencies $dir $package_name $version]
-        set deps_typed [list]
-        foreach {dep_name dep_version} $deps {
-            lappend deps_typed $dep_name [list S $dep_version]
-        }
-        lappend versions_typed $version [list M $deps_typed]
+        set deps_typed [get_package_version_dependencies $dir $package_name $version]
+        lappend versions_typed $version $deps_typed
     }
     return [::twebserver::build_response 200 application/json \
         [::tjson::typed_to_json [list M $versions_typed]]]
+}
+
+proc compute_iuse_flags {spec_handle} {
+    set if_use_nodes [::tjson::query $spec_handle {$..if}]
+
+    set iuse_list [list]
+    foreach if_use_node $if_use_nodes {
+        lappend iuse_list [::tjson::get_valuestring $if_use_node]
+    }
+    set iuse_unique [lsort -unique $iuse_list]
+    return $iuse_unique
 }
 
 proc get_package_spec_handler {ctx req} {
@@ -371,10 +375,19 @@ proc get_package_spec_handler {ctx req} {
         close $fp
         lappend patches_typed [file tail $patch_path] [list S [::twebserver::base64_encode $data]]
     }
+
+    set iuse_unique [compute_iuse_flags $spec_handle]
+
+    set iuse_typed [list]
+    foreach iuse_flag $iuse_unique {
+        lappend iuse_typed [list S $iuse_flag]
+    }
+
     ::tjson::create \
         [list M \
             [list \
                 version [list S $package_version] \
+                iuse [list L $iuse_typed] \
                 dependencies $deps_typed \
                 install_script $spec_build_typed]] \
         result_handle
@@ -448,10 +461,20 @@ proc get_package_version_page_handler {ctx req} {
             version \"$package_version\": $err"
     }
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
-    set deps_simple [::tjson::to_simple $deps_handle]
+    set deps_size [::tjson::size $deps_handle]
     set deps [list]
-    foreach {dep_name dep_version} $deps_simple {
-        lappend deps [list name $dep_name version $dep_version]
+    for {set i 0} {$i < $deps_size} {incr i} {
+        set item [::tjson::get_array_item $deps_handle $i]
+        #puts [::tjson::to_simple $item]
+        set dep_name [::tjson::get_string $item]
+        if { [::tjson::is_object $item] && [::tjson::has_object_item $item version] } {
+            set dep_version [::tjson::get_valuestring [::tjson::get_object_item $item "version"]]
+            set dep_if_use_flags [::tjson::get_valuestring [::tjson::get_object_item $item "if"]]
+        } else {
+            set dep_version [::tjson::get_valuestring $item]
+            set dep_if_use_flags ""
+        }
+        lappend deps [list name $dep_name version $dep_version condition $dep_if_use_flags]
     }
 
     set stat_platforms [get_package_version_stats $package_name $package_version]

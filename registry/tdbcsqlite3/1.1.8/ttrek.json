@@ -12,7 +12,7 @@
 	},
 	"build": {
 		"default": [
-			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/9.0b2/tdbcsqlite3-1.1.8.tar.gz" },
+			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/tdbcsqlite3-1.1.8.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{

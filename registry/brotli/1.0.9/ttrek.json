@@ -1,0 +1,26 @@
+{
+	"name":	"brotli",
+	"version":	"1.0.9",
+	"scripts":	{
+	},
+	"dependencies":	{
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/google/brotli/archive/refs/tags/v1.0.9.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{
+				"cmd": "cmake_config",
+				"options": [
+					{ "name": "CMAKE_BUILD_TYPE", "value": "Release" },
+					{ "name": "BUILD_SHARED_LIBS", "value":  "OFF", "if": "+static" }
+				]
+			},
+			{ "cmd": "make", "parallel": true },
+			{ "cmd": "make_install" }
+		]
+	}
+}

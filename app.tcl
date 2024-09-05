@@ -45,7 +45,7 @@ set ttrek_sh_cert [file normalize [file join $dir "certs/cert.pem"]]
 puts "server is running. go to http://ttrek.sh:8080/ or https://ttrek.sh:4433/"
 
 # wait forever
-vwait forever
+::twebserver::wait_signal
 
 # destroy the server
 ::twebserver::destroy_server $server_handle

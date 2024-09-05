@@ -1,0 +1,27 @@
+{
+	"name":	"twebserver",
+	"version":	"1.47.47",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"openssl": "^3.0.13",
+		"tcl": ">=8.6.14"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/jerily/twebserver/archive/refs/tags/v1.47.47.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{ "cmd": "cmake_config",
+				"options": [
+					{"name": "TCL_LIBRARY_DIR", "value":  "$INSTALL_DIR/lib"},
+					{"name": "TCL_INCLUDE_DIR", "value":  "$INSTALL_DIR/include"}
+				]
+			},
+			{ "cmd": "make" },
+			{ "cmd": "make_install" }
+		]
+	}
+}

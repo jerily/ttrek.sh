@@ -1,0 +1,24 @@
+{
+	"name":	"aws-lambda-cpp",
+	"version":	"0.2.10",
+	"scripts":	{
+	},
+	"dependencies":	{
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/awslabs/aws-lambda-cpp/archive/refs/tags/v0.2.10.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{ "cmd": "cmake_config",
+				"options": [
+					{"name": "CMAKE_BUILD_TYPE", "value":  "Release"}
+				]
+			},
+			{ "cmd": "make", "parallel": true },
+			{ "cmd": "make_install" }
+		]
+	}
+}

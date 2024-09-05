@@ -10,12 +10,19 @@
             <tpl if="$deps ne {}">
                 <p class="content-subhead">Dependencies:</p>
                 <table class="pure-table" style="border: 1px solid black; border-spacing: 20px 5px;">
-                    <thead><tr><th>Name</th><th>Version Requirement</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Version Range</th>
+                            <th>Condition</th>
+                        </tr>
+                      </thead>
                     <tbody>
                         <tpl foreach="dep" in="$deps">
                             <tr>
                                 <td>${dep.name}</td>
                                 <td>${dep.version}</td>
+                                <td>${dep.condition}</td>
                             </tr>
                         </tpl>
                     </tbody>

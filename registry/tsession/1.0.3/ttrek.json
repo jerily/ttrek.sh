@@ -1,0 +1,26 @@
+{
+	"name":	"tsession",
+	"version":	"1.0.3",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"tink-tcl": ">=20240704.0.0",
+		"twebserver": ">=1.47.53",
+		"tcl": ">=8.6.14",
+		"thread": ">=2.8.0"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/jerily/tsession/archive/refs/tags/v1.0.3.tar.gz" },
+			{ "cmd":  "unpack" },
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{ "cmd": "make_install",
+				"options": [
+					{ "name": "PREFIX", "value": "$INSTALL_DIR" }
+				]
+			}
+		]
+	}
+}

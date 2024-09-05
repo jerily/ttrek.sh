@@ -1,16 +1,16 @@
 {
 	"name":	"tdom",
-	"version":	"0.9.4-alpha",
+	"version":	"0.9.4",
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tcl": "^9.0.0-beta.2"
+		"tcl": "^9.0.0-beta.3"
 	},
 	"devDependencies":	{
 	},
 	"build": {
 		"default": [
-			{ "cmd": "download", "url": "http://tdom.org/index.html/tarball/trunk/tdom-trunk.tar.gz" },
+			{ "cmd": "download", "url": "http://tdom.org/downloads/tdom-0.9.4-src.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd", "dirname": "$SOURCE_DIR/unix" },
 			{

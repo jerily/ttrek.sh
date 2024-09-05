@@ -1,17 +1,16 @@
 {
-	"name":	"tdbcmysql",
-	"version":	"1.1.8",
+	"name":	"thread",
+	"version":	"3.0.0-beta.2",
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tcl": ">=8.6.14",
-		"tdbc": "=1.1.8"
+		"tcl": "=9.0.0-beta.3"
 	},
 	"devDependencies":	{
 	},
 	"build": {
 		"default": [
-			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/tdbcmysql1.1.8.tar.gz" },
+			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/thread3.0b4.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{

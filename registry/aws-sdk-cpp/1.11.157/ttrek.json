@@ -24,7 +24,7 @@
 				"options": [
 					{ "name": "BUILD_SHARED_LIBS", "value": "ON" },
 					{ "name": "CMAKE_BUILD_TYPE", "value": "Release" },
-					{ "name": "BUILD_ONLY", "value": "s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm" },
+					{ "name": "BUILD_ONLY", "value": "s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm;kms" },
 					{ "name": "ENABLE_TESTING", "value": "OFF" },
 					{ "name": "AUTORUN_UNIT_TESTS", "value": "OFF" }
 				]

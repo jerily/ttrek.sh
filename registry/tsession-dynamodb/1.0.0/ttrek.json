@@ -1,18 +1,17 @@
 {
-	"name":	"tsession",
-	"version":	"1.0.2",
+	"name":	"tsession-dynamodb",
+	"version":	"1.0.0",
 	"scripts":	{
 	},
 	"dependencies":	{
-		"tink-tcl": ">=20240401.0",
-		"twebserver": "^1.47.38",
-		"tcl": "^9.0.0-beta.2"
+		"aws-sdk-tcl": "^1.0.10",
+		"tsession": "^1.0.3"
 	},
 	"devDependencies":	{
 	},
 	"build": {
 		"default": [
-			{ "cmd": "git", "url": "https://github.com/jerily/tsession.git" },
+			{ "cmd": "git", "url": "https://github.com/jerily/tsession-dynamodb.git" },
 			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
 			{ "cmd": "make_install",
 				"options": [

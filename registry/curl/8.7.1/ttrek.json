@@ -18,7 +18,13 @@
 				"cmd": "configure",
 				"options": [
 					{ "name": "with-openssl", "value": "$INSTALL_DIR" },
-					{ "name": "with-zlib", "value": "$INSTALL_DIR" }
+					{ "name": "with-zlib", "value": "$INSTALL_DIR" },
+					{ "name": "without-brotli" },
+					{ "name": "without-zstd" },
+					{ "name": "disable-ldap" },
+					{ "name": "disable-libidn2" },
+					{ "name": "enable-threads" },
+					{ "name": "disable-shared", "if": "+static" }
 				]
 			},
 			{ "cmd": "make", "parallel": true },

@@ -10,7 +10,7 @@
 	},
 	"build": {
 		"default": [
-			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/9.0b2/sqlite3.45.3.tar.gz" },
+			{ "cmd": "download", "url": "https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/sqlite3.45.3.tar.gz" },
 			{ "cmd": "unpack" },
 			{ "cmd": "cd" },
 			{
