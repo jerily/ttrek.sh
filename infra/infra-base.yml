@@ -137,8 +137,8 @@ Resources:
     Properties:
       GroupId: !Ref TTrekVpc0SecurityGroup
       IpProtocol: tcp
-      FromPort: 8080
-      ToPort: 8080
+      FromPort: 80
+      ToPort: 80
       CidrIp: !Ref Vpc0CIDR
 
   TTrekPrivateSubnet1:

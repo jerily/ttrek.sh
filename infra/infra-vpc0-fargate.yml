@@ -35,19 +35,22 @@ Resources:
       SecurityGroups:
         - !Ref TTrekNetworkLoadBalancerSecurityGroup
       SubnetMappings:
-        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PublicSubnet1Id'
+        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet1Id'
           AllocationId: !GetAtt TTrekElasticIP.AllocationId
+        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet2Id'
 
   TTrekNetworkLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: "TTrek-NLB-SecurityGroup"
       GroupDescription: "TTrek-NLB-SecurityGroup"
       VpcId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0Id'
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          SourceSecurityGroupId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0SecurityGroupId'
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
 
   TTrekLoadBalancerListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -56,7 +59,7 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref TTrekLoadBalancerTargetGroup
       LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
-      Port: 8080
+      Port: 80
       Protocol: TCP
 
   TTrekLoadBalancerTargetGroup:
