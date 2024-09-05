@@ -158,6 +158,15 @@ Resources:
       GroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
       SourceSecurityGroupId: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
 
+  HttpsRequestInboundRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 4433
+      ToPort: 4433
+      GroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
+      SourceSecurityGroupId: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
+
 #  RedisInboundRule:
 #    Type: AWS::EC2::SecurityGroupIngress
 #    Properties:
