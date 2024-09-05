@@ -7,12 +7,7 @@ SOURCE_DIR="$SELF_DIR/build/source"
 INSTALL_DIR="$SELF_DIR/build/install"
 BUILD_DIR="$SELF_DIR/build/build"
 
-LD_LIBRARY_PATH="$INSTALL_DIR/lib"
-PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
-export LD_LIBRARY_PATH
-export PKG_CONFIG_PATH
-
-DEBUG=1
+DEBUG=0
 
 if [ "$DEBUG" != 0 ]; then
     CFLAGS="-DPURIFY -fsanitize=address -g"
@@ -33,7 +28,8 @@ if [ ! -e "$INSTALL_DIR"/bin/tclsh* ]; then
     echo "Build Tcl ..."
     if [ ! -e "$SOURCE_DIR"/tcl-* ]; then
         cd "$SOURCE_DIR"
-        curl -sL https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b3.tar.gz | tar zx
+        #curl -sL https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b1.tar.gz | tar zx
+        curl -sL https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b2.tar.gz | tar zx
     fi
     mkdir -p "$BUILD_DIR"/tcl
     cd "$BUILD_DIR"/tcl
@@ -46,8 +42,8 @@ if [ ! -e "$INSTALL_DIR"/lib/tdom*/pkgIndex.tcl ]; then
     echo "Build tdom ..."
     if [ ! -e "$SOURCE_DIR"/tdom-* ]; then
         cd "$SOURCE_DIR"
-#        curl -sL http://tdom.org/index.html/tarball/trunk/tdom-trunk.tar.gz | tar zx
-        curl -sL http://tdom.org/downloads/tdom-0.9.4-src.tar.gz | tar zx
+        curl -sL http://tdom.org/index.html/tarball/trunk/tdom-trunk.tar.gz | tar zx
+        #curl -sL http://tdom.org/downloads/tdom-0.9.3-src.tar.gz | tar zx
     fi
     mkdir -p "$BUILD_DIR"/tdom
     cd "$BUILD_DIR"/tdom
@@ -90,7 +86,7 @@ if [ ! -e "$INSTALL_DIR"/bin/openssl* ]; then
         curl -sL https://www.openssl.org/source/openssl-3.2.1.tar.gz | tar zx
     fi
     cd "$SOURCE_DIR"/openssl-*
-    CFLAGS= LDFLAGS= ./Configure --prefix="$INSTALL_DIR" --libdir="lib" no-docs
+    CFLAGS= LDFLAGS= ./Configure --prefix="$INSTALL_DIR" no-docs
     make
     make install
     make install_dev
@@ -113,7 +109,7 @@ if [ ! -e "$INSTALL_DIR"/lib/thread*/pkgIndex.tcl ]; then
     echo "Build threads ..."
     if [ ! -e "$SOURCE_DIR"/thread* ]; then
         cd "$SOURCE_DIR"
-        curl -sL https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/thread3.0b4.tar.gz | tar zx
+        curl -sL https://sourceforge.net/projects/tcl/files/Tcl/9.0b2/thread3.0b2.tar.gz | tar zx
     fi
     mkdir -p "$BUILD_DIR"/thread
     cd "$BUILD_DIR"/thread

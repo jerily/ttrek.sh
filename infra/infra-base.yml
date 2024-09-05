@@ -1,0 +1,307 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "KMS Key, ECR Repository, S3 Bucket, and VPC for TTrek"
+
+Metadata:
+  StackName: "Infra-DevOps-TTREK-Base"
+
+Parameters:
+  S3Prefix:
+    Type: String
+    Default: "jrl"
+  AppName:
+    Type: String
+    Default: "ttrek-app"
+  Vpc0CIDR:
+    Type: String
+    Default: 10.0.0.0/16
+  PublicSubnet1CIDR:
+    Type: String
+    Default: 10.0.1.0/24
+  PublicSubnet2CIDR:
+    Type: String
+    Default: 10.0.2.0/24
+  PrivateSubnet1CIDR:
+    Type: String
+    Default: 10.0.3.0/24
+  PrivateSubnet2CIDR:
+    Type: String
+    Default: 10.0.4.0/24
+
+Resources:
+  TTrekRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AppName}-repo"
+      LifecyclePolicy:
+        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep at most 3 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":3},\"action\":{\"type\":\"expire\"}}]}"
+
+  TTrekBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${S3Prefix}-${AppName}"
+      AccessControl: Private
+      Tags:
+        - Key: Name
+          Value: !Ref AppName
+
+  TTrekVpc0:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref Vpc0CIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-vpc0"
+
+  TTrekVpc0EndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+          - !Ref TTrekPrivateRouteTable
+          - !Ref TTrekPublicRouteTable
+
+  TTrekVpc0EndpointEcrDkr:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet1
+        - !Ref TTrekPrivateSubnet2
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
+  TTrekVpc0EndpointEcrApi:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet1
+        - !Ref TTrekPrivateSubnet2
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
+  TTrekVpc0EndpointLogs:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet1
+        - !Ref TTrekPrivateSubnet2
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
+  TTrekVpc0SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "TTrek-Vpc0-SecurityGroup"
+      VpcId: !Ref TTrekVpc0
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      Tags:
+          - Key: Name
+            Value: "TTrek-Vpc0-SecurityGroup"
+
+  # allow 443 traffic inside the VPC
+  TTrekHttpsVpc0SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TTrekVpc0SecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: !Ref Vpc0CIDR
+
+  TTrekHttpVpc0SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TTrekVpc0SecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      CidrIp: !Ref Vpc0CIDR
+
+  TTrekPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-private-subnet-1"
+
+  TTrekPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-private-subnet-2"
+
+  TTrekPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-private-route-table"
+
+  TTrekPrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref TTrekPrivateRouteTable
+      SubnetId: !Ref TTrekPrivateSubnet1
+
+  TTrekPrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref TTrekPrivateRouteTable
+      SubnetId: !Ref TTrekPrivateSubnet2
+
+  TTrekPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-subnet-1"
+
+  TTrekPublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref AWS::Region
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-subnet-2"
+
+  TTrekPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-route-table"
+
+  TTrekPublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref TTrekPublicRouteTable
+      SubnetId: !Ref TTrekPublicSubnet1
+
+  TTrekPublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref TTrekPublicRouteTable
+      SubnetId: !Ref TTrekPublicSubnet2
+
+  TTrekInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  TTrekInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref TTrekInternetGateway
+      VpcId: !Ref TTrekVpc0
+
+  TTrekDefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: TTrekInternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref TTrekPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref TTrekInternetGateway
+
+  TTrekDefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref TTrekPrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref TTrekInternetGateway
+
+Outputs:
+  TTrekRepositoryArn:
+    Description: "TTrek ECR Repository"
+    Value: !GetAtt TTrekRepository.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-RepositoryArn"
+
+  TTrekBucketArn:
+    Description: "TTrek S3 Bucket"
+    Value: !GetAtt TTrekBucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketArn"
+
+  TTrekVpc0Id:
+    Description: "TTrek Vpc0"
+    Value: !Ref TTrekVpc0
+    Export:
+      Name: !Sub "${AWS::StackName}-Vpc0Id"
+
+  TTrekPublicSubnet1Id:
+    Description: "TTrek Public Subnet 1"
+    Value: !Ref TTrekPublicSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
+
+  TTrekPublicSubnet2Id:
+    Description: "TTrek Public Subnet 2"
+    Value: !Ref TTrekPublicSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet2Id"
+
+  TTrekPrivateSubnet1Id:
+    Description: "TTrek Private Subnet 1"
+    Value: !Ref TTrekPrivateSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1Id"
+
+  TTrekPrivateSubnet2Id:
+    Description: "TTrek Private Subnet 2"
+    Value: !Ref TTrekPrivateSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet2Id"
+
+  TTrekVpc0SecurityGroupId:
+    Description: "TTrek Vpc0 Security Group"
+    Value: !GetAtt TTrekVpc0SecurityGroup.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-Vpc0SecurityGroupId"

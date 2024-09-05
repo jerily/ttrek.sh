@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  S3Prefix:
+    Type: String
+    Default: "jrl"
+  AppName:
+    Type: String
+    Default: "ttrek-app"
+  BranchName:
+    Type: String
+    Default: neo-dev
+
+Resources:
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-CodeBuildRole"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: "codebuild.amazonaws.com"
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
+
+  CodeBuildPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CodeBuildPolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+          - Action:
+              - s3:*
+            Effect: Allow
+            Resource:
+              - !Sub arn:aws:s3:::${S3Prefix}-${AppName}
+              - !Sub arn:aws:s3:::${S3Prefix}-${AppName}/*
+          - Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+            Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/*"
+          - Effect: Allow
+            Action:
+              - cloudformation:CreateChangeSet
+            Resource:
+              - arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31
+          - Effect: Allow
+            Action:
+              - cloudformation:CreateChangeSet
+              - cloudformation:CreateStack
+              - cloudformation:DeleteStack
+              - cloudformation:DescribeChangeSet
+              - cloudformation:DescribeStackEvents
+              - cloudformation:DescribeStacks
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:GetTemplateSummary
+              - cloudformation:ListStackResources
+              - cloudformation:UpdateStack
+            Resource:
+              - !Sub arn:aws:cloudformation:*:${AWS::AccountId}:stack/*
+              - !Sub arn:aws:cloudformation:*:${AWS::AccountId}:transform/*
+          - Effect: Allow
+            Action:
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:GetRolePolicy
+              - iam:PutRolePolicy
+              - iam:GetRole
+              - iam:TagRole
+              - iam:CreateRole
+              - iam:UpdateRole
+              - iam:DeleteRole
+              - iam:PassRole
+            Resource:
+              - !Sub arn:aws:iam::${AWS::AccountId}:role/Infra-DevOps-TTREK-*
+          - Effect: Allow
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:CreateGrant
+            Resource:
+              - !Sub arn:aws:kms:*:${AWS::AccountId}:key/*
+              - !Sub arn:aws:kms:*:${AWS::AccountId}:alias/*
+          - Effect: Allow
+            Action:
+              - ec2:CreateNetworkInterface
+              - ec2:CreateSecurityGroup
+              - ec2:DescribeNetworkInterfaces
+              - ec2:DeleteNetworkInterface
+              - ec2:DescribeSecurityGroups
+              - ec2:DescribeSubnets
+              - ec2:DescribeVpcs
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - ecr:GetAuthorizationToken
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - ecs:RunTask
+            Resource:
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/Infra-DevOps-TTREK-App-EcsTaskDefinition
+          - Effect: Allow
+            Action:
+              - ecs:DescribeClusters
+            Resource:
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/ttrek-app-Cluster
+          - Effect: Allow
+            Action:
+              - ecs:UpdateService
+            Resource:
+              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/ttrek-app-Cluster/TTrekFargateService
+          - Effect: Allow
+            Action:
+              - ecr:*
+            Resource:
+              - !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/ttrek-app-repo
+      Roles:
+        - !Ref CodeBuildRole
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: Infra-DevOps-TTREK-Builds
+      ServiceRole: !GetAtt "CodeBuildRole.Arn"
+      ConcurrentBuildLimit: 2
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:6.0
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: AppName
+            Type: PLAINTEXT
+            Value: !Ref AppName
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::AccountId}
+          - Name: AWS_DEFAULT_REGION
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::Region}
+
+      Source:
+        Type: GITHUB
+        Location: https://github.com/jerily/ttrek.sh.git
+        InsecureSsl: true
+        GitCloneDepth: 1
+        ReportBuildStatus: false
+      SourceVersion: !Ref BranchName
+      TimeoutInMinutes: 300
+      Cache:
+        Type: S3
+        Location: !Sub ${S3Prefix}-${AppName}/tmp/codebuild-cache
+Outputs:
+  CodeBuildProject:
+    Description: CodeBuild Project ARN
+    Value:
+      Fn::GetAtt:
+        - CodeBuildProject
+        - Arn
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-CodeBuildProject-Arn
+
+
