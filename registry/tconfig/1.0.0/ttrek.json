@@ -1,0 +1,24 @@
+{
+	"name":	"tconfig",
+	"version":	"1.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"tink-tcl": ">=20240704.0.0",
+		"aws-sdk-tcl": ">=1.0.10"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/jerily/tconfig/archive/refs/tags/v1.0.0.tar.gz" },
+			{ "cmd":  "unpack" },
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{ "cmd": "make_install",
+				"options": [
+					{ "name": "PREFIX", "value": "$INSTALL_DIR" }
+				]
+			}
+		]
+	}
+}
