@@ -194,6 +194,7 @@ Resources:
               Service: "ecs-tasks.amazonaws.com"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AWSKeyManagementServicePowerUser
 
   EcsTaskRole:
     Type: AWS::IAM::Role
@@ -222,6 +223,7 @@ Resources:
                   - kms:GenerateDataKey
                 Resource:
                   - !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
+                  - !Sub arn:aws:kms:*:${AWS::AccountId}:alias/${AppName}-kms-key
               - Effect: Allow
                 Action:
                   - s3:DeleteObject
