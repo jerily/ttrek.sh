@@ -103,6 +103,19 @@ Resources:
       SecurityGroupIds:
         - !Ref TTrekVpc0SecurityGroup
 
+  TTrekVpc0EndpointKMS:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.kms"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet1
+        - !Ref TTrekPrivateSubnet2
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
   TTrekVpc0SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
