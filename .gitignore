@@ -8,5 +8,6 @@ install
 local
 certs
 dist
-/ttrek-venv
+ttrek-venv
+ttrek-lock.json
 data

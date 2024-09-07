@@ -17,12 +17,15 @@ phases:
       - export APP_NAME=ttrek-app
       - chmod 755 -R build.sh
       - mkdir -p ../ttrek-app/artifacts/
-      - cp -R ../ttrek.sh/codedeploy-scripts/ ../ttrek-app/artifacts/
-      - cp -R ../ttrek.sh/. ../ttrek-app/artifacts/ttrek-app
+      - cp -R codedeploy-scripts/ ../ttrek-app/artifacts/
+      - cp -R . ../ttrek-app/artifacts/ttrek-app
       - apt-get update && apt-get install cmake -y
-      - ./build.sh
-      - cp -R ../ttrek.sh/build ../ttrek-app/artifacts/ttrek-app/
-      - cp -R ../ttrek.sh/certs ../ttrek-app/artifacts/ttrek-app/
+      - ./build-new.sh
+      - export INSTALL_DIR=`pwd`/build/install
+      - $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
+      - cp -R build ../ttrek-app/artifacts/ttrek-app/
+      - cp -R etc ../ttrek-app/artifacts/ttrek-app/
+#      - cp -R certs ../ttrek-app/artifacts/ttrek-app/
       - ls -la ../ttrek-app/artifacts/ttrek-app/
       - echo Build started on `date`
       - echo Building the Docker image...
