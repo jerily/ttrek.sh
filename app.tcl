@@ -34,6 +34,7 @@ thread::send $telemetry_thread_id [list ::telemetry::init \
 set init_script "source [file normalize [file join $dir tcl init-thread.tcl]]"
 set server_handle [::twebserver::create_server -with_router $config_dict process_conn $init_script]
 
+file mkdir -force [file join $dir certs]
 set ttrek_sh_key [file normalize [file join $dir "certs/key.pem"]]
 set ttrek_sh_cert [file normalize [file join $dir "certs/cert.pem"]]
 
