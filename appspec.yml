@@ -3,7 +3,7 @@ os: linux
 
 files:
   - source: ttrek-app
-    destination: /var/www/ttrek-app
+    destination: /app
 
 file_exists_behavior: OVERWRITE
 
