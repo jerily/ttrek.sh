@@ -9,6 +9,6 @@ ADD artifacts/codedeploy-scripts /codedeploy-scripts
 RUN chmod +x /codedeploy-scripts/AfterInstall.sh \
   && chmod +x /app/run.sh
 
-EXPOSE 10080
+EXPOSE 8080
 
 ENTRYPOINT ["/codedeploy-scripts/AfterInstall.sh"]
