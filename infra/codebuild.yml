@@ -142,7 +142,7 @@ Resources:
         Type: no_artifacts
       Environment:
         Type: LINUX_CONTAINER
-        ComputeType: BUILD_GENERAL1_SMALL
+        ComputeType: BUILD_GENERAL1_LARGE
         Image: aws/codebuild/standard:6.0
         PrivilegedMode: true
         EnvironmentVariables:
