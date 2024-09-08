@@ -21,9 +21,10 @@ phases:
       - cp -R . ../ttrek-app/artifacts/ttrek-app
       - apt-get update && apt-get install cmake -y
       - ./build-new.sh
-      - export INSTALL_DIR=`pwd`/build/install
+      - export CURRENT_DIR=`pwd`
+      - export INSTALL_DIR=$CURRENT_DIR/build/install
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
-      - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c `pwd` `pwd`/www
+      - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c $CURRENT_DIR $CURRENT_DIR/www
       # copy dependencies
       - cp -R build ../ttrek-app/artifacts/ttrek-app/
       # copy the encrypted config file
