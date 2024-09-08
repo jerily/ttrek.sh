@@ -31,7 +31,7 @@ set config_dict [::twebserver::get_config_dict]
 ::twebserver::add_route -strict -name post_telemetry_register $router POST /telemetry/register/:environment_id post_telemetry_register_handler
 ::twebserver::add_route -strict -name post_telemetry_collect $router POST /telemetry/collect/:package_name/:package_version post_telemetry_collect_handler
 ::twebserver::add_route -strict -name get_logo $router GET /logo get_logo_handler
-::twebserver::add_route -name get_catchall ./ru$router GET "*" get_catchall_handler
+::twebserver::add_route -name get_catchall $router GET "*" get_catchall_handler
 
 
 proc telemetry_event { event_type args } {

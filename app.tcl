@@ -61,7 +61,9 @@ set tratelimit_config {
     }
 }
 
-dict set tratelimit_config store valkeystore [dict create host [dict get $config redis host]]
+dict set tratelimit_config store valkeystore [dict create \
+    host [dict get $config redis host] \
+    port [dict get $config redis port]]
 
 
 
