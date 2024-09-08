@@ -7,7 +7,17 @@ package require thread
 package require tconfig::decrypt
 
 set dir [file dirname [info script]]
-set config [::tconfig::load_config [file join $dir etc config.enc]]
+
+set config_enc_filepath [file join $dir etc config.enc]
+set config_ini_filepath [file join $dir etc config.ini]
+if { [file exists $config_enc_filepath] } {
+    set config [::tconfig::load_config $config_enc_filepath]
+} elseif { [file exists $config_ini_filepath] } {
+    set config [::tconfig::read_config $config_ini_filepath]
+} else {
+    puts "No configuration file found"
+    exit 1
+}
 
 # Create telemetry thread
 set telemetry_thread_id [thread::create thread::wait]
@@ -38,8 +48,8 @@ file mkdir [file join $dir certs]
 set ttrek_sh_key [file normalize [file join $dir "certs/key.pem"]]
 set ttrek_sh_cert [file normalize [file join $dir "certs/cert.pem"]]
 
-writeFile $ttrek_sh_key [dict get $config ssl key]
-writeFile $ttrek_sh_cert [dict get $config ssl certificate]
+writeFile $ttrek_sh_key [binary decode base64 [dict get $config ssl key]]
+writeFile $ttrek_sh_cert [binary decode base64 [dict get $config ssl certificate]]
 
 ::twebserver::add_context $server_handle ttrek.sh $ttrek_sh_key $ttrek_sh_cert
 ::twebserver::add_context $server_handle www.ttrek.sh $ttrek_sh_key $ttrek_sh_cert
