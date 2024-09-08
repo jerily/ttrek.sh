@@ -124,7 +124,7 @@ Resources:
       Cluster: !Ref TTrekCluster
       LaunchType: FARGATE
       TaskDefinition: !Ref EcsTaskDefinition
-      DesiredCount: 2
+      DesiredCount: 1
       HealthCheckGracePeriodSeconds: 30
       LoadBalancers:
         - ContainerName: "TTrekContainerDefinition"
