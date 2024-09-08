@@ -19,6 +19,10 @@ set config_dict [::twebserver::get_config_dict]
 
 ::twebserver::create_router -command_name process_conn router
 
+::twebserver::add_middleware \
+    -enter_proc ::tratelimit::middleware::enter \
+    $router
+
 ::twebserver::add_route -strict -name get_index $router GET / get_index_page_handler
 ::twebserver::add_route -strict -name get_ttrek_init $router GET /init get_ttrek_init_handler
 ::twebserver::add_route -strict -name get_packages $router GET /packages get_packages_page_handler
