@@ -32,7 +32,7 @@ set tratelimit_config {
     global_limits {
         by_ip {
             window_millis 10000
-            limit 10
+            limit 1000
         }
         by_session {
             window_millis 60000
@@ -43,7 +43,7 @@ set tratelimit_config {
         get_index {
             by_ip {
                 window_millis 10000
-                limit 10
+                limit 100
             }
         }
         get_stats {
