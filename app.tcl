@@ -19,6 +19,52 @@ if { [file exists $config_enc_filepath] } {
     exit 1
 }
 
+# tratelimit
+
+set tratelimit_config {
+    store {
+        valkeystore {
+            host "localhost"
+            port 6379
+            password "foobared"
+        }
+    }
+    global_limits {
+        by_ip {
+            window_millis 10000
+            limit 10
+        }
+        by_session {
+            window_millis 60000
+            limit 5
+        }
+    }
+    route_limits {
+        get_index {
+            by_ip {
+                window_millis 10000
+                limit 10
+            }
+        }
+        get_stats {
+            by_ip {
+                window_millis 10000
+                limit 5
+            }
+        }
+        get_catchall {
+            by_ip {
+                window_millis 10000
+                limit 15
+            }
+        }
+    }
+}
+
+dict set tratelimit_config store valkeystore [dict create host [dict get $config redis host]]
+
+
+
 # Create telemetry thread
 set telemetry_thread_id [thread::create thread::wait]
 
@@ -28,7 +74,8 @@ set config_dict [dict create \
     gzip on \
     gzip_types [list text/plain application/json] \
     gzip_min_length 8192 \
-    telemetry_thread_id $telemetry_thread_id]
+    telemetry_thread_id $telemetry_thread_id \
+    tratelimit $tratelimit_config]
 
 # create the server
 set dir [file dirname [info script]]

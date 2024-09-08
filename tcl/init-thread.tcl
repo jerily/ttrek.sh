@@ -6,27 +6,32 @@ package require twebserver
 package require thtml
 package require tjson
 package require thread
+package require tratelimit
 
 ::thtml::init [dict create \
     debug 0 \
     cache 0 \
     rootdir [::twebserver::get_rootdir]]
 
+set config_dict [::twebserver::get_config_dict]
+
+::tratelimit::init_middleware [dict get $config_dict tratelimit]
+
 ::twebserver::create_router -command_name process_conn router
 
-::twebserver::add_route -strict $router GET / get_index_page_handler
-::twebserver::add_route -strict $router GET /init get_ttrek_init_handler
-::twebserver::add_route -strict $router GET /packages get_packages_page_handler
-::twebserver::add_route -prefix $router GET /(css|js|assets)/ get_css_or_js_or_assets_handler
-::twebserver::add_route -strict $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
-::twebserver::add_route $router -strict GET /package/:package_name get_package_page_handler
-::twebserver::add_route $router -strict GET /package/:package_name/:package_version get_package_version_page_handler
-::twebserver::add_route $router -strict GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
-::twebserver::add_route $router -strict GET /registry/:package_name get_package_versions_handler
-::twebserver::add_route $router -strict POST /telemetry/register/:environment_id post_telemetry_register_handler
-::twebserver::add_route $router -strict POST /telemetry/collect/:package_name/:package_version post_telemetry_collect_handler
-::twebserver::add_route -strict $router GET /logo get_logo_handler
-::twebserver::add_route $router GET "*" get_catchall_handler
+::twebserver::add_route -strict -name get_index $router GET / get_index_page_handler
+::twebserver::add_route -strict -name get_ttrek_init $router GET /init get_ttrek_init_handler
+::twebserver::add_route -strict -name get_packages $router GET /packages get_packages_page_handler
+::twebserver::add_route -prefix -name get_assets $router GET /(css|js|assets)/ get_css_or_js_or_assets_handler
+::twebserver::add_route -strict -name get_dist $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
+::twebserver::add_route -strict -name get_package $router GET /package/:package_name get_package_page_handler
+::twebserver::add_route -strict -name get_package_version $router GET /package/:package_name/:package_version get_package_version_page_handler
+::twebserver::add_route -strict -name get_package_spec $router GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
+::twebserver::add_route -strict -name get_package_versions $router GET /registry/:package_name get_package_versions_handler
+::twebserver::add_route -strict -name post_telemetry_register $router POST /telemetry/register/:environment_id post_telemetry_register_handler
+::twebserver::add_route -strict -name post_telemetry_collect $router POST /telemetry/collect/:package_name/:package_version post_telemetry_collect_handler
+::twebserver::add_route -strict -name get_logo $router GET /logo get_logo_handler
+::twebserver::add_route -name get_catchall ./ru$router GET "*" get_catchall_handler
 
 
 proc telemetry_event { event_type args } {
