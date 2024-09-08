@@ -173,15 +173,15 @@ Resources:
       GroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
       SourceSecurityGroupId: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
 
-#  RedisInboundRule:
-#    Type: AWS::EC2::SecurityGroupIngress
-#    Properties:
-#      IpProtocol: tcp
-#      FromPort: 6379
-#      ToPort: 6379
-#      SourceSecurityGroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
-#      GroupId: !ImportValue 'Infra-DevOps-TTREK-Base-RedisSecurityGroupId'
-#      Description: "Access from TTrek Fargate"
+  RedisInboundRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 6379
+      ToPort: 6379
+      SourceSecurityGroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
+      GroupId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0SecurityGroupId'
+      Description: "Access from TTrek Fargate"
 
   EcsExecutionRole:
     Type: AWS::IAM::Role

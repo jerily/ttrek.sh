@@ -270,6 +270,30 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref TTrekInternetGateway
 
+  TTrekRedisCacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: !Sub "${AppName}-redis-cache-subnet-group"
+      Description: "TTrek Redis Cache Subnet Group"
+      SubnetIds:
+          - !Ref TTrekPrivateSubnet1
+          - !Ref TTrekPrivateSubnet2
+
+  TTrekRedisCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheNodeType: cache.t3.small
+      Engine: redis
+      NumCacheNodes: 1
+      VpcSecurityGroupIds:
+        - !GetAtt TTrekVpc0SecurityGroup.GroupId
+      CacheSubnetGroupName: !Ref TTrekRedisCacheSubnetGroup
+#      EngineVersion: 6.x
+#      CacheParameterGroupName: default.redis6.x
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-redis-cluster"
+
 Outputs:
   TTrekRepositoryArn:
     Description: "TTrek ECR Repository"
@@ -318,3 +342,9 @@ Outputs:
     Value: !GetAtt TTrekVpc0SecurityGroup.GroupId
     Export:
       Name: !Sub "${AWS::StackName}-Vpc0SecurityGroupId"
+
+  TTrekRedisClusterId:
+    Description: "TTrek Redis Cluster"
+    Value: !Ref TTrekRedisCluster
+    Export:
+      Name: !Sub "${AWS::StackName}-RedisClusterId"
