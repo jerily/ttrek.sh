@@ -11,3 +11,4 @@ dist
 ttrek-venv
 ttrek-lock.json
 data
+cache

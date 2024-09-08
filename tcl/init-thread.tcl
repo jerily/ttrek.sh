@@ -9,9 +9,10 @@ package require thread
 package require tratelimit
 
 ::thtml::init [dict create \
-    debug 0 \
-    cache 0 \
-    rootdir [::twebserver::get_rootdir]]
+    debug 1 \
+    cache 1 \
+    rootdir [::twebserver::get_rootdir] \
+    bundle_outdir [file join [::twebserver::get_rootdir] public bundle]]
 
 set config_dict [::twebserver::get_config_dict]
 

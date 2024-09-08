@@ -28,9 +28,10 @@ phases:
       - cp -R build ../ttrek-app/artifacts/ttrek-app/
       # copy the encrypted config file
       - cp -R etc ../ttrek-app/artifacts/ttrek-app/
-      # copy the compiled template files
-      # - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c $CURRENT_DIR $CURRENT_DIR/www
-      # - cp -R cache ../ttrek-app/artifacts/ttrek-app/
+      # compile template files and copy them to the artifacts directory
+      - $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c $CURRENT_DIR $CURRENT_DIR/www
+      - cp -R cache ../ttrek-app/artifacts/ttrek-app/
+      - cp -R public ../ttrek-app/artifacts/ttrek-app/
 #      - cp -R certs ../ttrek-app/artifacts/ttrek-app/
       - ls -la ../ttrek-app/artifacts/ttrek-app/
       - echo Build started on `date`
