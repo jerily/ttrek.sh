@@ -88,6 +88,9 @@ Resources:
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: preserve_client_ip.enabled
+          Value: true
 
   TTrekLoadBalancerHttpsTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -102,6 +105,9 @@ Resources:
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: preserve_client_ip.enabled
+          Value: true
 
   TTrekCluster:
     Type: AWS::ECS::Cluster
