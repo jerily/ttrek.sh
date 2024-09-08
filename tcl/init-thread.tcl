@@ -8,7 +8,8 @@ package require tjson
 package require thread
 
 ::thtml::init [dict create \
-    cache 0 \
+    debug 0 \
+    cache 1 \
     rootdir [::twebserver::get_rootdir]]
 
 ::twebserver::create_router -command_name process_conn router
