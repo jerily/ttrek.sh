@@ -24,13 +24,13 @@ phases:
       - export CURRENT_DIR=`pwd`
       - export INSTALL_DIR=$CURRENT_DIR/build/install
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
-      - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c $CURRENT_DIR $CURRENT_DIR/www
       # copy dependencies
       - cp -R build ../ttrek-app/artifacts/ttrek-app/
       # copy the encrypted config file
       - cp -R etc ../ttrek-app/artifacts/ttrek-app/
       # copy the compiled template files
-      - cp -R cache ../ttrek-app/artifacts/ttrek-app/
+      # - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c $CURRENT_DIR $CURRENT_DIR/www
+      # - cp -R cache ../ttrek-app/artifacts/ttrek-app/
 #      - cp -R certs ../ttrek-app/artifacts/ttrek-app/
       - ls -la ../ttrek-app/artifacts/ttrek-app/
       - echo Build started on `date`
