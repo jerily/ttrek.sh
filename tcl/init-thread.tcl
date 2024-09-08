@@ -9,7 +9,7 @@ package require thread
 
 ::thtml::init [dict create \
     debug 0 \
-    cache 1 \
+    cache 0 \
     rootdir [::twebserver::get_rootdir]]
 
 ::twebserver::create_router -command_name process_conn router
