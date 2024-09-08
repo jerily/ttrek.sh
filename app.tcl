@@ -107,10 +107,10 @@ file delete -force $ttrek_sh_key
 file delete -force $ttrek_sh_cert
 
 # listen for an HTTPS connection on port 4433
-::twebserver::listen_server -num_threads 8 $server_handle 4433
+::twebserver::listen_server -num_threads 4 $server_handle 4433
 
 # listen for an HTTP connection on port 8080
-::twebserver::listen_server -http $server_handle 8080
+::twebserver::listen_server -num_threads 2 -http $server_handle 8080
 
 # print that the server is running
 puts "server is running. go to http://ttrek.sh:8080/ or https://ttrek.sh:4433/"
