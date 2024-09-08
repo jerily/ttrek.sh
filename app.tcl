@@ -76,6 +76,7 @@ set config_dict [dict create \
     gzip on \
     gzip_types [list text/plain application/json] \
     gzip_min_length 8192 \
+    conn_timeout_millis 10000 \
     telemetry_thread_id $telemetry_thread_id \
     tratelimit $tratelimit_config]
 

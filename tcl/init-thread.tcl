@@ -23,6 +23,7 @@ set config_dict [::twebserver::get_config_dict]
     -enter_proc ::tratelimit::middleware::enter \
     $router
 
+::twebserver::add_route -strict -name get_debug $router GET /debug get_debug_handler
 ::twebserver::add_route -strict -name get_index $router GET / get_index_page_handler
 ::twebserver::add_route -strict -name get_ttrek_init $router GET /init get_ttrek_init_handler
 ::twebserver::add_route -strict -name get_packages $router GET /packages get_packages_page_handler
@@ -37,6 +38,12 @@ set config_dict [::twebserver::get_config_dict]
 ::twebserver::add_route -strict -name get_logo $router GET /logo get_logo_handler
 ::twebserver::add_route -name get_catchall $router GET "*" get_catchall_handler
 
+
+proc get_debug_handler {ctx req} {
+    set data [dict merge $ctx $req]
+    set res [::twebserver::build_response 200 "text/plain; charset=utf-8" $data]
+    return $res
+}
 
 proc telemetry_event { event_type args } {
     thread::send -async [dict get [::twebserver::get_config_dict] telemetry_thread_id] \

@@ -20,20 +20,15 @@ Resources:
       RetentionInDays: 7
       KmsKeyId: !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
 
-  TTrekElasticIP1:
+  TTrekElasticIP:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
 
-  TTrekElasticIP2:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  TTrekNetworkLoadBalancer:
+  TTrekNetworkLoadBalancerSingleIP:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: TTrekNetworkLoadBalancer
+      Name: TTrekNetworkLoadBalancerSingleIP
       Scheme: internet-facing
       Type: network
       IpAddressType: ipv4
@@ -41,9 +36,7 @@ Resources:
         - !Ref TTrekNetworkLoadBalancerSecurityGroup
       SubnetMappings:
         - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet1Id'
-          AllocationId: !GetAtt TTrekElasticIP1.AllocationId
-        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet2Id'
-          AllocationId: !GetAtt TTrekElasticIP2.AllocationId
+          AllocationId: !GetAtt TTrekElasticIP.AllocationId
 
   TTrekNetworkLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -68,7 +61,7 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TTrekLoadBalancerHttpTargetGroup
-      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
+      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancerSingleIP.LoadBalancerArn
       Port: 80
       Protocol: TCP
 
@@ -78,7 +71,7 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TTrekLoadBalancerHttpsTargetGroup
-      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
+      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancerSingleIP.LoadBalancerArn
       Port: 443
       Protocol: TCP
 
@@ -270,7 +263,7 @@ Resources:
 
 Outputs:
   TTrekNetworkLoadBalancerDNSName:
-    Value: !GetAtt TTrekNetworkLoadBalancer.DNSName
+    Value: !GetAtt TTrekNetworkLoadBalancerSingleIP.DNSName
     Export:
       Name: "TTrekNLB-DNSName"
   TTrekNetworkLoadBalancerSecurityGroupId:
