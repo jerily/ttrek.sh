@@ -144,7 +144,42 @@ cmd() {
 init_tty
 
 PKG_CUR="1"
-PKG_TOT="17"
+PKG_TOT="20"
+
+PACKAGE='libvalkey'
+VERSION='0.1.0'
+SOURCE_DIR=''
+
+ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
+BUILD_DIR="$ROOT_BUILD_DIR/build/${PACKAGE}-${VERSION}"
+BUILD_LOG_DIR="$ROOT_BUILD_DIR/logs/${PACKAGE}-${VERSION}"
+
+if [ -z "$SOURCE_DIR" ]; then
+    SOURCE_DIR="$ROOT_BUILD_DIR/source/${PACKAGE}-${VERSION}"
+fi
+
+rm -rf "$SOURCE_DIR"
+mkdir -p "$SOURCE_DIR"
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+rm -rf "$BUILD_LOG_DIR"
+mkdir -p "$BUILD_LOG_DIR"
+
+stage 1
+cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'https://github.com/valkey-io/libvalkey/archive/1ce574c28ecf137329a410381ce03c453616a9f9.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
+stage 1
+cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
+cmd cd "$BUILD_DIR" || fail
+stage 2
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+stage 3
+cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
+stage 4
+cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
+ok
+
+PKG_CUR="2"
+PKG_TOT="20"
 
 PACKAGE='zlib'
 VERSION='1.3.1'
@@ -178,8 +213,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="2"
-PKG_TOT="17"
+PKG_CUR="3"
+PKG_TOT="20"
 
 PACKAGE='protobuf'
 VERSION='21.9.0'
@@ -213,8 +248,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="3"
-PKG_TOT="17"
+PKG_CUR="4"
+PKG_TOT="20"
 
 PACKAGE='abseil-cpp'
 VERSION='20230802.1.0'
@@ -248,8 +283,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="4"
-PKG_TOT="17"
+PKG_CUR="5"
+PKG_TOT="20"
 
 PACKAGE='openssl'
 VERSION='3.2.1'
@@ -285,8 +320,8 @@ stage 4
 cmd make "install_dev" >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="5"
-PKG_TOT="17"
+PKG_CUR="6"
+PKG_TOT="20"
 
 PACKAGE='tcl'
 VERSION='9.0.0-beta.3'
@@ -320,8 +355,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="6"
-PKG_TOT="17"
+PKG_CUR="7"
+PKG_TOT="20"
 
 PACKAGE='curl'
 VERSION='8.7.1'
@@ -619,8 +654,8 @@ diff -ur tink-cc-2.1.1/tink/util/CMakeLists.txt tink-cc/tink/util/CMakeLists.txt
 
 __TTREK_PATCH_EOF__
 
-PKG_CUR="7"
-PKG_TOT="17"
+PKG_CUR="8"
+PKG_TOT="20"
 
 PACKAGE='tink-cc'
 VERSION='2.1.1'
@@ -657,8 +692,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="8"
-PKG_TOT="17"
+PKG_CUR="9"
+PKG_TOT="20"
 
 PACKAGE='sqlite3'
 VERSION='3.45.3'
@@ -692,8 +727,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="9"
-PKG_TOT="17"
+PKG_CUR="10"
+PKG_TOT="20"
 
 PACKAGE='tdom'
 VERSION='0.9.4'
@@ -727,8 +762,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="10"
-PKG_TOT="17"
+PKG_CUR="11"
+PKG_TOT="20"
 
 PACKAGE='thread'
 VERSION='3.0.0-beta.4'
@@ -762,8 +797,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="11"
-PKG_TOT="17"
+PKG_CUR="12"
+PKG_TOT="20"
 
 PACKAGE='tjson'
 VERSION='1.0.25'
@@ -797,8 +832,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="12"
-PKG_TOT="17"
+PKG_CUR="13"
+PKG_TOT="20"
 
 PACKAGE='twebserver'
 VERSION='1.47.53'
@@ -832,8 +867,43 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="13"
-PKG_TOT="17"
+PKG_CUR="14"
+PKG_TOT="20"
+
+PACKAGE='valkey-tcl'
+VERSION='1.0.0'
+SOURCE_DIR=''
+
+ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
+BUILD_DIR="$ROOT_BUILD_DIR/build/${PACKAGE}-${VERSION}"
+BUILD_LOG_DIR="$ROOT_BUILD_DIR/logs/${PACKAGE}-${VERSION}"
+
+if [ -z "$SOURCE_DIR" ]; then
+    SOURCE_DIR="$ROOT_BUILD_DIR/source/${PACKAGE}-${VERSION}"
+fi
+
+rm -rf "$SOURCE_DIR"
+mkdir -p "$SOURCE_DIR"
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+rm -rf "$BUILD_LOG_DIR"
+mkdir -p "$BUILD_LOG_DIR"
+
+stage 1
+cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'https://github.com/jerily/valkey-tcl/archive/refs/tags/v1.0.0.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
+stage 1
+cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
+cmd cd "$BUILD_DIR" || fail
+stage 2
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+stage 3
+cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
+stage 4
+cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
+ok
+
+PKG_CUR="15"
+PKG_TOT="20"
 
 PACKAGE='aws-sdk-cpp'
 VERSION='1.11.157'
@@ -866,8 +936,8 @@ stage 4
 cmd cmake --install "$BUILD_DIR" --config='Release' >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="14"
-PKG_TOT="17"
+PKG_CUR="16"
+PKG_TOT="20"
 
 PACKAGE='tink-tcl'
 VERSION='20240704.0.0'
@@ -901,8 +971,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="15"
-PKG_TOT="17"
+PKG_CUR="17"
+PKG_TOT="20"
 
 PACKAGE='thtml'
 VERSION='1.5.0'
@@ -935,8 +1005,38 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="16"
-PKG_TOT="17"
+PKG_CUR="18"
+PKG_TOT="20"
+
+PACKAGE='tratelimit'
+VERSION='1.0.0'
+SOURCE_DIR=''
+
+ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
+BUILD_DIR="$ROOT_BUILD_DIR/build/${PACKAGE}-${VERSION}"
+BUILD_LOG_DIR="$ROOT_BUILD_DIR/logs/${PACKAGE}-${VERSION}"
+
+if [ -z "$SOURCE_DIR" ]; then
+    SOURCE_DIR="$ROOT_BUILD_DIR/source/${PACKAGE}-${VERSION}"
+fi
+
+rm -rf "$SOURCE_DIR"
+mkdir -p "$SOURCE_DIR"
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+rm -rf "$BUILD_LOG_DIR"
+mkdir -p "$BUILD_LOG_DIR"
+
+stage 1
+cmd git -C "$SOURCE_DIR" clone 'https://github.com/jerily/tratelimit' --depth 1 --single-branch . >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
+find "$SOURCE_DIR" -name '.git' -print0 | xargs -0 rm -rf || fail
+cmd cd "$SOURCE_DIR" || fail
+stage 4
+cmd make install "PREFIX"="$INSTALL_DIR" >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
+ok
+
+PKG_CUR="19"
+PKG_TOT="20"
 
 PACKAGE='aws-sdk-tcl'
 VERSION='1.0.10'
@@ -970,8 +1070,8 @@ stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="17"
-PKG_TOT="17"
+PKG_CUR="20"
+PKG_TOT="20"
 
 PACKAGE='tconfig'
 VERSION='1.0.0'

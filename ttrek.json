@@ -10,7 +10,8 @@
     "tconfig": "^1.0.0",
     "tjson": "^1.0.25",
     "sqlite3": "^3.45.3",
-    "thread": "^3.0.0-beta.4"
+    "thread": "^3.0.0-beta.4",
+    "tratelimit": "^1.0.0"
   },
   "devDependencies": {
 
