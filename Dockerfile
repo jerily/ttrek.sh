@@ -14,5 +14,6 @@ RUN chmod +x /codedeploy-scripts/AfterInstall.sh \
   && chmod +x /app/run.sh
 
 EXPOSE 8080
+EXPOSE 4433
 
 ENTRYPOINT ["/codedeploy-scripts/AfterInstall.sh"]
