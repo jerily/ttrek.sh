@@ -29,7 +29,7 @@ phases:
       # copy the encrypted config file
       - cp -R etc ../ttrek-app/artifacts/ttrek-app/
       # compile template files and copy them to the artifacts directory
-      - $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl tcl $CURRENT_DIR $CURRENT_DIR/www
+      - $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c $CURRENT_DIR $CURRENT_DIR/www
       - cp -R cache ../ttrek-app/artifacts/ttrek-app/
       - cp -R public ../ttrek-app/artifacts/ttrek-app/
 #      - cp -R certs ../ttrek-app/artifacts/ttrek-app/
