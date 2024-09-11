@@ -29,7 +29,7 @@
                 </table>
             </tpl>
 
-            <tpl if='[llength $stat_platforms]'>
+            <tpl if='[llength $stat_platforms] > 0'>
                 <p class="content-subhead">Statistics (installations):</p>
                 <table class="pure-table">
                     <thead><tr><th>Platform</th><th>Total</th><th>Success</th><th>Failure</th></tr></thead>
