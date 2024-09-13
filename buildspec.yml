@@ -23,17 +23,7 @@ phases:
       - ./build-new.sh
       - npm init -y
       - npm install chart.js purecss
-      - npm install --save-dev \
-          @rollup/plugin-typescript \
-          rollup-plugin-import-css \
-          @rollup/plugin-node-resolve \
-          rollup-plugin-inject-process-env \
-          @rollup/plugin-commonjs \
-          @rollup/plugin-babel \
-          @babel/preset-react \
-          tslib \
-          typescript
-
+      - npm install --save-dev @rollup/plugin-typescript rollup-plugin-import-css @rollup/plugin-node-resolve rollup-plugin-inject-process-env @rollup/plugin-commonjs @rollup/plugin-babel @babel/preset-react tslib typescript
       - export CURRENT_DIR=`pwd`
       - export INSTALL_DIR=$CURRENT_DIR/build/install
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
