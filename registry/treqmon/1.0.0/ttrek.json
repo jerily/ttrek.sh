@@ -1,0 +1,23 @@
+{
+	"name":	"treqmon",
+	"version":	"1.0.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"valkey-tcl": ">=1.0.0",
+		"twebserver": ">=1.47.53"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "git", "url": "https://github.com/jerily/treqmon" },
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{ "cmd": "make_install",
+				"options": [
+					{ "name": "PREFIX", "value": "$INSTALL_DIR" }
+				]
+			}
+		]
+	}
+}
