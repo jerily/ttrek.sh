@@ -21,6 +21,7 @@ phases:
       - cp -R . ../ttrek-app/artifacts/ttrek-app
       - apt-get update && apt-get install cmake npm -y
       - ./build-new.sh
+      - npm install -g rollup
       - npm init -y
       - npm install chart.js purecss
       - npm install --save-dev @rollup/plugin-typescript rollup-plugin-import-css @rollup/plugin-node-resolve rollup-plugin-inject-process-env @rollup/plugin-commonjs @rollup/plugin-babel @babel/preset-react tslib typescript
