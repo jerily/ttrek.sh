@@ -1,0 +1,6 @@
+<import name="InternalMaster" src="internal-master.thtml" />
+<import name="Stats" src="@treqmon/stats.thtml" />
+
+<InternalMaster bundle_css_url_prefix="$bundle_css_url_prefix" bundle_js_url_prefix="$bundle_js_url_prefix">
+    <Stats />
+</InternalMaster>

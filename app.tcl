@@ -65,6 +65,12 @@ dict set tratelimit_config store valkeystore [dict create \
     host [dict get $config redis host] \
     port [dict get $config redis port]]
 
+set treqmon_config {}
+dict set treqmon_config store valkeystore [dict create \
+    host [dict get $config redis host] \
+    port [dict get $config redis port] \
+    history_max_events 100000]
+
 
 
 # Create telemetry thread
@@ -78,7 +84,8 @@ set config_dict [dict create \
     gzip_min_length 8192 \
     conn_timeout_millis 10000 \
     telemetry_thread_id $telemetry_thread_id \
-    tratelimit $tratelimit_config]
+    tratelimit $tratelimit_config \
+    treqmon $treqmon_config]
 
 # create the server
 set dir [file dirname [info script]]
@@ -114,7 +121,7 @@ file delete -force $ttrek_sh_cert
 ::twebserver::listen_server -num_threads 2 -http $server_handle 8080
 
 # print that the server is running
-puts "server is running. go to http://ttrek.sh:8080/ or https://ttrek.sh:4433/"
+puts "server is running. go to http://localhost:8080/ or https://localhost:4433/"
 
 # wait forever
 ::twebserver::wait_signal

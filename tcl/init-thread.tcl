@@ -7,6 +7,7 @@ package require thtml
 package require tjson
 package require thread
 package require tratelimit
+package require treqmon
 
 ::thtml::init [dict create \
     debug 1 \
@@ -17,18 +18,26 @@ package require tratelimit
 set config_dict [::twebserver::get_config_dict]
 
 ::tratelimit::init_middleware [dict get $config_dict tratelimit]
+::treqmon::init_middleware [dict get $config_dict treqmon]
 
 ::twebserver::create_router -command_name process_conn router
+
+::twebserver::add_middleware \
+    -enter_proc ::treqmon::middleware::enter \
+    -leave_proc ::treqmon::middleware::leave \
+    $router
 
 ::twebserver::add_middleware \
     -enter_proc ::tratelimit::middleware::enter \
     $router
 
+#::twebserver::add_route $router -guard_proc_list [list ::tsession::guard_is_logged_in] GET "/request-monitor" get_stats_handler
+::twebserver::add_route $router -name get_stats GET "/request-monitor" get_stats_handler
 ::twebserver::add_route -strict -name get_debug $router GET /debug get_debug_handler
 ::twebserver::add_route -strict -name get_index $router GET / get_index_page_handler
 ::twebserver::add_route -strict -name get_ttrek_init $router GET /init get_ttrek_init_handler
 ::twebserver::add_route -strict -name get_packages $router GET /packages get_packages_page_handler
-::twebserver::add_route -prefix -name get_assets $router GET /(css|js|assets)/ get_css_or_js_or_assets_handler
+::twebserver::add_route -prefix -name get_assets $router GET /(css|js|assets|bundle)/ get_assets_handler
 ::twebserver::add_route -strict -name get_dist $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
 ::twebserver::add_route -strict -name get_package $router GET /package/:package_name get_package_page_handler
 ::twebserver::add_route -strict -name get_package_version $router GET /package/:package_name/:package_version get_package_version_page_handler
@@ -39,6 +48,12 @@ set config_dict [::twebserver::get_config_dict]
 ::twebserver::add_route -strict -name get_logo $router GET /logo get_logo_handler
 ::twebserver::add_route -name get_catchall $router GET "*" get_catchall_handler
 
+proc get_stats_handler {ctx req} {
+    set data [dict merge $req [list bundle_js_url_prefix "/bundle" bundle_css_url_prefix "/bundle"]]
+    set html [::thtml::renderfile request-monitor.thtml $data]
+    set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
+    return $res
+}
 
 proc get_debug_handler {ctx req} {
     set data [dict merge $ctx $req]
@@ -193,7 +208,7 @@ proc path_join {args} {
     return $normalized_path
 }
 
-proc get_css_or_js_or_assets_handler {ctx req} {
+proc get_assets_handler {ctx req} {
     set path [dict get $req path]
     set dir [file normalize [::thtml::get_rootdir]]
     set filepath [path_join $dir public $path]
@@ -206,7 +221,7 @@ proc get_css_or_js_or_assets_handler {ctx req} {
     } elseif { $ext eq {.svg} } {
         set mimetype image/svg+xml
     } else {
-        error "get_css_or_js_handler: unsupported extension \"$ext\""
+        error "get_assets_handler: unsupported extension \"$ext\""
     }
     set res [::twebserver::build_response -return_file 200 $mimetype $filepath]
     return $res

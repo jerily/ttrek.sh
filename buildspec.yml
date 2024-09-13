@@ -19,17 +19,34 @@ phases:
       - mkdir -p ../ttrek-app/artifacts/
       - cp -R codedeploy-scripts/ ../ttrek-app/artifacts/
       - cp -R . ../ttrek-app/artifacts/ttrek-app
-      - apt-get update && apt-get install cmake -y
+      - apt-get update && apt-get install cmake npm -y
       - ./build-new.sh
+      - npm init -y
+      - npm install chart.js purecss
+      - npm install --save-dev \
+          @rollup/plugin-typescript \
+          rollup-plugin-import-css \
+          @rollup/plugin-node-resolve \
+          rollup-plugin-inject-process-env \
+          @rollup/plugin-commonjs \
+          @rollup/plugin-babel \
+          @babel/preset-react \
+          tslib \
+          typescript
+
       - export CURRENT_DIR=`pwd`
       - export INSTALL_DIR=$CURRENT_DIR/build/install
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
       # copy dependencies
       - cp -R build ../ttrek-app/artifacts/ttrek-app/
+      # copy node_modules
+      - cp -R node_modules ../ttrek-app/artifacts/ttrek-app/
+      - cp package.json ../ttrek-app/artifacts/ttrek-app/
+      - cp package-lock.json ../ttrek-app/artifacts/ttrek-app/
       # copy the encrypted config file
       - cp -R etc ../ttrek-app/artifacts/ttrek-app/
       # compile template files and copy them to the artifacts directory
-      - $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl c $CURRENT_DIR $CURRENT_DIR/www
+      - $INSTALL_DIR/bin/tclsh9.0 $INSTALL_DIR/bin/thtml-compiledir.tcl tcl $CURRENT_DIR $CURRENT_DIR/www
       - cp -R cache ../ttrek-app/artifacts/ttrek-app/
       - cp -R public ../ttrek-app/artifacts/ttrek-app/
 #      - cp -R certs ../ttrek-app/artifacts/ttrek-app/

@@ -12,7 +12,8 @@
     "sqlite3": "^3.45.3",
     "thread": "^3.0.0-beta.4",
     "tratelimit": "^1.0.0",
-    "treqmon": "^1.0.0"
+    "treqmon": "^1.0.0",
+    "tsession-dynamodb": "^1.0.0"
   },
   "devDependencies": {
 
