@@ -257,13 +257,13 @@ Resources:
             - ContainerPort: 4433
               HostPort: 4433
               Protocol: tcp
-      Cpu: 1024
-      Memory: 2048
+      Cpu: 512
+      Memory: 1024
       NetworkMode: awsvpc
       ExecutionRoleArn: !GetAtt "EcsExecutionRole.Arn"
       TaskRoleArn: !GetAtt "EcsTaskRole.Arn"
       EphemeralStorage:
-        SizeInGiB: 40
+        SizeInGiB: 20
       RequiresCompatibilities:
         - FARGATE
 
