@@ -262,8 +262,8 @@ Resources:
       NetworkMode: awsvpc
       ExecutionRoleArn: !GetAtt "EcsExecutionRole.Arn"
       TaskRoleArn: !GetAtt "EcsTaskRole.Arn"
-      EphemeralStorage:
-        SizeInGiB: 20
+#      EphemeralStorage:
+#        SizeInGiB: 20
       RequiresCompatibilities:
         - FARGATE
 
