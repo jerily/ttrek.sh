@@ -137,7 +137,7 @@ Resources:
           AssignPublicIp: DISABLED
           Subnets:
             - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet1Id"
-            - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet2Id"
+#            - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet2Id"
           SecurityGroups:
             - !Ref TTrekServiceSecurityGroup
       Tags:

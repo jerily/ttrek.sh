@@ -14,12 +14,12 @@ Parameters:
   Vpc0CIDR:
     Type: String
     Default: 10.0.0.0/16
-  PublicSubnet1CIDR:
-    Type: String
-    Default: 10.0.1.0/24
-  PublicSubnet2CIDR:
-    Type: String
-    Default: 10.0.2.0/24
+#  PublicSubnet1CIDR:
+#    Type: String
+#    Default: 10.0.1.0/24
+#  PublicSubnet2CIDR:
+#    Type: String
+#    Default: 10.0.2.0/24
   PrivateSubnet1CIDR:
     Type: String
     Default: 10.0.3.0/24
@@ -200,31 +200,31 @@ Resources:
       RouteTableId: !Ref TTrekPrivateRouteTable
       SubnetId: !Ref TTrekPrivateSubnet2
 
-  TTrekPublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref TTrekVpc0
-      AvailabilityZone: !Select
-        - 0
-        - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !Ref PublicSubnet1CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-public-subnet-1"
-
-  TTrekPublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref TTrekVpc0
-      AvailabilityZone: !Select
-        - 1
-        - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !Ref PublicSubnet2CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-public-subnet-2"
+#  TTrekPublicSubnet1:
+#    Type: AWS::EC2::Subnet
+#    Properties:
+#      VpcId: !Ref TTrekVpc0
+#      AvailabilityZone: !Select
+#        - 0
+#        - Fn::GetAZs: !Ref AWS::Region
+#      CidrBlock: !Ref PublicSubnet1CIDR
+#      MapPublicIpOnLaunch: false
+#      Tags:
+#        - Key: Name
+#          Value: !Sub "${AppName}-public-subnet-1"
+#
+#  TTrekPublicSubnet2:
+#    Type: AWS::EC2::Subnet
+#    Properties:
+#      VpcId: !Ref TTrekVpc0
+#      AvailabilityZone: !Select
+#        - 1
+#        - Fn::GetAZs: !Ref AWS::Region
+#      CidrBlock: !Ref PublicSubnet2CIDR
+#      MapPublicIpOnLaunch: false
+#      Tags:
+#        - Key: Name
+#          Value: !Sub "${AppName}-public-subnet-2"
 
   TTrekPublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -234,17 +234,17 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-public-route-table"
 
-  TTrekPublicSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref TTrekPublicRouteTable
-      SubnetId: !Ref TTrekPublicSubnet1
-
-  TTrekPublicSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref TTrekPublicRouteTable
-      SubnetId: !Ref TTrekPublicSubnet2
+#  TTrekPublicSubnet1RouteTableAssociation:
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      RouteTableId: !Ref TTrekPublicRouteTable
+#      SubnetId: !Ref TTrekPublicSubnet1
+#
+#  TTrekPublicSubnet2RouteTableAssociation:
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      RouteTableId: !Ref TTrekPublicRouteTable
+#      SubnetId: !Ref TTrekPublicSubnet2
 
   TTrekInternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -313,17 +313,17 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-Vpc0Id"
 
-  TTrekPublicSubnet1Id:
-    Description: "TTrek Public Subnet 1"
-    Value: !Ref TTrekPublicSubnet1
-    Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
-
-  TTrekPublicSubnet2Id:
-    Description: "TTrek Public Subnet 2"
-    Value: !Ref TTrekPublicSubnet2
-    Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet2Id"
+#  TTrekPublicSubnet1Id:
+#    Description: "TTrek Public Subnet 1"
+#    Value: !Ref TTrekPublicSubnet1
+#    Export:
+#      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
+#
+#  TTrekPublicSubnet2Id:
+#    Description: "TTrek Public Subnet 2"
+#    Value: !Ref TTrekPublicSubnet2
+#    Export:
+#      Name: !Sub "${AWS::StackName}-PublicSubnet2Id"
 
   TTrekPrivateSubnet1Id:
     Description: "TTrek Private Subnet 1"
