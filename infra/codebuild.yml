@@ -9,7 +9,7 @@ Parameters:
     Default: "ttrek-app"
   BranchName:
     Type: String
-    Default: neo-dev
+    Default: main
 
 Resources:
   CodeBuildRole:
