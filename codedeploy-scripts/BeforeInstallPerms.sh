@@ -1,8 +1,7 @@
 
-mkdir -p /var/www/ttrek-app
-chmod 755 -R /var/www
+mkdir -p /app
+chmod 755 -R /app
 
-chown webapp: -R /var/www/ttrek-app
+chown webapp: -R /app
 
-ls -la /var/www/
-ls -la /var/www/ttrek-app/
+ls -la /app

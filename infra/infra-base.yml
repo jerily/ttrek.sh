@@ -14,12 +14,12 @@ Parameters:
   Vpc0CIDR:
     Type: String
     Default: 10.0.0.0/16
-  PublicSubnet1CIDR:
-    Type: String
-    Default: 10.0.1.0/24
-  PublicSubnet2CIDR:
-    Type: String
-    Default: 10.0.2.0/24
+#  PublicSubnet1CIDR:
+#    Type: String
+#    Default: 10.0.1.0/24
+#  PublicSubnet2CIDR:
+#    Type: String
+#    Default: 10.0.2.0/24
   PrivateSubnet1CIDR:
     Type: String
     Default: 10.0.3.0/24
@@ -95,6 +95,19 @@ Resources:
     Properties:
       VpcId: !Ref TTrekVpc0
       ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref TTrekPrivateSubnet1
+        - !Ref TTrekPrivateSubnet2
+      SecurityGroupIds:
+        - !Ref TTrekVpc0SecurityGroup
+
+  TTrekVpc0EndpointKMS:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.kms"
       PrivateDnsEnabled: true
       VpcEndpointType: Interface
       SubnetIds:
@@ -187,31 +200,31 @@ Resources:
       RouteTableId: !Ref TTrekPrivateRouteTable
       SubnetId: !Ref TTrekPrivateSubnet2
 
-  TTrekPublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref TTrekVpc0
-      AvailabilityZone: !Select
-        - 0
-        - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !Ref PublicSubnet1CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-public-subnet-1"
-
-  TTrekPublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref TTrekVpc0
-      AvailabilityZone: !Select
-        - 1
-        - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !Ref PublicSubnet2CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-public-subnet-2"
+#  TTrekPublicSubnet1:
+#    Type: AWS::EC2::Subnet
+#    Properties:
+#      VpcId: !Ref TTrekVpc0
+#      AvailabilityZone: !Select
+#        - 0
+#        - Fn::GetAZs: !Ref AWS::Region
+#      CidrBlock: !Ref PublicSubnet1CIDR
+#      MapPublicIpOnLaunch: false
+#      Tags:
+#        - Key: Name
+#          Value: !Sub "${AppName}-public-subnet-1"
+#
+#  TTrekPublicSubnet2:
+#    Type: AWS::EC2::Subnet
+#    Properties:
+#      VpcId: !Ref TTrekVpc0
+#      AvailabilityZone: !Select
+#        - 1
+#        - Fn::GetAZs: !Ref AWS::Region
+#      CidrBlock: !Ref PublicSubnet2CIDR
+#      MapPublicIpOnLaunch: false
+#      Tags:
+#        - Key: Name
+#          Value: !Sub "${AppName}-public-subnet-2"
 
   TTrekPublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -221,17 +234,17 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-public-route-table"
 
-  TTrekPublicSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref TTrekPublicRouteTable
-      SubnetId: !Ref TTrekPublicSubnet1
-
-  TTrekPublicSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref TTrekPublicRouteTable
-      SubnetId: !Ref TTrekPublicSubnet2
+#  TTrekPublicSubnet1RouteTableAssociation:
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      RouteTableId: !Ref TTrekPublicRouteTable
+#      SubnetId: !Ref TTrekPublicSubnet1
+#
+#  TTrekPublicSubnet2RouteTableAssociation:
+#    Type: AWS::EC2::SubnetRouteTableAssociation
+#    Properties:
+#      RouteTableId: !Ref TTrekPublicRouteTable
+#      SubnetId: !Ref TTrekPublicSubnet2
 
   TTrekInternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -257,6 +270,30 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref TTrekInternetGateway
 
+  TTrekRedisCacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: !Sub "${AppName}-redis-cache-subnet-group"
+      Description: "TTrek Redis Cache Subnet Group"
+      SubnetIds:
+          - !Ref TTrekPrivateSubnet1
+          - !Ref TTrekPrivateSubnet2
+
+  TTrekRedisCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheNodeType: cache.t3.small
+      Engine: redis
+      NumCacheNodes: 1
+      VpcSecurityGroupIds:
+        - !GetAtt TTrekVpc0SecurityGroup.GroupId
+      CacheSubnetGroupName: !Ref TTrekRedisCacheSubnetGroup
+#      EngineVersion: 6.x
+#      CacheParameterGroupName: default.redis6.x
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-redis-cluster"
+
 Outputs:
   TTrekRepositoryArn:
     Description: "TTrek ECR Repository"
@@ -276,17 +313,17 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-Vpc0Id"
 
-  TTrekPublicSubnet1Id:
-    Description: "TTrek Public Subnet 1"
-    Value: !Ref TTrekPublicSubnet1
-    Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
-
-  TTrekPublicSubnet2Id:
-    Description: "TTrek Public Subnet 2"
-    Value: !Ref TTrekPublicSubnet2
-    Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet2Id"
+#  TTrekPublicSubnet1Id:
+#    Description: "TTrek Public Subnet 1"
+#    Value: !Ref TTrekPublicSubnet1
+#    Export:
+#      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
+#
+#  TTrekPublicSubnet2Id:
+#    Description: "TTrek Public Subnet 2"
+#    Value: !Ref TTrekPublicSubnet2
+#    Export:
+#      Name: !Sub "${AWS::StackName}-PublicSubnet2Id"
 
   TTrekPrivateSubnet1Id:
     Description: "TTrek Private Subnet 1"
@@ -305,3 +342,9 @@ Outputs:
     Value: !GetAtt TTrekVpc0SecurityGroup.GroupId
     Export:
       Name: !Sub "${AWS::StackName}-Vpc0SecurityGroupId"
+
+  TTrekRedisClusterId:
+    Description: "TTrek Redis Cluster"
+    Value: !Ref TTrekRedisCluster
+    Export:
+      Name: !Sub "${AWS::StackName}-RedisClusterId"

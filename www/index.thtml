@@ -6,7 +6,7 @@
         <div class="splash">
             <h1 class="splash-head">$title</h1>
             <p class="splash-subhead">
-                <BashLine style="justify-content: center; color: white;" text="curl -k --proto '=https' --tlsv1.2 -sSf https://ttrek.sh:4433/init | sh" />
+                <BashLine style="justify-content: center; color: white;" text="curl --proto '=https' --tlsv1.2 -sSf https://ttrek.sh/init | sh" />
             </p>
             <p class="text-normal">
                 <a href="/packages" class="pure-button pure-button-primary">See all packages</a>

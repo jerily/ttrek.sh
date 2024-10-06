@@ -20,20 +20,15 @@ Resources:
       RetentionInDays: 7
       KmsKeyId: !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
 
-  TTrekElasticIP1:
+  TTrekElasticIP:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
 
-  TTrekElasticIP2:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  TTrekNetworkLoadBalancer:
+  TTrekNetworkLoadBalancerSingleIP:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: TTrekNetworkLoadBalancer
+      Name: TTrekNetworkLoadBalancerSingleIP
       Scheme: internet-facing
       Type: network
       IpAddressType: ipv4
@@ -41,9 +36,7 @@ Resources:
         - !Ref TTrekNetworkLoadBalancerSecurityGroup
       SubnetMappings:
         - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet1Id'
-          AllocationId: !GetAtt TTrekElasticIP1.AllocationId
-        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet2Id'
-          AllocationId: !GetAtt TTrekElasticIP2.AllocationId
+          AllocationId: !GetAtt TTrekElasticIP.AllocationId
 
   TTrekNetworkLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -68,7 +61,7 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TTrekLoadBalancerHttpTargetGroup
-      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
+      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancerSingleIP.LoadBalancerArn
       Port: 80
       Protocol: TCP
 
@@ -78,7 +71,7 @@ Resources:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref TTrekLoadBalancerHttpsTargetGroup
-      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancer.LoadBalancerArn
+      LoadBalancerArn: !GetAtt TTrekNetworkLoadBalancerSingleIP.LoadBalancerArn
       Port: 443
       Protocol: TCP
 
@@ -95,6 +88,9 @@ Resources:
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: preserve_client_ip.enabled
+          Value: true
 
   TTrekLoadBalancerHttpsTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -109,6 +105,9 @@ Resources:
       HealthCheckTimeoutSeconds: 10
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: preserve_client_ip.enabled
+          Value: true
 
   TTrekCluster:
     Type: AWS::ECS::Cluster
@@ -124,7 +123,7 @@ Resources:
       Cluster: !Ref TTrekCluster
       LaunchType: FARGATE
       TaskDefinition: !Ref EcsTaskDefinition
-      DesiredCount: 2
+      DesiredCount: 1
       HealthCheckGracePeriodSeconds: 30
       LoadBalancers:
         - ContainerName: "TTrekContainerDefinition"
@@ -138,7 +137,7 @@ Resources:
           AssignPublicIp: DISABLED
           Subnets:
             - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet1Id"
-            - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet2Id"
+#            - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet2Id"
           SecurityGroups:
             - !Ref TTrekServiceSecurityGroup
       Tags:
@@ -173,15 +172,15 @@ Resources:
       GroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
       SourceSecurityGroupId: !GetAtt TTrekNetworkLoadBalancerSecurityGroup.GroupId
 
-#  RedisInboundRule:
-#    Type: AWS::EC2::SecurityGroupIngress
-#    Properties:
-#      IpProtocol: tcp
-#      FromPort: 6379
-#      ToPort: 6379
-#      SourceSecurityGroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
-#      GroupId: !ImportValue 'Infra-DevOps-TTREK-Base-RedisSecurityGroupId'
-#      Description: "Access from TTrek Fargate"
+  RedisInboundRule:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      IpProtocol: tcp
+      FromPort: 6379
+      ToPort: 6379
+      SourceSecurityGroupId: !GetAtt TTrekServiceSecurityGroup.GroupId
+      GroupId: !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0SecurityGroupId'
+      Description: "Access from TTrek Fargate"
 
   EcsExecutionRole:
     Type: AWS::IAM::Role
@@ -194,6 +193,7 @@ Resources:
               Service: "ecs-tasks.amazonaws.com"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        - arn:aws:iam::aws:policy/AWSKeyManagementServicePowerUser
 
   EcsTaskRole:
     Type: AWS::IAM::Role
@@ -222,6 +222,7 @@ Resources:
                   - kms:GenerateDataKey
                 Resource:
                   - !ImportValue 'Infra-DevOps-TTREK-Keys-KMSMasterKeyArn'
+                  - !Sub arn:aws:kms:*:${AWS::AccountId}:alias/${AppName}-kms-key
               - Effect: Allow
                 Action:
                   - s3:DeleteObject
@@ -256,19 +257,19 @@ Resources:
             - ContainerPort: 4433
               HostPort: 4433
               Protocol: tcp
-      Cpu: 1024
-      Memory: 2048
+      Cpu: 512
+      Memory: 1024
       NetworkMode: awsvpc
       ExecutionRoleArn: !GetAtt "EcsExecutionRole.Arn"
       TaskRoleArn: !GetAtt "EcsTaskRole.Arn"
-      EphemeralStorage:
-        SizeInGiB: 40
+#      EphemeralStorage:
+#        SizeInGiB: 20
       RequiresCompatibilities:
         - FARGATE
 
 Outputs:
   TTrekNetworkLoadBalancerDNSName:
-    Value: !GetAtt TTrekNetworkLoadBalancer.DNSName
+    Value: !GetAtt TTrekNetworkLoadBalancerSingleIP.DNSName
     Export:
       Name: "TTrekNLB-DNSName"
   TTrekNetworkLoadBalancerSecurityGroupId:

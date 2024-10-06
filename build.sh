@@ -143,7 +143,7 @@ if [ ! -e "$SELF_DIR/certs/cert.pem" ]; then
         -sha256 \
         -days 3650 \
         -nodes \
-        -subj "/C=CY/ST=Cyprus/L=Home/O=none/OU=CompanySectionName/CN=ttrek.sh/CN=get.ttrek.sh"
+        -subj "/C=CY/ST=Cyprus/L=Home/O=none/OU=CompanySectionName/CN=ttrek.sh/CN=www.ttrek.sh"
 fi
 
 echo

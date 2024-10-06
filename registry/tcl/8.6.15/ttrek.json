@@ -1,0 +1,28 @@
+{
+	"name":	"tcl",
+	"version":	"8.6.15",
+	"scripts":	{
+	},
+	"dependencies":	{
+		"zlib":	"^1.3.1"
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/tcltk/tcl/archive/refs/tags/core-8-6-15.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "cd" },
+			{
+				"cmd": "configure",
+				"path": "$SOURCE_DIR/unix/configure",
+				"options": [
+					{ "name": "enable-threads" },
+					{ "name": "disable-shared", "if": "+static" }
+				]
+			},
+			{ "cmd": "make", "parallel": true },
+			{ "cmd": "make_install" }
+		]
+	}
+}
