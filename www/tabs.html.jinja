@@ -1,0 +1,9 @@
+{% macro tabs(heading, path) %}
+<div>
+    <h2>{{ heading }}</h2>
+    {% for tab in [{'url': '/', 'title': 'Home'}, {'url': '/packages', 'title': 'Packages'}] %}
+        {% if not loop.first %} | {% endif %}
+        {% if path == tab.url %}<strong>{{ tab.title }}</strong>{% else %}<a href="{{ tab.url }}">{{ tab.title }}</a>{% endif %}
+    {% endfor %}
+</div>
+{% endmacro %}

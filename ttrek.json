@@ -1,21 +1,17 @@
 {
   "name": "ttrek_sh",
   "version": "1.0.0",
-  "scripts": {
-
-  },
+  "scripts": {},
   "dependencies": {
-    "twebserver": "^1.47.53",
-    "thtml": "^1.5.0",
+    "twebserver": "^1.47.54",
     "tconfig": "^1.0.0",
-    "tjson": "^1.0.25",
-    "sqlite3": "^3.45.3",
-    "thread": "^3.0.0-beta.4",
+    "tjson": "^1.0.26",
     "tratelimit": "^1.0.0",
     "treqmon": "^1.0.0",
-    "tsession-dynamodb": "^1.0.0"
+    "tsession-dynamodb": "^1.0.0",
+    "tcl": "^9.1.0",
+    "jinja2-tcl": "^0.1.0",
+    "thread": "^3.0.7"
   },
-  "devDependencies": {
-
-  }
+  "devDependencies": {}
 }

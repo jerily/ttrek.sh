@@ -1,0 +1,9 @@
+.stats-container {
+    min-width: 320px;
+    max-width: 1024px;
+    margin: 0 auto;
+}
+
+.stats-chart {
+    margin: 2rem 0;
+}

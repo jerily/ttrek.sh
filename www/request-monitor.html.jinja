@@ -1,0 +1,27 @@
+{% extends 'internal-master.html.jinja' %}
+{% block content %}
+    <h3>Summary</h3>
+    <p><strong>Current Avg Response Time (in ms)</strong></p>
+    <ul>
+        <li>Last minute: {{ summary.last_minute_avg_response_time }}</li>
+        <li>Last 30 minutes: {{ summary.last_half_hour_avg_response_time }}</li>
+        <li>Last hour: {{ summary.last_hour_avg_response_time }}</li>
+        <li>Last 24 hours: {{ summary.last_day_avg_response_time }}</li>
+    </ul>
+    {% for group in groups %}
+        <h3>{{ group.title }}</h3>
+        {% for chart in group.charts %}
+            <section class="stats-chart pure-g">
+                <div class="pure-u-3-5">
+                    <canvas data-chart-config="{{ chart.config }}" aria-label="{{ chart.title }}" role="img"></canvas>
+                </div>
+                <div class="pure-u-2-5">
+                    <small>Max</small>
+                    {% for point in chart.top %}
+                        <div><small>{{ point.time }}: {{ point.value }}</small></div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    {% endfor %}
+{% endblock %}

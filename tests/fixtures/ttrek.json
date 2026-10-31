@@ -1,0 +1,8 @@
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "dependencies": {
+    "tcl": "^9.1.0",
+    "optional": {"version": ">=1.0", "if": "+ssl"}
+  }
+}

@@ -1,0 +1,16 @@
+
+{% extends 'master.html.jinja' %}
+{% block content %}
+    <div class="content-wrapper">
+        <div class="content">
+            <h2 class="content-head is-center">{{ title }}</h2>
+            <ul>
+                {% for package_name in package_names %}
+                    <li>
+                        <a href="/package/{{ package_name|urlencode }}">{{ package_name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

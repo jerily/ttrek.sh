@@ -1,0 +1,2 @@
+# Unified diffs prefix unchanged blank lines with a space.
+build-support/*.patch whitespace=-blank-at-eol,-blank-at-eof

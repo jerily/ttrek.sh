@@ -2,6 +2,7 @@
 # SPDX-FileCopyrightText: 2024 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
 
+package require Tcl 9.1
 package require twebserver
 package require thread
 package require tconfig::decrypt

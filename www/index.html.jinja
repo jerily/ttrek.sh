@@ -1,0 +1,16 @@
+
+{% extends 'master.html.jinja' %}
+{% block content %}
+{% include 'bashline.html.jinja' %}
+    <div class="splash-container">
+        <div class="splash">
+            <h1 class="splash-head">{{ title }}</h1>
+            <p class="splash-subhead">
+                {{ bashline("curl --proto '=https' --tlsv1.2 -sSf https://ttrek.sh/init | sh", "justify-content: center; color: white;") }}
+            </p>
+            <p class="text-normal">
+                <a href="/packages" class="pure-button pure-button-primary">See all packages</a>
+            </p>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,10 @@
+--- a/include/rapidjson/document.h
++++ b/include/rapidjson/document.h
+@@ -316,7 +316,6 @@
+ 
+     GenericStringRef(const GenericStringRef& rhs) : s(rhs.s), length(rhs.length) {}
+ 
+-    GenericStringRef& operator=(const GenericStringRef& rhs) { s = rhs.s; length = rhs.length; }
+ 
+     //! implicit conversion to plain CharType pointer
+     operator const Ch *() const { return s; }
