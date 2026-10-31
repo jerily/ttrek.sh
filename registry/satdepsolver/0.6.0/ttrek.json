@@ -1,0 +1,43 @@
+{
+  "name": "satdepsolver",
+  "version": "0.6.0",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {},
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://github.com/jerily/satdepsolver-cpp/archive/refs/tags/v0.6.0.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "cd"
+      },
+      {
+        "cmd": "cmake_config",
+        "options": [
+          {
+            "name": "CMAKE_INSTALL_LIBDIR",
+            "value": "lib"
+          },
+          {
+            "name": "SATDEPSOLVER_BUILD_TESTS",
+            "value": "OFF"
+          }
+        ]
+      },
+      {
+        "cmd": "cmake_make",
+        "config": "Release",
+        "parallel": true
+      },
+      {
+        "cmd": "cmake_install",
+        "config": "Release"
+      }
+    ]
+  }
+}
