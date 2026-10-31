@@ -1,0 +1,34 @@
+{
+	"name":	"openssl",
+	"version":	"4.1.0",
+	"scripts":	{
+	},
+	"dependencies":	{
+	},
+	"devDependencies":	{
+	},
+	"build": {
+		"default": [
+			{
+				"cmd": "download",
+				"url": "https://github.com/openssl/openssl/releases/download/openssl-4.1.0/openssl-4.1.0.tar.gz",
+				"sha256": "50c17baf54cb008f6ce42d50deb4b28050a1aad711636cabd4b241c7e90cc2fd"
+			},
+			{ "cmd": "unpack" },
+			{ "cmd": "cd", "dirname": "$SOURCE_DIR" },
+			{
+				"cmd": "configure",
+				"path": "./Configure",
+				"options": [
+					{ "name": "libdir", "value": "lib" },
+					{ "name": "no-shared", "if": "+static", "option_prefix": "" },
+					{ "name": "no-pinshared", "if": "+static", "option_prefix": "" },
+					{ "name": "no-docs", "if": "-docs", "option_prefix": "" }
+				]
+			},
+			{ "cmd": "make", "parallel": true },
+			{ "cmd": "make_install" },
+			{ "cmd": "make_install", "target": "install_dev" }
+		]
+	}
+}
