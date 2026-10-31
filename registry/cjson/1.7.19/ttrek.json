@@ -1,0 +1,53 @@
+{
+  "name": "cjson",
+  "version": "1.7.19",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {},
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "cd"
+      },
+      {
+        "cmd": "cmake_config",
+        "options": [
+          {
+            "name": "CMAKE_INSTALL_LIBDIR",
+            "value": "lib"
+          },
+          {
+            "name": "ENABLE_CJSON_TEST",
+            "value": "OFF"
+          },
+          {
+            "name": "BUILD_SHARED_LIBS",
+            "value": "OFF"
+          },
+          {
+            "name": "CMAKE_POSITION_INDEPENDENT_CODE",
+            "value": "ON"
+          },
+          {
+            "name": "CMAKE_POLICY_VERSION_MINIMUM",
+            "value": "3.5"
+          }
+        ]
+      },
+      {
+        "cmd": "make",
+        "parallel": true
+      },
+      {
+        "cmd": "make_install"
+      }
+    ]
+  }
+}

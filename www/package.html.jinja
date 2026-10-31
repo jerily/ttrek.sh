@@ -1,0 +1,34 @@
+
+{% extends 'master.html.jinja' %}
+{% block content %}
+{% include 'bashline.html.jinja' %}
+    <div class="content-wrapper">
+        <div class="content">
+            <h2 class="content-head is-center text-normal">{{ package_name }}</h2>
+            <p class="content-subhead">Install:</p>
+            {{ bashline("ttrek install " ~ package_name) }}
+            <p class="content-subhead">Versions:</p>
+            {% for version in versions %}
+                <div class="version">
+                    <a href="/package/{{ package_name|urlencode }}/{{ version|urlencode }}">{{ version }}</a>
+                </div>
+            {% endfor %}
+            {% if stat_platforms %}
+                <p class="content-subhead">Statistics (installations):</p>
+                <table class="pure-table">
+                    <thead><tr><th>Platform</th><th>Total</th><th>Success</th><th>Failure</th></tr></thead>
+                    <tbody>
+                        {% for stat_platform in stat_platforms %}
+                            <tr>
+                                <td>{{ stat_platform[0] }}</td>
+                                <td>{{ stat_platform[1] }}</td>
+                                <td>{{ stat_platform[2] }}</td>
+                                <td>{{ stat_platform[3] }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

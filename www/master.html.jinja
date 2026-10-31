@@ -1,17 +1,17 @@
-<import name="Tabs" src="tabs.thtml" />
-<html>
+<!DOCTYPE html>
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="stylesheet" href="/css/pure/pure-min.css" />
         <link rel="stylesheet" href="/css/pure/grids-responsive-min.css" />
         <link rel="stylesheet" href="/css/styles.css" />
-        <title>$pagetitle</title>
+        <title>{{ pagetitle }}</title>
     </head>
     <body>
         <div class="header">
             <div class="home-menu pure-menu pure-menu-horizontal pure-menu-fixed">
-                <a class="pure-menu-heading text-normal" href="/">$pagetitle</a>
+                <a class="pure-menu-heading text-normal" href="/">{{ pagetitle }}</a>
 
                 <ul class="pure-menu-list">
                     <li class="pure-menu-item pure-menu-selected"><a href="/" class="pure-menu-link">Home</a></li>
@@ -20,7 +20,7 @@
                 </ul>
             </div>
         </div>
-        <slave />
+        {% block content %}{% endblock %}
         <div class="footer l-box is-center">
             &#169; 2024 JERILY LTD - View the source code on <a href="https://github.com/jerily/ttrek">github</a>.
         </div>

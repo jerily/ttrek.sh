@@ -144,7 +144,7 @@ cmd() {
 init_tty
 
 PKG_CUR="1"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='libvalkey'
 VERSION='0.1.0'
@@ -179,7 +179,7 @@ cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/inst
 ok
 
 PKG_CUR="2"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='zlib'
 VERSION='1.3.1'
@@ -214,7 +214,7 @@ cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/inst
 ok
 
 PKG_CUR="3"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='protobuf'
 VERSION='21.9.0'
@@ -249,7 +249,7 @@ cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/inst
 ok
 
 PKG_CUR="4"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='abseil-cpp'
 VERSION='20230802.1.0'
@@ -284,7 +284,7 @@ cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/inst
 ok
 
 PKG_CUR="5"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='openssl'
 VERSION='3.2.1'
@@ -321,10 +321,10 @@ cmd make "install_dev" >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DI
 ok
 
 PKG_CUR="6"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='tcl'
-VERSION='9.0.0-beta.3'
+VERSION='9.1.0'
 SOURCE_DIR=''
 
 ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
@@ -343,7 +343,7 @@ rm -rf "$BUILD_LOG_DIR"
 mkdir -p "$BUILD_LOG_DIR"
 
 stage 1
-cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'https://github.com/tcltk/tcl/archive/refs/tags/core-9-0-b3.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
+cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'https://prdownloads.sourceforge.net/tcl/tcl9.1.0-src.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
 stage 1
 cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
 cmd cd "$BUILD_DIR" || fail
@@ -356,7 +356,7 @@ cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/inst
 ok
 
 PKG_CUR="7"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='curl'
 VERSION='8.7.1'
@@ -655,7 +655,7 @@ diff -ur tink-cc-2.1.1/tink/util/CMakeLists.txt tink-cc/tink/util/CMakeLists.txt
 __TTREK_PATCH_EOF__
 
 PKG_CUR="8"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='tink-cc'
 VERSION='2.1.1'
@@ -693,10 +693,10 @@ cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/inst
 ok
 
 PKG_CUR="9"
-PKG_TOT="23"
+PKG_TOT="21"
 
-PACKAGE='sqlite3'
-VERSION='3.45.3'
+PACKAGE='cjson'
+VERSION='1.7.19'
 SOURCE_DIR=''
 
 ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
@@ -715,12 +715,12 @@ rm -rf "$BUILD_LOG_DIR"
 mkdir -p "$BUILD_LOG_DIR"
 
 stage 1
-cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/sqlite3.45.3.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
+cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
 stage 1
 cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
 cmd cd "$BUILD_DIR" || fail
 stage 2
-cmd "$SOURCE_DIR/configure" '--'prefix="$INSTALL_DIR" '--''with-tcl'="$INSTALL_DIR/lib" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
 stage 3
 cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
 stage 4
@@ -728,77 +728,7 @@ cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/inst
 ok
 
 PKG_CUR="10"
-PKG_TOT="23"
-
-PACKAGE='tdom'
-VERSION='0.9.4'
-SOURCE_DIR=''
-
-ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
-BUILD_DIR="$ROOT_BUILD_DIR/build/${PACKAGE}-${VERSION}"
-BUILD_LOG_DIR="$ROOT_BUILD_DIR/logs/${PACKAGE}-${VERSION}"
-
-if [ -z "$SOURCE_DIR" ]; then
-    SOURCE_DIR="$ROOT_BUILD_DIR/source/${PACKAGE}-${VERSION}"
-fi
-
-rm -rf "$SOURCE_DIR"
-mkdir -p "$SOURCE_DIR"
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
-rm -rf "$BUILD_LOG_DIR"
-mkdir -p "$BUILD_LOG_DIR"
-
-stage 1
-cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'http://tdom.org/downloads/tdom-0.9.4-src.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
-stage 1
-cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
-cmd cd "$SOURCE_DIR/unix" || fail
-stage 2
-cmd "../configure" '--'prefix="$INSTALL_DIR" '--''with-tcl'="$INSTALL_DIR/lib" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
-stage 3
-cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
-stage 4
-cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
-ok
-
-PKG_CUR="11"
-PKG_TOT="23"
-
-PACKAGE='thread'
-VERSION='3.0.0-beta.4'
-SOURCE_DIR=''
-
-ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
-BUILD_DIR="$ROOT_BUILD_DIR/build/${PACKAGE}-${VERSION}"
-BUILD_LOG_DIR="$ROOT_BUILD_DIR/logs/${PACKAGE}-${VERSION}"
-
-if [ -z "$SOURCE_DIR" ]; then
-    SOURCE_DIR="$ROOT_BUILD_DIR/source/${PACKAGE}-${VERSION}"
-fi
-
-rm -rf "$SOURCE_DIR"
-mkdir -p "$SOURCE_DIR"
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
-rm -rf "$BUILD_LOG_DIR"
-mkdir -p "$BUILD_LOG_DIR"
-
-stage 1
-cmd curl -sL -o "$DOWNLOAD_DIR/$ARCHIVE_FILE" 'https://sourceforge.net/projects/tcl/files/Tcl/9.0b3/thread3.0b4.tar.gz' >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
-stage 1
-cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
-cmd cd "$BUILD_DIR" || fail
-stage 2
-cmd "$SOURCE_DIR/configure" '--'prefix="$INSTALL_DIR" '--''with-tcl'="$INSTALL_DIR/lib" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
-stage 3
-cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
-stage 4
-cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
-ok
-
-PKG_CUR="12"
-PKG_TOT="23"
+PKG_TOT="21"
 
 PACKAGE='tjson'
 VERSION='1.0.25'
@@ -825,15 +755,15 @@ stage 1
 cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
 cmd cd "$BUILD_DIR" || fail
 stage 2
-cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" -DTCL_LIBRARY="$INSTALL_DIR/lib/libtcl9.1.so" -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
 stage 3
 cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
 stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="13"
-PKG_TOT="23"
+PKG_CUR="11"
+PKG_TOT="21"
 
 PACKAGE='twebserver'
 VERSION='1.47.53'
@@ -860,15 +790,15 @@ stage 1
 cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
 cmd cd "$BUILD_DIR" || fail
 stage 2
-cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" -DTCL_LIBRARY="$INSTALL_DIR/lib/libtcl9.1.so" -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
 stage 3
 cmd make >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
 stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="14"
-PKG_TOT="23"
+PKG_CUR="12"
+PKG_TOT="21"
 
 PACKAGE='valkey-tcl'
 VERSION='1.0.0'
@@ -895,15 +825,15 @@ stage 1
 cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
 cmd cd "$BUILD_DIR" || fail
 stage 2
-cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" -DTCL_LIBRARY="$INSTALL_DIR/lib/libtcl9.1.so" -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
 stage 3
 cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
 stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="15"
-PKG_TOT="23"
+PKG_CUR="13"
+PKG_TOT="21"
 
 PACKAGE='aws-sdk-cpp'
 VERSION='1.11.157'
@@ -936,8 +866,8 @@ stage 4
 cmd cmake --install "$BUILD_DIR" --config='Release' >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="16"
-PKG_TOT="23"
+PKG_CUR="14"
+PKG_TOT="21"
 
 PACKAGE='tink-tcl'
 VERSION='20240704.0.0'
@@ -964,18 +894,18 @@ stage 1
 cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
 cmd cd "$BUILD_DIR" || fail
 stage 2
-cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" -D'TINK_CPP_DIR'="$INSTALL_DIR" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" -DTCL_LIBRARY="$INSTALL_DIR/lib/libtcl9.1.so" -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" -D'TINK_CPP_DIR'="$INSTALL_DIR" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
 stage 3
 cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
 stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="17"
-PKG_TOT="23"
+PKG_CUR="15"
+PKG_TOT="21"
 
-PACKAGE='thtml'
-VERSION='1.5.0'
+PACKAGE='jinja2-tcl'
+VERSION='0.1.0'
 SOURCE_DIR=''
 
 ARCHIVE_FILE="${PACKAGE}-${VERSION}.archive"
@@ -994,19 +924,20 @@ rm -rf "$BUILD_LOG_DIR"
 mkdir -p "$BUILD_LOG_DIR"
 
 stage 1
-cmd git -C "$SOURCE_DIR" clone 'https://github.com/jerily/thtml' --depth 1 --single-branch . >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
+cmd git -C "$SOURCE_DIR" clone 'https://github.com/jerily/jinja2-tcl' --depth 1 --single-branch . >"$BUILD_LOG_DIR/download.log" 2>&1 || fail "$BUILD_LOG_DIR/download.log"
 find "$SOURCE_DIR" -name '.git' -print0 | xargs -0 rm -rf || fail
 cmd cd "$BUILD_DIR" || fail
 stage 2
-cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -DCMAKE_INSTALL_LIBDIR=lib -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
 stage 3
 cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
+cmd ctest --output-on-failure >"$BUILD_LOG_DIR/test.log" 2>&1 || fail "$BUILD_LOG_DIR/test.log"
 stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="18"
-PKG_TOT="23"
+PKG_CUR="16"
+PKG_TOT="21"
 
 PACKAGE='tratelimit'
 VERSION='1.0.0'
@@ -1035,8 +966,8 @@ stage 4
 cmd make install "PREFIX"="$INSTALL_DIR" >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="19"
-PKG_TOT="23"
+PKG_CUR="17"
+PKG_TOT="21"
 
 PACKAGE='treqmon'
 VERSION='1.0.0'
@@ -1065,8 +996,8 @@ stage 4
 cmd make install "PREFIX"="$INSTALL_DIR" >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="20"
-PKG_TOT="23"
+PKG_CUR="18"
+PKG_TOT="21"
 
 PACKAGE='aws-sdk-tcl'
 VERSION='1.0.10'
@@ -1093,15 +1024,15 @@ stage 1
 cmd unpack "$DOWNLOAD_DIR/$ARCHIVE_FILE" "$SOURCE_DIR" >"$BUILD_LOG_DIR/unpack.log" 2>&1 || fail "$BUILD_LOG_DIR/unpack.log"
 cmd cd "$BUILD_DIR" || fail
 stage 2
-cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" -D'AWS_SDK_CPP_DIR'="$INSTALL_DIR" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
+cmd cmake "$SOURCE_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR/" -D'TCL_LIBRARY_DIR'="$INSTALL_DIR/lib" -D'TCL_INCLUDE_DIR'="$INSTALL_DIR/include" -DTCL_LIBRARY="$INSTALL_DIR/lib/libtcl9.1.so" -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" -D'AWS_SDK_CPP_DIR'="$INSTALL_DIR" >"$BUILD_LOG_DIR/configure.log" 2>&1 || fail "$BUILD_LOG_DIR/configure.log"
 stage 3
 cmd make -j"$DEFAULT_THREADS" >"$BUILD_LOG_DIR/build.log" 2>&1 || fail "$BUILD_LOG_DIR/build.log"
 stage 4
 cmd make install >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="21"
-PKG_TOT="23"
+PKG_CUR="19"
+PKG_TOT="21"
 
 PACKAGE='tsession'
 VERSION='1.0.3'
@@ -1131,8 +1062,8 @@ stage 4
 cmd make install "PREFIX"="$INSTALL_DIR" >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="22"
-PKG_TOT="23"
+PKG_CUR="20"
+PKG_TOT="21"
 
 PACKAGE='tconfig'
 VERSION='1.0.0'
@@ -1162,8 +1093,8 @@ stage 4
 cmd make install "PREFIX"="$INSTALL_DIR" >"$BUILD_LOG_DIR/install.log" 2>&1 || fail "$BUILD_LOG_DIR/install.log"
 ok
 
-PKG_CUR="23"
-PKG_TOT="23"
+PKG_CUR="21"
+PKG_TOT="21"
 
 PACKAGE='tsession-dynamodb'
 VERSION='1.0.0'

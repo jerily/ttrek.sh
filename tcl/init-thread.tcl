@@ -3,17 +3,15 @@
 # SPDX-License-Identifier: MIT.
 
 package require twebserver
-package require thtml
+package require Tcl 9.1
 package require tjson
 package require thread
 package require tratelimit
 package require treqmon
 
-::thtml::init [dict create \
-    debug 1 \
-    cache 1 \
-    rootdir [::twebserver::get_rootdir] \
-    bundle_outdir [file join [::twebserver::get_rootdir] public bundle]]
+source [file join [file dirname [info script]] templates.tcl]
+source [file join [file dirname [info script]] request-monitor.tcl]
+::views::init [file join [::twebserver::get_rootdir] www]
 
 set config_dict [::twebserver::get_config_dict]
 
@@ -37,7 +35,7 @@ set config_dict [::twebserver::get_config_dict]
 ::twebserver::add_route -strict -name get_index $router GET / get_index_page_handler
 ::twebserver::add_route -strict -name get_ttrek_init $router GET /init get_ttrek_init_handler
 ::twebserver::add_route -strict -name get_packages $router GET /packages get_packages_page_handler
-::twebserver::add_route -prefix -name get_assets $router GET /(css|js|assets|bundle)/ get_assets_handler
+::twebserver::add_route -prefix -name get_assets $router GET /(css|js|assets)/ get_assets_handler
 ::twebserver::add_route -strict -name get_dist $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
 ::twebserver::add_route -strict -name get_package $router GET /package/:package_name get_package_page_handler
 ::twebserver::add_route -strict -name get_package_version $router GET /package/:package_name/:package_version get_package_version_page_handler
@@ -49,8 +47,8 @@ set config_dict [::twebserver::get_config_dict]
 ::twebserver::add_route -name get_catchall $router GET "*" get_catchall_handler
 
 proc get_stats_handler {ctx req} {
-    set data [dict merge $req [list bundle_js_url_prefix "/bundle" bundle_css_url_prefix "/bundle"]]
-    set html [::thtml::renderfile request-monitor.thtml $data]
+    set data [::request_monitor::context]
+    set html [::views::render request-monitor.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 }
@@ -210,7 +208,7 @@ proc path_join {args} {
 
 proc get_assets_handler {ctx req} {
     set path [dict get $req path]
-    set dir [file normalize [::thtml::get_rootdir]]
+    set dir [file normalize [::twebserver::get_rootdir]]
     set filepath [path_join $dir public $path]
 #    puts filepath=$filepath
     set ext [file extension $filepath]
@@ -228,7 +226,7 @@ proc get_assets_handler {ctx req} {
 }
 
 proc get_ttrek_init_handler {ctx req} {
-    set dir [file normalize [::thtml::get_rootdir]]
+    set dir [file normalize [::twebserver::get_rootdir]]
     return [::twebserver::build_response -return_file 200 application/octet-stream $dir/public/ttrek-init]
     return $res
 }
@@ -241,8 +239,8 @@ proc get_index_page_handler {ctx req} {
 #            return [::twebserver::build_response -return_file 200 application/octet-stream [::twebserver::get_rootdir]/public/ttrek-init]
 #        }
 #    }
-    set data [dict merge $req [list title "Install ttrek"]]
-    set html [::thtml::renderfile index.thtml $data]
+    set data [dict create title {S {Install ttrek}}]
+    set html [::views::render index.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 }
@@ -252,14 +250,14 @@ proc get_packages_page_handler {ctx req} {
     foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry/*]] {
         lappend package_names [file tail $path]
     }
-    set data [dict merge $req [list title "Packages" package_names [lsort $package_names]]]
-    set html [::thtml::renderfile packages.thtml $data]
+    set data [dict create title {S Packages} package_names [::views::strings [lsort $package_names]]]
+    set html [::views::render packages.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 }
 
 proc get_logo_handler {ctx req} {
-    set dir [file normalize [::thtml::get_rootdir]]
+    set dir [file normalize [::twebserver::get_rootdir]]
     set filepath [path_join $dir www plume.png]
     set res [::twebserver::build_response -return_file 200 image/png $filepath]
     return $res
@@ -459,14 +457,11 @@ proc get_package_page_handler {ctx req} {
 
     set stat_platforms [get_package_stats $package_name]
 
-    set data [dict merge $req \
-        [list \
-            package_name   $package_name \
-            versions       [lsort -command compare_versions -decreasing $versions] \
-            stat_platforms $stat_platforms \
-        ] \
-    ]
-    set html [::thtml::renderfile package.thtml $data]
+    set data [dict create \
+        package_name [list S $package_name] \
+        versions [::views::strings [lsort -command compare_versions -decreasing $versions]] \
+        stat_platforms [::views::platform_stats $stat_platforms]]
+    set html [::views::render package.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 }
@@ -507,19 +502,18 @@ proc get_package_version_page_handler {ctx req} {
             set dep_version [::tjson::get_valuestring $item]
             set dep_if_use_flags ""
         }
-        lappend deps [list name $dep_name version $dep_version condition $dep_if_use_flags]
+        lappend deps [list M [list name [list S $dep_name] version [list S $dep_version] condition [list S $dep_if_use_flags]]]
     }
 
     set stat_platforms [get_package_version_stats $package_name $package_version]
 
-    set data [dict merge $req \
-        [list \
-            package_name $package_name \
-            package_version $package_version \
-            deps $deps \
-            stat_platforms $stat_platforms]]
+    set data [dict create \
+        package_name [list S $package_name] \
+        package_version [list S $package_version] \
+        deps [list L $deps] \
+        stat_platforms [::views::platform_stats $stat_platforms]]
 
-    set html [::thtml::renderfile package-version.thtml $data]
+    set html [::views::render package-version.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 
