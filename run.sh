@@ -10,4 +10,4 @@ export LD_LIBRARY_PATH
 
 set -x
 
-"$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR"/app.tcl
+exec "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR"/app.tcl

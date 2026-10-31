@@ -19,8 +19,8 @@ phases:
       - mkdir -p ../ttrek-app/artifacts/
       - cp -R codedeploy-scripts/ ../ttrek-app/artifacts/
       - cp -R . ../ttrek-app/artifacts/ttrek-app
-      - apt-get update && apt-get install cmake npm pkg-config -y
-      - ./build-new.sh
+      - apt-get update && apt-get install build-essential cmake npm pkg-config git curl patch zlib1g-dev -y
+      - ./build.sh
       - npm ci --ignore-scripts
       - npm run build
       - export CURRENT_DIR=`pwd`

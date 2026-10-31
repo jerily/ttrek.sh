@@ -10,6 +10,9 @@ BUILD_DIR="$SELF_DIR/build/build"
 TCL_VERSION=9.1.0
 CJSON_VERSION=1.7.19
 DEBUG=0
+BUILD_JOBS=${TTREK_MAKE_THREADS:-4}
+
+export PATH="$INSTALL_DIR/bin:$PATH"
 
 export LD_LIBRARY_PATH="$INSTALL_DIR/lib:$INSTALL_DIR/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
@@ -38,7 +41,7 @@ if [ ! -x "$INSTALL_DIR/bin/tclsh9.1" ]; then
     mkdir -p "$BUILD_DIR/tcl$TCL_VERSION"
     cd "$BUILD_DIR/tcl$TCL_VERSION"
     "$SOURCE_DIR/tcl$TCL_VERSION/unix/configure" "$SYMBOLS_FLAG" --prefix="$INSTALL_DIR"
-    make -j
+    make -j"$BUILD_JOBS"
     # The Tcl release includes matching Thread and SQLite packages.
     make install
 fi
@@ -52,7 +55,7 @@ if [ ! -e "$INSTALL_DIR/lib/pkgconfig/libcjson.pc" ]; then
     cmake -S "$SOURCE_DIR/cJSON-$CJSON_VERSION" -B "$BUILD_DIR/cJSON" \
         -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_INSTALL_LIBDIR=lib \
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-    cmake --build "$BUILD_DIR/cJSON" --parallel
+    cmake --build "$BUILD_DIR/cJSON" --parallel "$BUILD_JOBS"
     cmake --install "$BUILD_DIR/cJSON"
 fi
 
@@ -68,22 +71,24 @@ if [ ! -e "$INSTALL_DIR/lib/jinja20.1.0/pkgIndex.tcl" ]; then
         -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" \
         -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" \
         -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1"
-    cmake --build "$BUILD_DIR/jinja2-tcl" --parallel
+    cmake --build "$BUILD_DIR/jinja2-tcl" --parallel "$BUILD_JOBS"
     ctest --test-dir "$BUILD_DIR/jinja2-tcl" --output-on-failure
     cmake --install "$BUILD_DIR/jinja2-tcl"
 fi
 
-if [ ! -e "$INSTALL_DIR"/lib/tjson*/pkgIndex.tcl ]; then
-    echo "Build tjson ..."
-    if [ ! -e "$SOURCE_DIR"/tjson-* ]; then
-        cd "$SOURCE_DIR"
-        curl -fLsS https://github.com/jerily/tjson/archive/refs/heads/main.tar.gz | tar zx
+if [ ! -e "$INSTALL_DIR/lib/tjson1.0.26/pkgIndex.tcl" ]; then
+    echo "Build tjson 1.0.26 ..."
+    if [ ! -d "$SOURCE_DIR/tjson-1.0.26" ]; then
+        curl -fLsS https://github.com/jerily/tjson/archive/refs/tags/v1.0.26.tar.gz -o "$SOURCE_DIR/tjson-1.0.26.tar.gz"
+        tar -xzf "$SOURCE_DIR/tjson-1.0.26.tar.gz" -C "$SOURCE_DIR"
     fi
-    mkdir -p "$BUILD_DIR"/tjson
-    cd "$BUILD_DIR"/tjson
-    cmake "$SOURCE_DIR"/tjson-* -DTCL_LIBRARY_DIR="$INSTALL_DIR"/lib -DTCL_INCLUDE_DIR="$INSTALL_DIR"/include -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
-    make -j
-    make install
+    cmake -S "$SOURCE_DIR/tjson-1.0.26" -B "$BUILD_DIR/tjson-1.0.26" \
+        -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" \
+        -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" \
+        -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" \
+        -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
+    cmake --build "$BUILD_DIR/tjson-1.0.26" --parallel "$BUILD_JOBS"
+    cmake --install "$BUILD_DIR/tjson-1.0.26"
 fi
 
 
@@ -95,23 +100,29 @@ if [ ! -e "$INSTALL_DIR"/bin/openssl* ]; then
     fi
     cd "$SOURCE_DIR"/openssl-*
     CFLAGS= LDFLAGS= ./Configure --prefix="$INSTALL_DIR" no-docs
-    make
+    make -j"$BUILD_JOBS"
     make install
     make install_dev
 fi
 
-if [ ! -e "$INSTALL_DIR"/lib/twebserver*/pkgIndex.tcl ]; then
-    echo "Build twebserver ..."
-    if [ ! -e "$SOURCE_DIR"/twebserver-* ]; then
-        cd "$SOURCE_DIR"
-        curl -fLsS https://github.com/jerily/twebserver/archive/refs/heads/main.tar.gz | tar zx
+if [ ! -e "$INSTALL_DIR/lib/twebserver1.47.54/pkgIndex.tcl" ]; then
+    echo "Build twebserver 1.47.54 ..."
+    if [ ! -d "$SOURCE_DIR/twebserver-1.47.54" ]; then
+        curl -fLsS https://github.com/jerily/twebserver/archive/refs/tags/v1.47.54.tar.gz -o "$SOURCE_DIR/twebserver-1.47.54.tar.gz"
+        tar -xzf "$SOURCE_DIR/twebserver-1.47.54.tar.gz" -C "$SOURCE_DIR"
     fi
-    mkdir -p "$BUILD_DIR"/twebserver
-    cd "$BUILD_DIR"/twebserver
-    cmake "$SOURCE_DIR"/twebserver-* -DTCL_LIBRARY_DIR="$INSTALL_DIR"/lib -DTCL_INCLUDE_DIR="$INSTALL_DIR"/include -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
-    make -j
-    make install
+    cmake -S "$SOURCE_DIR/twebserver-1.47.54" -B "$BUILD_DIR/twebserver-1.47.54" \
+        -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" \
+        -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" \
+        -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" \
+        -DOPENSSL_ROOT_DIR="$INSTALL_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
+    cmake --build "$BUILD_DIR/twebserver-1.47.54" --parallel "$BUILD_JOBS"
+    cmake --install "$BUILD_DIR/twebserver-1.47.54"
 fi
+
+. "$SELF_DIR/build-support/runtime-dependencies.sh"
+
+"$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl"
 
 if [ ! -e "$SELF_DIR/certs/cert.pem" ]; then
     echo "Generate certificates ..."

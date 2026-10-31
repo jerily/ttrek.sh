@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "scripts": {},
   "dependencies": {
-    "twebserver": "^1.47.53",
+    "twebserver": "^1.47.54",
     "tconfig": "^1.0.0",
-    "tjson": "^1.0.25",
+    "tjson": "^1.0.26",
     "tratelimit": "^1.0.0",
     "treqmon": "^1.0.0",
     "tsession-dynamodb": "^1.0.0",

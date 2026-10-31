@@ -522,7 +522,7 @@ proc get_package_version_page_handler {ctx req} {
 proc get_package_stats {package_name} {
     set stat_platforms [telemetry_sql {
         SELECT
-            pl.os || " " || pl.arch,
+            pl.os || ' ' || pl.arch,
             COUNT(*),
             COUNT(CASE WHEN install_outcome = 1 THEN 1 END),
             COUNT(CASE WHEN install_outcome = 0 THEN 1 END)
@@ -544,7 +544,7 @@ proc get_package_stats {package_name} {
 proc get_package_version_stats {package_name package_version} {
     set stat_platforms [telemetry_sql {
         SELECT
-            pl.os || " " || pl.arch,
+            pl.os || ' ' || pl.arch,
             COUNT(*),
             COUNT(CASE WHEN install_outcome = 1 THEN 1 END),
             COUNT(CASE WHEN install_outcome = 0 THEN 1 END)
