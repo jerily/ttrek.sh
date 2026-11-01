@@ -151,7 +151,7 @@ a.pure-button-primary {
     position: absolute;
     top: 0; left: 0; bottom: 0; right: 0;
     text-align: center;
-    text-transform: uppercase;
+    /* text-transform: uppercase; */
     color:white;
 }
 
@@ -160,7 +160,7 @@ a.pure-button-primary {
     font-size: 20px;
     font-weight: bold;
     color: white;
-    padding: 1em 1.6em;
+    /* padding: 1em 1.6em; */
     font-weight: 100;
     /*border: 3px solid white;*/
     /*border-radius: 5px;*/
