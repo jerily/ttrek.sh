@@ -36,14 +36,42 @@ test config-4 {Local mode cannot fall back to production} -body {
     ::app_config::load $root
 } -returnCodes error -result {ENV=LOCAL requires etc/config.local.ini}
 
-test config-5 {TLS cannot be disabled through configuration} -body {
+test config-5 {Production TLS cannot be disabled through configuration} -body {
+    set ::env(ENV) PROD
     set settings [::app_config::valkey {redis {host localhost port 6379 password test ssl false}}]
     list [dict get $settings ssl] [dict get $settings username]
 } -result {true appuser}
 
 test config-6 {Missing credentials fail before connecting} -body {
+    set ::env(ENV) PROD
     ::app_config::valkey {redis {host localhost port 6379}}
 } -returnCodes error -match glob -result {Set redis.password*}
+
+test config-7 {Local plain TCP supports the existing unauthenticated loopback service} -body {
+    set ::env(ENV) LOCAL
+    set settings [::app_config::valkey {redis {host remote.example port 6379 password {} ssl false ssl_ca_file local/cert.pem}}]
+    list [dict get $settings host] [dict get $settings port] [dict get $settings ssl] \
+        [dict exists $settings password] [dict exists $settings username] [dict exists $settings ssl_ca_file]
+} -result {localhost 6379 false 0 0 0}
+
+test config-8 {Relative certificate paths resolve against the project root} -setup {
+    close [open [file join $root etc config.local.ini] w]
+    rename ::tconfig::read_config ::tconfig::saved_read_config
+    proc ::tconfig::read_config {path} {dict create redis {host localhost ssl_ca_file local/cert.pem}}
+} -body {
+    set ::env(ENV) LOCAL
+    set config [::app_config::load $root]
+    expr {[dict get $config redis ssl_ca_file] eq [file normalize [file join $root local/cert.pem]]}
+} -cleanup {
+    rename ::tconfig::read_config {}
+    rename ::tconfig::saved_read_config ::tconfig::read_config
+} -result 1
+
+test config-9 {Local authenticated TLS remains supported} -body {
+    set ::env(ENV) LOCAL
+    set settings [::app_config::valkey {redis {host remote.example port 6379 password test ssl true ssl_ca_file local/cert.pem}}]
+    list [dict get $settings host] [dict get $settings ssl] [dict get $settings username] [dict get $settings password]
+} -result {localhost true appuser test}
 
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env

@@ -95,6 +95,9 @@ writeFile $ttrek_sh_cert [binary decode base64 [dict get $config ssl certificate
 
 ::twebserver::add_context $server_handle ttrek.sh $ttrek_sh_key $ttrek_sh_cert
 ::twebserver::add_context $server_handle www.ttrek.sh $ttrek_sh_key $ttrek_sh_cert
+if {[::app_config::mode] eq "LOCAL"} {
+    ::twebserver::add_context $server_handle localhost $ttrek_sh_key $ttrek_sh_cert
+}
 
 file delete -force $ttrek_sh_key
 file delete -force $ttrek_sh_cert

@@ -25,15 +25,34 @@ proc ::app_config::load {root} {
             error "ENV=PROD requires etc/config.enc or etc/config.ini"
         }
     }
+    if {[dict exists $config redis ssl_ca_file]} {
+        set ca_file [dict get $config redis ssl_ca_file]
+        if {$ca_file ne "" && [file pathtype $ca_file] eq "relative"} {
+            dict set config redis ssl_ca_file [file normalize [file join $root $ca_file]]
+        }
+    }
     return $config
 }
 
 proc ::app_config::valkey {config} {
-    set settings [dict merge [dict create username appuser timeout 5000 \
+    set settings [dict merge [dict create username appuser timeout 5000 ssl true \
         ssl_ca_file /etc/ssl/certs/ca-certificates.crt] [dict get $config redis]]
-    dict set settings ssl true
+    if {[mode] eq "PROD"} {
+        dict set settings ssl true
+    } else {
+        dict set settings host localhost
+    }
     if {![dict exists $settings password] || [dict get $settings password] eq ""} {
-        error "Set redis.password in the application configuration (production SSM: /ttrek_sh/prod/redis/password)"
+        if {[dict get $settings ssl]} {
+            error "Set redis.password in the application configuration (production SSM: /ttrek_sh/prod/redis/password)"
+        }
+        dict unset settings password
+        dict unset settings username
+    }
+    if {![dict get $settings ssl]} {
+        foreach key {ssl_ca_file ssl_cert_file ssl_key_file} {
+            dict unset settings $key
+        }
     }
     return $settings
 }

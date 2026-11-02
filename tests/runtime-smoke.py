@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import socket
+import ssl
 import subprocess
 import tempfile
 import time
@@ -108,6 +109,11 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                     body = response.read().decode()
                     assert expected in body, f"Unexpected response for {path}"
                 print(f"PASS GET {path}")
+            if mode == "LOCAL":
+                context = ssl.create_default_context(cafile=str(app / "cert.pem"))
+                with urllib.request.urlopen(f"https://localhost:{https_port}/", context=context, timeout=5) as response:
+                    assert "Install ttrek" in response.read().decode()
+                print("PASS HTTPS localhost with certificate verification")
             for action in ("verify", "disconnect"):
                 subprocess.run([str(INSTALL / "bin/tclsh9.1"), str(ROOT / "tests/cache-smoke.tcl"),
                                 str(app), action], env=env, check=True, timeout=10)
