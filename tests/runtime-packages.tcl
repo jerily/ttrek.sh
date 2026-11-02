@@ -10,7 +10,18 @@ if {![llength $packages]} {
 }
 set failed 0
 foreach name $packages {
-    if {[catch {package require $name} result]} {
+    if {[catch {
+        switch -- $name {
+            valkey {
+                set version [package require valkey 1.0.3]
+                if {![::valkey::pkgconfig get feature-ssl]} {error "valkey requires TLS support"}
+                set version
+            }
+            treqmon {package require treqmon 2.0.0}
+            tratelimit {package require tratelimit 1.0.1}
+            default {package require $name}
+        }
+    } result]} {
         puts stderr "$name: $result"
         set failed 1
     } else {

@@ -9,27 +9,15 @@ package require tconfig::decrypt
 
 set dir [file dirname [info script]]
 
-set config_enc_filepath [file join $dir etc config.enc]
-set config_ini_filepath [file join $dir etc config.ini]
-if { [file exists $config_enc_filepath] } {
-    set config [::tconfig::load_config $config_enc_filepath]
-} elseif { [file exists $config_ini_filepath] } {
-    set config [::tconfig::read_config $config_ini_filepath]
-} else {
-    puts "No configuration file found"
-    exit 1
-}
+source [file join $dir tcl config.tcl]
+set config [::app_config::load $dir]
+
+# Shared TLS connection settings for both middleware stores.
+set valkey_config [::app_config::valkey $config]
 
 # tratelimit
 
 set tratelimit_config {
-    store {
-        valkeystore {
-            host "localhost"
-            port 6379
-            password "foobared"
-        }
-    }
     global_limits {
         by_ip {
             window_millis 10000
@@ -62,15 +50,11 @@ set tratelimit_config {
     }
 }
 
-dict set tratelimit_config store valkeystore [dict create \
-    host [dict get $config redis host] \
-    port [dict get $config redis port]]
+dict set tratelimit_config store valkeystore $valkey_config
 
 set treqmon_config {}
-dict set treqmon_config store valkeystore [dict create \
-    host [dict get $config redis host] \
-    port [dict get $config redis port] \
-    history_max_events 100000]
+dict set treqmon_config store valkeystore [dict merge $valkey_config \
+    [dict create history_max_events 100000]]
 
 
 

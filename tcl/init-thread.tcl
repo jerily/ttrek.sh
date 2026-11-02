@@ -6,8 +6,8 @@ package require twebserver
 package require Tcl 9.1
 package require tjson
 package require thread
-package require tratelimit
-package require treqmon
+package require tratelimit 1.0.1
+package require treqmon 2.0.0
 
 source [file join [file dirname [info script]] templates.tcl]
 source [file join [file dirname [info script]] request-monitor.tcl]

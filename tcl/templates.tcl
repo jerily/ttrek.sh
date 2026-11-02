@@ -9,7 +9,8 @@ namespace eval ::views {
 # Load trusted application templates once in each worker interpreter.
 proc ::views::init {directory} {
     variable templates
-    set templates {}
+    ::treqmon::view::init
+    set templates $::treqmon::view::templates
     foreach path [glob -directory $directory *.html.jinja] {
         set channel [open $path r]
         try {

@@ -1,0 +1,53 @@
+package require tcltest 2
+namespace import ::tcltest::test
+source [file join [file dirname [info script]] .. tcl config.tcl]
+
+set root [::tcltest::makeDirectory config-fixture]
+file mkdir [file join $root etc]
+foreach name {config.ini config.enc config.local.ini} {
+    close [open [file join $root etc $name] w]
+}
+set saved_env [array get ::env ENV]
+namespace eval ::tconfig {
+    proc read_config {path} {dict create redis {host production.example port 6379 password test} loaded [file tail $path]}
+    proc load_config {path} {read_config $path}
+}
+
+test config-1 {Default production mode prefers encrypted configuration} -body {
+    unset -nocomplain ::env(ENV)
+    set config [::app_config::load $root]
+    list [dict get $config loaded] [dict get $config redis host]
+} -result {config.enc production.example}
+
+test config-2 {Local mode selects only local configuration and forces localhost} -body {
+    set ::env(ENV) LOCAL
+    set config [::app_config::load $root]
+    list [dict get $config loaded] [dict get $config redis host]
+} -result {config.local.ini localhost}
+
+test config-3 {Invalid mode fails} -body {
+    set ::env(ENV) invalid
+    ::app_config::load $root
+} -returnCodes error -result {ENV must be LOCAL or PROD}
+
+test config-4 {Local mode cannot fall back to production} -body {
+    set ::env(ENV) LOCAL
+    file delete [file join $root etc config.local.ini]
+    ::app_config::load $root
+} -returnCodes error -result {ENV=LOCAL requires etc/config.local.ini}
+
+test config-5 {TLS cannot be disabled through configuration} -body {
+    set settings [::app_config::valkey {redis {host localhost port 6379 password test ssl false}}]
+    list [dict get $settings ssl] [dict get $settings username]
+} -result {true appuser}
+
+test config-6 {Missing credentials fail before connecting} -body {
+    ::app_config::valkey {redis {host localhost port 6379}}
+} -returnCodes error -match glob -result {Set redis.password*}
+
+unset -nocomplain ::env(ENV)
+array set ::env $saved_env
+::tcltest::removeDirectory config-fixture
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed > 0}]

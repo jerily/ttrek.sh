@@ -14,5 +14,6 @@ data
 cache
 node_modules
 bundle
+etc/config.local.ini
 
 public/js/chart.umd.js
