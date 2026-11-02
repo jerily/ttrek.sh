@@ -73,6 +73,53 @@ test config-9 {Local authenticated TLS remains supported} -body {
     list [dict get $settings host] [dict get $settings ssl] [dict get $settings username] [dict get $settings password]
 } -result {localhost true appuser test}
 
+test config-10 {Registry defaults to the application submodule in both modes} -body {
+    set result {}
+    foreach mode {LOCAL PROD} {
+        set ::env(ENV) $mode
+        set config [::app_config::load $root]
+        lappend result [expr {[dict get $config registry directory] eq [file join $root registry]}]
+    }
+    set result
+} -result {1 1}
+
+test config-11 {Relative registry directories resolve against the application root, not the working directory} -setup {
+    rename ::tconfig::read_config ::tconfig::saved_read_config
+    proc ::tconfig::read_config {path} {dict create registry {directory {packages [local]}}}
+    set saved_cwd [pwd]
+    cd [file join $root etc]
+} -body {
+    set ::env(ENV) LOCAL
+    set config [::app_config::load $root]
+    expr {[dict get $config registry directory] eq [file join $root {packages [local]}]}
+} -cleanup {
+    cd $saved_cwd
+    rename ::tconfig::read_config {}
+    rename ::tconfig::saved_read_config ::tconfig::read_config
+} -result 1
+
+test config-12 {Absolute registry paths in production configuration remain absolute} -setup {
+    rename ::tconfig::read_config ::tconfig::saved_read_config
+    proc ::tconfig::read_config {path} {dict create registry [dict create directory $::root]}
+} -body {
+    set ::env(ENV) PROD
+    dict get [::app_config::load $root] registry directory
+} -cleanup {
+    rename ::tconfig::read_config {}
+    rename ::tconfig::saved_read_config ::tconfig::read_config
+} -result $root
+
+test config-13 {An empty registry directory cannot expose the application root} -setup {
+    rename ::tconfig::read_config ::tconfig::saved_read_config
+    proc ::tconfig::read_config {path} {dict create registry {directory {}}}
+} -body {
+    set ::env(ENV) LOCAL
+    ::app_config::load $root
+} -cleanup {
+    rename ::tconfig::read_config {}
+    rename ::tconfig::saved_read_config ::tconfig::read_config
+} -returnCodes error -result {registry.directory must not be empty}
+
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env
 ::tcltest::removeDirectory config-fixture

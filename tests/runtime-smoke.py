@@ -58,8 +58,10 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
     copied_app = app / "app.tcl"
     copied_app.write_text(copied_app.read_text().replace("$server_handle 4433", f"$server_handle {https_port}")
                           .replace("$server_handle 8080", f"$server_handle {http_port}"))
-    for name in ("tcl", "www", "public", "registry"):
+    for name in ("tcl", "www", "public"):
         shutil.copytree(ROOT / name, app / name)
+    registry_dir = "package registry"
+    shutil.copytree(ROOT / "registry", app / registry_dir, ignore=shutil.ignore_patterns(".git"))
     (app / "build").mkdir()
     (app / "build/install").symlink_to(INSTALL, target_is_directory=True)
     (app / "etc").mkdir()
@@ -71,6 +73,7 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
             "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1",
         ], env=env, stdout=log, stderr=log, check=True)
     config = (ROOT / "tests/fixtures/local-config.ini.in").read_text().format(
+        registry_dir=registry_dir,
         port=valkey_port,
         ca_file=app / "cert.pem",
         key=base64.b64encode((app / "key.pem").read_bytes()).decode(),

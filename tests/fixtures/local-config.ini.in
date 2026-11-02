@@ -1,3 +1,6 @@
+[registry]
+directory = {registry_dir}
+
 [redis]
 host = localhost
 port = {port}

@@ -64,6 +64,7 @@ set telemetry_thread_id [thread::create thread::wait]
 # use threads and gzip compression
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
+    registry_dir [dict get $config registry directory] \
     gzip on \
     gzip_types [list text/plain application/json] \
     gzip_min_length 8192 \

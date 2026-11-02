@@ -14,6 +14,7 @@ phases:
   build:
     on-failure: ABORT
     commands:
+      - git submodule update --init --recursive -- registry
       - export APP_NAME=ttrek-app
       - chmod 755 -R build.sh
       - mkdir -p ../ttrek-app/artifacts/

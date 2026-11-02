@@ -15,7 +15,46 @@
   Restart the server after editing templates. Missing includes and invalid
   templates fail startup.
 - The package registry contains published package specifications independently
-  of the website's own dependencies.
+  of the website's own dependencies. It lives in
+  [jerily/ttrek-registry](https://github.com/jerily/ttrek-registry), included here
+  as the `registry` Git submodule at a pinned commit.
+
+Clone the website with its registry:
+
+```bash
+git clone --recurse-submodules https://github.com/jerily/ttrek.sh.git
+```
+
+For an existing checkout, initialize or update the registry after pulling:
+
+```bash
+git submodule update --init --recursive
+```
+
+Make package changes in `jerily/ttrek-registry` and publish them there first.
+Then update the website's pinned registry commit and commit the change in
+`ttrek.sh`:
+
+```bash
+git -C registry fetch origin
+git -C registry checkout --detach origin/main
+git add registry
+git commit -m "Update registry submodule"
+```
+
+The website reads package specifications and patches from `[registry] directory`
+in the application configuration:
+
+```ini
+[registry]
+directory = registry
+```
+
+The default is the `registry` submodule. Relative paths resolve against the
+application root, and absolute paths can point to a separate registry checkout.
+Set this in `etc/config.local.ini` for LOCAL mode or the production configuration
+for PROD mode, then restart the server. All package pages and registry API routes
+use this directory. The build still uses the pinned submodule for its patch files.
 
 Registry recipes use `if: "+static"` for optional static build settings.
 Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the project.
