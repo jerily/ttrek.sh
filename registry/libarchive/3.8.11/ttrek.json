@@ -1,0 +1,141 @@
+{
+  "name": "libarchive",
+  "version": "3.8.11",
+  "scripts": {},
+  "dependencies": {
+    "openssl": "^3.5.9",
+    "zlib": "^1.3.2"
+  },
+  "devDependencies": {},
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://github.com/libarchive/libarchive/releases/download/v3.8.11/libarchive-3.8.11.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "cd"
+      },
+      {
+        "cmd": "cmake_config",
+        "options": [
+          {
+            "name": "CMAKE_BUILD_TYPE",
+            "value": "Release"
+          },
+          {
+            "name": "CMAKE_INSTALL_LIBDIR",
+            "value": "lib"
+          },
+          {
+            "name": "CMAKE_POLICY_VERSION_MINIMUM",
+            "value": "3.5"
+          },
+          {
+            "name": "BUILD_SHARED_LIBS",
+            "value": "OFF",
+            "if": "+static"
+          },
+          {
+            "name": "ENABLE_ACL",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_CPIO",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_TAR",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_CAT",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_UNZIP",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_TEST",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_XATTR",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_ICONV",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_COVERAGE",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_LIBB2",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_LZ4",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_LZO",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_LZMA",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_ZSTD",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_BZip2",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_LIBXML2",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_EXPAT",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_PCREPOSIX",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_PCRE2POSIX",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_CNG",
+            "value": "OFF"
+          },
+          {
+            "name": "ENABLE_ZLIB",
+            "value": "ON"
+          },
+          {
+            "name": "ENABLE_OPENSSL",
+            "value": "ON"
+          }
+        ]
+      },
+      {
+        "cmd": "cmake_make",
+        "parallel": true
+      },
+      {
+        "cmd": "cmake_install"
+      }
+    ]
+  }
+}

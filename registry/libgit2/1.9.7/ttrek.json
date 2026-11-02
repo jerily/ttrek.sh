@@ -1,0 +1,84 @@
+{
+  "name": "libgit2",
+  "version": "1.9.7",
+  "scripts": {},
+  "dependencies": {
+    "zlib": "^1.3.2"
+  },
+  "devDependencies": {},
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://github.com/libgit2/libgit2/archive/refs/tags/v1.9.7.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "cd"
+      },
+      {
+        "cmd": "cmake_config",
+        "options": [
+          {
+            "name": "CMAKE_BUILD_TYPE",
+            "value": "Release"
+          },
+          {
+            "name": "CMAKE_INSTALL_LIBDIR",
+            "value": "lib"
+          },
+          {
+            "name": "CMAKE_POLICY_VERSION_MINIMUM",
+            "value": "3.5"
+          },
+          {
+            "name": "BUILD_SHARED_LIBS",
+            "value": "OFF",
+            "if": "+static"
+          },
+          {
+            "name": "BUILD_TESTS",
+            "value": "OFF"
+          },
+          {
+            "name": "BUILD_CLI",
+            "value": "OFF"
+          },
+          {
+            "name": "USE_THREADS",
+            "value": "OFF"
+          },
+          {
+            "name": "USE_NSEC",
+            "value": "OFF"
+          },
+          {
+            "name": "USE_HTTPS",
+            "value": "OFF"
+          },
+          {
+            "name": "USE_SSH",
+            "value": "OFF"
+          },
+          {
+            "name": "USE_ICONV",
+            "value": "OFF"
+          },
+          {
+            "name": "REGEX_BACKEND",
+            "value": "builtin"
+          }
+        ]
+      },
+      {
+        "cmd": "cmake_make",
+        "parallel": true
+      },
+      {
+        "cmd": "cmake_install"
+      }
+    ]
+  }
+}

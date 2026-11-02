@@ -22,11 +22,13 @@
 			{
 				"cmd": "cmake_config",
 				"options": [
-					{ "name": "BUILD_SHARED_LIBS", "value": "ON" },
-					{ "name": "CMAKE_BUILD_TYPE", "value": "Release" },
-					{ "name": "BUILD_ONLY", "value": "s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm;kms" },
-					{ "name": "ENABLE_TESTING", "value": "OFF" },
-					{ "name": "AUTORUN_UNIT_TESTS", "value": "OFF" }
+					{"name": "BUILD_SHARED_LIBS", "value": "ON"},
+					{"name": "CMAKE_BUILD_TYPE", "value": "Release"},
+					{"name": "BUILD_ONLY", "value": "s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm;kms"},
+					{"name": "ENABLE_TESTING", "value": "OFF"},
+					{"name": "AUTORUN_UNIT_TESTS", "value": "OFF"},
+					{"name": "BUILD_SHARED_LIBS", "value": "OFF", "if": "+static"},
+					{"name": "CMAKE_POSITION_INDEPENDENT_CODE", "value": "ON"}
 				]
 			},
 			{ "cmd": "cmake_make", "config": "Release", "parallel": true },

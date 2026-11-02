@@ -17,6 +17,11 @@
 - The package registry contains published package specifications independently
   of the website's own dependencies.
 
+Registry recipes use `if: "+static"` for optional static build settings.
+Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the project.
+Without the flag, recipes keep their normal defaults.
+Static Tcl extensions are intended for embedding, not `package require` loading.
+
 # Build
 
 Install a C/C++17 toolchain, make, CMake 3.22.1+, pkg-config, git, curl, tar,

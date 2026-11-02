@@ -1,0 +1,88 @@
+{
+  "name": "curl",
+  "version": "8.23.0",
+  "scripts": {},
+  "dependencies": {
+    "openssl": "^3.5.9",
+    "zlib": "^1.3.2"
+  },
+  "devDependencies": {},
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://curl.se/download/curl-8.23.0.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "cd"
+      },
+      {
+        "cmd": "configure",
+        "options": [
+          {
+            "name": "with-openssl",
+            "value": "$INSTALL_DIR"
+          },
+          {
+            "name": "with-zlib",
+            "value": "$INSTALL_DIR"
+          },
+          {
+            "name": "without-brotli"
+          },
+          {
+            "name": "without-zstd"
+          },
+          {
+            "name": "without-nghttp2"
+          },
+          {
+            "name": "without-nghttp3"
+          },
+          {
+            "name": "without-ngtcp2"
+          },
+          {
+            "name": "without-libpsl"
+          },
+          {
+            "name": "without-libidn2"
+          },
+          {
+            "name": "without-libssh2"
+          },
+          {
+            "name": "without-librtmp"
+          },
+          {
+            "name": "without-gssapi"
+          },
+          {
+            "name": "disable-ldap"
+          },
+          {
+            "name": "disable-ldaps"
+          },
+          {
+            "name": "disable-shared",
+            "if": "+static"
+          },
+          {
+            "name": "enable-static",
+            "if": "+static"
+          }
+        ]
+      },
+      {
+        "cmd": "make",
+        "parallel": true
+      },
+      {
+        "cmd": "make_install"
+      }
+    ]
+  }
+}
