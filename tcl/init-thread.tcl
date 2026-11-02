@@ -245,9 +245,13 @@ proc get_index_page_handler {ctx req} {
     return $res
 }
 
+proc get_registry_dir {} {
+    return [dict get [::twebserver::get_config_dict] registry_dir]
+}
+
 proc get_packages_page_handler {ctx req} {
     set package_names [list]
-    foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry/*]] {
+    foreach path [glob -nocomplain -type d -directory [get_registry_dir] *] {
         lappend package_names [file tail $path]
     }
     set data [dict create title {S Packages} package_names [::views::strings [lsort $package_names]]]
@@ -263,17 +267,17 @@ proc get_logo_handler {ctx req} {
     return $res
 }
 
-proc get_package_versions {dir package_name} {
+proc get_package_versions {registry_dir package_name} {
     set versions [list]
-    foreach path [glob -nocomplain -type d [file join $dir registry $package_name/*]] {
+    foreach path [glob -nocomplain -type d -directory [file join $registry_dir $package_name] *] {
         lappend versions [file tail $path]
     }
     return [lsort -command compare_versions -decreasing $versions]
 }
 
-proc get_package_version_dependencies {dir package_name version} {
+proc get_package_version_dependencies {registry_dir package_name version} {
     set deps [list]
-    set spec_path [file join $dir registry $package_name $version ttrek.json]
+    set spec_path [file join $registry_dir $package_name $version ttrek.json]
     if {![file exists $spec_path]} {
         error "spec file not found: $package_name $version"
     }
@@ -292,8 +296,8 @@ proc get_package_version_dependencies {dir package_name version} {
     return [::tjson::to_typed $deps_handle]
 }
 
-proc get_latest_version {dir package_name} {
-    set versions [get_package_versions $dir $package_name]
+proc get_latest_version {registry_dir package_name} {
+    set versions [get_package_versions $registry_dir $package_name]
     set latest_version [lindex $versions 0]
     return $latest_version
 }
@@ -325,12 +329,12 @@ proc post_telemetry_register_handler {ctx req} {
 }
 
 proc get_package_versions_handler {ctx req} {
-    set dir [::twebserver::get_rootdir]
+    set registry_dir [get_registry_dir]
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_reg_get_pkg -pkg_name $package_name
     set versions_typed [list]
-    foreach version [get_package_versions $dir $package_name] {
-        set deps_typed [get_package_version_dependencies $dir $package_name $version]
+    foreach version [get_package_versions $registry_dir $package_name] {
+        set deps_typed [get_package_version_dependencies $registry_dir $package_name $version]
         lappend versions_typed $version $deps_typed
     }
     return [::twebserver::build_response 200 application/json \
@@ -358,18 +362,18 @@ proc get_package_spec_handler {ctx req} {
         -pkg_name $package_name -pkg_version $package_version \
         -os $os -arch $machine
 
-    set dir [::twebserver::get_rootdir]
+    set registry_dir [get_registry_dir]
 
     puts "package_name: $package_name package_version: $package_version os: $os machine: $machine"
 
     if { $package_version eq "latest" } {
-        set package_version [get_latest_version $dir $package_name]
+        set package_version [get_latest_version $registry_dir $package_name]
         if { $package_version eq {} } {
             return [::twebserver::build_response 404 text/plain "not found"]
         }
     }
 
-    set spec_path [file join $dir registry $package_name $package_version ttrek.json]
+    set spec_path [file join $registry_dir $package_name $package_version ttrek.json]
     if {![file exists $spec_path]} {
         return [::twebserver::build_response 404 text/plain "not found"]
     }
@@ -400,7 +404,7 @@ proc get_package_spec_handler {ctx req} {
     set spec_build_typed [::tjson::to_typed $spec_build_handle]
 
     set patches_typed [list]
-    foreach patch_path [glob -nocomplain -type f [file join $dir registry $package_name $package_version *.diff]] {
+    foreach patch_path [glob -nocomplain -type f -directory [file join $registry_dir $package_name $package_version] *.diff] {
         set fp [open $patch_path]
         set data [read $fp]
         close $fp
@@ -450,16 +454,13 @@ proc compare_versions {a b} {
 proc get_package_page_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_pkg_get -pkg_name $package_name
-    set versions [list]
-    foreach path [glob -nocomplain -type d [file join [::twebserver::get_rootdir] registry $package_name/*]] {
-        lappend versions [file tail $path]
-    }
+    set versions [get_package_versions [get_registry_dir] $package_name]
 
     set stat_platforms [get_package_stats $package_name]
 
     set data [dict create \
         package_name [list S $package_name] \
-        versions [::views::strings [lsort -command compare_versions -decreasing $versions]] \
+        versions [::views::strings $versions] \
         stat_platforms [::views::platform_stats $stat_platforms]]
     set html [::views::render package.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
@@ -471,9 +472,9 @@ proc get_package_version_page_handler {ctx req} {
     set package_version [::twebserver::get_path_param $req package_version]
     telemetry_event_common req_pkg_version_get -pkg_name $package_name -pkg_version $package_version
 
-    set dir [::twebserver::get_rootdir]
+    set registry_dir [get_registry_dir]
 
-    set spec_path [file join $dir registry $package_name $package_version ttrek.json]
+    set spec_path [file join $registry_dir $package_name $package_version ttrek.json]
     if {![file exists $spec_path]} {
         return [::twebserver::build_response 404 text/plain "not found"]
     }

@@ -4,5 +4,8 @@
   "dependencies": {
     "tcl": "^9.1.0",
     "optional": {"version": ">=1.0", "if": "+ssl"}
+  },
+  "build": {
+    "default": [{"cmd": "cd"}]
   }
 }

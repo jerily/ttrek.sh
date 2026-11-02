@@ -4,6 +4,7 @@ namespace import ::tcltest::test
 
 set root [file dirname [file dirname [file normalize [info script]]]]
 set test_root $root
+set test_registry [file join $root registry]
 set test_stats {}
 # Stub external services, but exercise the real handlers, serializer and renderer.
 package provide twebserver 1.47.54
@@ -11,7 +12,9 @@ package provide tratelimit 1.0.1
 package require treqmon 2.0.0
 namespace eval ::twebserver {
     proc get_rootdir {} {return $::test_root}
-    proc get_config_dict {} {return {tratelimit {} treqmon {}}}
+    proc get_config_dict {} {
+        return [dict create tratelimit {} treqmon {} registry_dir $::test_registry]
+    }
     proc create_router {args} {uplevel 1 {set router test_router}}
     proc add_middleware {args} {}
     proc add_route {args} {}
@@ -32,11 +35,16 @@ proc telemetry_event_common {args} {}
 proc telemetry_sql {args} {return $::test_stats}
 
 set fixture [::tcltest::makeDirectory registry-fixture]
-file mkdir [file join $fixture registry demo 1.0.0]
-file mkdir [file join $fixture registry demo 2.0.0]
-file copy -force [file join $root tests fixtures ttrek.json] \
-    [file join $fixture registry demo 1.0.0 ttrek.json]
+set registry_fixture [::tcltest::makeDirectory {custom registry [data]}]
+foreach version {1.0.0 2.0.0} {
+    file mkdir [file join $registry_fixture demo $version]
+    file copy -force [file join $root tests fixtures ttrek.json] \
+        [file join $registry_fixture demo $version ttrek.json]
+}
+file copy -force [file join $root registry tink-cc 2.1.1 rapidjson-1.1.0.diff] \
+    [file join $registry_fixture demo 2.0.0 rapidjson-1.1.0.diff]
 set test_root $fixture
+set test_registry $registry_fixture
 
 proc body {response} {dict get $response body}
 proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
@@ -105,7 +113,7 @@ test handlers-6 {Static paths use the server root without a template engine depe
 } -result [list $fixture/public/css/typebase.css $fixture/public/ttrek-init $fixture/www/plume.png]
 
 test registry-1 {Static options are conditional USE flags} -setup {
-    set test_root $root
+    set test_registry [file join $root registry]
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name jinja2-tcl package_version 0.1.0 os Linux machine x86_64}]]
@@ -122,7 +130,7 @@ test registry-1 {Static options are conditional USE flags} -setup {
     }
     list [dict get $response status] [expr {"+static" in [dict get $spec iuse]}] $static_option
 } -cleanup {
-    set test_root $fixture
+    set test_registry $registry_fixture
 } -result {200 1 1}
 
 test registry-2 {Shared defaults remain unconditional before static overrides} -body {
@@ -146,7 +154,7 @@ test registry-2 {Shared defaults remain unconditional before static overrides} -
 } -result {{ON 0 OFF +static} {ON 0 OFF +static} {ON 0 OFF +static}}
 
 test registry-3 {Build recipes retain their embedded patches} -setup {
-    set test_root $root
+    set test_registry [file join $root registry]
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name tink-cc package_version 2.1.1 os Linux machine x86_64}]]
@@ -155,8 +163,24 @@ test registry-3 {Build recipes retain their embedded patches} -setup {
     list [dict get $response status] \
         [contains $patch {GenericStringRef& operator=}] [llength [dict get $spec install_script]]
 } -cleanup {
-    set test_root $fixture
+    set test_registry $registry_fixture
 } -result {200 1 7}
+
+test registry-4 {Version API reads dependencies from the configured directory} -body {
+    set response [get_package_versions_handler {} {pathParameters {package_name demo}}]
+    set versions [::tjson::json_to_simple [body $response]]
+    list [dict get $response status] [dict keys $versions] \
+        [dict get $versions 2.0.0 tcl]
+} -result {200 {2.0.0 1.0.0} ^9.1.0}
+
+test registry-5 {Latest recipe and patches use the configured directory with literal glob characters} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name demo package_version latest os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    set patch [binary decode base64 [dict get $spec patches rapidjson-1.1.0.diff]]
+    list [dict get $response status] [dict get $spec version] \
+        [contains $patch {GenericStringRef& operator=}]
+} -result {200 2.0.0 1}
 
 # A deterministic sample matching treqmon's public statistics shape.
 proc monitor_stats {metric top_key} {
@@ -211,6 +235,7 @@ test templates-5 {Template data cannot execute Tcl or inject HTML} -body {
 } -result {0 1 0}
 
 ::tcltest::removeDirectory registry-fixture
+::tcltest::removeDirectory {custom registry [data]}
 set failed $::tcltest::numTests(Failed)
 ::tcltest::cleanupTests
 exit [expr {$failed > 0}]

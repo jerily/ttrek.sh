@@ -161,6 +161,8 @@ Resources:
         Location: https://github.com/jerily/ttrek.sh.git
         InsecureSsl: true
         GitCloneDepth: 1
+        GitSubmodulesConfig:
+          FetchSubmodules: true
         ReportBuildStatus: false
       SourceVersion: !Ref BranchName
       TimeoutInMinutes: 300

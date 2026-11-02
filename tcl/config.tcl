@@ -31,6 +31,12 @@ proc ::app_config::load {root} {
             dict set config redis ssl_ca_file [file normalize [file join $root $ca_file]]
         }
     }
+    set registry_dir registry
+    if {[dict exists $config registry directory]} {
+        set registry_dir [dict get $config registry directory]
+    }
+    if {$registry_dir eq ""} {error "registry.directory must not be empty"}
+    dict set config registry directory [file normalize [file join $root $registry_dir]]
     return $config
 }
 
