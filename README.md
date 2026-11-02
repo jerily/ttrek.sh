@@ -33,15 +33,11 @@ tjson's private cJSON implementation is not used by jinja2-tcl. The interpreter
 is `build/install/bin/tclsh9.1`; no sibling repository is needed. The build and
 registry use the published tjson 1.0.26 and twebserver 1.47.54 release tags.
 
-`build.sh` also builds TLS-enabled Valkey bindings, protobuf, Abseil, Tink and AWS SDK
-libraries, then installs tconfig, rate limiting, request monitoring and session
-packages. The dependency recipes and native build patches live in `build-support/`.
-Completed installs are reused; old or non-TLS Valkey bindings are rebuilt.
-Set `TTREK_MAKE_THREADS` to control build parallelism (default: 4). The script finishes by loading the real
-runtime packages in a fresh Tcl interpreter and fails if any are missing or
-cannot load. The native patches retain the Tink shared-library install, use the
-standard system linker, fix a RapidJSON header rejected by GCC 15, and make the
-pinned tink-tcl release request Tcl 9.1 when loaded.
+`build.sh` installs the runtime dependencies, including TLS-enabled Valkey and
+`tink-tcl` 20240704.0.1 with Tcl stubs. Tink and RapidJSON patches live in
+`registry/tink-cc/2.1.1/`. Completed installs are reused. Set `TTREK_MAKE_THREADS`
+to control parallelism (default: 4). The build checks package loading and a Tink
+encryption round trip before finishing.
 
 Configure the Valkey service and `etc/config.ini` before running the application.
 Encrypted configuration additionally requires the configured AWS credentials
