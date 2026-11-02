@@ -93,6 +93,42 @@ After building the dependencies and browser asset, run `ttrek.sh` locally.
 ./run.sh
 ```
 
+## Infrastructure
+
+For a new environment, run the scripts in `infra/` in numeric order: keys,
+storage, VPC, cache, CodeBuild, then Fargate. `10-deploy-infra-storage.sh` deploys
+`10-infra-storage.yml` (ECR and S3) before `20-deploy-infra-vpc0.sh` deploys
+`20-infra-vpc0.yml` (networking). `25-deploy-infra-cache.sh` then deploys
+`25-infra-cache.yml` (Valkey and its subnet group), importing the VPC's private
+subnet and security group. Build and push the container image before deploying
+Fargate.
+
+The cache follows the Valkey 8.2 setup with one `cache.t4g.micro` node, TLS
+required, an `appuser` account, and a disabled default user. Set
+`TTREK_VALKEY_PASSWORD` (16-128 characters) before running the cache deployment
+script; it supplies the `NoEcho` CloudFormation password parameter. User and
+user-group IDs include `AppName` to avoid collisions with other deployments.
+The cache stack exports `Infra-DevOps-TTREK-Cache-ValkeyClusterId` and
+`Infra-DevOps-TTREK-Cache-ValkeyClusterEndpointAddress`.
+
+Application connections must use TLS on port 6379 with `appuser` and that
+password. `app.tcl` currently forwards only the cache host and port to the
+rate-limit and request-monitor stores; TLS and credentials still need to be
+wired into those clients before using this cache.
+
+The VPC uses one availability zone. The load balancer and a single NAT gateway
+have public IPs in the public subnet; Fargate and Valkey use the private subnet.
+Outbound traffic uses NAT instead of VPC endpoints. Egress therefore depends
+on that one availability zone.
+
+The VPC deployment retains the `Infra-DevOps-TTREK-Base` stack name and its
+remaining exports. For an existing deployment, migrate the ECR repository and
+S3 bucket into `Infra-DevOps-TTREK-Storage` using CloudFormation resource
+refactoring or retain/import before applying the split templates; a normal
+deployment cannot move existing resources between stacks. The cache stack
+creates a new Valkey replication group, so migrate any required Redis data
+before retiring the old cache.
+
 ## Security
 
 ### Surface

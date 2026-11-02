@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Valkey Cache for TTrek"
+
+Metadata:
+  StackName: "Infra-DevOps-TTREK-Cache"
+
+Parameters:
+  AppName:
+    Type: String
+    Default: "ttrek-app"
+  ValkeyPassword:
+    Type: String
+    NoEcho: true
+    Description: "The password for the Valkey custom user. Must be 16-128 characters."
+    MinLength: 16
+    MaxLength: 128
+
+Resources:
+  TTrekValkeyUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      Engine: valkey
+      UserId: !Sub "${AppName}-valkey-user"
+      UserName: appuser
+      AccessString: 'on ~* +@all'
+      AuthenticationMode:
+        Type: password
+        Passwords:
+          - !Ref ValkeyPassword
+
+  TTrekValkeyDefaultUser:
+    Type: AWS::ElastiCache::User
+    Properties:
+      Engine: valkey
+      UserId: !Sub "${AppName}-valkey-default-disabled"
+      UserName: default
+      AccessString: 'off ~* -@all'
+      AuthenticationMode:
+        Type: no-password-required
+
+  TTrekValkeyUserGroup:
+    Type: AWS::ElastiCache::UserGroup
+    Properties:
+      Engine: valkey
+      UserGroupId: !Sub "${AppName}-valkey-user-group"
+      UserIds:
+        - !Ref TTrekValkeyDefaultUser
+        - !Ref TTrekValkeyUser
+
+  TTrekValkeyCustomParameterGroup:
+    Type: AWS::ElastiCache::ParameterGroup
+    Properties:
+      CacheParameterGroupFamily: valkey8
+      Description: "Custom parameter group for ElastiCache Valkey 8.2"
+      Properties:
+        timeout: '300'
+
+  TTrekValkeyCacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: !Sub "${AppName}-valkey-cache-subnet-group"
+      Description: "TTrek Valkey Cache Subnet Group"
+      SubnetIds:
+        - !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet1Id'
+
+  TTrekValkeyReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupDescription: !Sub "${AppName} Valkey replication group"
+      Engine: valkey
+      EngineVersion: '8.2'
+      CacheNodeType: cache.t4g.micro
+      ClusterMode: disabled
+      NumCacheClusters: 1
+      AutomaticFailoverEnabled: false
+      Port: 6379
+      CacheParameterGroupName: !Ref TTrekValkeyCustomParameterGroup
+      SecurityGroupIds:
+        - !ImportValue 'Infra-DevOps-TTREK-Base-Vpc0SecurityGroupId'
+      CacheSubnetGroupName: !Ref TTrekValkeyCacheSubnetGroup
+      UserGroupIds:
+        - !Ref TTrekValkeyUserGroup
+      TransitEncryptionEnabled: true
+      TransitEncryptionMode: required
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-valkey-replication-group"
+
+Outputs:
+  TTrekValkeyClusterId:
+    Description: "TTrek Valkey Replication Group"
+    Value: !Ref TTrekValkeyReplicationGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-ValkeyClusterId"
+
+  TTrekValkeyClusterEndpointAddress:
+    Description: "TTrek Valkey Primary Endpoint Address"
+    Value: !GetAtt TTrekValkeyReplicationGroup.PrimaryEndPoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-ValkeyClusterEndpointAddress"
