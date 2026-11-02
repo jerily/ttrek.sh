@@ -35,7 +35,7 @@ Resources:
       SecurityGroups:
         - !Ref TTrekNetworkLoadBalancerSecurityGroup
       SubnetMappings:
-        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet1Id'
+        - SubnetId: !ImportValue 'Infra-DevOps-TTREK-Base-PublicSubnet1Id'
           AllocationId: !GetAtt TTrekElasticIP.AllocationId
 
   TTrekNetworkLoadBalancerSecurityGroup:
@@ -137,7 +137,6 @@ Resources:
           AssignPublicIp: DISABLED
           Subnets:
             - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet1Id"
-#            - !ImportValue "Infra-DevOps-TTREK-Base-PrivateSubnet2Id"
           SecurityGroups:
             - !Ref TTrekServiceSecurityGroup
       Tags:
