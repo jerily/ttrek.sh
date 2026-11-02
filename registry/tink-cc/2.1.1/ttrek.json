@@ -24,6 +24,8 @@
 					{ "name": "TINK_USE_SYSTEM_OPENSSL", "value": "ON" },
 					{ "name": "TINK_USE_INSTALLED_PROTOBUF", "value": "ON" },
 					{ "name": "TINK_USE_INSTALLED_RAPIDJSON", "value": "OFF" },
+					{ "name": "TINK_RAPIDJSON_PATCH", "value": "$PATCH_DIR/patch-$PACKAGE-$VERSION-rapidjson-1.1.0.diff" },
+					{ "name": "CMAKE_POLICY_VERSION_MINIMUM", "value": "3.5" },
 					{ "name": "TINK_BUILD_TESTS", "value": "OFF" },
 					{ "name": "CMAKE_SKIP_RPATH", "value": "ON" },
 					{ "name": "CMAKE_BUILD_TYPE", "value": "Release" }

@@ -17,6 +17,7 @@ foreach name $packages {
                 if {![::valkey::pkgconfig get feature-ssl]} {error "valkey requires TLS support"}
                 set version
             }
+            tink {package require tink 20240704.0.1}
             treqmon {package require treqmon 2.0.0}
             tratelimit {package require tratelimit 1.0.1}
             default {package require $name}
