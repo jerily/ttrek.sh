@@ -36,16 +36,16 @@ package_installed() {
     "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl" "$@" >/dev/null 2>&1
 }
 
-if [ ! -f "$INSTALL_DIR/lib/pkgconfig/valkey.pc" ]; then
+if ! pkg-config --exact-version=0.5.0 valkey || ! pkg-config --exists valkey_tls; then
     echo "Build libvalkey ..."
-    fetch_source libvalkey-0.1.0 https://github.com/valkey-io/libvalkey/archive/1ce574c28ecf137329a410381ce03c453616a9f9.tar.gz
-    cmake_install libvalkey-0.1.0 -DDISABLE_TESTS=ON
+    fetch_source libvalkey-0.5.0 https://github.com/valkey-io/libvalkey/archive/refs/tags/0.5.0.tar.gz
+    cmake_install libvalkey-0.5.0 -DDISABLE_TESTS=ON -DENABLE_TLS=ON -DOPENSSL_ROOT_DIR="$INSTALL_DIR"
 fi
 
 if ! package_installed valkey; then
     echo "Build valkey-tcl ..."
-    fetch_source valkey-tcl-1.0.0 https://github.com/jerily/valkey-tcl/archive/refs/tags/v1.0.0.tar.gz
-    tcl_cmake_install valkey-tcl-1.0.0
+    fetch_source valkey-tcl-1.0.3 https://github.com/jerily/valkey-tcl/archive/refs/tags/v1.0.3.tar.gz
+    tcl_cmake_install valkey-tcl-1.0.3 -DENABLE_SSL=ON -DOPENSSL_ROOT_DIR="$INSTALL_DIR"
 fi
 
 if [ ! -f "$INSTALL_DIR/lib/pkgconfig/protobuf.pc" ]; then
@@ -134,8 +134,8 @@ install_tcl_package() (
     fi
 )
 
-install_tcl_package tratelimit-main tratelimit1.0.0 https://github.com/jerily/tratelimit/archive/refs/heads/main.tar.gz
-install_tcl_package treqmon-main treqmon1.0.0 https://github.com/jerily/treqmon/archive/refs/heads/main.tar.gz
+install_tcl_package tratelimit-1.0.1 tratelimit1.0.1 https://github.com/jerily/tratelimit/archive/refs/tags/v1.0.1.tar.gz
+install_tcl_package treqmon-2.0.0 treqmon2.0.0 https://github.com/jerily/treqmon/archive/refs/tags/v2.0.0.tar.gz
 install_tcl_package tsession-1.0.3 tsession1.0.3 https://github.com/jerily/tsession/archive/refs/tags/v1.0.3.tar.gz
 install_tcl_package tconfig-1.0.0 tconfig1.0.0 https://github.com/jerily/tconfig/archive/refs/tags/v1.0.0.tar.gz
 install_tcl_package tsession-dynamodb-main tsession-dynamodb1.0.0 https://github.com/jerily/tsession-dynamodb/archive/refs/heads/main.tar.gz

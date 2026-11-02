@@ -32,6 +32,7 @@ phases:
       - cp -R etc ../ttrek-app/artifacts/ttrek-app/
       # Validate and render the Jinja templates before packaging.
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 tests/all.tcl
+      - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 tests/config.test
       - cp -R public ../ttrek-app/artifacts/ttrek-app/
 #      - cp -R certs ../ttrek-app/artifacts/ttrek-app/
       - ls -la ../ttrek-app/artifacts/ttrek-app/

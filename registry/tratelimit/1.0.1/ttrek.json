@@ -1,0 +1,33 @@
+{
+  "name": "tratelimit",
+  "version": "1.0.1",
+  "scripts": {},
+  "dependencies": {
+    "valkey-tcl": ">=1.0.1",
+    "twebserver": ">=1.47.53"
+  },
+  "devDependencies": {},
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://github.com/jerily/tratelimit/archive/refs/tags/v1.0.1.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "cd"
+      },
+      {
+        "cmd": "make_install",
+        "options": [
+          {
+            "name": "PREFIX",
+            "value": "$INSTALL_DIR"
+          }
+        ]
+      }
+    ]
+  }
+}

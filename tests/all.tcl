@@ -7,8 +7,8 @@ set test_root $root
 set test_stats {}
 # Stub external services, but exercise the real handlers, serializer and renderer.
 package provide twebserver 1.47.54
-package provide tratelimit 1.0.0
-package provide treqmon 1.0.0
+package provide tratelimit 1.0.1
+package require treqmon 2.0.0
 namespace eval ::twebserver {
     proc get_rootdir {} {return $::test_root}
     proc get_config_dict {} {return {tratelimit {} treqmon {}}}
@@ -43,7 +43,7 @@ proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
     dict size $::views::templates
-} -result 9
+} -result 12
 
 test templates-2 {Index layout and literal clipboard command} -body {
     set html [body [get_index_page_handler {} {}]]
@@ -123,7 +123,7 @@ proc ::treqmon::get_active_users {events} {monitor_stats active_users top_k_user
 test monitor-1 {Charts fill missing buckets with zero for every interval} -body {
     set result {}
     foreach interval {second minute hour} {
-        set chart [::request_monitor::chart [monitor_stats page_views top_k_views] $interval page_views {Page Views} Views top_k_views]
+        set chart [::treqmon::view::chart [monitor_stats page_views top_k_views] $interval page_views {Page Views} Views top_k_views]
         set chart [::tjson::json_to_simple [::tjson::typed_to_json $chart]]
         set config [::tjson::json_to_simple [dict get $chart config]]
         lappend result [dict get [lindex [dict get $config data datasets] 0] data]

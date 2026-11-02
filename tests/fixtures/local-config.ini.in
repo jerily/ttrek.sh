@@ -1,6 +1,9 @@
 [redis]
-host = 127.0.0.1
+host = localhost
 port = {port}
+username = appuser
+password = tls-smoke-password
+ssl_ca_file = {ca_file}
 
 [ssl]
 key = {key}
