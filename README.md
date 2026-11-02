@@ -95,12 +95,27 @@ After building the dependencies and browser asset, run `ttrek.sh` locally.
 loads `etc/config.enc`, or `etc/config.ini` if no encrypted file exists.
 `ENV=LOCAL` loads only `etc/config.local.ini` and forces the Valkey host to
 `localhost`. Copy `etc/config.ini` to that ignored local file and set the local
-port, username, password, CA file, and HTTPS certificate/key. Both modes require TLS:
+port, username, password, CA file, and HTTPS certificate/key. Production requires
+authenticated TLS; LOCAL mode accepts `ssl = false` for the loopback system service:
 ```bash
 ENV=LOCAL ./run.sh
 # or
 ENV=PROD ./run.sh
 ```
+
+LOCAL mode also registers the `localhost` TLS hostname for
+`https://localhost:4433/`. Use a local certificate with a `DNS:localhost` subject
+alternative name. To use the system `valkey-server` service on its usual port,
+set `[redis]` to `host = localhost`, `port = 6379`, and `ssl = false`. Omit
+`username` and `password` when the local service does not require authentication.
+LOCAL mode always forces the connection host to localhost. Production still
+forces TLS and requires credentials even if the configuration says `ssl = false`.
+
+`ssl_ca_file` may be relative to the project root, for example
+`local/dev-runtime/cert.pem`; the loader resolves it independently of the launch
+working directory. TLS certificate options are omitted for plain TCP. Keep local
+certificates and keys under ignored `local/`, and keep the machine-specific
+configuration in ignored `etc/config.local.ini`.
 
 ## Infrastructure
 
@@ -122,9 +137,9 @@ The cache stack exports `Infra-DevOps-TTREK-Cache-ValkeyClusterId` and
 
 `valkey-tcl` 1.0.3, `tratelimit` 1.0.1, and `treqmon` 2.0.0 are direct application
 dependencies. The registry and build use libvalkey 0.5.0 with TLS enabled.
-Rate-limit counters and request-monitor history both use Valkey over verified
-TLS with `appuser`. Configure `[redis]` keys `host`, `port`, `username`, `password`
-and `ssl_ca_file`. Production's CA file defaults to `/etc/ssl/certs/ca-certificates.crt`;
+Production rate-limit counters and request-monitor history both use Valkey over
+verified TLS with `appuser`. Configure `[redis]` keys `host`, `port`, `username`,
+`password` and `ssl_ca_file`. Production's CA file defaults to `/etc/ssl/certs/ca-certificates.crt`;
 set `/ttrek_sh/prod/redis/password` as an SSM SecureString before building the
 encrypted config. The password must match the cache deployment password.
 
@@ -155,7 +170,8 @@ application also exposes registry, telemetry and static-file endpoints.
 
 ### Protections
 
-Valkey connections require TLS and verify the CA and hostname, including reconnects.
+Production Valkey connections require TLS and verify the CA and hostname,
+including reconnects. LOCAL mode can use plain TCP only against localhost.
 
 Template lookup is restricted to the dictionary loaded from the application's
 `www` directory and treqmon's installed templates. jinja2-tcl never evaluates Tcl from templates. Contexts retain
