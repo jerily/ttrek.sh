@@ -37,6 +37,16 @@
           {
             "name": "TCL_TCLSH",
             "value": "$INSTALL_DIR/bin/tclsh9.1"
+          },
+          {
+            "name": "BUILD_SHARED_LIBS",
+            "value": "OFF",
+            "if": "+static"
+          },
+          {
+            "name": "BUILD_TESTING",
+            "value": "OFF",
+            "if": "+static"
           }
         ]
       },

@@ -16,6 +16,7 @@ namespace eval ::twebserver {
     proc add_middleware {args} {}
     proc add_route {args} {}
     proc get_path_param {request name} {return [dict get $request pathParameters $name]}
+    proc base64_encode {value} {binary encode base64 $value}
     proc build_response {args} {
         if {[lindex $args 0] eq "-return_file"} {
             return [dict create status [lindex $args 1] file [lindex $args 3]]
@@ -102,6 +103,60 @@ test handlers-6 {Static paths use the server root without a template engine depe
         [dict get [get_ttrek_init_handler {} {}] file] \
         [dict get [get_logo_handler {} {}] file]
 } -result [list $fixture/public/css/typebase.css $fixture/public/ttrek-init $fixture/www/plume.png]
+
+test registry-1 {Static options are conditional USE flags} -setup {
+    set test_root $root
+} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name jinja2-tcl package_version 0.1.0 os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    set static_option 0
+    foreach step [dict get $spec install_script] {
+        if {[dict get $step cmd] ne "cmake_config"} {continue}
+        foreach option [dict get $step options] {
+            if {[dict get $option name] eq "BUILD_SHARED_LIBS" &&
+                [dict get $option value] eq "OFF" && [dict get $option if] eq "+static"} {
+                set static_option 1
+            }
+        }
+    }
+    list [dict get $response status] [expr {"+static" in [dict get $spec iuse]}] $static_option
+} -cleanup {
+    set test_root $fixture
+} -result {200 1 1}
+
+test registry-2 {Shared defaults remain unconditional before static overrides} -body {
+    set result {}
+    foreach {name version} {abseil-cpp 20230802.1.0 aws-sdk-cpp 1.11.157 protobuf 21.9.0} {
+        set fp [open [file join $root registry $name $version ttrek.json]]
+        set spec [::tjson::json_to_simple [read $fp]]
+        close $fp
+        set shared {}
+        foreach step [dict get $spec build default] {
+            if {[dict get $step cmd] ne "cmake_config"} {continue}
+            foreach option [dict get $step options] {
+                if {[dict get $option name] eq "BUILD_SHARED_LIBS"} {lappend shared $option}
+            }
+        }
+        lappend result [list [dict get [lindex $shared 0] value] \
+            [dict exists [lindex $shared 0] if] [dict get [lindex $shared 1] value] \
+            [dict get [lindex $shared 1] if]]
+    }
+    set result
+} -result {{ON 0 OFF +static} {ON 0 OFF +static} {ON 0 OFF +static}}
+
+test registry-3 {Build recipes retain their embedded patches} -setup {
+    set test_root $root
+} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name tink-cc package_version 2.1.1 os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    set patch [binary decode base64 [dict get $spec patches rapidjson-1.1.0.diff]]
+    list [dict get $response status] \
+        [contains $patch {GenericStringRef& operator=}] [llength [dict get $spec install_script]]
+} -cleanup {
+    set test_root $fixture
+} -result {200 1 7}
 
 # A deterministic sample matching treqmon's public statistics shape.
 proc monitor_stats {metric top_key} {

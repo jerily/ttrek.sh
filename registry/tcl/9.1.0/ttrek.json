@@ -60,6 +60,10 @@
           {
             "name": "disable-shared",
             "if": "+static"
+          },
+          {
+            "name": "with-zlib",
+            "value": "$INSTALL_DIR"
           }
         ]
       },
@@ -69,6 +73,21 @@
       },
       {
         "cmd": "make_install"
+      },
+      {
+        "cmd": "make_install",
+        "target": "install-libraries",
+        "if": "+static"
+      },
+      {
+        "cmd": "make_install",
+        "target": "install-msgs",
+        "if": "+static"
+      },
+      {
+        "cmd": "make_install",
+        "target": "install-tzdata",
+        "if": "+static"
       }
     ]
   }
