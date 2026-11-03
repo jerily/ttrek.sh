@@ -64,15 +64,15 @@ Static Tcl extensions are intended for embedding, not `package require` loading.
 ## Binary distributions
 
 `GET /dist/<target>/ttrek` redirects to a signed HTTPS S3 GET URL. Configure the
-public distribution bucket in `[releases]` in `etc/config.local.ini` for LOCAL
+private distribution bucket in `[releases]` in `etc/config.local.ini` for LOCAL
 mode, or the production configuration. Empty `bucket` disables downloads with
 HTTP 503; it does not affect registry routes. The tracked template and local
 configuration contain the same release settings:
 
 ```ini
 [releases]
-bucket =
-region =
+bucket = jerily-ttrek-app
+region = eu-central-1
 prefix = ttrek/1.0.0
 version = 1.0.0
 url_expiry_seconds = 300
@@ -118,9 +118,10 @@ installed SDK modules and bindings. Each worker lazily creates an S3 client
 using the configured region and the SDK's default credential provider. Configure
 an AWS profile/environment locally or an ECS task role in production with
 `s3:GetObject` on the release prefix. No credentials go in the release settings.
-The bucket must be reachable by download clients; signing also works for a
-private bucket. This change does not alter bucket access policies. The signer
-still needs valid credentials even when objects are public. See AWS's
+The `jerily-ttrek-app` bucket remains private; download clients receive temporary
+access through signed URLs. The infrastructure declares private bucket access
+and grants the application task role object-read permissions. The signer needs
+valid AWS credentials. See AWS's
 [presigned URL documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html).
 
 # Build
@@ -225,6 +226,10 @@ certificates and keys under ignored `local/`, and keep the machine-specific
 configuration in ignored `etc/config.local.ini`.
 
 ## Infrastructure
+
+All deployment scripts use the AWS profile `ttrek-prod-neo`, configured for
+`eu-central-1`. The storage, build and application templates use the `jerily`
+S3 prefix, matching the private release bucket `jerily-ttrek-app`.
 
 For a new environment, run the scripts in `infra/` in numeric order: keys,
 storage, VPC, cache, CodeBuild, then Fargate. `10-deploy-infra-storage.sh` deploys

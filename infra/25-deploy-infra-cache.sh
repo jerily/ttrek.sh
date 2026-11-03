@@ -7,4 +7,4 @@ aws cloudformation deploy \
   --stack-name Infra-DevOps-TTREK-Cache \
   --parameter-overrides "ValkeyPassword=${TTREK_VALKEY_PASSWORD:?Set TTREK_VALKEY_PASSWORD to the Valkey password}" \
   --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
-  --profile jrl-neo-dev
+  --profile ttrek-prod-neo
