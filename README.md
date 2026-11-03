@@ -96,6 +96,11 @@ configured bucket, using these target names:
 For example, `/dist/linux-arm64-musl/ttrek` and
 `/dist/aarch64-unknown-linux-musl/ttrek` select the same object. The existing
 installer follows the redirect. Unknown targets and extensions return 404.
+`public/ttrek-init` defaults to `https://ttrek.sh`, detects Linux libc and CPU,
+and selects native ARM64 on Apple Silicon even under Rosetta. Intel Macs retain
+the Intel target. Curl and wget verify certificates and follow the S3 redirect.
+For local testing, override `TTREK_UPDATE_ROOT` and trust the local certificate
+through the downloader's CA configuration.
 
 Set `sha256_<target>` for each published executable (use `sha256sum` on Linux or
 `shasum -a 256` on macOS). `GET /releases/latest/<target>` then returns JSON with
@@ -162,11 +167,15 @@ All assets are served locally; no template compiler or JavaScript bundler is use
 LD_LIBRARY_PATH="$PWD/build/install/lib:$PWD/build/install/lib64" build/install/bin/tclsh9.1 tests/runtime-packages.tcl
 LD_LIBRARY_PATH="$PWD/build/install/lib:$PWD/build/install/lib64" build/install/bin/tclsh9.1 tests/all.tcl
 build/install/bin/tclsh9.1 tests/config.test
+python3 tests/installer.py
 ```
 
 `tests/runtime-packages.tcl` checks installed dependencies without service mocks.
 This includes `awss3`; release-handler tests cover target selection, signing
 arguments, metadata, disabled downloads, invalid requests and signer failures.
+The Python installer test uses mocked platform/download commands and disposable
+homes to verify all supported targets, endpoints, Rosetta detection and overrides;
+it does not download real distributions or modify the user's installation.
 The rendering tests validate all templates and exercise the real request handlers and
 renderer with isolated service fixtures, including empty collections, dependency
 conditions, version ordering, HTML/URL escaping and monitor chart data. They do
