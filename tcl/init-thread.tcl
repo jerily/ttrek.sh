@@ -423,6 +423,11 @@ proc get_package_spec_handler {ctx req} {
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
     set deps_typed [::tjson::to_typed $deps_handle]
 
+    set scripts_typed [list M {}]
+    if {[::tjson::has_object_item $spec_handle scripts]} {
+        set scripts_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle scripts]]
+    }
+
     set spec_build_handle [::tjson::get_object_item $spec_handle build]
     set platform [string tolower "$os.$machine"]
     if { [::tjson::has_object_item $spec_build_handle $platform] } {
@@ -456,6 +461,7 @@ proc get_package_spec_handler {ctx req} {
                 version [list S $package_version] \
                 iuse [list L $iuse_typed] \
                 dependencies $deps_typed \
+                scripts $scripts_typed \
                 install_script $spec_build_typed]] \
         result_handle
 
