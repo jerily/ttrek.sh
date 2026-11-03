@@ -61,6 +61,13 @@ Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the pr
 Without the flag, recipes keep their normal defaults.
 Static Tcl extensions are intended for embedding, not `package require` loading.
 
+The recipe API returns the selected version's `scripts` object together with
+its dependencies, build instructions, USE flags and patches. Missing scripts
+are represented as an empty object. Script bodies remain JSON strings; the
+website does not execute them. The CLI saves them with the installed package
+for offline `ttrek run -package PACKAGE -script NAME` and
+`ttrek scripts -package PACKAGE ls|describe` commands.
+
 ## Binary distributions
 
 `GET /dist/<target>/ttrek` redirects to a signed HTTPS S3 GET URL. Configure the

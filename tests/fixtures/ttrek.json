@@ -1,6 +1,9 @@
 {
   "name": "demo",
   "version": "1.0.0",
+  "scripts": {
+    "hello": "#!/bin/sh\nprintf '%s\\n' \"$PROJECT_HOME\" 'café'\n"
+  },
   "dependencies": {
     "tcl": "^9.1.0",
     "optional": {"version": ">=1.0", "if": "+ssl"}

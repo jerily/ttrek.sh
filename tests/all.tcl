@@ -291,6 +291,41 @@ test registry-4 {Version API reads dependencies from the configured directory} -
         [dict get $versions 2.0.0 tcl]
 } -result {200 {2.0.0 1.0.0} ^9.1.0}
 
+test registry-scripts-1 {Recipe API preserves named script bodies exactly} -body {
+    set fp [open [file join $registry_fixture demo 1.0.0 ttrek.json]]
+    set recipe [::tjson::json_to_simple [read $fp]]
+    close $fp
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name demo package_version 1.0.0 os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    list [dict get $response status] [dict get $spec version] \
+        [expr {[dict get $spec scripts] eq [dict get $recipe scripts]}]
+} -result {200 1.0.0 1}
+
+test registry-scripts-2 {Recipes without scripts return an empty scripts object} -setup {
+    file mkdir [file join $registry_fixture no-scripts 1.0.0]
+    file copy -force [file join $root tests fixtures no-scripts.json] \
+        [file join $registry_fixture no-scripts 1.0.0 ttrek.json]
+} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name no-scripts package_version 1.0.0 os Linux machine x86_64}]]
+    ::tjson::parse [body $response] no_scripts_response
+    list [dict get $response status] \
+        [::tjson::to_typed [::tjson::get_object_item $no_scripts_response scripts]]
+} -result {200 {M {}}}
+
+test registry-scripts-3 {Pinned OpenACS recipe exposes the installed-package entry points} -setup {
+    set test_registry [file join $root registry]
+} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name openacs package_version 5.10.1 os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    list [dict get $response status] [lsort [dict keys [dict get $spec scripts]]] \
+        [contains [dict get $spec scripts init-local] {$PROJECT_INSTALL_DIR}]
+} -cleanup {
+    set test_registry $registry_fixture
+} -result {200 {init-local start-local} 1}
+
 test registry-5 {Latest recipe and patches use the configured directory with literal glob characters} -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name demo package_version latest os Linux machine x86_64}]]
