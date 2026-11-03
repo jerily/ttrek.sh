@@ -6,6 +6,8 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 set test_root $root
 set test_registry [file join $root registry]
 set test_stats {}
+source [file join $root tcl config.tcl]
+set test_releases [::app_config::releases {}]
 # Stub external services, but exercise the real handlers, serializer and renderer.
 package provide twebserver 1.47.54
 package provide tratelimit 1.0.1
@@ -13,7 +15,7 @@ package require treqmon 2.0.0
 namespace eval ::twebserver {
     proc get_rootdir {} {return $::test_root}
     proc get_config_dict {} {
-        return [dict create tratelimit {} treqmon {} registry_dir $::test_registry]
+        return [dict create tratelimit {} treqmon {} registry_dir $::test_registry releases $::test_releases]
     }
     proc create_router {args} {uplevel 1 {set router test_router}}
     proc add_middleware {args} {}
@@ -27,12 +29,113 @@ namespace eval ::twebserver {
         lassign $args status type body
         return [dict create status $status type $type body $body]
     }
+    proc build_redirect {status location} {
+        return [dict create status $status headers [dict create Location $location] body {}]
+    }
 }
 namespace eval ::tratelimit {proc init_middleware {config} {}}
 namespace eval ::treqmon {proc init_middleware {config} {}}
 source [file join $root tcl init-thread.tcl]
 proc telemetry_event_common {args} {}
 proc telemetry_sql {args} {return $::test_stats}
+
+# Stub only AWS calls; retain the real distribution handler and key selection.
+rename ::aws::s3::create ::aws::s3::real_create
+rename ::aws::s3::generate_presigned_url ::aws::s3::real_generate_presigned_url
+proc ::aws::s3::create {settings} {
+    set ::s3_settings $settings
+    return test_s3_client
+}
+proc ::aws::s3::generate_presigned_url {args} {
+    lappend ::s3_calls $args
+    if {$::s3_url eq "error"} {error "signer unavailable"}
+    return $::s3_url
+}
+
+test releases-1 {Every installer triple and release directory signs the matching executable} -setup {
+    set test_releases [::app_config::releases {releases {bucket public-releases region eu-west-1 prefix /ttrek/1.0.0/ url_expiry_seconds 120}}]
+    set s3_calls {}
+    set s3_url "https://public-releases.s3.eu-west-1.amazonaws.com/ttrek?X-Amz-Signature=[string repeat a 64]"
+} -body {
+    set result {}
+    foreach {triple target} {
+        x86_64-unknown-linux-gnu linux-amd64-glibc aarch64-unknown-linux-gnu linux-arm64-glibc
+        x86_64-unknown-linux-musl linux-amd64-musl aarch64-unknown-linux-musl linux-arm64-musl
+        aarch64-apple-darwin macos-arm64 x86_64-apple-darwin macos-x86_64
+        universal2-apple-darwin macos-universal2
+    } {
+        foreach arch [list $triple $target] {
+            set response [get_dist_handler {} [dict create pathParameters [dict create arch $arch ext {}]]]
+            lappend result [expr {[dict get $response status] == 302 &&
+                [dict get $response headers Location] eq $s3_url &&
+                [dict get $response headers Cache-Control] eq "no-store" &&
+                [lindex $s3_calls end] eq [list -method GET -expire 120 test_s3_client public-releases "ttrek/1.0.0/$target/ttrek"]}]
+        }
+    }
+    list [lsort -unique $result] $s3_settings
+} -result {1 {region eu-west-1}}
+
+test releases-2 {Unknown targets, path traversal and extensions cannot sign arbitrary keys} -body {
+    set s3_calls {}
+    set result {}
+    foreach {arch ext} {windows .exe ../../secret {} linux-amd64-glibc .exe linux-amd64-glibc /secret} {
+        lappend result [dict get [get_dist_handler {} [dict create pathParameters [dict create arch $arch ext $ext]]] status]
+    }
+    list $result $s3_calls
+} -result {{404 404 404 404} {}}
+
+test releases-3 {Disabled downloads do not contact AWS} -setup {
+    set test_releases [::app_config::releases {}]
+    set s3_calls {}
+} -body {
+    set response [get_dist_handler {} {pathParameters {arch linux-amd64-glibc ext {}}}]
+    list [dict get $response status] [dict get $response headers Cache-Control] $s3_calls
+} -result {503 no-store {}}
+
+test releases-4 {Invalid signing results never become redirects} -setup {
+    set test_releases [::app_config::releases {releases {bucket public-releases region us-east-1}}]
+} -body {
+    set result {}
+    foreach s3_url [list {} error https://example.com/unsigned "https://example.com/\r\nInjected: header" http://example.com/insecure] {
+        lappend result [dict get [get_dist_handler {} {pathParameters {arch macos-arm64 ext {}}}] status]
+    }
+    set result
+} -result {503 503 503 503 503}
+
+test releases-5 {Metadata contains the configured version, target, checksum and signed URL} -setup {
+    dict set test_releases sha256_linux-arm64-musl [string repeat B 64]
+    set s3_url "https://public-releases.s3.amazonaws.com/ttrek?X-Amz-Signature=[string repeat a 64]"
+} -body {
+    set response [get_release_handler {} {pathParameters {target aarch64-unknown-linux-musl}}]
+    set metadata [::tjson::json_to_simple [dict get $response body]]
+    list [dict get $response status] [dict get $metadata version] [dict get $metadata target] \
+        [expr {[dict get $metadata sha256] eq [string repeat b 64]}] \
+        [expr {[dict get $metadata url] eq $s3_url}] [dict get $response headers Cache-Control]
+} -result {200 1.0.0 linux-arm64-musl 1 1 no-store}
+
+test releases-6 {Metadata requires a published checksum and supported target} -body {
+    list [dict get [get_release_handler {} {pathParameters {target macos-arm64}}] status] \
+        [dict get [get_release_handler {} {pathParameters {target ../secret}}] status]
+} -result {503 404}
+
+rename ::aws::s3::create {}
+rename ::aws::s3::real_create ::aws::s3::create
+rename ::aws::s3::generate_presigned_url {}
+rename ::aws::s3::real_generate_presigned_url ::aws::s3::generate_presigned_url
+set ::releases::client {}
+
+test releases-7 {The real SDK generates a signed URL without an AWS request} -setup {
+    set test_releases [::app_config::releases {releases {bucket public-releases region eu-west-1}}]
+    set ::releases::client [::aws::s3::create {region eu-west-1 aws_access_key_id test aws_secret_access_key test}]
+} -body {
+    set url [::releases::signed_url linux-amd64-glibc]
+    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.0.0/linux-amd64-glibc/ttrek?*} $url] \
+        [regexp {[?&]X-Amz-Expires=300(&|$)} $url] \
+        [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
+} -cleanup {
+    ::aws::s3::destroy $::releases::client
+    set ::releases::client {}
+} -result {1 1 1}
 
 set fixture [::tcltest::makeDirectory registry-fixture]
 set registry_fixture [::tcltest::makeDirectory {custom registry [data]}]

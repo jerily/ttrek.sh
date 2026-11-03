@@ -9,6 +9,7 @@ BUILD_DIR="$SELF_DIR/build/build"
 
 TCL_VERSION=9.1.0
 CJSON_VERSION=1.7.19
+AWS_SDK_CPP_VERSION=1.11.921
 DEBUG=0
 BUILD_JOBS=${TTREK_MAKE_THREADS:-4}
 
@@ -222,23 +223,27 @@ if [ ! -f "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" ]; then
     )
 fi
 
-if [ ! -f "$INSTALL_DIR/lib/cmake/AWSSDK/AWSSDKConfig.cmake" ]; then
+AWS_SDK_CPP_REBUILT=0
+if ! grep -q "^set(PACKAGE_VERSION \"$AWS_SDK_CPP_VERSION\")$" \
+        "$INSTALL_DIR/lib/cmake/AWSSDK/AWSSDKConfigVersion.cmake" 2>/dev/null; then
     echo "Build AWS SDK for C++ ..."
-    if [ ! -d "$SOURCE_DIR/aws-sdk-cpp-1.11.157/.git" ]; then
-        git clone --depth 1 --branch 1.11.157 --single-branch \
-            https://github.com/aws/aws-sdk-cpp "$SOURCE_DIR/aws-sdk-cpp-1.11.157"
+    if [ ! -d "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION/.git" ]; then
+        git clone --depth 1 --branch "$AWS_SDK_CPP_VERSION" --single-branch \
+            https://github.com/aws/aws-sdk-cpp "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION"
     fi
-    git -C "$SOURCE_DIR/aws-sdk-cpp-1.11.157" submodule update --init --recursive --depth 1
-    cmake_install aws-sdk-cpp-1.11.157 \
+    git -C "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION" submodule update --init --recursive --depth 1
+    cmake_install "aws-sdk-cpp-$AWS_SDK_CPP_VERSION" \
+        -DCMAKE_MODULE_PATH="$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION/crt/aws-crt-cpp/crt/aws-c-common/cmake" \
         -DBUILD_ONLY='s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm;kms' \
         -DENABLE_TESTING=OFF -DAUTORUN_UNIT_TESTS=OFF \
         -DOPENSSL_ROOT_DIR="$INSTALL_DIR"
+    AWS_SDK_CPP_REBUILT=1
 fi
 
-if ! package_installed awskms awsssm awsdynamodb; then
+if [ "$AWS_SDK_CPP_REBUILT" = 1 ] || ! package_installed awss3 awskms awsssm awsdynamodb; then
     echo "Build aws-sdk-tcl ..."
-    fetch_source aws-sdk-tcl-1.0.10 https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.10.tar.gz
-    tcl_cmake_install aws-sdk-tcl-1.0.10 -DAWS_SDK_CPP_DIR="$INSTALL_DIR"
+    fetch_source aws-sdk-tcl-1.0.12 https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.12.tar.gz
+    tcl_cmake_install aws-sdk-tcl-1.0.12 -DAWS_SDK_CPP_DIR="$INSTALL_DIR"
 fi
 
 install_tcl_package() (

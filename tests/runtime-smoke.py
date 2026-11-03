@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+import urllib.error
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL = ROOT / "build/install"
@@ -112,6 +113,17 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                     body = response.read().decode()
                     assert expected in body, f"Unexpected response for {path}"
                 print(f"PASS GET {path}")
+            for path, status in (("/dist/linux-amd64-glibc/ttrek", 503),
+                                 ("/releases/latest/linux-amd64-glibc", 503),
+                                 ("/dist/unknown/ttrek", 404)):
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{http_port}" + path, timeout=5)
+                    raise AssertionError(f"Expected {status} for {path}")
+                except urllib.error.HTTPError as response:
+                    assert response.code == status
+                    if status == 503:
+                        assert response.headers["Cache-Control"] == "no-store"
+                print(f"PASS GET {path}: {status}")
             if mode == "LOCAL":
                 context = ssl.create_default_context(cafile=str(app / "cert.pem"))
                 with urllib.request.urlopen(f"https://localhost:{https_port}/", context=context, timeout=5) as response:

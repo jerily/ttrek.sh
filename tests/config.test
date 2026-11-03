@@ -120,6 +120,29 @@ test config-13 {An empty registry directory cannot expose the application root} 
     rename ::tconfig::saved_read_config ::tconfig::read_config
 } -returnCodes error -result {registry.directory must not be empty}
 
+test releases-config-1 {Downloads default to disabled with a short URL lifetime} -body {
+    set settings [::app_config::releases {}]
+    list [dict get $settings bucket] [dict get $settings url_expiry_seconds]
+} -result {{} 300}
+
+test releases-config-2 {Release settings normalize prefixes and preserve hashes} -body {
+    set settings [::app_config::releases {releases {bucket public-releases region eu-west-1 prefix /ttrek/1.0.0/}}]
+    list [dict get $settings prefix] [dict get $settings region]
+} -result {ttrek/1.0.0 eu-west-1}
+
+test releases-config-3 {Invalid release settings fail before serving requests} -body {
+    set result {}
+    foreach settings {
+        {bucket https://bucket.example region us-east-1}
+        {bucket public-releases region {}}
+        {url_expiry_seconds 0} {url_expiry_seconds 604801} {url_expiry_seconds invalid}
+        {prefix ../secret} {version latest} {sha256_linux-amd64-glibc invalid}
+    } {
+        lappend result [catch {::app_config::releases [dict create releases $settings]}]
+    }
+    set result
+} -result {1 1 1 1 1 1 1 1}
+
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env
 ::tcltest::removeDirectory config-fixture
