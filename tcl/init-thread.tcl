@@ -267,7 +267,11 @@ proc get_index_page_handler {ctx req} {
 #            return [::twebserver::build_response -return_file 200 application/octet-stream [::twebserver::get_rootdir]/public/ttrek-init]
 #        }
 #    }
-    set data [dict create title {S {Install ttrek}}]
+    set install_command {curl --proto '=https' --tlsv1.2 -sSf https://ttrek.sh/init | sh}
+    if {[info exists ::env(ENV)] && $::env(ENV) eq "LOCAL"} {
+        set install_command {curl -fsS http://localhost:8080/init | ENV=LOCAL sh}
+    }
+    set data [dict create title {S {Install ttrek}} install_command [list S $install_command]]
     set html [::views::render index.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res

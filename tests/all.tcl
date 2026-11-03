@@ -157,12 +157,27 @@ test templates-1 {All local templates validate including dependencies} -body {
     dict size $::views::templates
 } -result 12
 
-test templates-2 {Index layout and literal clipboard command} -body {
+test templates-2 {Index layout and literal clipboard command} -setup {
+    set saved_env [array get ::env ENV]
+    unset -nocomplain ::env(ENV)
+} -body {
     set html [body [get_index_page_handler {} {}]]
     list [contains $html {<h1 class="splash-head">Install ttrek</h1>}] \
         [contains $html {data-clipboard-text="curl --proto &#39;=https&#39; --tlsv1.2 -sSf https://ttrek.sh/init | sh"}] \
         [contains $html {<title>ttrek: registry, website, and command-line interface</title>}]
+} -cleanup {
+    array set ::env $saved_env
 } -result {1 1 1}
+
+test templates-2-local {LOCAL installer command preserves local mode for the downloaded script} -setup {
+    set saved_env [array get ::env ENV]
+    set ::env(ENV) LOCAL
+} -body {
+    contains [body [get_index_page_handler {} {}]] {data-clipboard-text="curl -fsS http://localhost:8080/init | ENV=LOCAL sh"}
+} -cleanup {
+    unset -nocomplain ::env(ENV)
+    array set ::env $saved_env
+} -result 1
 
 test templates-3 {Names remain strings; HTML and URL contexts are escaped} -body {
     set html [::views::render packages.html.jinja [dict create \

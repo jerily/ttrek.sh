@@ -99,7 +99,9 @@ installer follows the redirect. Unknown targets and extensions return 404.
 `public/ttrek-init` defaults to `https://ttrek.sh`, detects Linux libc and CPU,
 and selects native ARM64 on Apple Silicon even under Rosetta. Intel Macs retain
 the Intel target. Curl and wget verify certificates and follow the S3 redirect.
-For local testing, override `TTREK_UPDATE_ROOT` and trust the local certificate
+With `ENV=LOCAL`, it defaults to `http://localhost:8080`; the LOCAL homepage's
+install command passes that environment setting into the script. To use local
+HTTPS, set `TTREK_UPDATE_ROOT=https://localhost:4433` and trust the local certificate
 through the downloader's CA configuration.
 
 Set `sha256_<target>` for each published executable (use `sha256sum` on Linux or

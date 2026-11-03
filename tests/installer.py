@@ -65,6 +65,7 @@ else:
                        TEST_DOWNLOAD=str(home / "download.json"))
             env.pop("TTREK_UPDATE_ROOT", None)
             env.pop("TTREK_HOME", None)
+            env.pop("ENV", None)
             result = subprocess.run(["/bin/sh", str(ROOT / "public/ttrek-init"), "-y"], env=env,
                                     capture_output=True, text=True, timeout=10)
             assert result.returncode == 0, (system, cpu, result.stdout, result.stderr)
@@ -80,4 +81,14 @@ else:
             subprocess.run(["/bin/sh", str(ROOT / "public/ttrek-init"), "-y"], env=env,
                            capture_output=True, check=True, timeout=10)
             assert f"https://localhost:4433/dist/{triple}/ttrek" in json.loads((home / "download.json").read_text())
+            env.pop('TTREK_UPDATE_ROOT')
+            env['ENV'] = 'LOCAL'
+            subprocess.run(["/bin/sh", str(ROOT / "public/ttrek-init"), "-y"], env=env,
+                           capture_output=True, check=True, timeout=10)
+            args = json.loads((home / "download.json").read_text())
+            assert f"http://localhost:8080/dist/{triple}/ttrek" in args
+            if client == 'curl':
+                assert args[args.index('--proto') + 1] == '=https,http'
+            else:
+                assert '--https-only' not in args
 print('Installer endpoints, Linux libc/architecture, native/Intel/Rosetta macOS and curl/wget checks passed')

@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                                            start_new_session=True)
             wait_for_port(http_port, app_process)
             checks = {
-                "/": "Install ttrek",
+                "/": "http://localhost:8080/init | ENV=LOCAL sh" if mode == "LOCAL" else "https://ttrek.sh/init",
                 "/packages": "jinja2-tcl",
                 "/package/tcl": "9.1.0",
                 "/package/tcl/9.1.0": "tcl@9.1.0",
