@@ -11,6 +11,7 @@ package require treqmon 2.0.0
 
 source [file join [file dirname [info script]] templates.tcl]
 source [file join [file dirname [info script]] request-monitor.tcl]
+source [file join [file dirname [info script]] releases.tcl]
 ::views::init [file join [::twebserver::get_rootdir] www]
 
 set config_dict [::twebserver::get_config_dict]
@@ -37,6 +38,7 @@ set config_dict [::twebserver::get_config_dict]
 ::twebserver::add_route -strict -name get_packages $router GET /packages get_packages_page_handler
 ::twebserver::add_route -prefix -name get_assets $router GET /(css|js|assets)/ get_assets_handler
 ::twebserver::add_route -strict -name get_dist $router GET "/dist/{:arch}/ttrek{:ext}?" get_dist_handler
+::twebserver::add_route -strict -name get_release $router GET /releases/latest/:target get_release_handler
 ::twebserver::add_route -strict -name get_package $router GET /package/:package_name get_package_page_handler
 ::twebserver::add_route -strict -name get_package_version $router GET /package/:package_name/:package_version get_package_version_page_handler
 ::twebserver::add_route -strict -name get_package_spec $router GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
@@ -177,14 +179,40 @@ proc post_telemetry_collect_handler {ctx req} {
 
 proc get_dist_handler {ctx req} {
     set arch [::twebserver::get_path_param $req arch]
-    telemetry_event_common req_dist_get -os linux -arch $arch
     set ext [::twebserver::get_path_param $req ext]
-    # hardcode for alpine
-    # set arch "alpine"
-    set dir [::twebserver::get_rootdir]
-    set filename "ttrek-$arch$ext"
-    set filepath [file normalize [file join $dir dist $filename]]
-    return [::twebserver::build_response -return_file 200 application/octet-stream $filepath]
+    set artifact [::releases::artifact $arch]
+    if {$ext ne "" || $artifact eq ""} {
+        return [::twebserver::build_response 404 text/plain "Unsupported distribution"]
+    }
+    set settings [dict get [::twebserver::get_config_dict] releases]
+    if {[dict get $settings bucket] eq "" || [catch {::releases::signed_url $artifact} url]} {
+        set response [::twebserver::build_response 503 text/plain "Downloads are temporarily unavailable"]
+    } else {
+        set os [expr {[string match macos-* $artifact] ? "macos" : "linux"}]
+        telemetry_event_common req_dist_get -os $os -arch $arch
+        set response [::twebserver::build_redirect 302 $url]
+    }
+    dict set response headers Cache-Control no-store
+    return $response
+}
+
+proc get_release_handler {ctx req} {
+    set target [::releases::artifact [::twebserver::get_path_param $req target]]
+    if {$target eq ""} {
+        return [::twebserver::build_response 404 text/plain "Unsupported distribution"]
+    }
+    set settings [dict get [::twebserver::get_config_dict] releases]
+    if {[dict get $settings bucket] eq "" || ![dict exists $settings sha256_$target] ||
+        [catch {::releases::signed_url $target} url]} {
+        set response [::twebserver::build_response 503 text/plain "Release metadata is unavailable"]
+    } else {
+        set data [list M [dict create version [list S [dict get $settings version]] \
+            target [list S $target] url [list S $url] \
+            sha256 [list S [string tolower [dict get $settings sha256_$target]]]]]
+        set response [::twebserver::build_response 200 application/json [::tjson::typed_to_json $data]]
+    }
+    dict set response headers Cache-Control no-store
+    return $response
 }
 
 proc path_join {args} {
@@ -239,7 +267,11 @@ proc get_index_page_handler {ctx req} {
 #            return [::twebserver::build_response -return_file 200 application/octet-stream [::twebserver::get_rootdir]/public/ttrek-init]
 #        }
 #    }
-    set data [dict create title {S {Install ttrek}}]
+    set install_command {curl --proto '=https' --tlsv1.2 -sSf https://ttrek.sh/init | sh}
+    if {[info exists ::env(ENV)] && $::env(ENV) eq "LOCAL"} {
+        set install_command {curl -fsS http://localhost:8080/init | ENV=LOCAL sh}
+    }
+    set data [dict create title {S {Install ttrek}} install_command [list S $install_command]]
     set html [::views::render index.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res

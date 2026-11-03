@@ -62,3 +62,39 @@ proc ::app_config::valkey {config} {
     }
     return $settings
 }
+
+proc ::app_config::releases {config} {
+    set settings [dict create bucket {} region {} prefix ttrek/1.0.0 version 1.0.0 url_expiry_seconds 300]
+    if {[dict exists $config releases]} {
+        set settings [dict merge $settings [dict get $config releases]]
+    }
+    set bucket [dict get $settings bucket]
+    if {$bucket ne ""} {
+        if {![regexp {^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$} $bucket]} {
+            error "releases.bucket must be an S3 bucket name"
+        }
+        if {![regexp {^[a-z0-9-]+$} [dict get $settings region]]} {
+            error "releases.region is required when releases.bucket is set"
+        }
+    }
+    set expiry [dict get $settings url_expiry_seconds]
+    if {![string is integer -strict $expiry] || $expiry < 1 || $expiry > 604800} {
+        error "releases.url_expiry_seconds must be between 1 and 604800"
+    }
+    set prefix [string trim [dict get $settings prefix] /]
+    if {![regexp {^[a-zA-Z0-9._/-]*$} $prefix] ||
+        "." in [split $prefix /] || ".." in [split $prefix /]} {
+        error "releases.prefix must be an S3 key prefix without dot segments"
+    }
+    dict set settings prefix $prefix
+    if {![regexp {^[0-9]+\.[0-9]+\.[0-9]+$} [dict get $settings version]]} {
+        error "releases.version must be a stable major.minor.patch version"
+    }
+    foreach target {linux-amd64-glibc linux-arm64-glibc linux-amd64-musl linux-arm64-musl macos-arm64 macos-x86_64 macos-universal2} {
+        set key sha256_$target
+        if {[dict exists $settings $key] && ![regexp {^[0-9a-fA-F]{64}$} [dict get $settings $key]]} {
+            error "releases.$key must be a SHA-256 hex digest"
+        }
+    }
+    return $settings
+}

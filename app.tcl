@@ -14,6 +14,7 @@ set config [::app_config::load $dir]
 
 # Shared TLS connection settings for both middleware stores.
 set valkey_config [::app_config::valkey $config]
+set releases_config [::app_config::releases $config]
 
 # tratelimit
 
@@ -65,6 +66,7 @@ set telemetry_thread_id [thread::create thread::wait]
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
     registry_dir [dict get $config registry directory] \
+    releases $releases_config \
     gzip on \
     gzip_types [list text/plain application/json] \
     gzip_min_length 8192 \

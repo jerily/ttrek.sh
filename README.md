@@ -61,6 +61,69 @@ Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the pr
 Without the flag, recipes keep their normal defaults.
 Static Tcl extensions are intended for embedding, not `package require` loading.
 
+## Binary distributions
+
+`GET /dist/<target>/ttrek` redirects to a signed HTTPS S3 GET URL. Configure the
+private distribution bucket in `[releases]` in `etc/config.local.ini` for LOCAL
+mode, or the production configuration. Empty `bucket` disables downloads with
+HTTP 503; it does not affect registry routes. The tracked template and local
+configuration contain the same release settings:
+
+```ini
+[releases]
+bucket = jerily-ttrek-app
+region = eu-central-1
+prefix = ttrek/1.0.0
+version = 1.0.0
+url_expiry_seconds = 300
+# sha256_linux-amd64-glibc = <64-character SHA-256 of the executable>
+```
+
+The [portable release build](https://github.com/jerily/ttrek/pull/33) exports
+`dist/<target>/ttrek`. Upload each executable to `<prefix>/<target>/ttrek` in the
+configured bucket, using these target names:
+
+| Target | Installer alias |
+| --- | --- |
+| `linux-amd64-glibc` | `x86_64-unknown-linux-gnu` |
+| `linux-arm64-glibc` | `aarch64-unknown-linux-gnu` |
+| `linux-amd64-musl` | `x86_64-unknown-linux-musl` |
+| `linux-arm64-musl` | `aarch64-unknown-linux-musl` |
+| `macos-arm64` | `aarch64-apple-darwin` |
+| `macos-x86_64` | `x86_64-apple-darwin` |
+| `macos-universal2` (optional) | `universal2-apple-darwin` |
+
+For example, `/dist/linux-arm64-musl/ttrek` and
+`/dist/aarch64-unknown-linux-musl/ttrek` select the same object. The existing
+installer follows the redirect. Unknown targets and extensions return 404.
+`public/ttrek-init` defaults to `https://ttrek.sh`, detects Linux libc and CPU,
+and selects native ARM64 on Apple Silicon even under Rosetta. Intel Macs retain
+the Intel target. Curl and wget verify certificates and follow the S3 redirect.
+With `ENV=LOCAL`, it defaults to `http://localhost:8080`; the LOCAL homepage's
+install command passes that environment setting into the script. To use local
+HTTPS, set `TTREK_UPDATE_ROOT=https://localhost:4433` and trust the local certificate
+through the downloader's CA configuration.
+
+Set `sha256_<target>` for each published executable (use `sha256sum` on Linux or
+`shasum -a 256` on macOS). `GET /releases/latest/<target>` then returns JSON with
+`version`, canonical `target`, `sha256`, and a signed `url` for `ttrek self-update`.
+It returns 503 if the bucket or that checksum is missing. Use an immutable prefix
+per release and update the version, prefix and hashes together after uploading.
+Both endpoints send `Cache-Control: no-store` so cached redirects cannot outlive
+their signatures. Restart the application after changing configuration.
+
+`aws-sdk-tcl` ^1.0.12 is a direct dependency, using AWS SDK C++ ^1.11.921 in the
+registry. `build.sh` builds 1.0.12 against SDK C++ 1.11.921 and upgrades older
+installed SDK modules and bindings. Each worker lazily creates an S3 client
+using the configured region and the SDK's default credential provider. Configure
+an AWS profile/environment locally or an ECS task role in production with
+`s3:GetObject` on the release prefix. No credentials go in the release settings.
+The `jerily-ttrek-app` bucket remains private; download clients receive temporary
+access through signed URLs. The infrastructure declares private bucket access
+and grants the application task role object-read permissions. The signer needs
+valid AWS credentials. See AWS's
+[presigned URL documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html).
+
 # Build
 
 Install a C/C++17 toolchain, make, CMake 3.22.1+, pkg-config, git, curl, tar,
@@ -107,9 +170,15 @@ All assets are served locally; no template compiler or JavaScript bundler is use
 LD_LIBRARY_PATH="$PWD/build/install/lib:$PWD/build/install/lib64" build/install/bin/tclsh9.1 tests/runtime-packages.tcl
 LD_LIBRARY_PATH="$PWD/build/install/lib:$PWD/build/install/lib64" build/install/bin/tclsh9.1 tests/all.tcl
 build/install/bin/tclsh9.1 tests/config.test
+python3 tests/installer.py
 ```
 
 `tests/runtime-packages.tcl` checks installed dependencies without service mocks.
+This includes `awss3`; release-handler tests cover target selection, signing
+arguments, metadata, disabled downloads, invalid requests and signer failures.
+The Python installer test uses mocked platform/download commands and disposable
+homes to verify all supported targets, endpoints, Rosetta detection and overrides;
+it does not download real distributions or modify the user's installation.
 The rendering tests validate all templates and exercise the real request handlers and
 renderer with isolated service fixtures, including empty collections, dependency
 conditions, version ordering, HTML/URL escaping and monitor chart data. They do
@@ -157,6 +226,10 @@ certificates and keys under ignored `local/`, and keep the machine-specific
 configuration in ignored `etc/config.local.ini`.
 
 ## Infrastructure
+
+All deployment scripts use the AWS profile `ttrek-prod-neo`, configured for
+`eu-central-1`. The storage, build and application templates use the `jerily`
+S3 prefix, matching the private release bucket `jerily-ttrek-app`.
 
 For a new environment, run the scripts in `infra/` in numeric order: keys,
 storage, VPC, cache, CodeBuild, then Fargate. `10-deploy-infra-storage.sh` deploys
@@ -208,6 +281,11 @@ Registry metadata and request-monitor statistics are rendered into HTML. The
 application also exposes registry, telemetry and static-file endpoints.
 
 ### Protections
+
+Distribution targets are allowlisted and only configured object keys can be
+signed. Redirects require a signed HTTPS URL and disable caching. Failed signing
+returns a generic 503 without exposing credentials or SDK diagnostics. Release
+metadata includes an executable checksum; no bucket listing or upload route is exposed.
 
 Production Valkey connections require TLS and verify the CA and hostname,
 including reconnects. LOCAL mode can use plain TCP only against localhost.

@@ -7,7 +7,7 @@ Metadata:
 Parameters:
   S3Prefix:
     Type: String
-    Default: "jrl"
+    Default: "jerily"
   AppName:
     Type: String
     Default: "ttrek-app"

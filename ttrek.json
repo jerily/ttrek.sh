@@ -5,6 +5,7 @@
   "dependencies": {
     "twebserver": "^1.47.54",
     "tconfig": "^1.0.0",
+    "aws-sdk-tcl": "^1.0.12",
     "tjson": "^1.0.26",
     "valkey-tcl": "^1.0.3",
     "tratelimit": "^1.0.1",

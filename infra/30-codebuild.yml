@@ -3,7 +3,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Parameters:
   S3Prefix:
     Type: String
-    Default: "jrl"
+    Default: "jerily"
   AppName:
     Type: String
     Default: "ttrek-app"
