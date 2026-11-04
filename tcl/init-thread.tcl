@@ -387,6 +387,41 @@ proc compute_iuse_flags {spec_handle} {
     return $iuse_unique
 }
 
+proc resolve_recipe_scripts {scripts_typed directory} {
+    lassign $scripts_typed type scripts
+    if {$type ne "M"} {error "recipe scripts must be an object"}
+    set result {}
+    dict for {name script} $scripts {
+        if {$name eq {}} {error "recipe script names must not be empty"}
+        lassign $script type value
+        if {$type eq "S"} {
+            lappend result $name $script
+            continue
+        }
+        if {$type ne "M" || [dict size $value] != 1 || ![dict exists $value file] ||
+            [lindex [dict get $value file] 0] ne "S"} {
+            error "recipe scripts must have string bodies or a single file reference"
+        }
+        set filename [lindex [dict get $value file] 1]
+        if {![regexp {^[A-Za-z0-9._+-]+$} $filename] || $filename in {. ..}} {
+            error "Invalid recipe script filename"
+        }
+        set path [file join $directory $filename]
+        if {![file exists $path] || [file type $path] ne "file"} {
+            error "Recipe script must be a regular file in its recipe directory: $path"
+        }
+        set fp [open $path rb]
+        try {
+            set body [encoding convertfrom utf-8 [read $fp]]
+        } finally {
+            close $fp
+        }
+        if {[string first \u0000 $body] >= 0} {error "Recipe script must not contain NUL bytes"}
+        lappend result $name [list S $body]
+    }
+    return [list M $result]
+}
+
 proc get_package_spec_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
@@ -428,7 +463,8 @@ proc get_package_spec_handler {ctx req} {
 
     set scripts_typed [list M {}]
     if {[::tjson::has_object_item $spec_handle scripts]} {
-        set scripts_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle scripts]]
+        set scripts_typed [resolve_recipe_scripts \
+            [::tjson::to_typed [::tjson::get_object_item $spec_handle scripts]] [file dirname $spec_path]]
     }
 
     set spec_build_handle [::tjson::get_object_item $spec_handle build]
