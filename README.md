@@ -56,6 +56,12 @@ Set this in `etc/config.local.ini` for LOCAL mode or the production configuratio
 for PROD mode, then restart the server. All package pages and registry API routes
 use this directory. The build still uses the pinned submodule for its patch files.
 
+Recipe scripts can reference files beside their spec, for example
+`"scripts": {"demo": {"file": "demo.sh"}}`. The API reads these UTF-8 files
+and returns their contents as script strings, preserving compatibility with
+installed-script caching. Only regular files directly in the recipe directory
+are accepted; paths and symbolic links are rejected. Inline scripts also work.
+
 Registry recipes use `if: "+static"` for optional static build settings.
 Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the project.
 Without the flag, recipes keep their normal defaults.

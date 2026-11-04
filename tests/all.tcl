@@ -320,6 +320,49 @@ test registry-scripts-2 {Recipes without scripts return an empty scripts object}
         [::tjson::to_typed [::tjson::get_object_item $no_scripts_response scripts]]
 } -result {200 {M {}}}
 
+test registry-script-files-1 {Recipe files preserve UTF-8, CRLF and final newline through the API} -setup {
+    set recipe_dir [file join $registry_fixture file-demo 1.0.0]
+    file mkdir $recipe_dir
+    set script_body "#!/bin/sh\r\nprintf '%s\\n' 'café'\r\n"
+    set fp [open [file join $recipe_dir demo.sh] wb]
+    puts -nonewline $fp [encoding convertto utf-8 $script_body]
+    close $fp
+    set fp [open [file join $recipe_dir ttrek.json] w]
+    puts $fp {{"dependencies":{},"scripts":{"demo":{"file":"demo.sh"},"inline":"echo inline"},"build":{"default":[]}}}
+    close $fp
+} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name file-demo package_version 1.0.0 os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    list [dict get $response status] [expr {[dict get $spec scripts demo] eq $script_body}] \
+        [dict get $spec scripts inline]
+} -result {200 1 {echo inline}}
+
+test registry-script-files-2 {Reject missing files, paths and invalid reference objects} -body {
+    set errors {}
+    foreach reference [list {M {}} {M {file {N 42}}} {M {file {S demo.sh} extra {B true}}} \
+            {M {file {S missing.sh}}} {M {file {S ../outside.sh}}} \
+            {M {file {S /etc/passwd}}} {M {file {S .}}} {M {file {S ..}}}] {
+        lappend errors [catch {resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir}]
+    }
+    set errors
+} -result {1 1 1 1 1 1 1 1}
+
+test registry-script-files-3 {Reject symbolic links, directories and NUL bytes} -setup {
+    file link -symbolic [file join $recipe_dir linked.sh] [file join $recipe_dir demo.sh]
+    file mkdir [file join $recipe_dir folder.sh]
+    set fp [open [file join $recipe_dir nul.sh] wb]
+    puts -nonewline $fp "echo before\u0000echo after"
+    close $fp
+} -body {
+    set errors {}
+    foreach filename {linked.sh folder.sh nul.sh} {
+        lappend errors [catch {resolve_recipe_scripts \
+            [list M [list demo [list M [list file [list S $filename]]]]] $recipe_dir}]
+    }
+    set errors
+} -result {1 1 1}
+
 test registry-scripts-3 {Pinned OpenACS recipe exposes the installed-package entry points} -setup {
     set test_registry [file join $root registry]
 } -body {
