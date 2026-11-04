@@ -61,6 +61,22 @@ Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the pr
 Without the flag, recipes keep their normal defaults.
 Static Tcl extensions are intended for embedding, not `package require` loading.
 
+### Recipe search
+
+`GET /registry/search?q=tcl` returns a JSON array of `{ "name": "tcl", "distance": 0 }`
+objects for all recipe names within Levenshtein distance 2, sorted by distance
+then name. Exact matches come first; case and punctuation are preserved.
+No matches returns `[]`. Missing or invalid `q` returns HTTP 400; names accept
+1–255 ASCII letters, digits, `.`, `_`, `+` and `-`, excluding `.` and `..`.
+Encode a literal plus as `%2B` in the query string.
+
+Each worker builds its own [ttrie 0.1.1](https://github.com/jerily/ttrie) index
+from the configured registry at startup. Names must contain a
+`version/ttrek.json` and are indexed once regardless of version count. Requests
+reuse the index without reading recipes. Restart the server after registry
+changes; a missing registry directory fails initialization. `build.sh` installs
+the loadable Tcl extension, linked through Tcl stubs and declared in `ttrek.json`.
+
 The recipe API returns the selected version's `scripts` object together with
 its dependencies, build instructions, USE flags and patches. Missing scripts
 are represented as an empty object. Script bodies remain JSON strings; the

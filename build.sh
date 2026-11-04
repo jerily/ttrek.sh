@@ -159,6 +159,13 @@ package_installed() {
     "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl" "$@" >/dev/null 2>&1
 }
 
+if ! package_installed ttrie; then
+    echo "Build ttrie 0.1.1 ..."
+    fetch_source ttrie-0.1.1 https://github.com/jerily/ttrie/releases/download/v0.1.1/ttrie-0.1.1.tar.gz
+    tcl_cmake_install ttrie-0.1.1
+    ctest --test-dir "$BUILD_DIR/ttrie-0.1.1" --output-on-failure
+fi
+
 if ! pkg-config --exact-version=0.5.0 valkey || ! pkg-config --exists valkey_tls; then
     echo "Build libvalkey ..."
     fetch_source libvalkey-0.5.0 https://github.com/valkey-io/libvalkey/archive/refs/tags/0.5.0.tar.gz
