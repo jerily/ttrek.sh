@@ -1,43 +1,98 @@
 set search_fixture [::tcltest::makeDirectory search-registry]
-foreach name {tcl tclx tk tcl-tk a-c a_c a.c a+c abc} {
-    foreach version {1.0.0 2.0.0} {
-        file mkdir [file join $search_fixture $name $version]
-        close [open [file join $search_fixture $name $version ttrek.json] w]
-    }
+proc search_recipe {root name version {description {}}} {
+    set directory [file join $root $name $version]
+    file mkdir $directory
+    set channel [open [file join $directory ttrek.json] w]
+    puts $channel [::tjson::typed_to_json [list M [dict create description [list S $description]]]]
+    close $channel
 }
+foreach name {tcl tclx tk tcl-tk a-c a_c a.c a+c abc web webserver atweb zzwebzzz b wec encryption} {
+    foreach version {1.0.0 2.0.0} {search_recipe $search_fixture $name $version}
+}
+foreach {name description} {
+    twebserver {A Tcl web server.}
+    portal {Embedded Web platform.}
+    doc-server {Fast web server.}
+    doc-encryption {Encryption toolkit.}
+    literal-typo {Literal encrytion phrase.}
+} {search_recipe $search_fixture $name 1.0.0 $description}
+search_recipe $search_fixture twebserver 2.0.0 {Compression utilities.}
 file mkdir [file join $search_fixture tclz 1.0.0]
 rename ::recipe_search::index ::recipe_search::original_index
+rename ::recipe_search::descriptions ::recipe_search::original_descriptions
+set saved_entries $::recipe_search::entries
+set saved_documents $::recipe_search::documents
 ::recipe_search::init $search_fixture
+proc search_names {query} {
+    lmap match [::recipe_search::search $query] {dict get $match name}
+}
 
-test search-1 {Exact and fuzzy names sorted by distance and name, each once} -body {
-    set response [get_search_handler {} {queryStringParameters {q tcl}}]
-    list [dict get $response status] [dict get $response type] \
-        [::tjson::json_to_simple [dict get $response body]]
-} -result {200 application/json {{name tcl distance 0} {name tclx distance 1} {name tk distance 2}}}
+test search-1 {Exact, prefix and substring names precede descriptions and typo suggestions} -body {
+    search_names web
+} -result {web webserver atweb zzwebzzz twebserver doc-server portal wec}
 
-test search-2 {Punctuation is distinct; no matches is a JSON array} -body {
-    set response [get_search_handler {} {queryStringParameters {q a_c}}]
-    set names [lmap match [::tjson::json_to_simple [dict get $response body]] {dict get $match name}]
-    set empty [get_search_handler {} {queryStringParameters {q unknown}}]
-    list $names [dict get $empty body]
-} -result {{a_c a+c a-c a.c abc} {[]}}
+test search-2 {Case folding, whitespace and short-query typo limit} -body {
+    list [expr {[search_names { WEB }] eq [search_names web]}] [search_names TCL] \
+        [expr {"b" ni [search_names web]}] [lindex [search_names b] 0]
+} -result {1 {tcl tclx tcl-tk twebserver} 1 b}
 
-test search-3 {Missing, empty, invalid and oversized queries return 400} -body {
+test search-3 {Punctuation is preserved; names occur once across versions} -body {
+    search_names a_c
+} -result {a_c a+c a-c a.c abc}
+
+test search-4 {Description literals precede name typos and description typo suggestions} -body {
+    lrange [search_names encrytion] 0 2
+} -result {literal-typo encryption doc-encryption}
+
+test search-5 {Index every version and display the matching description} -body {
+    set response [get_search_handler {} {queryStringParameters {q compression}}]
+    set matches [::tjson::json_to_simple [dict get $response body]]
+    list [dict get $response status] [dict get $response type] $matches
+} -result {200 application/json {{name twebserver description {Compression utilities.} match description distance 0 coverage 1}}}
+
+test search-6 {Phrase queries and description display for a name substring} -body {
+    set response [get_search_handler {} {queryStringParameters {q web}}]
+    set matches [::tjson::json_to_simple [dict get $response body]]
+    set found [lindex $matches 4]
+    list [lrange [search_names {web server}] 0 1] [dict get $found description] \
+        [dict get $found match] [dict exists $found distance]
+} -result {{doc-server twebserver} {A Tcl web server.} substring 0}
+
+test search-7 {Invalid queries return 400 and no matches is an empty JSON array} -body {
     set statuses [list [dict get [get_search_handler {} {}] status]]
-    foreach query [list {} . .. ../etc {a b} café "abc\n" "a\u0000b" [string repeat a 256]] {
+    foreach query [list {} {   } . .. ../etc café "abc\n" "a\u0000b" [string repeat a 256]] {
         lappend statuses [dict get [get_search_handler {} [dict create queryStringParameters [dict create q $query]]] status]
     }
-    lsort -unique $statuses
-} -result 400
+    list [lsort -unique $statuses] [dict get [get_search_handler {} {queryStringParameters {q unknown}}] body]
+} -result {400 {[]}}
 
-test search-4 {Requests reuse the index even after the registry disappears} -body {
+test search-8 {Bad descriptions fail refresh without replacing the working index} -body {
+    set invalid [file join $search_fixture bad 1.0.0]
+    file mkdir $invalid
+    set rejected {}
+    foreach json {{"description":42} {"description":null} {"description":{}} {"description":"bad\nline"}} {
+        set channel [open [file join $invalid ttrek.json] w]
+        puts $channel \{$json\}
+        close $channel
+        lappend rejected [catch {::recipe_search::init $search_fixture} message]
+        if {![string match {*description must be*} $message]} {error $message}
+    }
+    file delete -force [file join $search_fixture bad]
+    list [lsort -unique $rejected] [lindex [search_names web] 0]
+} -result {1 web}
+
+test search-9 {Requests reuse the startup indexes after registry files disappear} -body {
     file delete -force $search_fixture
-    ::tjson::json_to_simple [dict get [get_search_handler {} {queryStringParameters {q tcl}}] body]
-} -result {{name tcl distance 0} {name tclx distance 1} {name tk distance 2}}
+    list [lindex [search_names web] 4] [search_names compression]
+} -result {twebserver twebserver}
 
-test search-5 {Missing registry fails initialization} -body {
+test search-10 {Missing registry fails initialization} -body {
     ::recipe_search::init $search_fixture
 } -returnCodes error -result {Search registry directory does not exist}
 
 ::recipe_search::index destroy
+::recipe_search::descriptions destroy
 rename ::recipe_search::original_index ::recipe_search::index
+rename ::recipe_search::original_descriptions ::recipe_search::descriptions
+set ::recipe_search::entries $saved_entries
+set ::recipe_search::documents $saved_documents
