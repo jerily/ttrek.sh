@@ -12,9 +12,11 @@ package require treqmon 2.0.0
 source [file join [file dirname [info script]] templates.tcl]
 source [file join [file dirname [info script]] request-monitor.tcl]
 source [file join [file dirname [info script]] releases.tcl]
+source [file join [file dirname [info script]] search.tcl]
 ::views::init [file join [::twebserver::get_rootdir] www]
 
 set config_dict [::twebserver::get_config_dict]
+::recipe_search::init [dict get $config_dict registry_dir]
 
 ::tratelimit::init_middleware [dict get $config_dict tratelimit]
 ::treqmon::init_middleware [dict get $config_dict treqmon]
@@ -42,6 +44,7 @@ set config_dict [::twebserver::get_config_dict]
 ::twebserver::add_route -strict -name get_package $router GET /package/:package_name get_package_page_handler
 ::twebserver::add_route -strict -name get_package_version $router GET /package/:package_name/:package_version get_package_version_page_handler
 ::twebserver::add_route -strict -name get_package_spec $router GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler
+::twebserver::add_route -strict -name get_search $router GET /registry/search get_search_handler
 ::twebserver::add_route -strict -name get_package_versions $router GET /registry/:package_name get_package_versions_handler
 ::twebserver::add_route -strict -name post_telemetry_register $router POST /telemetry/register/:environment_id post_telemetry_register_handler
 ::twebserver::add_route -strict -name post_telemetry_collect $router POST /telemetry/collect/:package_name/:package_version post_telemetry_collect_handler

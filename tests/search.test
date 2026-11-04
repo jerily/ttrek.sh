@@ -1,0 +1,43 @@
+set search_fixture [::tcltest::makeDirectory search-registry]
+foreach name {tcl tclx tk tcl-tk a-c a_c a.c a+c abc} {
+    foreach version {1.0.0 2.0.0} {
+        file mkdir [file join $search_fixture $name $version]
+        close [open [file join $search_fixture $name $version ttrek.json] w]
+    }
+}
+file mkdir [file join $search_fixture tclz 1.0.0]
+rename ::recipe_search::index ::recipe_search::original_index
+::recipe_search::init $search_fixture
+
+test search-1 {Exact and fuzzy names sorted by distance and name, each once} -body {
+    set response [get_search_handler {} {queryStringParameters {q tcl}}]
+    list [dict get $response status] [dict get $response type] \
+        [::tjson::json_to_simple [dict get $response body]]
+} -result {200 application/json {{name tcl distance 0} {name tclx distance 1} {name tk distance 2}}}
+
+test search-2 {Punctuation is distinct; no matches is a JSON array} -body {
+    set response [get_search_handler {} {queryStringParameters {q a_c}}]
+    set names [lmap match [::tjson::json_to_simple [dict get $response body]] {dict get $match name}]
+    set empty [get_search_handler {} {queryStringParameters {q unknown}}]
+    list $names [dict get $empty body]
+} -result {{a_c a+c a-c a.c abc} {[]}}
+
+test search-3 {Missing, empty, invalid and oversized queries return 400} -body {
+    set statuses [list [dict get [get_search_handler {} {}] status]]
+    foreach query [list {} . .. ../etc {a b} café "abc\n" "a\u0000b" [string repeat a 256]] {
+        lappend statuses [dict get [get_search_handler {} [dict create queryStringParameters [dict create q $query]]] status]
+    }
+    lsort -unique $statuses
+} -result 400
+
+test search-4 {Requests reuse the index even after the registry disappears} -body {
+    file delete -force $search_fixture
+    ::tjson::json_to_simple [dict get [get_search_handler {} {queryStringParameters {q tcl}}] body]
+} -result {{name tcl distance 0} {name tclx distance 1} {name tk distance 2}}
+
+test search-5 {Missing registry fails initialization} -body {
+    ::recipe_search::init $search_fixture
+} -returnCodes error -result {Search registry directory does not exist}
+
+::recipe_search::index destroy
+rename ::recipe_search::original_index ::recipe_search::index

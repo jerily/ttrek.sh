@@ -13,7 +13,8 @@
     "tsession-dynamodb": "^1.0.0",
     "tcl": "^9.1.0",
     "jinja2-tcl": "^0.1.0",
-    "thread": "^3.0.7"
+    "thread": "^3.0.7",
+    "ttrie": "=0.1.1"
   },
   "devDependencies": {}
 }

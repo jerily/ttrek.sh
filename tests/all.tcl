@@ -21,6 +21,10 @@ namespace eval ::twebserver {
     proc add_middleware {args} {}
     proc add_route {args} {}
     proc get_path_param {request name} {return [dict get $request pathParameters $name]}
+    proc get_query_param {request name} {
+        if {[dict exists $request queryStringParameters $name]} {return [dict get $request queryStringParameters $name]}
+        error "query parameter not found"
+    }
     proc base64_encode {value} {binary encode base64 $value}
     proc build_response {args} {
         if {[lindex $args 0] eq "-return_file"} {
@@ -38,6 +42,8 @@ namespace eval ::treqmon {proc init_middleware {config} {}}
 source [file join $root tcl init-thread.tcl]
 proc telemetry_event_common {args} {}
 proc telemetry_sql {args} {return $::test_stats}
+
+source [file join $root tests search.test]
 
 # Stub only AWS calls; retain the real distribution handler and key selection.
 rename ::aws::s3::create ::aws::s3::real_create

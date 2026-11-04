@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Start a disposable copy of the app against an isolated local Valkey server."""
 import base64
+import json
 import os
 from pathlib import Path
 import shutil
@@ -63,6 +64,10 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
         shutil.copytree(ROOT / name, app / name)
     registry_dir = "package registry"
     shutil.copytree(ROOT / "registry", app / registry_dir, ignore=shutil.ignore_patterns(".git"))
+    # Stable fuzzy-search candidate independent of the pinned registry contents.
+    search_recipe = app / registry_dir / "tclx" / "1.0.0"
+    search_recipe.mkdir(parents=True, exist_ok=True)
+    (search_recipe / "ttrek.json").write_text('{}')
     (app / "build").mkdir()
     (app / "build/install").symlink_to(INSTALL, target_is_directory=True)
     (app / "etc").mkdir()
@@ -124,6 +129,26 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                     if status == 503:
                         assert response.headers["Cache-Control"] == "no-store"
                 print(f"PASS GET {path}: {status}")
+            for query in ("tcl", "tcll", "no-such-recipe-xyz"):
+                with urllib.request.urlopen(f"http://127.0.0.1:{http_port}/registry/search?q={query}", timeout=5) as response:
+                    matches = json.load(response)
+                    assert response.headers.get_content_type() == "application/json"
+                    assert matches == sorted(matches, key=lambda match: (match["distance"], match["name"]))
+                    assert all(0 <= match["distance"] <= 2 for match in matches)
+                    if query == "tcl":
+                        assert matches[0] == {"name": "tcl", "distance": 0}
+                        assert {"name": "tclx", "distance": 1} in matches
+                    elif query == "tcll":
+                        assert {"name": "tcl", "distance": 1} in matches
+                    else:
+                        assert matches == []
+                print(f"PASS recipe search: {query}")
+            for suffix in ("", "?q=", "?q=..%2Fetc", "?q=" + "a" * 256):
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{http_port}/registry/search{suffix}", timeout=5)
+                    raise AssertionError("Expected invalid search to return 400")
+                except urllib.error.HTTPError as response:
+                    assert response.code == 400
             if mode == "LOCAL":
                 context = ssl.create_default_context(cafile=str(app / "cert.pem"))
                 with urllib.request.urlopen(f"https://localhost:{https_port}/", context=context, timeout=5) as response:
