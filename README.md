@@ -63,19 +63,24 @@ Static Tcl extensions are intended for embedding, not `package require` loading.
 
 ### Recipe search
 
-`GET /registry/search?q=tcl` returns a JSON array of `{ "name": "tcl", "distance": 0 }`
-objects for all recipe names within Levenshtein distance 2, sorted by distance
-then name. Exact matches come first; case and punctuation are preserved.
-No matches returns `[]`. Missing or invalid `q` returns HTTP 400; names accept
-1–255 ASCII letters, digits, `.`, `_`, `+` and `-`, excluding `.` and `..`.
-Encode a literal plus as `%2B` in the query string.
+`GET /registry/search?q=web` returns JSON objects with `name`, `description`, and
+`match`. Ranking: exact name, prefix, substring, literal description, name typo,
+description typo. Ties prefer fewer edits, greater query-trigram coverage, less
+unmatched name text, then name. `distance` is omitted for prefix/substring name
+matches; `coverage` is shared/total unique query trigrams for description hits.
 
-Each worker builds its own [ttrie 0.1.1](https://github.com/jerily/ttrie) index
-from the configured registry at startup. Names must contain a
-`version/ttrek.json` and are indexed once regardless of version count. Requests
-reuse the index without reading recipes. Restart the server after registry
-changes; a missing registry directory fails initialization. `build.sh` installs
-the loadable Tcl extension, linked through Tcl stubs and declared in `ttrek.json`.
+Matching ignores ASCII case. Queries accept 1–255 ASCII letters, digits, spaces,
+`.`, `_`, `+` and `-`, excluding empty queries, `.` and `..`. Encode literal `+`
+as `%2B`. Invalid queries return 400; no matches returns `[]`. Queries of at most
+three characters allow one edit, longer queries two. Description suggestions
+require a shared trigram and a verified substring distance; below three
+characters descriptions match literally.
+
+Each worker builds ttrie 0.1.1 and ttrigrams 0.1.0 indexes at startup. All version
+descriptions are indexed, with one result per package. Description hits display
+the matched text; name hits use the first nonempty description in alphabetical
+order. Missing descriptions are allowed. Requests reuse the snapshot; restart
+after registry edits. `build.sh` installs both extensions using Tcl stubs.
 
 The recipe API returns the selected version's `scripts` object together with
 its dependencies, build instructions, USE flags and patches. Missing scripts

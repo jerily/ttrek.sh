@@ -10,6 +10,7 @@ import ssl
 import subprocess
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 import urllib.error
 
@@ -129,21 +130,36 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                     if status == 503:
                         assert response.headers["Cache-Control"] == "no-store"
                 print(f"PASS GET {path}: {status}")
-            for query in ("tcl", "tcll", "no-such-recipe-xyz"):
-                with urllib.request.urlopen(f"http://127.0.0.1:{http_port}/registry/search?q={query}", timeout=5) as response:
+            cli = Path(os.environ.get("TTREK_SEARCH_BINARY", ROOT.parent / "ttrek/build/ttrek"))
+            tiers = {kind: i for i, kind in enumerate(("exact", "prefix", "substring", "description", "fuzzy", "description-fuzzy"))}
+            for query in ("tcl", "tcll", "web", "compression", "encrytion", "web server", "c++", " WEB ", "no-such-recipe-xyz"):
+                url = f"http://127.0.0.1:{http_port}/registry/search?" + urllib.parse.urlencode({"q": query})
+                with urllib.request.urlopen(url, timeout=5) as response:
                     matches = json.load(response)
                     assert response.headers.get_content_type() == "application/json"
-                    assert matches == sorted(matches, key=lambda match: (match["distance"], match["name"]))
-                    assert all(0 <= match["distance"] <= 2 for match in matches)
-                    if query == "tcl":
-                        assert matches[0] == {"name": "tcl", "distance": 0}
-                        assert {"name": "tclx", "distance": 1} in matches
-                    elif query == "tcll":
-                        assert {"name": "tcl", "distance": 1} in matches
-                    else:
+                    def rank(match):
+                        unmatched = len(match["name"]) - len(query) if match["match"] in ("prefix", "substring") else 0
+                        return (tiers[match["match"]], match.get("distance", 0), -match.get("coverage", 0), unmatched, match["name"])
+                    assert matches == sorted(matches, key=rank)
+                    assert all("description" in match for match in matches)
+                    assert len({match["name"] for match in matches}) == len(matches)
+                    if query == "web":
+                        assert matches[0]["name"] == "twebserver"
+                        assert "web server" in matches[0]["description"]
+                        assert "b" not in {match["name"] for match in matches}
+                    elif query == "tcl":
+                        assert matches[0]["name"] == "tcl" and matches[0]["match"] == "exact"
+                    elif query == "encrytion":
+                        assert any(match["name"] == "tink-tcl" and match["distance"] == 1 for match in matches)
+                    elif query == "no-such-recipe-xyz":
                         assert matches == []
-                print(f"PASS recipe search: {query}")
-            for suffix in ("", "?q=", "?q=..%2Fetc", "?q=" + "a" * 256):
+                    if cli.is_file():
+                        result = subprocess.run([str(cli), "search", "-registry", str(app / registry_dir), query],
+                                                env=env, capture_output=True, text=True, timeout=5, check=True)
+                        rows = [line.partition("\t")[::2] for line in result.stdout.splitlines()]
+                        assert rows == [(match["name"], match["description"]) for match in matches], (query, rows, matches)
+                print(f"PASS recipe search{' and CLI parity' if cli.is_file() else ''}: {query}")
+            for suffix in ("", "?q=", "?q=..%2Fetc", "?q=web&q=server", "?q=%7Bweb%20server%7D", "?q=" + "a" * 256):
                 try:
                     urllib.request.urlopen(f"http://127.0.0.1:{http_port}/registry/search{suffix}", timeout=5)
                     raise AssertionError("Expected invalid search to return 400")

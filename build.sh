@@ -166,6 +166,13 @@ if ! package_installed ttrie; then
     ctest --test-dir "$BUILD_DIR/ttrie-0.1.1" --output-on-failure
 fi
 
+if ! package_installed ttrigrams; then
+    echo "Build ttrigrams 0.1.0 ..."
+    fetch_source ttrigrams-0.1.0 https://github.com/jerily/ttrigrams/releases/download/v0.1.0/ttrigrams-0.1.0.tar.gz
+    tcl_cmake_install ttrigrams-0.1.0
+    ctest --test-dir "$BUILD_DIR/ttrigrams-0.1.0" --output-on-failure
+fi
+
 if ! pkg-config --exact-version=0.5.0 valkey || ! pkg-config --exists valkey_tls; then
     echo "Build libvalkey ..."
     fetch_source libvalkey-0.5.0 https://github.com/valkey-io/libvalkey/archive/refs/tags/0.5.0.tar.gz
