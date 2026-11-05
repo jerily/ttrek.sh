@@ -15,7 +15,8 @@
     "jinja2-tcl": "^0.1.0",
     "thread": "^3.0.7",
     "ttrie": "=0.1.1",
-    "ttrigrams": "=0.1.0"
+    "ttrigrams": "=0.1.0",
+    "topenapi": "^0.1.0"
   },
   "devDependencies": {}
 }

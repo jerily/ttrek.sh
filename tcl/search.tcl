@@ -139,20 +139,29 @@ proc ::recipe_search::search {text} {
 }
 
 proc ::recipe_search::request_query {request} {
-    # Decode the raw query so spaces are not interpreted as Tcl list separators.
-    if {![dict exists $request queryString]} {
-        return [query [::twebserver::get_query_param $request q]]
-    }
+    # Decode raw query text once; preserve repeated values as arrays for validation.
     set values {}
-    foreach pair [split [dict get $request queryString] &] {
-        set separator [string first = $pair]
-        if {$separator < 0} {continue}
-        set key [::twebserver::decode_uri_component [string range $pair 0 [expr {$separator - 1}]] utf-8]
-        if {$key eq "q"} {
-            lappend values [::twebserver::decode_uri_component [string range $pair [expr {$separator + 1}] end] utf-8]
+    if {[dict exists $request queryString]} {
+        foreach pair [split [dict get $request queryString] &] {
+            set separator [string first = $pair]
+            if {$separator < 0} {continue}
+            set key [::twebserver::decode_uri_component [string range $pair 0 [expr {$separator - 1}]] utf-8]
+            if {$key eq "q"} {
+                lappend values [::twebserver::decode_uri_component [string range $pair [expr {$separator + 1}] end] utf-8]
+            }
         }
+    } elseif {[dict exists $request multiValueQueryStringParameters q]} {
+        set values [dict get $request multiValueQueryStringParameters q]
+    } elseif {[dict exists $request queryStringParameters q]} {
+        set values [list [dict get $request queryStringParameters q]]
     }
-    if {[llength $values] != 1} {error "Expected one q parameter"}
+    set input [dict create httpMethod GET]
+    if {[llength $values] == 1} {
+        dict set input queryStringParameters q [lindex $values 0]
+    } elseif {[llength $values] > 1} {
+        dict set input multiValueQueryStringParameters q $values
+    }
+    ::request_validation::check search $input
     return [query [lindex $values 0]]
 }
 

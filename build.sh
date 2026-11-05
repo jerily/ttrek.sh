@@ -159,6 +159,13 @@ package_installed() {
     "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl" "$@" >/dev/null 2>&1
 }
 
+if ! package_installed topenapi; then
+    echo "Build topenapi 0.1.0 ..."
+    fetch_source topenapi-0.1.0 https://github.com/jerily/topenapi/releases/download/v0.1.0/topenapi-0.1.0.tar.gz
+    tcl_cmake_install topenapi-0.1.0
+    ctest --test-dir "$BUILD_DIR/topenapi-0.1.0" --output-on-failure
+fi
+
 if ! package_installed ttrie; then
     echo "Build ttrie 0.1.1 ..."
     fetch_source ttrie-0.1.1 https://github.com/jerily/ttrie/releases/download/v0.1.1/ttrie-0.1.1.tar.gz

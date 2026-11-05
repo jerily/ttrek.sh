@@ -12,6 +12,7 @@ package require treqmon 2.0.0
 source [file join [file dirname [info script]] templates.tcl]
 source [file join [file dirname [info script]] request-monitor.tcl]
 source [file join [file dirname [info script]] releases.tcl]
+source [file join [file dirname [info script]] request-validation.tcl]
 source [file join [file dirname [info script]] search.tcl]
 ::views::init [file join [::twebserver::get_rootdir] www]
 
@@ -99,79 +100,19 @@ proc telemetry_event_common { event_type args } {
 }
 
 proc post_telemetry_collect_handler {ctx req} {
+    if {[catch {
+        set normalized [::request_validation::check telemetry-collect $req]
+    }]} {
+        return [::twebserver::build_response 400 text/plain "Invalid telemetry request"]
+    }
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
-
-    set data [dict get $req body]
-    if { [catch {
-        ::tjson::parse $data data_handle
-    } err] } {
-        return -code error "post_package_handler: ERROR while parsing json\
-            data for \"$package_name\" version \"$package_version\": $err"
-    }
-
-    if { [catch {
-        set action [::tjson::to_simple [::tjson::get_object_item \
-            $data_handle action]]
-    } err] } {
-        return -code error "post_package_handler: ERROR: no action field in\
-            json data for \"$package_name\" version \"$package_version\": $err"
-    }
-    if { $action ne "install" } {
-        return -code error "post_package_handler: ERROR: unsupported action\
-            \"$action\" in\ json data for \"$package_name\" version\
-            \"$package_version\""
-    }
-
-    if { [catch {
-        set outcome [::tjson::to_simple [::tjson::get_object_item \
-            $data_handle outcome]]
-    } err] } {
-        return -code error "post_package_handler: ERROR: no outcome field\
-            for install action in json data for \"$package_name\" version\
-            \"$package_version\": $err"
-    }
-    if { $outcome ni {success failure} } {
-        return -code error "post_package_handler: ERROR: unsupported outcome\
-            \"$outcome\" for install action in json data for \"$package_name\"\
-            version \"$package_version\""
-    }
-
-    set outcome [expr { $outcome eq "success" ? 1 : 0 }]
-
-    if { [catch {
-        set is_toplevel [::tjson::to_simple [::tjson::get_object_item \
-            $data_handle is_toplevel]]
-    } err] } {
-        return -code error "post_package_handler: ERROR: no is_toplevel field\
-            for install action in json data for \"$package_name\" version\
-            \"$package_version\": $err"
-    }
-    if { ![string is boolean -strict $is_toplevel] } {
-        return -code error "post_package_handler: ERROR: unsupported\
-            is_toplevel \"$is_toplevel\" for install action in json data for\
-            \"$package_name\" version \"$package_version\""
-    }
-
-    set is_toplevel [expr { [string is true -strict $is_toplevel] ? 1 : 0 }]
-
-    if { [catch {
-        set os [::tjson::to_simple [::tjson::get_object_item \
-            $data_handle os]]
-    } err] } {
-        return -code error "post_package_handler: ERROR: no os field\
-            for install action in json data for \"$package_name\" version\
-            \"$package_version\": $err"
-    }
-
-    if { [catch {
-        set arch [::tjson::to_simple [::tjson::get_object_item \
-            $data_handle arch]]
-    } err] } {
-        return -code error "post_package_handler: ERROR: no arch field\
-            for install action in json data for \"$package_name\" version\
-            \"$package_version\": $err"
-    }
+    set request_data [::tjson::json_to_simple $normalized]
+    set data [::tjson::json_to_simple [dict get $request_data raw_body]]
+    set outcome [expr {[dict get $data outcome] eq "success" ? 1 : 0}]
+    set is_toplevel [expr {[dict get $data is_toplevel] ? 1 : 0}]
+    set os [dict get $data os]
+    set arch [dict get $data arch]
 
     telemetry_event_common req_pkg_install_event -pkg_name $package_name \
         -pkg_version $package_version -install_outcome $outcome \

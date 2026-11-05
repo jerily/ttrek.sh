@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
     copied_app = app / "app.tcl"
     copied_app.write_text(copied_app.read_text().replace("$server_handle 4433", f"$server_handle {https_port}")
                           .replace("$server_handle 8080", f"$server_handle {http_port}"))
-    for name in ("tcl", "www", "public"):
+    for name in ("tcl", "www", "public", "schemas"):
         shutil.copytree(ROOT / name, app / name)
     registry_dir = "package registry"
     shutil.copytree(ROOT / "registry", app / registry_dir, ignore=shutil.ignore_patterns(".git"))
@@ -165,6 +165,24 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                     raise AssertionError("Expected invalid search to return 400")
                 except urllib.error.HTTPError as response:
                     assert response.code == 400
+            telemetry = {"action": "install", "outcome": "success", "is_toplevel": True,
+                         "os": "Linux", "arch": "x86_64"}
+            for payload, content_type, expected in (
+                (json.dumps(telemetry).encode(), "application/json", 200),
+                (json.dumps(dict(telemetry, is_toplevel="true")).encode(), "application/json", 400),
+                (b"{} trailing", "application/json", 400),
+                (json.dumps(telemetry).encode(), "text/plain", 400),
+            ):
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{http_port}/telemetry/collect/tcl/9.1.0",
+                    data=payload, headers={"Content-Type": content_type}, method="POST")
+                try:
+                    response = urllib.request.urlopen(request, timeout=5)
+                except urllib.error.HTTPError as error:
+                    response = error
+                with response:
+                    assert response.status == expected, (response.status, response.read())
+            print("PASS telemetry request schemas and HTTP 400 errors")
             if mode == "LOCAL":
                 context = ssl.create_default_context(cafile=str(app / "cert.pem"))
                 with urllib.request.urlopen(f"https://localhost:{https_port}/", context=context, timeout=5) as response:
