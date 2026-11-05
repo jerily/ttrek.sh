@@ -51,5 +51,15 @@ test request-validation-4 {Repeated query dictionaries cannot bypass single-quer
     dict get [get_search_handler {} {queryStringParameters {q web} multiValueQueryStringParameters {q {web server}}}] status
 } -result 400
 
+test request-validation-5 {Native binding removes separate JSON parsing from the telemetry handler} -setup {
+    rename ::tjson::json_to_simple ::tjson::saved_json_to_simple
+    proc ::tjson::json_to_simple {args} {error "handler must use native bind"}
+} -body {
+    dict get [post_telemetry_collect_handler {} [telemetry_request $valid_telemetry]] status
+} -cleanup {
+    rename ::tjson::json_to_simple {}
+    rename ::tjson::saved_json_to_simple ::tjson::json_to_simple
+} -result 200
+
 rename telemetry_request {}
 unset valid_telemetry

@@ -16,7 +16,9 @@
     "thread": "^3.0.7",
     "ttrie": "=0.1.1",
     "ttrigrams": "=0.1.0",
-    "topenapi": "^0.1.0"
+    "topenapi": "^0.2.0",
+    "tink-tcl": "^20240704.0.1",
+    "tsession": "^1.0.3"
   },
   "devDependencies": {}
 }
