@@ -101,18 +101,18 @@ proc telemetry_event_common { event_type args } {
 
 proc post_telemetry_collect_handler {ctx req} {
     if {[catch {
-        set normalized [::request_validation::check telemetry-collect $req]
+        [::request_validation::validator telemetry-collect] bind [::topenapi::from_twebserver $req] {
+            package_name    {params package_name}
+            package_version {params package_version}
+            outcome         {body outcome}
+            is_toplevel     {body is_toplevel}
+            os              {body os}
+            arch            {body arch}
+        }
     }]} {
         return [::twebserver::build_response 400 text/plain "Invalid telemetry request"]
     }
-    set package_name [::twebserver::get_path_param $req package_name]
-    set package_version [::twebserver::get_path_param $req package_version]
-    set request_data [::tjson::json_to_simple $normalized]
-    set data [::tjson::json_to_simple [dict get $request_data raw_body]]
-    set outcome [expr {[dict get $data outcome] eq "success" ? 1 : 0}]
-    set is_toplevel [expr {[dict get $data is_toplevel] ? 1 : 0}]
-    set os [dict get $data os]
-    set arch [dict get $data arch]
+    set outcome [expr {$outcome eq "success" ? 1 : 0}]
 
     telemetry_event_common req_pkg_install_event -pkg_name $package_name \
         -pkg_version $package_version -install_outcome $outcome \

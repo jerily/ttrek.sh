@@ -160,10 +160,10 @@ package_installed() {
 }
 
 if ! package_installed topenapi; then
-    echo "Build topenapi 0.1.0 ..."
-    fetch_source topenapi-0.1.0 https://github.com/jerily/topenapi/releases/download/v0.1.0/topenapi-0.1.0.tar.gz
-    tcl_cmake_install topenapi-0.1.0
-    ctest --test-dir "$BUILD_DIR/topenapi-0.1.0" --output-on-failure
+    echo "Build topenapi 0.2.0 ..."
+    fetch_source topenapi-0.2.0 https://github.com/jerily/topenapi/releases/download/v0.2.0/topenapi-0.2.0.tar.gz
+    tcl_cmake_install topenapi-0.2.0
+    ctest --test-dir "$BUILD_DIR/topenapi-0.2.0" --output-on-failure
 fi
 
 if ! package_installed ttrie; then

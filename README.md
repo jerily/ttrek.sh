@@ -97,10 +97,13 @@ for offline `ttrek run -package PACKAGE -script NAME` and
 
 ## Request validation
 
-Each worker uses [topenapi](https://github.com/jerily/topenapi) 0.1.0 to cache the
+Each worker uses [topenapi](https://github.com/jerily/topenapi) 0.2.0 to cache the
 inline operation schemas in `schemas/`. Its C adapter normalizes twebserver
-request dictionaries. The build installs the extension with Tcl stubs; restart
-the application after editing schemas.
+request dictionaries. The telemetry handler uses the validator's native `bind`
+command to create typed local variables from explicitly selected path and body
+fields. Validation and field extraction finish before variable assignment; the
+handler does not parse the JSON body a second time. The build installs the
+extension with Tcl stubs; restart the application after editing schemas.
 
 The search endpoint validates a single `q` parameter against `schemas/search.json`
 after URL decoding. Repeated values, invalid characters and oversized queries
@@ -194,6 +197,11 @@ upstream cJSON separately and links it statically into the template extension;
 tjson's private cJSON implementation is not used by jinja2-tcl. The interpreter
 is `build/install/bin/tclsh9.1`; no sibling repository is needed. The build and
 registry use the published tjson 1.0.26 and twebserver 1.47.54 release tags.
+
+`ttrek.json` declares every Tcl extension installed by `build.sh` as a direct
+dependency, including `tink-tcl` 20240704.0.1 and `tsession` 1.0.3. Their native
+libraries remain transitive registry dependencies. Tcl's bundled SQLite package
+comes with the Tcl runtime.
 
 `build.sh` installs the runtime dependencies, including TLS-enabled Valkey and
 `tink-tcl` 20240704.0.1 with Tcl stubs. Tink and RapidJSON patches live in

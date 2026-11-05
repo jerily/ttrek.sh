@@ -1,4 +1,4 @@
-package require topenapi 0.1.0
+package require topenapi 0.2.0
 
 namespace eval ::request_validation {
     variable validators {}
@@ -24,4 +24,9 @@ proc ::request_validation::check {name request} {
         return -code error -errorcode {TTREK REQUEST INVALID} [dict get $result error]
     }
     return $normalized
+}
+
+proc ::request_validation::validator {name} {
+    variable validators
+    return [dict get $validators $name]
 }
