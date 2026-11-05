@@ -3,7 +3,7 @@ package require Tcl 9.1
 set packages $argv
 if {![llength $packages]} {
     set packages {
-        twebserver thread sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
+        twebserver topenapi thread sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
         awss3 awskms awsssm awsdynamodb tconfig::decrypt tconfig::encrypt
         tratelimit treqmon tsession tsession-dynamodb
     }
@@ -18,6 +18,7 @@ foreach name $packages {
                 set version
             }
             tink {package require tink 20240704.0.1}
+            topenapi {package require topenapi 0.1.0}
             ttrie {package require ttrie 0.1.1}
             ttrigrams {package require ttrigrams 0.1.0}
             treqmon {package require treqmon 2.0.0}

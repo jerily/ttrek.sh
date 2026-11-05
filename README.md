@@ -95,6 +95,27 @@ website does not execute them. The CLI saves them with the installed package
 for offline `ttrek run -package PACKAGE -script NAME` and
 `ttrek scripts -package PACKAGE ls|describe` commands.
 
+## Request validation
+
+Each worker uses [topenapi](https://github.com/jerily/topenapi) 0.1.0 to cache the
+inline operation schemas in `schemas/`. Its C adapter normalizes twebserver
+request dictionaries. The build installs the extension with Tcl stubs; restart
+the application after editing schemas.
+
+The search endpoint validates a single `q` parameter against `schemas/search.json`
+after URL decoding. Repeated values, invalid characters and oversized queries
+return HTTP 400. Existing search normalization and ranking remain in the search
+module.
+
+`POST /telemetry/collect/:package_name/:package_version` validates paths, media
+type and body using `schemas/telemetry-collect.json` before recording an event.
+It requires `application/json`, action `install`, outcome `success` or `failure`,
+a JSON boolean `is_toplevel`, and nonempty string `os`/`arch` values of at most
+64 characters. Malformed JSON, missing fields and wrong types return HTTP 400
+with a generic message. Valid requests retain the existing telemetry event and
+HTTP 200 response. Additional body fields are accepted. The CLI already sends
+this typed JSON contract.
+
 ## Binary distributions
 
 `GET /dist/<target>/ttrek` redirects to a signed HTTPS S3 GET URL. Configure the

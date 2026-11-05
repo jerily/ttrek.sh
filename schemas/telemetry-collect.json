@@ -1,0 +1,71 @@
+{
+  "parameters": [
+    {
+      "name": "package_name",
+      "in": "path",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9._+-]+$"
+      }
+    },
+    {
+      "name": "package_version",
+      "in": "path",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255,
+        "pattern": "^[A-Za-z0-9._+-]+$"
+      }
+    }
+  ],
+  "requestBody": {
+    "required": true,
+    "content": {
+      "application/json": {
+        "schema": {
+          "type": "object",
+          "required": [
+            "action",
+            "outcome",
+            "is_toplevel",
+            "os",
+            "arch"
+          ],
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": [
+                "install"
+              ]
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "success",
+                "failure"
+              ]
+            },
+            "is_toplevel": {
+              "type": "boolean"
+            },
+            "os": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "arch": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        }
+      }
+    }
+  }
+}

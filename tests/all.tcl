@@ -44,6 +44,7 @@ proc telemetry_event_common {args} {}
 proc telemetry_sql {args} {return $::test_stats}
 
 source [file join $root tests search.test]
+source [file join $root tests request-validation.test]
 
 # Stub only AWS calls; retain the real distribution handler and key selection.
 rename ::aws::s3::create ::aws::s3::real_create

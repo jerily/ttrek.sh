@@ -1,0 +1,55 @@
+proc telemetry_request {body {type application/json}} {
+    dict create httpMethod POST pathParameters {package_name tcl package_version 9.1.0} \
+        headers [dict create content-type $type] body $body
+}
+set valid_telemetry {{"action":"install","outcome":"success","is_toplevel":true,"os":"Linux","arch":"x86_64"}}
+
+test request-validation-1 {Validated telemetry preserves event arguments} -setup {
+    rename telemetry_event_common telemetry_event_common_original
+    proc telemetry_event_common {args} {set ::validation_event $args}
+} -body {
+    set response [post_telemetry_collect_handler {} [telemetry_request $valid_telemetry]]
+    list [dict get $response status] $validation_event
+} -cleanup {
+    rename telemetry_event_common {}
+    rename telemetry_event_common_original telemetry_event_common
+    unset validation_event
+} -result {200 {req_pkg_install_event -pkg_name tcl -pkg_version 9.1.0 -install_outcome 1 -install_is_toplevel 1 -os Linux -arch x86_64}}
+
+test request-validation-2 {Invalid JSON, types, fields and media types return 400 without an event} -setup {
+    rename telemetry_event_common telemetry_event_common_original
+    proc telemetry_event_common {args} {error "invalid telemetry must not be recorded"}
+} -body {
+    set statuses {}
+    foreach body [list bad "$valid_telemetry trailing" {{}} \
+        [string map {true 1} $valid_telemetry] \
+        [string map {"true" {"true"}} $valid_telemetry] \
+        [string map {success unsupported} $valid_telemetry] \
+        [string map {install delete} $valid_telemetry] \
+        [string map {{"Linux"} 42} $valid_telemetry]] {
+        lappend statuses [dict get [post_telemetry_collect_handler {} [telemetry_request $body]] status]
+    }
+    foreach type {{} text/plain application/xml} {
+        lappend statuses [dict get [post_telemetry_collect_handler {} [telemetry_request $valid_telemetry $type]] status]
+    }
+    set request [telemetry_request $valid_telemetry]
+    dict unset request pathParameters package_version
+    lappend statuses [dict get [post_telemetry_collect_handler {} $request] status]
+    lsort -unique $statuses
+} -cleanup {
+    rename telemetry_event_common {}
+    rename telemetry_event_common_original telemetry_event_common
+} -result 400
+
+test request-validation-3 {A false JSON boolean and a base64 body are accepted} -body {
+    set request [telemetry_request [binary encode base64 [string map {true false} $valid_telemetry]]]
+    dict set request isBase64Encoded 1
+    dict get [post_telemetry_collect_handler {} $request] status
+} -result 200
+
+test request-validation-4 {Repeated query dictionaries cannot bypass single-query validation} -body {
+    dict get [get_search_handler {} {queryStringParameters {q web} multiValueQueryStringParameters {q {web server}}}] status
+} -result 400
+
+rename telemetry_request {}
+unset valid_telemetry
