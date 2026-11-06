@@ -96,9 +96,9 @@ order. Missing descriptions are allowed. Requests reuse the snapshot; restart
 after registry edits. `build.sh` installs both extensions using Tcl stubs.
 
 The recipe API returns the selected version's `scripts` object together with
-its combined dependencies/devDependencies, build instructions, USE flags and patches.
-The version API combines both sections too, allowing recursive development
-dependencies to participate in resolution. Duplicate names across sections are rejected. Missing scripts
+its dependencies, build instructions, USE flags and patches. Both registry
+endpoints omit recipe devDependencies, following npm semantics: development
+dependencies are installed only for the root project. Missing scripts
 are represented as an empty object. Script bodies remain JSON strings; the
 website does not execute them. The CLI saves them with the installed package
 for offline `ttrek run -package PACKAGE -script NAME` and
@@ -230,8 +230,8 @@ Duplicate creation returns 409. Existing-page editing remains available in edit
 mode when `allow_create` is false.
 
 `web-wiki`, `tpersist` and `tpathexp` are runtime dependencies. The local launcher uses Tcllib's `inifile` package to read the creation policy. `twebserver`,
-`tdevops` and `tcllib` are `devDependencies`. The three mocks are transitive
-devDependencies of tdevops; use ttrek with recursive recipe devDependencies support.
+`tdevops` and `tcllib` are `devDependencies`. The three mocks are regular
+dependencies of tdevops and install transitively into this project's prefix.
 `etc/tdevops.tcl` owns the application staging, S3 seeds and local policy. Installed
 tdevops owns packaging, ZIP extraction and service supervision. The project
 exports `package-lambda` with `package` as its short alias; the installed command
