@@ -13,7 +13,7 @@ namespace eval ::site {
     variable connection
 }
 
-foreach module {templates request-monitor releases request-validation search handlers} {
+foreach module {editor templates request-monitor releases request-validation search handlers} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -43,10 +43,19 @@ proc ::site::sync {connection directory} {
 proc ::site::mount {router connection} {
     set store [::web::wiki::create -connection $connection -domain ttrek.sh -title Documentation]
     set templates $::views::templates
+    set settings [config]
+    set allowCreate false
+    if {[dict exists $settings content allow_create]} {set allowCreate [dict get $settings content allow_create]}
+    set editor {}
+    if {[dict exists $settings editor] && [dict get $settings editor] ne {}} {
+        set policy [dict get $settings editor]
+        set editor [list -authorize [list ::site::editor::authorize $policy] \
+            -csrf [list ::site::editor::csrf $policy]]
+    }
     ::web::wiki::mount $router -store $store -prefix /docs \
         -navigation {{Home /} {Documentation /docs} {Packages /packages}} \
-        -config [dict create master_template [dict get $templates docs-master.html.jinja] \
-            templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
+        -config [dict create allow_create $allowCreate master_template [dict get $templates docs-master.html.jinja] \
+            templates [dict create master.html.jinja [dict get $templates master.html.jinja]]] {*}$editor
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {
         $router add $method $pattern [list ::site::invoke $handler $name] -strict true
     }
@@ -87,7 +96,13 @@ proc ::site::dispatch {router request {context {}}} {
         }
         set request $result
     }
-    set response [$router dispatch $request $context]
+    if {[dict exists $settings editor] && [dict get $settings editor] ne {} &&
+        [regexp {^/docs/(_edit/|_new(/|$))} [dict get $request path]] &&
+        ![::site::editor::authorize [dict get $settings editor] $request $context edit /]} {
+        set response [dict create statusCode 401 body {Sign in as admin to edit.} \
+            headers {content-type {text/plain; charset=utf-8} cache-control no-store \
+                www-authenticate {Basic realm="Documentation editor", charset="UTF-8"}}]
+    } else {set response [$router dispatch $request $context]}
     if {[dict exists $settings treqmon]} {
         set response [::treqmon::middleware::leave $context $request $response]
     }

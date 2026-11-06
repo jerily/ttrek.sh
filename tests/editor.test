@@ -1,0 +1,57 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl site.tcl]
+
+proc setup_editor {} {
+    set ::db [::tpersist::db_connect -database :memory: -autobegin 0]
+    ::site::initdb $::db
+    ::site::sync $::db [file join $::root content docs]
+    set ::router [::tpathexp::router]
+    set ::settings [dict create rootdir $::root registry_dir [file join $::root registry] \
+        releases [::app_config::releases {}] content [::app_config::content {content {allow_create true}}]]
+    set ::auth "Basic [binary encode base64 admin:editor-test]"
+}
+proc cleanup_editor {} {$::router destroy; ::tpersist::db_disconnect $::db}
+
+test editor-1 {content configuration cannot enable editing without editor credentials} -setup setup_editor -body {
+    ::site::configure $settings
+    ::site::mount $router $db
+    list [dict get [::site::dispatch $router {method GET path /docs/_new}] statusCode] \
+        [string match {*href="/docs/_new"*} [dict get [::site::dispatch $router {method GET path /docs}] body]]
+} -cleanup cleanup_editor -result {404 0}
+
+test editor-2 {host protects creation and renders the editor assets before saving} -setup setup_editor -body {
+    dict set settings editor {password editor-test csrf_secret 01234567890123456789012345678901}
+    ::site::configure $settings
+    ::site::mount $router $db
+    set denied [::site::dispatch $router {method GET path /docs/_new}]
+    set form [::site::dispatch $router [dict create method GET path /docs/_new headers [dict create authorization $auth]]]
+    set request [dict create method POST path /docs/_new headers [dict create authorization $auth \
+        content-type application/x-www-form-urlencoded] \
+        body {title=New+Guide&markdown=Created+in+the+browser&csrf=01234567890123456789012345678901}]
+    set saved [::site::dispatch $router $request]
+    list [dict get $denied statusCode] [dict get $form statusCode] \
+        [string match {*src="/docs/_assets/markdown-editor.bundle.js"*} [dict get $form body]] \
+        [dict get $saved statusCode] [dict get $saved headers location] \
+        [dict get [::site::dispatch $router $request] statusCode] \
+        [string match {*Created in the browser*} [dict get [::site::dispatch $router {method GET path /docs/new-guide}] body]]
+} -cleanup cleanup_editor -result {401 200 1 303 /docs/new-guide 409 1}
+
+test editor-3 {the content flag disables creation while keeping existing-page editing} -setup setup_editor -body {
+    dict set settings content allow_create false
+    dict set settings editor {password editor-test csrf_secret 01234567890123456789012345678901}
+    ::site::configure $settings
+    ::site::mount $router $db
+    set result {}
+    foreach path {/docs/_new /docs/_edit/getting-started} {
+        lappend result [dict get [::site::dispatch $router \
+            [dict create method GET path $path headers [dict create authorization $auth]]] statusCode]
+    }
+    set result
+} -cleanup cleanup_editor -result {404 200}
+
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

@@ -198,7 +198,36 @@ ttrek sync
 ttrek install -y -registry ../private-ttrek-registry -add-pubreg
 ```
 
-`web-wiki`, `tpersist` and `tpathexp` are runtime dependencies. `twebserver`,
+To enable browser creation in local edit mode, set this in `etc/config.local.ini`:
+
+```ini
+[content]
+allow_create = true
+```
+
+The flag defaults to `false` and must be a boolean. It only permits creation when
+editing is explicitly enabled. For the direct server, set `ENV=LOCAL` and
+`TTREK_EDITOR_PASSWORD`, then run `ttrek run -script edit-direct`. For the local
+Lambda stack, rebuild the ZIP with updated web-wiki, set `TTREK_EDITOR_PASSWORD`,
+and run `ttrek run -script edit-local`. Sign in as **admin** with that password.
+The docs index and page toolbar expose **New page**, using the local Markdown
+editor and the same authorization/CSRF checks as revision saves.
+
+The local launcher reads only this content policy from `etc/config.local.ini`;
+`TTREK_LOCAL_CONFIG` may select another INI. It passes the validated flag to the
+runtime without packaging host configuration or credentials. Local edit mode
+uses `var/docs-lambda.sqlite3`, overridden by `--database FILE`. It seeds the file
+once from the ZIP; all workers share the database and a startup CSRF token.
+Edits and new pages survive restarts. Ordinary `start-local` stays read-only and
+serves its disposable packaged seed. `--database` requires `--edit`.
+
+Browser-created pages have title-derived URLs and revision history in SQLite.
+They do not write source files. Sync preserves them and their containing folders;
+a conflicting source URL fails instead of replacing browser-created content.
+Duplicate creation returns 409. Existing-page editing remains available in edit
+mode when `allow_create` is false.
+
+`web-wiki`, `tpersist` and `tpathexp` are runtime dependencies. The local launcher uses Tcllib's `inifile` package to read the creation policy. `twebserver`,
 `mock-proxy-app`, `mock-lambda-app` and `mock-s3-app` are `devDependencies`.
 The private source checkout supplies the wiki and mock recipes; Git needs access
 to their source repositories. The public source supplies the other packages.
@@ -207,7 +236,7 @@ The **Documentation** navigation link opens `/docs`. Its starter guides live in
 `content/docs/*.md`. The host mounts the wiki with `-store`, `-prefix`,
 `-navigation` and `-config master_template`, following the company-site example.
 Only the shared master template is passed as an additional template, so host
-page names cannot override the wiki's index or item templates. Editing is disabled.
+page names cannot override the wiki's index or item templates. Editing is disabled unless explicitly started in edit mode.
 
 For the direct server, initialize once and import changes explicitly:
 
@@ -322,6 +351,7 @@ All assets are served locally; no template compiler or JavaScript bundler is use
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
+ttrek run tclsh9.1 "$PWD/tests/editor.test"
 python3 tests/installer.py
 python3 tests/runtime-smoke.py
 python3 tests/local-stack.py
@@ -431,13 +461,15 @@ deployment cannot move existing resources between stacks. The cache stack
 creates a new Valkey replication group, so migrate any required Redis data
 before retiring the old cache.
 
+`python3 tests/local-editor.py --zip /path/to/ttrek-sh.zip` verifies configured creation, both Lambda event formats, authentication/CSRF, shared workers, persistence and read-only startup against a freshly packaged local ZIP.
+
 ## Security
 
 ### Surface
 
 Registry metadata and request-monitor statistics are rendered into HTML. The
 application also exposes registry, telemetry and static-file endpoints, a public
-read-only documentation wiki and local mock service endpoints.
+documentation wiki with optional local editing and creation, and local mock service endpoints.
 
 ### Protections
 
@@ -450,7 +482,8 @@ Production Valkey connections require TLS and verify the CA and hostname,
 including reconnects. LOCAL mode can use plain TCP only against localhost.
 
 Wiki content uses `web-wiki`'s bound SQL and safe-mode Markdown rendering. The
-host supplies trusted layout templates and no editor authorization callbacks.
+host supplies trusted layout templates. Explicit local edit mode supplies host-owned
+Basic authentication and CSRF callbacks; creation additionally requires `allow_create`.
 Local launchers bind the mocks to loopback and keep host secrets out of packages.
 
 Template lookup is restricted to the dictionary loaded from the application's
@@ -463,5 +496,5 @@ attributes before JavaScript parses it; it is never inserted as executable scrip
 The existing request-monitor and debug routes have no authentication guard in
 this repository. Apply the deployment's access controls before exposing them.
 The mocks execute trusted local code and do not authenticate callers. They are
-development services. Production wiki editing, shared Lambda persistence and
-deployment configuration remain outside this local integration.
+development services. Production wiki editing and deployment configuration remain outside this local integration.
+Persistent editing databases are supported only by the explicit local edit launcher.
