@@ -68,6 +68,12 @@ proc ::app_config::releases {config} {
     if {[dict exists $config releases]} {
         set settings [dict merge $settings [dict get $config releases]]
     }
+    if {[dict exists $settings endpoint] && [dict get $settings endpoint] ne ""} {
+        if {[mode] ne "LOCAL" ||
+            ![regexp {^http://(127\.0\.0\.1|localhost):[0-9]+$} [dict get $settings endpoint]]} {
+            error "releases.endpoint is only supported for a loopback mock in LOCAL mode"
+        }
+    }
     set bucket [dict get $settings bucket]
     if {$bucket ne ""} {
         if {![regexp {^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$} $bucket]} {

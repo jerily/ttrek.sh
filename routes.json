@@ -1,0 +1,8 @@
+{
+  "lambdaEndpoint": "http://127.0.0.1:3001",
+  "timeoutMs": 30000,
+  "routes": [
+    {"method": "ANY", "path": "/", "function": "ttrek-sh"},
+    {"method": "ANY", "path": "/{proxy+}", "function": "ttrek-sh"}
+  ]
+}

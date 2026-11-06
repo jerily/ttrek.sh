@@ -39,7 +39,11 @@ namespace eval ::twebserver {
 }
 namespace eval ::tratelimit {proc init_middleware {config} {}}
 namespace eval ::treqmon {proc init_middleware {config} {}}
-source [file join $root tcl init-thread.tcl]
+source [file join $root tcl site.tcl]
+proc ::site::config {} {
+    dict merge [dict create rootdir $::test_root] [::twebserver::get_config_dict]
+}
+::site::configure [::site::config]
 proc telemetry_event_common {args} {}
 proc telemetry_sql {args} {return $::test_stats}
 
@@ -162,7 +166,7 @@ proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
     dict size $::views::templates
-} -result 12
+} -result 13
 
 test templates-2 {Index layout and literal clipboard command} -setup {
     set saved_env [array get ::env ENV]

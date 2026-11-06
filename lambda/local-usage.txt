@@ -1,0 +1,22 @@
+Usage: start-local.sh [options]
+       start-lambda.sh|start-proxy.sh|start-s3.sh [options]
+
+  --zip FILE          Packaged site (default: dist/ttrek-sh.zip)
+  --routes FILE       Proxy routes (default: routes.json)
+  --s3-dir DIRECTORY  Public asset and release buckets (default: dist/s3)
+  --state-dir DIR     Disposable service directories (default: var/local)
+  --port PORT         Loopback proxy port (default: 8080)
+  --lambda-port PORT  Loopback Lambda API port (default: 3001)
+  --s3-port PORT      Loopback S3 port (default: 3015)
+  --lambda-workers N  Lambda processes (default: 4)
+  --worker-threads N  Proxy/Lambda HTTP threads (default: 2)
+  --help              Show this help
+
+Run the package script before starting. These services execute trusted local
+code and serve the packaged documentation without browser editing. Runtime
+state and uploaded mock objects are disposable; the archive and source files
+remain unchanged. Stop with Ctrl-C; the supervisor stops all three services.
+
+TTREK_SITE_PREFIX selects installed dependencies. TTREK_SITE_ZIP,
+TTREK_SITE_PORT, TTREK_LAMBDA_PORT and TTREK_LOCAL_DIR supply defaults.
+MOCK_LAMBDA_APP, MOCK_PROXY_APP and MOCK_S3_APP can select package directories.

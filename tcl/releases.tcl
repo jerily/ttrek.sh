@@ -20,10 +20,16 @@ proc ::releases::artifact {target} {
 
 proc ::releases::signed_url {artifact} {
     variable client
-    set settings [dict get [::twebserver::get_config_dict] releases]
+    set settings [dict get [::site::config] releases]
     if {$client eq ""} {
         # One client per worker; the SDK's default provider refreshes role credentials.
-        set client [::aws::s3::create [dict create region [dict get $settings region]]]
+        set client_settings [dict create region [dict get $settings region]]
+        if {[dict exists $settings endpoint] && [dict get $settings endpoint] ne ""} {
+            dict set client_settings endpoint [dict get $settings endpoint]
+            dict set client_settings aws_access_key_id local
+            dict set client_settings aws_secret_access_key local
+        }
+        set client [::aws::s3::create $client_settings]
     }
     set key "$artifact/ttrek"
     if {[dict get $settings prefix] ne ""} {
@@ -32,7 +38,11 @@ proc ::releases::signed_url {artifact} {
     set url [::aws::s3::generate_presigned_url -method GET \
         -expire [dict get $settings url_expiry_seconds] $client [dict get $settings bucket] $key]
     # The SDK can return an empty or unsigned URL when credentials are unavailable.
-    if {![string match {https://*} $url] || [regexp {[\r\n]} $url] ||
+    set valid_origin [string match {https://*} $url]
+    if {[dict exists $settings endpoint] && [dict get $settings endpoint] ne ""} {
+        set valid_origin [string match "[dict get $settings endpoint]/*" $url]
+    }
+    if {!$valid_origin || [regexp {[\r\n]} $url] ||
         ![regexp {[?&]X-Amz-Signature=[0-9a-fA-F]{64}(&|$)} $url]} {
         error "S3 did not return a signed HTTPS URL"
     }

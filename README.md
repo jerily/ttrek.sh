@@ -14,6 +14,13 @@
 - Each worker loads and validates the complete template dictionary at startup.
   Restart the server after editing templates. Missing includes and invalid
   templates fail startup.
+- Documentation uses `web-wiki` at `/docs`, mounted on the host's `tpathexp`
+  router in the same way as `jerily-company-site`. The host supplies its layout
+  and owns the SQLite connection; the package owns its schema, routes and content.
+- Documentation initialization and Markdown imports are explicit maintenance
+  operations. Request workers never import content or create its schema.
+- Direct HTTP and Lambda HTTP events share `tcl/site.tcl`, `tcl/routes.tcl`
+  and `tcl/handlers.tcl`. Mock applications own local HTTP transport and S3 storage.
 - The package registry contains published package specifications independently
   of the website's own dependencies. It lives in
   [jerily/ttrek-registry](https://github.com/jerily/ttrek-registry), included here
@@ -182,11 +189,93 @@ and grants the application task role object-read permissions. The signer needs
 valid AWS credentials. See AWS's
 [presigned URL documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html).
 
-# Build
+# Local documentation and mock stack
 
-Install a C/C++17 toolchain, make, CMake 3.22.1+, pkg-config, git, curl, tar,
-patch, Perl, and the zlib development headers. The same build script installs
-the complete Tcl runtime for local development and CI:
+Install dependencies from this directory:
+
+```sh
+ttrek sync
+ttrek install -y -registry ../private-ttrek-registry -add-pubreg
+```
+
+`web-wiki`, `tpersist` and `tpathexp` are runtime dependencies. `twebserver`,
+`mock-proxy-app`, `mock-lambda-app` and `mock-s3-app` are `devDependencies`.
+The private source checkout supplies the wiki and mock recipes; Git needs access
+to their source repositories. The public source supplies the other packages.
+
+The **Documentation** navigation link opens `/docs`. Its starter guides live in
+`content/docs/*.md`. The host mounts the wiki with `-store`, `-prefix`,
+`-navigation` and `-config master_template`, following the company-site example.
+Only the shared master template is passed as an additional template, so host
+page names cannot override the wiki's index or item templates. Editing is disabled.
+
+For the direct server, initialize once and import changes explicitly:
+
+```sh
+ttrek run -script init-docs
+ttrek run -script sync-docs
+ENV=LOCAL ttrek run -script start-direct
+```
+
+The direct documentation database is `data/docs.sqlite3`. Each worker owns a
+connection with a busy timeout and its own router. Direct serving still uses
+the configured Valkey service and TLS settings described below.
+
+To run the website through all three mocks, without Valkey or AWS:
+
+```sh
+ttrek run -script package -- --local-only
+ttrek run -script start-local
+```
+
+Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor starts:
+
+| Service | Default port | Responsibility |
+| --- | --- | --- |
+| mock-proxy-app | 8080 | Routes HTTP requests to the `ttrek-sh` Lambda function |
+| mock-lambda-app | 3001 | Runs the packaged custom runtime and HTTP event adapter |
+| mock-s3-app | 3015 | Serves public assets and the locally built release executable |
+
+`routes.json` maps `/` and `/{proxy+}` to the function. The Lambda adapter supports
+payloads 1.0 and 2.0, preserves query/body data and returns base64-encoded response
+bytes. Static website assets are fetched from S3 through Lambda, retaining the
+browser's origin and the wiki's content security policy. Wiki-owned assets remain
+owned by the wiki package. Release redirects and checksum metadata use the mock
+S3 endpoint and local credentials. HTTP S3 endpoints are accepted only on loopback
+in LOCAL mode; production signing still requires HTTPS.
+
+Packaging creates `dist/ttrek-sh.zip`, with a fresh documentation database and
+telemetry schema, plus `dist/s3/ttrek-assets` and `dist/s3/ttrek-local` seed buckets.
+It includes installed runtime libraries, templates and public registry recipes;
+it excludes host configuration, TLS keys, Git metadata and working databases.
+The release bucket contains this host's `ttrek` executable, not a published release.
+`--local-only` selects the host ABI; no archive is uploaded or deployed.
+
+The Lambda runtime uses disposable documentation/telemetry database copies and
+per-process request-monitor history. Local mock mode has no Valkey rate limiter.
+Mock object uploads and runtime state are disposable. Repackage after source
+changes and restart the services; serving never rebuilds or imports content.
+
+All services bind to loopback. Custom ports and paths can be passed together:
+
+```sh
+ttrek run -script start-local -- --port 8081 --lambda-port 3002 --s3-port 3016 \
+    --zip /path/to/ttrek-sh.zip --s3-dir /path/to/s3 --state-dir /tmp/ttrek-local
+```
+
+`start-lambda`, `start-proxy` and `start-s3` also run individually with the same
+options. `TTREK_SITE_PREFIX` selects installed dependencies, defaulting to
+`PROJECT_INSTALL_DIR` under ttrek or `ttrek-venv/local`. Ctrl-C stops the supervised
+services and their workers; generated service directories are removed.
+
+The existing `build.sh`/CodeBuild container pipeline predates this local wiki
+integration. It has not been migrated to private package installation or Lambda
+deployment; use the ttrek workflow above to review these local changes.
+
+# Public dependency bootstrap
+
+The older public-only bootstrap requires a C/C++17 toolchain, make, CMake
+3.22.1+, pkg-config, git, curl, tar, patch, Perl and the zlib development headers:
 ```bash
 ./build.sh
 ```
@@ -203,11 +292,11 @@ dependency, including `tink-tcl` 20240704.0.1 and `tsession` 1.0.3. Their native
 libraries remain transitive registry dependencies. Tcl's bundled SQLite package
 comes with the Tcl runtime.
 
-`build.sh` installs the runtime dependencies, including TLS-enabled Valkey and
+`build.sh` installs public runtime dependencies, including TLS-enabled Valkey and
 `tink-tcl` 20240704.0.1 with Tcl stubs. Tink and RapidJSON patches live in
 `registry/tink-cc/2.1.1/`. Completed installs are reused. Set `TTREK_MAKE_THREADS`
-to control parallelism (default: 4). The build checks package loading and a Tink
-encryption round trip before finishing.
+to control parallelism (default: 4). Its final package check now also expects the
+wiki and mock packages; use the ttrek installation above for the complete site.
 
 Configure the Valkey service and `etc/config.ini` before running the application.
 Encrypted configuration additionally requires the configured AWS credentials
@@ -230,14 +319,20 @@ All assets are served locally; no template compiler or JavaScript bundler is use
 ## Validation
 
 ```bash
-LD_LIBRARY_PATH="$PWD/build/install/lib:$PWD/build/install/lib64" build/install/bin/tclsh9.1 tests/runtime-packages.tcl
-LD_LIBRARY_PATH="$PWD/build/install/lib:$PWD/build/install/lib64" build/install/bin/tclsh9.1 tests/all.tcl
-build/install/bin/tclsh9.1 tests/config.test
+ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
+ttrek run tclsh9.1 "$PWD/tests/all.tcl"
+ttrek run tclsh9.1 "$PWD/tests/config.test"
 python3 tests/installer.py
+python3 tests/runtime-smoke.py
+python3 tests/local-stack.py
 ```
 
-`tests/runtime-packages.tcl` checks installed dependencies without service mocks.
-This includes `awss3`; release-handler tests cover target selection, signing
+`tests/runtime-packages.tcl` loads runtime and development packages without starting services.
+`tests/local-stack.py` runs the packaged site through all three installed mock
+services on temporary ports. It checks documentation, HEAD/error behavior,
+S3-backed asset changes, binary objects, signed release downloads and checksums,
+Lambda payload 1.0 query/body handling, an unchanged archive, and shutdown cleanup.
+Package before running this test. Package checks include `awss3`; release-handler tests cover target selection, signing
 arguments, metadata, disabled downloads, invalid requests and signer failures.
 The Python installer test uses mocked platform/download commands and disposable
 homes to verify all supported targets, endpoints, Rosetta detection and overrides;
@@ -341,7 +436,8 @@ before retiring the old cache.
 ### Surface
 
 Registry metadata and request-monitor statistics are rendered into HTML. The
-application also exposes registry, telemetry and static-file endpoints.
+application also exposes registry, telemetry and static-file endpoints, a public
+read-only documentation wiki and local mock service endpoints.
 
 ### Protections
 
@@ -353,6 +449,10 @@ metadata includes an executable checksum; no bucket listing or upload route is e
 Production Valkey connections require TLS and verify the CA and hostname,
 including reconnects. LOCAL mode can use plain TCP only against localhost.
 
+Wiki content uses `web-wiki`'s bound SQL and safe-mode Markdown rendering. The
+host supplies trusted layout templates and no editor authorization callbacks.
+Local launchers bind the mocks to loopback and keep host secrets out of packages.
+
 Template lookup is restricted to the dictionary loaded from the application's
 `www` directory and treqmon's installed templates. jinja2-tcl never evaluates Tcl from templates. Contexts retain
 JSON types, ordinary output is escaped, and chart JSON is escaped into HTML data
@@ -362,3 +462,6 @@ attributes before JavaScript parses it; it is never inserted as executable scrip
 
 The existing request-monitor and debug routes have no authentication guard in
 this repository. Apply the deployment's access controls before exposing them.
+The mocks execute trusted local code and do not authenticate callers. They are
+development services. Production wiki editing, shared Lambda persistence and
+deployment configuration remain outside this local integration.

@@ -66,6 +66,7 @@ set telemetry_thread_id [thread::create thread::wait]
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
     registry_dir [dict get $config registry directory] \
+    docs_database [file normalize [file join $dir data docs.sqlite3]] \
     releases $releases_config \
     gzip on \
     gzip_types [list text/plain application/json] \
@@ -87,7 +88,7 @@ thread::send $telemetry_thread_id [list ::telemetry::init \
     -file [file normalize [file join $dir data telemetry.sqlite3]]]
 
 set init_script "source [file normalize [file join $dir tcl init-thread.tcl]]"
-set server_handle [::twebserver::create_server -with_router $config_dict process_conn $init_script]
+set server_handle [::twebserver::create_server $config_dict process_conn $init_script]
 
 file mkdir [file join $dir certs]
 set ttrek_sh_key [file normalize [file join $dir "certs/key.pem"]]

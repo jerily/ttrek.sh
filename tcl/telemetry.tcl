@@ -92,6 +92,7 @@ proc ::telemetry::init { args } {
     }
 
     sqlite3 db $db_file -fullmutex true
+    db timeout 5000
 
     db eval {
         PRAGMA foreign_keys = ON;

@@ -6,6 +6,8 @@ if {![llength $packages]} {
         twebserver topenapi thread sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
         awss3 awskms awsssm awsdynamodb tconfig::decrypt tconfig::encrypt
         tratelimit treqmon tsession tsession-dynamodb
+        web-wiki tpersist tpathexp cmark_gfm tdbc::sqlite3
+        mock-proxy-app mock-lambda-app mock-s3-app
     }
 }
 set failed 0
