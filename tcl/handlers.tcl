@@ -203,26 +203,6 @@ proc get_package_versions {registry_dir package_name} {
     return [lsort -command compare_versions -decreasing $versions]
 }
 
-proc recipe_dependencies {spec_handle} {
-    set result {}
-    foreach section {dependencies devDependencies} {
-        if {![::tjson::has_object_item $spec_handle $section]} {
-            if {$section eq "dependencies"} {error "dependencies must be an object"}
-            continue
-        }
-        lassign [::tjson::to_typed [::tjson::get_object_item $spec_handle $section]] type dependencies
-        if {$type ne "M"} {error "$section must be an object"}
-        foreach {name requirement} $dependencies {
-            if {$name eq {}} {error "dependency names must not be empty"}
-            if {[dict exists $result $name]} {
-                error "package $name is listed more than once in dependencies/devDependencies; keep it in only one section"
-            }
-            dict set result $name $requirement
-        }
-    }
-    return [list M $result]
-}
-
 proc get_package_version_dependencies {registry_dir package_name version} {
     set deps [list]
     set spec_path [file join $registry_dir $package_name $version ttrek.json]
@@ -240,7 +220,8 @@ proc get_package_version_dependencies {registry_dir package_name version} {
         return -code error "Error while parsing json file for \"$package_name\"\
             version \"$version\": $err"
     }
-    return [recipe_dependencies $spec_handle]
+    set deps_handle [::tjson::get_object_item $spec_handle dependencies]
+    return [::tjson::to_typed $deps_handle]
 }
 
 proc get_latest_version {registry_dir package_name} {
@@ -370,7 +351,8 @@ proc get_package_spec_handler {ctx req} {
         return -code error "Error while parsing json file for \"$package_name\"\
             version \"$package_version\": $err"
     }
-    set deps_typed [recipe_dependencies $spec_handle]
+    set deps_handle [::tjson::get_object_item $spec_handle dependencies]
+    set deps_typed [::tjson::to_typed $deps_handle]
 
     set scripts_typed [list M {}]
     if {[::tjson::has_object_item $spec_handle scripts]} {
