@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+SITE_ROOT=${LAMBDA_TASK_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}
+LD_LIBRARY_PATH="$SITE_ROOT/local/lib:$SITE_ROOT/local/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+TCL_LIBRARY="$SITE_ROOT/local/lib/tcl-runtime"
+export LD_LIBRARY_PATH TCL_LIBRARY
+unset TCLLIBPATH TCL_PACKAGE_PATH
+exec "$SITE_ROOT/local/bin/tclsh" "$SITE_ROOT/lambda/runtime.tcl"

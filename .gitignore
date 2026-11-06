@@ -17,3 +17,4 @@ bundle
 etc/config.local.ini
 
 public/js/chart.umd.js
+var/

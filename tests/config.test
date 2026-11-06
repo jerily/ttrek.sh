@@ -143,6 +143,21 @@ test releases-config-3 {Invalid release settings fail before serving requests} -
     set result
 } -result {1 1 1 1 1 1 1 1}
 
+test releases-config-4 {Mock S3 endpoint is restricted to loopback in LOCAL mode} -body {
+    set result {}
+    foreach {mode endpoint} {
+        LOCAL http://127.0.0.1:3015
+        LOCAL http://localhost:3015
+        PROD http://127.0.0.1:3015
+        LOCAL http://example.com:3015
+        LOCAL http://127.0.0.1:3015/path
+    } {
+        set ::env(ENV) $mode
+        lappend result [catch {::app_config::releases [dict create releases [dict create endpoint $endpoint]]}]
+    }
+    set result
+} -result {0 0 1 1 1}
+
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env
 ::tcltest::removeDirectory config-fixture

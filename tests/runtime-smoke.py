@@ -15,7 +15,7 @@ import urllib.request
 import urllib.error
 
 ROOT = Path(__file__).resolve().parents[1]
-INSTALL = ROOT / "build/install"
+INSTALL = Path(os.environ.get("TTREK_SITE_PREFIX", ROOT / "ttrek-venv/local"))
 VALKEY = os.environ.get("VALKEY_SERVER", "valkey-server")
 
 
@@ -52,6 +52,7 @@ http_port, https_port, valkey_port = ports
 mode = os.environ.get("ENV", "LOCAL")
 assert mode in ("LOCAL", "PROD")
 env = dict(os.environ, AWS_EC2_METADATA_DISABLED="true", ENV=mode)
+env["TTREK_SITE_PREFIX"] = str(INSTALL)
 env["LD_LIBRARY_PATH"] = f"{INSTALL}/lib:{INSTALL}/lib64"
 valkey_process = app_process = None
 with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as temporary:
@@ -61,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
     copied_app = app / "app.tcl"
     copied_app.write_text(copied_app.read_text().replace("$server_handle 4433", f"$server_handle {https_port}")
                           .replace("$server_handle 8080", f"$server_handle {http_port}"))
-    for name in ("tcl", "www", "public", "schemas"):
+    for name in ("tcl", "www", "public", "schemas", "bin", "content"):
         shutil.copytree(ROOT / name, app / name)
     registry_dir = "package registry"
     shutil.copytree(ROOT / "registry", app / registry_dir, ignore=shutil.ignore_patterns(".git"))
@@ -72,9 +73,11 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
     (app / "build").mkdir()
     (app / "build/install").symlink_to(INSTALL, target_is_directory=True)
     (app / "etc").mkdir()
+    subprocess.run([str(app / "bin/docs.sh"), "init"], env=env, check=True)
     with (app / "certificate.log").open("w") as log:
         subprocess.run([
             str(INSTALL / "bin/openssl"), "req", "-x509", "-newkey", "rsa:2048",
+            "-config", "/dev/null",
             "-nodes", "-keyout", str(app / "key.pem"), "-out", str(app / "cert.pem"),
             "-days", "1", "-subj", "/CN=localhost",
             "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1",
@@ -106,6 +109,8 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
             checks = {
                 "/": "http://localhost:8080/init | ENV=LOCAL sh" if mode == "LOCAL" else "https://ttrek.sh/init",
                 "/packages": "jinja2-tcl",
+                "/docs": "Getting started",
+                "/docs/getting-started": "ttrek init -y",
                 "/package/tcl": "9.1.0",
                 "/package/tcl/9.1.0": "tcl@9.1.0",
                 "/package/tjson/1.0.26": "tjson@1.0.26",
