@@ -505,3 +505,19 @@ this repository. Apply the deployment's access controls before exposing them.
 The mocks execute trusted local code and do not authenticate callers. They are
 development services. Production wiki editing and deployment configuration remain outside this local integration.
 Persistent editing databases are supported only by the explicit local edit launcher.
+
+## API Gateway template
+
+```sh
+ttrek install -force -registry ../private-ttrek-registry -add-pubreg tdevops mock-proxy-app
+ttrek run -package tdevops -script generate-api-gateway
+```
+
+This writes `dist/api-gateway.json` from `routes.json`. Deployment defaults live
+under `apiGateway`; the CLI only selects input/output files. The template exposes
+API name, stage, timeout, backend function and `AuthorizerFunction` parameters.
+Authorization starts disabled because `authorizer.function` is empty. Supply an
+existing Lambda name or ARN there, or through the CloudFormation parameter, to
+enable it. `authorizer.excludePaths` lists exact configured paths that stay public
+for every method. Add explicit routes for public pages beneath a protected catch-all.
+The local mock ignores these deployment settings. Template generation does not deploy AWS resources.
