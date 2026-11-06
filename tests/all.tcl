@@ -302,6 +302,34 @@ test registry-4 {Version API reads dependencies from the configured directory} -
         [dict get $versions 2.0.0 tcl]
 } -result {200 {2.0.0 1.0.0} ^9.1.0}
 
+test registry-dev-dependencies-1 {Version and recipe APIs include dev dependencies without changing constraints} -setup {
+    set directory [file join $registry_fixture dev-tool 1.0.0]
+    file mkdir $directory
+    set fp [open [file join $directory ttrek.json] w]
+    puts $fp {{"dependencies":{"tcl":"^9.1.0"},"devDependencies":{"mock":"^0.1.0","conditional":{"version":"^1.0.0","if":"+static"}},"build":{"default":[]}}}
+    close $fp
+} -body {
+    set versions [::tjson::json_to_simple [body [get_package_versions_handler {} {pathParameters {package_name dev-tool}}]]]
+    set recipe [::tjson::json_to_simple [body [get_package_spec_handler {} [dict create pathParameters \
+        {package_name dev-tool package_version 1.0.0 os Linux machine x86_64}]]]]
+    list [expr {[dict get $versions 1.0.0] eq [dict get $recipe dependencies]}] \
+        [dict get $recipe dependencies mock] [dict get $recipe dependencies conditional if]
+} -result {1 ^0.1.0 +static}
+
+test registry-dev-dependencies-2 {Reject duplicate names and malformed dependency sections} -body {
+    set errors {}
+    foreach json {
+        {{"dependencies":{"mock":"^1.0.0"},"devDependencies":{"mock":"^2.0.0"}}}
+        {{"dependencies":{},"devDependencies":[]}}
+        {{"dependencies":{},"devDependencies":null}}
+    } {
+        ::tjson::parse $json dependency_spec
+        lappend errors [catch {recipe_dependencies $dependency_spec}]
+        unset dependency_spec
+    }
+    set errors
+} -result {1 1 1}
+
 test registry-scripts-1 {Recipe API preserves named script bodies exactly} -body {
     set fp [open [file join $registry_fixture demo 1.0.0 ttrek.json]]
     set recipe [::tjson::json_to_simple [read $fp]]

@@ -11,7 +11,8 @@
     "start-proxy": "exec \"$PROJECT_HOME/bin/start-proxy.sh\" \"$@\"",
     "start-s3": "exec \"$PROJECT_HOME/bin/start-s3.sh\" \"$@\"",
     "edit-direct": "exec \"$PROJECT_HOME/run.sh\" -authorize \"$@\"",
-    "edit-local": "exec \"$PROJECT_HOME/bin/start-local.sh\" --edit \"$@\""
+    "edit-local": "exec \"$PROJECT_HOME/bin/start-local.sh\" --edit \"$@\"",
+    "package-lambda": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\""
   },
   "dependencies": {
     "tcl": "^9.1.0",
@@ -19,6 +20,7 @@
     "thread": "^3.0.7",
     "tjson": "^1.0.26",
     "topenapi": "^0.2.0",
+    "tpathexp": "^1.1.0",
     "ttrie": "=0.1.1",
     "ttrigrams": "=0.1.0",
     "valkey-tcl": "^1.0.3",
@@ -27,17 +29,14 @@
     "tratelimit": "^1.0.1",
     "treqmon": "^2.0.0",
     "tsession": "^1.0.3",
+    "tpersist": "^0.1.0",
     "tconfig": "^1.0.0",
     "tsession-dynamodb": "^1.0.0",
-    "web-wiki": "^0.1.0",
-    "tpathexp": "^1.1.0",
-    "tpersist": "^0.1.0"
+    "web-wiki": "^0.1.0"
   },
   "devDependencies": {
+    "tcllib": "^2.0.0",
     "twebserver": "^1.47.54",
-    "mock-lambda-app": "^0.1.0",
-    "mock-proxy-app": "^0.1.0",
-    "mock-s3-app": "^0.1.0",
-    "tcllib": "^2.0.0"
+    "tdevops": "^0.1.0"
   }
 }

@@ -1,0 +1,54 @@
+# Application policy; packaging and service mechanics live in tdevops.
+::tdevops::configure {
+    archive ttrek-sh.zip
+    files {tcl www schemas registry public LICENSE lambda/runtime.tcl lambda/paths.tcl lambda/prepare.tcl}
+    content-collections {docs}
+    prepare lambda/prepare.tcl
+    services {s3 lambda proxy}
+    required-files {lambda/runtime.tcl data/docs.sqlite3}
+    environment {TTREK_SITE_ZIP --zip TTREK_SITE_PORT --port
+        TTREK_LAMBDA_PORT --lambda-port TTREK_LOCAL_DIR --state-dir}
+    editor {password-env TTREK_EDITOR_PASSWORD database var/docs-lambda.sqlite3
+        seed data/docs.sqlite3 database-env TTREK_LOCAL_EDIT_DATABASE csrf-env TTREK_LOCAL_CSRF_SECRET}
+    package-help lambda/package-usage.txt
+    local-help lambda/local-usage.txt
+    local-hook ::project_devops::local
+}
+
+namespace eval ::project_devops {}
+proc ::project_devops::local {options work} {
+    set root $::tdevops::root
+    # Read only the content policy from the checkout's local INI.
+    source [file join $root tcl config.tcl]
+    set contentPolicy [::app_config::content {}]
+    set configPath [file join $root etc config.local.ini]
+    if {[info exists ::env(TTREK_LOCAL_CONFIG)] && $::env(TTREK_LOCAL_CONFIG) ne {}} {
+        set configPath [file normalize $::env(TTREK_LOCAL_CONFIG)]
+        if {![file isfile $configPath]} {error "local configuration does not exist: $configPath"}
+    }
+    if {[file isfile $configPath]} {set contentPolicy [::app_config::content_from_ini $configPath]}
+    set ::env(TTREK_LOCAL_ALLOW_CREATE) [dict get $contentPolicy allow_create]
+    set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $work data]
+    set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:[dict get $options --s3-port]
+    foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.0.0/*/ttrek] {
+        set ::env(TTREK_LOCAL_RELEASE_TARGET) [file tail [file dirname $binary]]
+        set ::env(TTREK_LOCAL_RELEASE_SHA256) [lindex [exec sha256sum $binary] 0]
+        break
+    }
+}
+
+::tdevops::configure {package-hook ::project_devops::seed_s3}
+proc ::project_devops::seed_s3 {options architecture} {
+    set root $::tdevops::root
+    set seed [file normalize [dict get $options --s3-dir]]
+    # Seed data travels beside the archive; it contains public assets and a
+    # local CLI build, never the host configuration or working databases.
+    file mkdir $seed
+    ::tdevops::lambda::copy_tree [file join $root public] [file join $seed ttrek-assets]
+    set cli [auto_execok ttrek]
+    if {$cli eq {}} {error "ttrek is required to seed the local release download"}
+    set target linux-[expr {$architecture eq "x86_64" ? "amd64" : "arm64"}]-glibc
+    set release [file join $seed ttrek-local ttrek 1.0.0 $target]
+    file mkdir $release
+    file copy -force [lindex $cli 0] [file join $release ttrek]
+}
