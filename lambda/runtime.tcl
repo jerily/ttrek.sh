@@ -50,14 +50,29 @@ proc ::site_lambda::initialize {} {
         set dataDirectory $::env(TTREK_LOCAL_RUNTIME_DATA)
     }
     file mkdir $dataDirectory
-    set channel [file tempfile database [file join $dataDirectory ttrek-docs-XXXXXX.sqlite3]]
-    close $channel
-    file copy -force [file join $::siteRoot data docs.sqlite3] $database
+    set editor {}
+    set content [::app_config::content {}]
+    if {[info exists ::env(TTREK_LOCAL_EDIT_DATABASE)] && $::env(TTREK_LOCAL_EDIT_DATABASE) ne {}} {
+        set database $::env(TTREK_LOCAL_EDIT_DATABASE)
+        foreach name {TTREK_EDITOR_PASSWORD TTREK_LOCAL_CSRF_SECRET} {
+            if {![info exists ::env($name)] || $::env($name) eq {}} {error "local editing requires $name"}
+        }
+        if {[string length $::env(TTREK_LOCAL_CSRF_SECRET)] < 32} {error "local editing requires a random CSRF secret"}
+        if {![file isfile $database]} {error "local editing database does not exist: $database"}
+        set editor [dict create password $::env(TTREK_EDITOR_PASSWORD) csrf_secret $::env(TTREK_LOCAL_CSRF_SECRET)]
+        if {[info exists ::env(TTREK_LOCAL_ALLOW_CREATE)]} {
+            set content [::app_config::content [dict create content [dict create allow_create $::env(TTREK_LOCAL_ALLOW_CREATE)]]]
+        }
+    } else {
+        set channel [file tempfile database [file join $dataDirectory ttrek-docs-XXXXXX.sqlite3]]
+        close $channel
+        file copy -force [file join $::siteRoot data docs.sqlite3] $database
+    }
     set channel [file tempfile telemetry [file join $dataDirectory ttrek-telemetry-XXXXXX.sqlite3]]
     close $channel
     file copy -force [file join $::siteRoot data telemetry.sqlite3] $telemetry
     set settings [dict create rootdir $::siteRoot registry_dir [file join $::siteRoot registry] \
-        docs_database $database releases [::app_config::releases {}] \
+        docs_database $database editor $editor content $content releases [::app_config::releases {}] \
         treqmon {store {tsvstore {history_max_events 10000}}}]
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
         set ::env(ENV) LOCAL

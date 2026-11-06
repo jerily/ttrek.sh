@@ -104,3 +104,25 @@ proc ::app_config::releases {config} {
     }
     return $settings
 }
+
+proc ::app_config::content {config} {
+    set allow false
+    if {[dict exists $config content allow_create]} {set allow [dict get $config content allow_create]}
+    if {![string is boolean -strict $allow]} {error "content.allow_create must be a boolean"}
+    return [dict create allow_create $allow]
+}
+
+# The local mock host needs only this public setting, without loading AWS clients.
+proc ::app_config::content_from_ini {path} {
+    package require inifile
+    set comment [::ini::commentchar]
+    set ini {}
+    try {
+        ::ini::commentchar #
+        set ini [::ini::open $path r]
+        return [content [dict create content [dict create allow_create [::ini::value $ini content allow_create false]]]]
+    } finally {
+        if {$ini ne {}} {::ini::close $ini}
+        ::ini::commentchar $comment
+    }
+}

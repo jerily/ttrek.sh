@@ -158,6 +158,35 @@ test releases-config-4 {Mock S3 endpoint is restricted to loopback in LOCAL mode
     set result
 } -result {0 0 1 1 1}
 
+test content-config-1 {creation defaults off and requires an explicit boolean} -body {
+    set result [list [dict get [::app_config::content {}] allow_create]]
+    foreach value {true false 1 0 yes no invalid {}} {
+        lappend result [catch {::app_config::content [dict create content [dict create allow_create $value]]}]
+    }
+    set result
+} -result {false 0 0 0 0 0 0 1 1}
+
+test content-config-2 {local INI loading extracts and validates the content policy} -body {
+    set path [file join $root etc content.ini]
+    set result {}
+    foreach text {{[content]
+# Explicit creation policy
+allow_create = true
+} {[registry]
+directory = registry
+} {[content]
+allow_create = invalid
+}} {
+        set channel [open $path w]
+        puts $channel $text
+        close $channel
+        if {[catch {::app_config::content_from_ini $path} config]} {
+            lappend result invalid
+        } else {lappend result [dict get $config allow_create]}
+    }
+    set result
+} -result {true false invalid}
+
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env
 ::tcltest::removeDirectory config-fixture

@@ -20,13 +20,14 @@ proc ::site_local::options {arguments} {
     set options [dict create --zip [file join $root dist ttrek-sh.zip] \
         --routes [file join $root routes.json] --state-dir [file join $root var local] \
         --port 8080 --lambda-port 3001 --lambda-workers 4 --worker-threads 2 \
-        --s3-port 3015 --s3-dir [file join $root dist s3]]
+        --s3-port 3015 --s3-dir [file join $root dist s3] --edit 0 --database {}]
     foreach {name key} {TTREK_SITE_ZIP --zip TTREK_SITE_PORT --port \
         TTREK_LAMBDA_PORT --lambda-port TTREK_LOCAL_DIR --state-dir} {
         if {[info exists ::env($name)] && $::env($name) ne {}} {dict set options $key $::env($name)}
     }
     for {set i 0} {$i < [llength $arguments]} {incr i} {
         set key [lindex $arguments $i]
+        if {$key eq "--edit"} {dict set options --edit 1; continue}
         if {![dict exists $options $key]} {error "unknown option: $key (see --help)"}
         if {[incr i] >= [llength $arguments]} {error "missing value for $key"}
         dict set options $key [lindex $arguments $i]
@@ -41,7 +42,39 @@ proc ::site_local::options {arguments} {
         if {[dict get $options $key] eq {}} {error "$key cannot be empty"}
         dict set options $key [file normalize [dict get $options $key]]
     }
+    if {[dict get $options --edit]} {
+        if {![info exists ::env(TTREK_EDITOR_PASSWORD)] || $::env(TTREK_EDITOR_PASSWORD) eq {}} {
+            error "--edit requires TTREK_EDITOR_PASSWORD"
+        }
+        if {[dict get $options --database] eq {}} {
+            dict set options --database [file join $root var docs-lambda.sqlite3]
+        }
+        dict set options --database [file normalize [dict get $options --database]]
+    } elseif {[dict get $options --database] ne {}} {error "--database requires --edit"}
     return $options
+}
+
+proc ::site_local::configure_editing {options task} {
+    unset -nocomplain ::env(TTREK_LOCAL_EDIT_DATABASE) ::env(TTREK_LOCAL_CSRF_SECRET)
+    if {![dict get $options --edit]} {return}
+    set database [dict get $options --database]
+    if {![file exists $database]} {
+        file mkdir [file dirname $database]
+        # Seed once, before starting any workers; never replace existing edits.
+        file copy [file join $task data docs.sqlite3] $database
+        file attributes $database -permissions u+rw
+    }
+    if {![file isfile $database] || ![file writable $database]} {
+        error "editing database must be a writable file: $database"
+    }
+    set channel [open /dev/urandom rb]
+    try {set bytes [read $channel 32]} finally {close $channel}
+    if {[string length $bytes] != 32} {error "cannot obtain a random CSRF token"}
+    # The mock runtime passes these settings to every child. Keep secrets in the
+    # process environment rather than writing them into generated configuration.
+    set ::env(TTREK_LOCAL_EDIT_DATABASE) $database
+    set ::env(TTREK_LOCAL_CSRF_SECRET) [binary encode hex $bytes]
+    puts "Local editing database: $database"
 }
 
 proc ::site_local::load_app {mode} {
@@ -109,6 +142,17 @@ proc ::site_local::main {mode arguments} {
         set common [list --host 127.0.0.1 --worker-threads [dict get $options --worker-threads]]
         if {$mode eq "lambda"} {
             extract [dict get $options --zip] [file join $work task]
+            configure_editing $options [file join $work task]
+            # Read only the content policy from the checkout's local INI.
+            source [file join $root tcl config.tcl]
+            set contentPolicy [::app_config::content {}]
+            set configPath [file join $root etc config.local.ini]
+            if {[info exists ::env(TTREK_LOCAL_CONFIG)] && $::env(TTREK_LOCAL_CONFIG) ne {}} {
+                set configPath [file normalize $::env(TTREK_LOCAL_CONFIG)]
+                if {![file isfile $configPath]} {error "local configuration does not exist: $configPath"}
+            }
+            if {[file isfile $configPath]} {set contentPolicy [::app_config::content_from_ini $configPath]}
+            set ::env(TTREK_LOCAL_ALLOW_CREATE) [dict get $contentPolicy allow_create]
             set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $work data]
             set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:[dict get $options --s3-port]
             foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.0.0/*/ttrek] {
