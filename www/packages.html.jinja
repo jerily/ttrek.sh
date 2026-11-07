@@ -1,16 +1,37 @@
-
 {% extends 'master.html.jinja' %}
+{% block body_class %}registry-page{% endblock %}
+{% block home_selected %}{% endblock %}
+{% block packages_selected %} pure-menu-selected{% endblock %}
+{% block styles %}<link rel="stylesheet" href="/css/search.css" />{% endblock %}
 {% block content %}
-    <div class="content-wrapper">
-        <div class="content">
-            <h2 class="content-head is-center">{{ title }}</h2>
-            <ul>
-                {% for package_name in package_names %}
-                    <li>
-                        <a href="/package/{{ package_name|urlencode }}">{{ package_name }}</a>
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
+<main class="registry-main">
+    <header class="registry-intro">
+        <p class="eyebrow">THE TTREK REGISTRY</p>
+        <h1>Find your next dependency.</h1>
+        <p>Tools and libraries for whatever you’re building with Tcl.</p>
+    </header>
+    {% include 'search-form.html.jinja' %}
+    <div class="results-heading">
+        <h2>{% if is_search %}Results for “{{ query }}”{% else %}All packages{% endif %}</h2>
+        <span class="result-count">{{ result_count }} packages</span>
     </div>
+    {% if error %}
+        <div class="empty-results" role="alert"><h2>Let’s try that again.</h2><p>{{ error }}</p></div>
+    {% elif packages %}
+        <div class="package-grid">
+        {% for package in packages %}
+            <article class="package-card">
+                <div class="package-icon" aria-hidden="true">{ }</div>
+                <h2><a href="/package/{{ package.name|urlencode }}">{{ package.name }}</a></h2>
+                <p>{{ package.description if package.description else 'Explore available versions and installation details.' }}</p>
+                {% if package.match_label %}<span class="match-label">{{ package.match_label }}</span>{% endif %}
+            </article>
+        {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-results"><h2>No packages found.</h2><p>Try a shorter name or describe what you need, like “web” or “compression”.</p><a href="/packages">Browse all packages →</a></div>
+    {% endif %}
+    {% if is_search %}<p class="browse-link"><a href="/packages">← Back to all packages</a></p>{% endif %}
+</main>
 {% endblock %}
+{% block scripts %}<script type="module" src="/js/search.js"></script>{% endblock %}

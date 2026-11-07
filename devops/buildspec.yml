@@ -2,66 +2,25 @@ version: 0.2
 
 env:
   shell: bash
+  git-credential-helper: yes
 phases:
-  pre_build:
+  install:
+    on-failure: ABORT
+    runtime-versions:
+      nodejs: 22
+      python: 3.12
     commands:
-      - echo Logging in to Amazon ECR...
-      - aws --version
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/ttrek-app-repo
-      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - dnf install -y gcc gcc-c++ make git patch pkgconf-pkg-config perl tar gzip unzip zip binutils
+      - python3 -m pip install 'cmake>=3.25,<5' 'aws-sam-cli>=1.135,<2'
   build:
     on-failure: ABORT
     commands:
-      - git submodule update --init --recursive -- registry
-      - export APP_NAME=ttrek-app
-      - chmod 755 -R build.sh
-      - mkdir -p ../ttrek-app/artifacts/
-      - cp -R devops/codedeploy-scripts/ ../ttrek-app/artifacts/
-      - cp devops/appspec.yml ../ttrek-app/artifacts/
-      - cp -R . ../ttrek-app/artifacts/ttrek-app
-      - apt-get update && apt-get install build-essential cmake npm pkg-config git curl patch python3 zlib1g-dev -y
-      - ./build.sh
-      - npm ci --ignore-scripts
-      - npm run build
-      - export CURRENT_DIR=`pwd`
-      - export INSTALL_DIR=$CURRENT_DIR/build/install
-      - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
-      # copy dependencies
-      - cp -R build ../ttrek-app/artifacts/ttrek-app/
-      # copy configuration and the generated search index
-      - cp -R etc ../ttrek-app/artifacts/ttrek-app/
-      # Validate and render the Jinja templates before packaging.
-      - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 tests/all.tcl
-      - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 tests/config.test
-      - python3 tests/installer.py
-      - cp -R public ../ttrek-app/artifacts/ttrek-app/
-#      - cp -R certs ../ttrek-app/artifacts/ttrek-app/
-      - ls -la ../ttrek-app/artifacts/ttrek-app/
-      - echo Build started on `date`
-      - echo Building the Docker image...
-      - echo `pwd`
-      - ls -la
-      - cd ../ttrek-app
-      - docker build -t $REPOSITORY_URI:latest -f ../ttrek.sh/Dockerfile .
-      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
-  post_build:
-    commands:
-      - echo Build completed on `date`
-      - echo Pushing the Docker images...
-      - docker push $REPOSITORY_URI:latest
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Writing image definitions file...
-      - printf '[{"name":"%s","imageUri":"%s"}]' $APP_NAME $REPOSITORY_URI:$IMAGE_TAG > $CODEBUILD_SRC_DIR/imagedefinitions.json
-      - |
-        CLUSTER_STATUS=`aws ecs describe-clusters --clusters ttrek-app-Cluster --query "clusters[0].status" --output text`
-
-        if [ "$CLUSTER_STATUS" == "ACTIVE" ]; then
-            echo "TTrek Cluster is ACTIVE. Force new deployment"
-            aws ecs update-service --cluster ttrek-app-Cluster --service TTrekFargateService --force-new-deployment
-        fi
-
-artifacts:
-  files: $CODEBUILD_SRC_DIR/imagedefinitions.json
-  discard-paths: yes
+      - bash devops/build-lambda.sh
+      - >-
+        sam deploy --template-file devops/sam-template.yaml
+        --stack-name "$SAM_STACK_NAME"
+        --s3-bucket "$SAM_ARTIFACT_BUCKET" --s3-prefix lambda/ttrek-sh
+        --region "$AWS_DEFAULT_REGION"
+        --capabilities CAPABILITY_NAMED_IAM
+        --parameter-overrides "FunctionName=$LAMBDA_FUNCTION_NAME" Architecture=x86_64
+        --no-confirm-changeset --no-fail-on-empty-changeset

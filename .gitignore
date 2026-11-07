@@ -13,10 +13,17 @@ ttrek-lock.json
 data
 cache
 node_modules
+__pycache__/
 bundle
 etc/config.local.ini
 
-public/js/chart.umd.js
 var/
 
 /etc/search-index.json
+
+# Generated browser assets (npm run build).
+public/js/chart.umd.js
+public/js/chart.LICENSE.txt
+public/js/chart-color.LICENSE.txt
+public/js/search.js
+public/js/search.LICENSE.txt

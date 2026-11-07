@@ -2,6 +2,7 @@
   "name": "ttrek_sh",
   "version": "1.0.0",
   "scripts": {
+    "build-assets": "cd \"$PROJECT_HOME\" && npm ci --ignore-scripts && npm run build",
     "build-search": "exec \"$PROJECT_HOME/bin/build-search.sh\" \"$@\"",
     "start-direct": "exec \"$PROJECT_HOME/run.sh\" \"$@\"",
     "package": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\"",
@@ -33,6 +34,7 @@
     "web-static-wiki": "^0.1.0"
   },
   "devDependencies": {
+    "trequests": "^1.1.0",
     "tcllib": "^2.0.0",
     "twebserver": "^1.47.54",
     "tdevops": "^0.2.0"

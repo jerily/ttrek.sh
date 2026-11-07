@@ -78,6 +78,10 @@ proc ::site::dispatch {router request {context {}}} {
         set request $result
     }
     set response [$router dispatch $request $context]
+    if {[dict exists $response headers content-type] &&
+        [string match {text/html*} [dict get $response headers content-type]]} {
+        dict set response body [::views::stamp_year [dict get $response body]]
+    }
     if {[dict exists $settings treqmon]} {
         set response [::treqmon::middleware::leave $context $request $response]
     }

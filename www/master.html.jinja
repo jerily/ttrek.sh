@@ -9,13 +9,14 @@
         {% block styles %}{% endblock %}
         <title>{% if pagetitle %}{{ pagetitle }}{% else %}{{ title }} · ttrek{% endif %}</title>
     </head>
-    <body>
+    <body class="{% block body_class %}{% endblock %}">
         <div class="header">
             <div class="home-menu pure-menu pure-menu-horizontal pure-menu-fixed">
-                <a class="pure-menu-heading text-normal" href="/">{% if pagetitle %}{{ pagetitle }}{% else %}ttrek{% endif %}</a>
+                <a class="pure-menu-heading text-normal" href="/">ttrek<span class="brand-dot">.</span></a>
 
                 <ul class="pure-menu-list">
                     <li class="pure-menu-item{% block home_selected %} pure-menu-selected{% endblock %}"><a href="/" class="pure-menu-link">Home</a></li>
+                    <li class="pure-menu-item{% block packages_selected %}{% endblock %}"><a href="/packages" class="pure-menu-link">Packages</a></li>
                     <li class="pure-menu-item{% block docs_selected %}{% endblock %}"><a href="/docs" class="pure-menu-link">Documentation</a></li>
                     <li class="pure-menu-item{% block blog_selected %}{% endblock %}"><a href="/blog" class="pure-menu-link">Blog</a></li>
                 </ul>
@@ -23,7 +24,7 @@
         </div>
         {% block content %}{% endblock %}
         <div class="footer l-box is-center">
-            &#169; 2024 JERILY LTD - View the source code on <a href="https://github.com/jerily/ttrek">github</a>.
+            &#169; <!-- ttrek-current-year --> JERILY LTD · <a href="https://github.com/jerily/ttrek">Source on GitHub</a>
         </div>
         {% block scripts %}
             <script src="/js/clipboard.min.js"></script>

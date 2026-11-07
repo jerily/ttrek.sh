@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ttrek registry and website using the shared tdevops Lambda runtime.
+
+Parameters:
+  FunctionName:
+    Type: String
+    Default: ttrek-sh
+    AllowedPattern: '[A-Za-z0-9_-]{1,54}'
+  Architecture:
+    Type: String
+    Default: x86_64
+    AllowedValues: [x86_64, arm64]
+    Description: Must match the native libraries in the packaged ZIP.
+
+Resources:
+  SiteLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${FunctionName}
+      RetentionInDays: 14
+
+  SiteRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${FunctionName}-execution
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: WriteFunctionLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt SiteLogs.Arn
+
+  SiteApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+
+  SiteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      CodeUri: ../dist/ttrek-sh.zip
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures: [!Ref Architecture]
+      Role: !GetAtt SiteRole.Arn
+      MemorySize: 1024
+      Timeout: 30
+      Environment:
+        Variables:
+          ENV: PROD
+      Events:
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SiteApi
+            Path: /
+            Method: ANY
+            PayloadFormatVersion: '2.0'
+            TimeoutInMillis: 29000
+        Proxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SiteApi
+            Path: /{proxy+}
+            Method: ANY
+            PayloadFormatVersion: '2.0'
+            TimeoutInMillis: 29000
+
+Outputs:
+  SiteUrl:
+    Description: Registry and website HTTP API endpoint.
+    Value: !Sub https://${SiteApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/
+  FunctionArn:
+    Value: !GetAtt SiteFunction.Arn

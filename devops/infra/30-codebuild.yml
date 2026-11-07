@@ -1,184 +1,173 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Compile ttrek, build the registry website and deploy its SAM application.
 
 Parameters:
   S3Prefix:
     Type: String
-    Default: "jerily"
+    Default: jerily
   AppName:
     Type: String
-    Default: "ttrek-app"
+    Default: ttrek-app
   BranchName:
     Type: String
     Default: main
+  TtrekRef:
+    Type: String
+    Default: main
+    Description: ttrek branch, tag or commit containing build-ttrek.sh.
+  PrivateRegistryRef:
+    Type: String
+    Default: main
+  GitHubConnectionArn:
+    Type: String
+    Default: ''
+    Description: Optional AWS CodeConnections GitHub App ARN; otherwise use the account's default GitHub credentials.
+
+  LambdaStackName:
+    Type: String
+    Default: Infra-DevOps-TTREK-Lambda
+  LambdaFunctionName:
+    Type: String
+    Default: ttrek-sh
+    AllowedPattern: '[A-Za-z0-9_-]{1,54}'
+
+Conditions:
+  HasGitHubConnection: !Not [!Equals [!Ref GitHubConnectionArn, '']]
 
 Resources:
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AppName}-CodeBuildRole"
+      RoleName: !Sub ${AppName}-CodeBuildRole
       AssumeRolePolicyDocument:
+        Version: '2012-10-17'
         Statement:
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
-              Service: "codebuild.amazonaws.com"
-      Path: /
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
-
-  CodeBuildPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: CodeBuildPolicy
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Action:
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
-            Effect: Allow
-            Resource:
-              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
-          - Action:
-              - s3:*
-            Effect: Allow
-            Resource:
-              - !Sub arn:aws:s3:::${S3Prefix}-${AppName}
-              - !Sub arn:aws:s3:::${S3Prefix}-${AppName}/*
-          - Effect: Allow
-            Action:
-              - ssm:GetParameter
-              - ssm:GetParameters
-            Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/*"
-          - Effect: Allow
-            Action:
-              - cloudformation:CreateChangeSet
-            Resource:
-              - arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31
-          - Effect: Allow
-            Action:
-              - cloudformation:CreateChangeSet
-              - cloudformation:CreateStack
-              - cloudformation:DeleteStack
-              - cloudformation:DescribeChangeSet
-              - cloudformation:DescribeStackEvents
-              - cloudformation:DescribeStacks
-              - cloudformation:ExecuteChangeSet
-              - cloudformation:GetTemplateSummary
-              - cloudformation:ListStackResources
-              - cloudformation:UpdateStack
-            Resource:
-              - !Sub arn:aws:cloudformation:*:${AWS::AccountId}:stack/*
-              - !Sub arn:aws:cloudformation:*:${AWS::AccountId}:transform/*
-          - Effect: Allow
-            Action:
-              - iam:AttachRolePolicy
-              - iam:DetachRolePolicy
-              - iam:DeleteRolePolicy
-              - iam:GetRolePolicy
-              - iam:PutRolePolicy
-              - iam:GetRole
-              - iam:TagRole
-              - iam:CreateRole
-              - iam:UpdateRole
-              - iam:DeleteRole
-              - iam:PassRole
-            Resource:
-              - !Sub arn:aws:iam::${AWS::AccountId}:role/Infra-DevOps-TTREK-*
-          - Effect: Allow
-            Action:
-              - kms:Encrypt
-              - kms:Decrypt
-              - kms:DescribeKey
-              - kms:CreateGrant
-            Resource:
-              - !Sub arn:aws:kms:*:${AWS::AccountId}:key/*
-              - !Sub arn:aws:kms:*:${AWS::AccountId}:alias/*
-          - Effect: Allow
-            Action:
-              - ec2:CreateNetworkInterface
-              - ec2:CreateSecurityGroup
-              - ec2:DescribeNetworkInterfaces
-              - ec2:DeleteNetworkInterface
-              - ec2:DescribeSecurityGroups
-              - ec2:DescribeSubnets
-              - ec2:DescribeVpcs
-            Resource: "*"
-          - Effect: Allow
-            Action:
-              - ecr:GetAuthorizationToken
-            Resource: "*"
-          - Effect: Allow
-            Action:
-              - ecs:RunTask
-            Resource:
-              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/Infra-DevOps-TTREK-App-EcsTaskDefinition
-          - Effect: Allow
-            Action:
-              - ecs:DescribeClusters
-            Resource:
-              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:cluster/ttrek-app-Cluster
-          - Effect: Allow
-            Action:
-              - ecs:UpdateService
-            Resource:
-              - !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:service/ttrek-app-Cluster/TTrekFargateService
-          - Effect: Allow
-            Action:
-              - ecr:*
-            Resource:
-              - !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/ttrek-app-repo
-      Roles:
-        - !Ref CodeBuildRole
+              Service: codebuild.amazonaws.com
+      Policies:
+        - PolicyName: BuildAndDeployLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - !If
+                - HasGitHubConnection
+                - Effect: Allow
+                  Action: [codeconnections:GetConnection, codeconnections:GetConnectionToken]
+                  Resource: !Ref GitHubConnectionArn
+                - !Ref AWS::NoValue
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/Infra-DevOps-TTREK-Builds:*
+              - Effect: Allow
+                Action: [s3:GetBucketLocation, s3:ListBucket]
+                Resource: !Sub arn:${AWS::Partition}:s3:::${S3Prefix}-${AppName}
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub arn:${AWS::Partition}:s3:::${S3Prefix}-${AppName}/lambda/*
+              - Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStacks
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:ListStackResources
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${LambdaStackName}/*
+              - Effect: Allow
+                Action:
+                  - lambda:CreateFunction
+                  - lambda:DeleteFunction
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                  - lambda:GetPolicy
+                  - lambda:ListTags
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}
+              - Effect: Allow
+                Action: [iam:CreateRole, iam:DeleteRole, iam:GetRole, iam:UpdateAssumeRolePolicy, iam:PutRolePolicy, iam:GetRolePolicy, iam:DeleteRolePolicy, iam:TagRole, iam:UntagRole, iam:ListRolePolicies, iam:ListAttachedRolePolicies]
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-execution
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-execution
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
+              - Effect: Allow
+                Action: [apigateway:GET, apigateway:POST, apigateway:PATCH, apigateway:PUT, apigateway:DELETE]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis
+                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/*
+                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/*
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:DeleteLogGroup, logs:PutRetentionPolicy, logs:DeleteRetentionPolicy, logs:TagResource, logs:UntagResource, logs:ListTagsForResource]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${LambdaFunctionName}:*
+              - Effect: Allow
+                Action: logs:DescribeLogGroups
+                Resource: '*'
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: Infra-DevOps-TTREK-Builds
-      ServiceRole: !GetAtt "CodeBuildRole.Arn"
-      ConcurrentBuildLimit: 2
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      ConcurrentBuildLimit: 1
       Artifacts:
-        Type: no_artifacts
+        Type: NO_ARTIFACTS
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_LARGE
-        Image: aws/codebuild/standard:6.0
-        PrivilegedMode: true
+        Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
+        PrivilegedMode: false
         EnvironmentVariables:
-          - Name: AppName
-            Type: PLAINTEXT
-            Value: !Ref AppName
-          - Name: AWS_ACCOUNT_ID
-            Type: PLAINTEXT
-            Value: !Sub ${AWS::AccountId}
-          - Name: AWS_DEFAULT_REGION
-            Type: PLAINTEXT
-            Value: !Sub ${AWS::Region}
-
+          - Name: SAM_STACK_NAME
+            Value: !Ref LambdaStackName
+          - Name: SAM_ARTIFACT_BUCKET
+            Value: !Sub ${S3Prefix}-${AppName}
+          - Name: LAMBDA_FUNCTION_NAME
+            Value: !Ref LambdaFunctionName
       Source:
+        Auth: !If [HasGitHubConnection, {Type: CODECONNECTIONS, Resource: !Ref GitHubConnectionArn}, !Ref AWS::NoValue]
         BuildSpec: devops/buildspec.yml
         Type: GITHUB
         Location: https://github.com/jerily/ttrek.sh.git
-        InsecureSsl: true
         GitCloneDepth: 1
         GitSubmodulesConfig:
           FetchSubmodules: true
         ReportBuildStatus: false
       SourceVersion: !Ref BranchName
+      SecondarySources:
+        - SourceIdentifier: Ttrek
+          Type: GITHUB
+          Auth: !If [HasGitHubConnection, {Type: CODECONNECTIONS, Resource: !Ref GitHubConnectionArn}, !Ref AWS::NoValue]
+          Location: https://github.com/jerily/ttrek.git
+          GitCloneDepth: 1
+        - SourceIdentifier: PrivateRegistry
+          Type: GITHUB
+          Auth: !If [HasGitHubConnection, {Type: CODECONNECTIONS, Resource: !Ref GitHubConnectionArn}, !Ref AWS::NoValue]
+          Location: https://github.com/jerily/private-ttrek-registry.git
+          GitCloneDepth: 1
+      SecondarySourceVersions:
+        - SourceIdentifier: Ttrek
+          SourceVersion: !Ref TtrekRef
+        - SourceIdentifier: PrivateRegistry
+          SourceVersion: !Ref PrivateRegistryRef
       TimeoutInMinutes: 300
-      Cache:
-        Type: S3
-        Location: !Sub ${S3Prefix}-${AppName}/tmp/codebuild-cache
+
 Outputs:
   CodeBuildProject:
     Description: CodeBuild Project ARN
-    Value:
-      Fn::GetAtt:
-        - CodeBuildProject
-        - Arn
+    Value: !GetAtt CodeBuildProject.Arn
     Export:
-      Name:
-        Fn::Sub: ${AWS::StackName}-CodeBuildProject-Arn
-
-
+      Name: !Sub ${AWS::StackName}-CodeBuildProject-Arn

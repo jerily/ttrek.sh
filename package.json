@@ -2,9 +2,13 @@
   "name": "ttrek-sh-assets",
   "private": true,
   "scripts": {
-    "build": "cp node_modules/chart.js/dist/chart.umd.js public/js/chart.umd.js"
+    "build": "rollup --config && cp node_modules/chart.js/dist/chart.umd.js public/js/chart.umd.js && cp node_modules/chart.js/LICENSE.md public/js/chart.LICENSE.txt && cp node_modules/@kurkle/color/LICENSE.md public/js/chart-color.LICENSE.txt && cp node_modules/throttle-debounce/LICENSE.md public/js/search.LICENSE.txt"
   },
   "dependencies": {
-    "chart.js": "4.4.4"
+    "chart.js": "4.4.4",
+    "throttle-debounce": "5.0.2"
+  },
+  "devDependencies": {
+    "rollup": "4.68.0"
   }
 }

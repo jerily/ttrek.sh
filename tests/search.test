@@ -91,6 +91,38 @@ test search-8 {Bad descriptions preserve the artifact and working indexes} -body
     list [lsort -unique $rejected] [expr {$before eq $after}] [lindex [search_names web] 0]
 } -result {1 1 web}
 
+test autocomplete-1 {Suggestions preserve search ranking and return at most eight names and descriptions} -body {
+    set response [get_autocomplete_handler {} {queryStringParameters {q e}}]
+    set matches [::tjson::json_to_simple [dict get $response body]]
+    list [dict get $response status] [dict get $response type] [llength $matches] \
+        [expr {[lmap match $matches {dict get $match name}] eq [lrange [search_names e] 0 7]}] \
+        [dict keys [lindex $matches 0]]
+} -result {200 application/json 8 1 {name description}}
+
+test autocomplete-2 {Validation rejects missing, repeated and invalid queries; no matches stays an array} -body {
+    set statuses {}
+    foreach req [list {} {multiValueQueryStringParameters {q {web tcl}}} \
+        {queryStringParameters {q {}}} {queryStringParameters {q ../etc}}] {
+        lappend statuses [dict get [get_autocomplete_handler {} $req] status]
+    }
+    list $statuses [dict get [get_autocomplete_handler {} {queryStringParameters {q unknown}}] body]
+} -result {{400 400 400 400} {[]}}
+
+test search-page-1 {HTML search renders results and matching descriptions without JavaScript} -body {
+    set response [get_search_page_handler {} {queryStringParameters {q compression}}]
+    set html [dict get $response body]
+    list [dict get $response status] [expr {[string first {href="/package/twebserver"} $html] >= 0}] \
+        [expr {[string first {Compression utilities.} $html] >= 0}] \
+        [expr {[string first {value="compression"} $html] >= 0}]
+} -result {200 1 1 1}
+
+test search-page-2 {Empty results and invalid requests have useful HTML responses} -body {
+    set empty [get_search_page_handler {} {queryStringParameters {q unknown}}]
+    set invalid [get_search_page_handler {} {queryStringParameters {q {<script>}}}]
+    list [dict get $empty status] [expr {[string first {No packages found.} [dict get $empty body]] >= 0}] \
+        [dict get $invalid status] [expr {[string first {<script>} [dict get $invalid body]] < 0}]
+} -result {200 1 400 1}
+
 test search-snapshot-1 {Builds are deterministic and do not change the active index} -body {
     set channel [open $search_snapshot rb]
     set before [read $channel]

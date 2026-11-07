@@ -1,17 +1,25 @@
 
 {% extends 'master.html.jinja' %}
+{% block body_class %}home-page{% endblock %}
+{% block styles %}<link rel="stylesheet" href="/css/search.css" />{% endblock %}
 {% block content %}
 {% include 'bashline.html.jinja' %}
-    <div class="splash-container">
+    <main class="splash-container">
         <div class="splash">
+            <p class="eyebrow">SMALL LANGUAGE. BIG POSSIBILITIES.</p>
             <h1 class="splash-head">{{ title }}</h1>
-            <p class="splash-subhead">The TCL Package Manager</p>
-            <p class="splash-subhead">
-                {{ bashline(install_command, "justify-content: center; color: white;") }}
-            </p>
-            <p class="text-normal">
-                <a href="/packages" class="pure-button pure-button-primary">See all packages</a>
-            </p>
+            <p class="splash-subhead">Your next Tcl project starts here.<br />Discover packages. Install dependencies. Keep building.</p>
+            {% include 'search-form.html.jinja' %}
+            <p class="search-examples">Try <a href="/search?q=web">web</a>, <a href="/search?q=json">json</a> or <a href="/search?q=compression">compression</a><span> · </span><a href="/packages">Browse all packages →</a></p>
+            <div class="install-panel">
+                <p>One command to get started</p>
+                {{ bashline(install_command, "justify-content: center;") }}
+            </div>
         </div>
-    </div>
+    </main>
+{% endblock %}
+{% block scripts %}
+    <script src="/js/clipboard.min.js"></script>
+    <script src="/js/clipboard-init.js" defer></script>
+    <script type="module" src="/js/search.js"></script>
 {% endblock %}

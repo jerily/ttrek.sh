@@ -174,7 +174,7 @@ proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
     dict size $::views::templates
-} -result 14
+} -result 15
 
 test templates-2 {Index layout and literal clipboard command} -setup {
     set saved_env [array get ::env ENV]
@@ -199,8 +199,9 @@ test templates-2-local {LOCAL installer command preserves local mode for the dow
 } -result 1
 
 test templates-3 {Names remain strings; HTML and URL contexts are escaped} -body {
+    set packages [lmap name [list 123 {} {a&"<b>} Καλημέρα] {dict create name $name description {}}]
     set html [::views::render packages.html.jinja [dict create \
-        title {S Packages} package_names [::views::strings [list 123 {} {a&"<b>} Καλημέρα]]]]
+        title {S Packages} packages [::recipe_search::cards $packages]]]
     list [contains $html {>123</a>}] [contains $html {a&amp;&quot;&lt;b&gt;</a>}] \
         [contains $html {/package/a%26%22%3Cb%3E}] [contains $html {Καλημέρα</a>}]
 } -result {1 1 1 1}
@@ -208,8 +209,27 @@ test templates-3 {Names remain strings; HTML and URL contexts are escaped} -body
 test templates-4 {Empty collections stay JSON arrays} -body {
     set json [::tjson::typed_to_json [list M [list names [::views::strings {}] stats [::views::platform_stats {}]]]]
     list [::tjson::json_to_typed $json] \
-        [contains [::views::render packages.html.jinja [dict create title {S Packages} package_names {L {}}]] {href="/package/}]
+        [contains [::views::render packages.html.jinja [dict create title {S Packages} packages {L {}}]] {href="/package/}]
 } -result {{M {names {L {}} stats {L {}}}} 0}
+
+test templates-year {Copyright follows the clock for each render, including a warm worker across New Year} -setup {
+    rename ::clock ::original_clock
+    set test_year 2030
+    proc ::clock {operation args} {
+        if {$operation eq "seconds"} {return [::original_clock scan "$::test_year-01-15"]}
+        ::original_clock $operation {*}$args
+    }
+} -body {
+    set results {}
+    foreach test_year {2030 2031} {
+        lappend results [contains [body [get_index_page_handler {} {}]] "&#169; $test_year JERILY LTD"]
+    }
+    set results
+} -cleanup {
+    rename ::clock {}
+    rename ::original_clock ::clock
+    unset test_year
+} -result {1 1}
 
 test handlers-1 {Package listing comes from the registry} -body {
     contains [body [get_packages_page_handler {} {}]] {href="/package/demo">demo</a>}

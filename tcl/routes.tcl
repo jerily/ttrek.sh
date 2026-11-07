@@ -5,6 +5,7 @@ return {
     GET / get_index_page_handler get_index
     GET /init get_ttrek_init_handler get_ttrek_init
     GET /packages get_packages_page_handler get_packages
+    GET /search get_search_page_handler get_search_page
     GET /:type(css|js|assets)/:path(.*) get_assets_handler get_assets
     GET /dist/:arch/ttrek:ext? get_dist_handler get_dist
     GET /releases/latest/:target get_release_handler get_release
@@ -12,6 +13,7 @@ return {
     GET /package/:package_name/:package_version get_package_version_page_handler get_package_version
     GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler get_package_spec
     GET /registry/search get_search_handler get_search
+    GET /registry/autocomplete get_autocomplete_handler get_autocomplete
     GET /registry/:package_name get_package_versions_handler get_package_versions
     POST /telemetry/register/:environment_id post_telemetry_register_handler post_telemetry_register
     POST /telemetry/collect/:package_name/:package_version post_telemetry_collect_handler post_telemetry_collect

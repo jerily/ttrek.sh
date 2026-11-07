@@ -84,6 +84,14 @@ description typo. Ties prefer fewer edits, greater query-trigram coverage, less
 unmatched name text, then name. `distance` is omitted for prefix/substring name
 matches; `coverage` is shared/total unique query trigrams for description hits.
 
+`GET /registry/autocomplete?q=web` returns up to eight `{name, description}`
+objects with the same ranking and validation. Both endpoints use the loaded build
+snapshot. `GET /search?q=web` renders the full results page; `/packages` browses
+all packages. The home and registry pages share an accessible search form with
+keyboard navigation and a 200 ms `throttle-debounce` throttle. Pending lookups
+are cancelled and stale responses ignored. Normal form submission works without
+JavaScript, including when suggestions are unavailable.
+
 Matching ignores ASCII case. Queries accept 1–255 ASCII letters, digits, spaces,
 `.`, `_`, `+` and `-`, excluding empty queries, `.` and `..`. Encode literal `+`
 as `%2B`. Invalid queries return 400; no matches returns `[]`. Queries of at most
@@ -108,7 +116,7 @@ ttrek run -script build-search -- /path/to/registry
 
 `bin/build-search.tcl ?registry_directory? ?output_file?` defaults to the pinned
 `registry` and `etc/search-index.json` relative to the application root.
-`build.sh` runs it for the pinned registry; CodeBuild copies the artifact into the application.
+`build.sh` and CodeBuild run it for the pinned registry.
 Lambda packaging builds it from the staged registry in `devops/prepare-lambda.tcl`.
 Restart workers after rebuilding, or repackage and restart the local mock stack.
 
@@ -347,9 +355,8 @@ options. `TTREK_SITE_PREFIX` selects installed dependencies, defaulting to
 `PROJECT_INSTALL_DIR` under ttrek or `ttrek-venv/local`. Ctrl-C stops the supervised
 services and their workers; generated service directories are removed.
 
-The existing `build.sh`/CodeBuild container pipeline predates this local wiki
-integration. It has not been migrated to private package installation or Lambda
-deployment; use the ttrek workflow above to review these local changes.
+CodeBuild uses the same ttrek packaging workflow for the SAM Lambda deployment
+described below. The older `build.sh` remains a public dependency bootstrap.
 
 # Public dependency bootstrap
 
@@ -382,18 +389,23 @@ Encrypted configuration additionally requires the configured AWS credentials
 and KMS access. Building the libraries and checking package loading do not
 require AWS credentials.
 
-Build the request-monitor browser asset with Node.js and npm:
+Build browser assets with Node.js 22 and npm (build prerequisites, not ttrek
+runtime dependencies):
 
 ```bash
-npm ci --ignore-scripts
-npm run build
+ttrek run -script build-assets
 ```
 
-This copies the pinned Chart.js UMD distribution to `public/js/chart.umd.js`.
+This named project script runs `npm ci --ignore-scripts` and `npm run build`.
+Rollup bundles `assets/js/search.js` with the pinned `throttle-debounce` package
+into `public/js/search.js`. Chart.js's pinned UMD distribution is copied to
+`public/js/chart.umd.js`; library licenses travel beside the generated files.
+Generated assets and `node_modules` are ignored. All browser assets are served
+locally; Node and npm are not included in the Lambda runtime.
+
 The request-monitor page uses treqmon 2.0.0's Jinja templates and statistics APIs,
-with the website's page layout and local assets. It preserves page-view,
-average-response-time and optional active-user charts for seconds, minutes and hours, including maxima.
-All assets are served locally; no template compiler or JavaScript bundler is used.
+with the website's layout and local Chart.js asset. The host renders the footer
+year from the system clock on each request, including documentation and blog pages.
 
 ## Validation
 
@@ -403,13 +415,13 @@ ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
-python3 tests/installer.py
-python3 tests/runtime-smoke.py
-python3 tests/local-stack.py
+ttrek run tclsh9.1 "$PWD/tests/installer.tcl"
+ttrek run tclsh9.1 "$PWD/tests/runtime-smoke.tcl"
+ttrek run tclsh9.1 "$PWD/tests/local-stack.tcl"
 ```
 
 `tests/runtime-packages.tcl` loads runtime and development packages without starting services.
-`tests/local-stack.py` runs the packaged site through all three installed mock
+`tests/local-stack.tcl` runs the packaged site through all three installed mock
 services on temporary ports. It checks documentation, HEAD/error behavior,
 S3-backed asset changes, binary objects, signed release downloads and checksums,
 Lambda payload 1.0 query/body handling, an unchanged archive, and shutdown cleanup.
@@ -418,7 +430,7 @@ arguments, metadata, disabled downloads, invalid requests and signer failures.
 Config tests cover manifest validation, paths, and exact environment/version
 selection. The local stack test checks that uploaded metadata takes precedence
 over seed hashes and the production section of the manifest.
-The Python installer test uses mocked platform/download commands and disposable
+The Tcl installer test uses mocked platform/download commands and disposable
 homes to verify all supported targets, endpoints, Rosetta detection and overrides;
 it does not download real distributions or modify the user's installation.
 The rendering tests validate all templates and exercise the real request handlers and
@@ -426,11 +438,22 @@ renderer with isolated service fixtures, including empty collections, dependency
 conditions, version ordering, HTML/URL escaping and monitor chart data. They do
 not connect to Valkey, AWS or the telemetry database. CI runs them before packaging.
 
-The optional startup smoke test needs Python 3, a local `valkey-server` executable
+Integration tests use Tcl 9.1 and the development dependency `trequests` 1.1.0
+for HTTP, binary bodies and verified TLS. They need Linux `setsid` and OpenSSL
+for isolated service processes and native checksums.
+
+Optional browser regression checks require Python Playwright and Chromium in
+your test environment. After packaging, run `TTREK_BROWSER_TESTS=1 ttrek run
+tclsh9.1 "$PWD/tests/local-stack.tcl"`. `PLAYWRIGHT_PYTHON` can select that Python
+interpreter. `tests/search_ui.py` is the only Python test. It covers keyboard and pointer selection, throttling,
+out-of-order responses, escaping, network errors, mobile widths and search with
+JavaScript disabled. Browser tooling is not needed to build or run the site.
+
+The optional startup smoke test needs a local `valkey-server` executable
 with TLS support:
 
 ```bash
-VALKEY_SERVER=/path/to/valkey-server python3 tests/runtime-smoke.py
+VALKEY_SERVER=/path/to/valkey-server ttrek run tclsh9.1 "$PWD/tests/runtime-smoke.tcl"
 ```
 
 It launches a disposable copy of the app with an isolated Valkey process, test
@@ -440,7 +463,7 @@ or AWS. Run it with `ENV=LOCAL` and `ENV=PROD` to check both modes.
 
 # Run
 
-After building the dependencies and browser asset, run `ttrek.sh` locally.
+After building the dependencies and browser assets, run `ttrek.sh` locally.
 `run.sh` sets the library search path automatically. `ENV=PROD` (the default)
 loads `etc/config.enc`, or `etc/config.ini` if no encrypted file exists.
 `ENV=LOCAL` loads only `etc/config.local.ini` and forces the Valkey host to
@@ -469,7 +492,7 @@ configuration in ignored `etc/config.local.ini`.
 
 ## Directory layout
 
-- `devops/`: deployment configuration (`appspec.yml`, `buildspec.yml`),
+- `devops/`: deployment configuration (`sam-template.yaml`, `appspec.yml`, `buildspec.yml`),
   CodeDeploy hooks in `codedeploy-scripts/`, and CloudFormation templates and
   launchers in `infra/`.
 - `etc/`: application configuration, proxy/API Gateway routes, release checksums,
@@ -478,37 +501,103 @@ configuration in ignored `etc/config.local.ini`.
 - `bin/`: local command launchers. `tdevops` supplies the shared Lambda runtime;
   `etc/lambda.json` declares the function and `tcl/lambda.tcl` owns app callbacks.
 - `tcl/`: application modules; `www/`: Jinja templates; `schemas/`: request schemas.
-- `content/` and `public/`: authored content and public assets; `registry/`: pinned
+- `assets/js/`: browser source bundled by Rollup; `content/` and `public/`:
+  authored content and public assets; `registry/`: pinned
   package recipes. `build/`, `dist/`, and `var/` contain generated output or state.
 
 ## Infrastructure
 
+`devops/sam-template.yaml` deploys the packaged Tcl Lambda on `provided.al2023`,
+with an HTTP API for `/` and `/{proxy+}`, a scoped logging role, and 14-day log
+retention. `Architecture` must match the native libraries in the ZIP (x86_64 by
+default). Public assets, content, and the built search indexes are included in
+the archive. The existing Lambda adapter keeps telemetry and request-monitor
+state local to each execution environment; it does not use the direct server's
+Valkey configuration or enable production release downloads.
+
 CodeBuild reads `devops/buildspec.yml`, selected by `Source.BuildSpec` in
-`devops/infra/30-codebuild.yml`. Existing CodeBuild projects must update that
-setting before building this layout (redeploy the build stack or set the
-project's buildspec path). See the
-[AWS buildspec reference](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html).
+`devops/infra/30-codebuild.yml`. The AL2023 x86_64 build image matches Lambda's
+native-library ABI. The build:
 
-The source AppSpec lives at `devops/appspec.yml`. The build stages it as
-`artifacts/appspec.yml`, alongside `artifacts/codedeploy-scripts/` and
-`artifacts/ttrek-app/`, preserving its relative hook and application paths.
-For EC2/On-Premises CodeDeploy, archive the contents of `artifacts/` so
-`appspec.yml` is at the revision root, as required by
-[CodeDeploy](https://docs.aws.amazon.com/codedeploy/latest/userguide/application-revisions-appspec-file.html).
-The container build uses the same staged hooks. Source-file locations and bundle
-locations are separate; the ECS build still publishes its container image.
+1. Compiles the `Ttrek` secondary source with its `build-ttrek.sh`.
+2. Uses that binary to install from the private registry (build tools) and the
+   pinned public `registry` submodule (runtime recipes).
+3. Runs the project's asset and search builds, then the application checks.
+4. Packages with tdevops, leaving its AL2023 compatibility check enabled.
+5. Validates and deploys `devops/sam-template.yaml` with SAM.
 
-All deployment scripts use the AWS profile `ttrek-prod-neo`, configured for
-`eu-central-1`. The storage, build and application templates use the `jerily`
-S3 prefix, matching the private release bucket `jerily-ttrek-app`.
+CodeBuild checks out `PrivateRegistry` as a secondary source. Its GitHub
+credentials must permit access to `private-ttrek-registry`, `tdevops` and the
+mock-tool source repositories. The build enables CodeBuild's Git credential
+helper for private recipe downloads. `PrivateRegistryRef` selects the registry
+branch/tag/commit. Node/npm are supplied by the build image, and SAM is installed
+as a build tool. Neither is a ttrek dependency.
 
-For a new environment, run the scripts in `devops/infra/` in numeric order: keys,
-storage, VPC, cache, CodeBuild, then Fargate. `10-deploy-infra-storage.sh` deploys
-`10-infra-storage.yml` (ECR and S3) before `20-deploy-infra-vpc0.sh` deploys
-`20-infra-vpc0.yml` (networking). `25-deploy-infra-cache.sh` then deploys
-`25-infra-cache.yml` (Valkey and its subnet group), importing the VPC's private
-subnet and security group. Build and push the container image before deploying
-Fargate.
+To authenticate the private registry, create an AWS CodeConnections connection
+to GitHub in the build's region and complete the GitHub App installation for the
+`jerily` organization. Grant it access to `ttrek.sh`, `ttrek`,
+`private-ttrek-registry`, `tdevops`, and any private source repositories referenced
+by those recipes, including the mock apps. Finish the connection handshake so
+its status is `AVAILABLE`, then pass its ARN when updating the build stack:
+
+```bash
+aws cloudformation deploy --template-file devops/infra/30-codebuild.yml \
+  --stack-name Infra-DevOps-TTREK-Builds --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides GitHubConnectionArn=arn:aws:codeconnections:eu-central-1:ACCOUNT:connection/ID \
+  --region eu-central-1 --profile ttrek-prod-neo
+```
+
+The template applies that connection to all three GitHub sources and grants the
+build role `codeconnections:GetConnection` and `codeconnections:GetConnectionToken`
+for that ARN. Source credentials apply to the listed repositories. For HTTPS Git
+clones of other private repositories run by recipes, register the same connection
+as CodeBuild's regional default GitHub credential:
+
+```bash
+aws codebuild import-source-credentials --server-type GITHUB \
+  --auth-type CODECONNECTIONS \
+  --token arn:aws:codeconnections:eu-central-1:ACCOUNT:connection/ID \
+  --region eu-central-1 --profile ttrek-prod-neo
+```
+
+This sets the account default for CodeBuild projects in that region. The enabled
+`env.git-credential-helper: yes` supplies credentials to recipe Git clones; no
+token belongs in `ttrek.json`, a clone URL, or the build log.
+If `GitHubConnectionArn` is empty, CodeBuild uses the account's configured default
+GitHub source credentials instead. A private repository requires either setup.
+See [AWS's GitHub App connection instructions](https://docs.aws.amazon.com/codebuild/latest/userguide/connections-github-app.html)
+and [source credential selection](https://docs.aws.amazon.com/codebuild/latest/userguide/multiple-access-tokens.html).
+
+Redeploy `devops/infra/30-codebuild.yml` to apply the source, image, permissions
+and environment changes. `TtrekRef` selects the CLI branch/tag/commit;
+`LambdaStackName` and `LambdaFunctionName` select deployment targets. The existing
+`${S3Prefix}-${AppName}` bucket stores SAM artifacts. CodeBuild deploys only after
+all build commands succeed; it no longer publishes ECR images or updates ECS.
+
+For a manual deployment from an AL2023 build host with dependencies installed:
+
+```bash
+ttrek run -script build-assets
+ttrek run -script package-lambda
+sam validate --lint --template-file devops/sam-template.yaml
+sam deploy --template-file devops/sam-template.yaml \
+  --stack-name Infra-DevOps-TTREK-Lambda \
+  --s3-bucket jerily-ttrek-app --s3-prefix lambda/ttrek-sh \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region eu-central-1 --profile ttrek-prod-neo
+```
+
+Use a normal AL2023 package for AWS; `--local-only` skips the ABI check and is
+only for local tests. This workflow does not rewrite archive execution bits.
+The ZIP produced by the current packager needs executable permissions on
+`bootstrap` and `local/bin/tclsh` before AWS can invoke it; that permission step
+remains caller-managed.
+
+The existing EC2/CodeDeploy and Fargate templates remain under `devops/` for
+those deployments. They are not used by the Lambda build. The source AppSpec
+is `devops/appspec.yml`; a CodeDeploy revision must stage it at the archive root
+alongside `codedeploy-scripts/` and `ttrek-app/`. Existing deployment scripts use
+the `ttrek-prod-neo` profile and `eu-central-1`.
 
 The cache follows the Valkey 8.2 setup with one `cache.t4g.micro` node, TLS
 required, an `appuser` account, and a disabled default user. Set
@@ -581,7 +670,7 @@ attributes before JavaScript parses it; it is never inserted as executable scrip
 The existing request-monitor and debug routes have no authentication guard in
 this repository. Apply the deployment's access controls before exposing them.
 The mocks execute trusted local code and do not authenticate callers. They are
-development services. Deployment configuration remains outside this local integration.
+development services. The SAM API is public; it does not add an authorizer.
 
 ## API Gateway template
 
