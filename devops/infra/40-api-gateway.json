@@ -25,12 +25,6 @@
       "Description": "Existing website Lambda name or ARN",
       "AllowedPattern": "(arn:aws[a-z0-9-]*:lambda:[a-z0-9-]+:[0-9]{12}:function:)?[A-Za-z0-9_-]{1,64}(:[A-Za-z0-9_-]{1,128})?"
     },
-    "AuthorizerFunction": {
-      "Type": "String",
-      "Default": "",
-      "Description": "Authorizer Lambda name or ARN; leave empty to disable authorization",
-      "AllowedPattern": "((arn:aws[a-z0-9-]*:lambda:[a-z0-9-]+:[0-9]{12}:function:)?[A-Za-z0-9_-]{1,64}(:[A-Za-z0-9_-]{1,128})?)?"
-    },
     "DomainName": {
       "Type": "String",
       "Default": "ttrek.sh"
@@ -75,36 +69,6 @@
           ]
         },
         "arn"
-      ]
-    },
-    "AuthorizerFunctionIsArn": {
-      "Fn::Equals": [
-        {
-          "Fn::Select": [
-            0,
-            {
-              "Fn::Split": [
-                ":",
-                {
-                  "Ref": "AuthorizerFunction"
-                }
-              ]
-            }
-          ]
-        },
-        "arn"
-      ]
-    },
-    "UseAuthorizer": {
-      "Fn::Not": [
-        {
-          "Fn::Equals": [
-            {
-              "Ref": "AuthorizerFunction"
-            },
-            ""
-          ]
-        }
       ]
     },
     "UseRoute53": {
@@ -222,80 +186,6 @@
         }
       }
     },
-    "LambdaAuthorizer": {
-      "Type": "AWS::ApiGatewayV2::Authorizer",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "Name": "LambdaAuthorizer",
-        "AuthorizerType": "REQUEST",
-        "AuthorizerUri": {
-          "Fn::Sub": [
-            "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations",
-            {
-              "FunctionArn": {
-                "Fn::If": [
-                  "AuthorizerFunctionIsArn",
-                  {
-                    "Ref": "AuthorizerFunction"
-                  },
-                  {
-                    "Fn::Sub": [
-                      "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}",
-                      {
-                        "FunctionName": {
-                          "Ref": "AuthorizerFunction"
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        "AuthorizerPayloadFormatVersion": "2.0",
-        "IdentitySource": [
-          "$request.header.Authorization"
-        ],
-        "AuthorizerResultTtlInSeconds": 0,
-        "EnableSimpleResponses": false
-      },
-      "Condition": "UseAuthorizer"
-    },
-    "AuthorizerPermission": {
-      "Type": "AWS::Lambda::Permission",
-      "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::If": [
-            "AuthorizerFunctionIsArn",
-            {
-              "Ref": "AuthorizerFunction"
-            },
-            {
-              "Fn::Sub": [
-                "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}",
-                {
-                  "FunctionName": {
-                    "Ref": "AuthorizerFunction"
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        "Principal": "apigateway.amazonaws.com",
-        "SourceAccount": {
-          "Ref": "AWS::AccountId"
-        },
-        "SourceArn": {
-          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/authorizers/${LambdaAuthorizer}"
-        }
-      },
-      "Condition": "UseAuthorizer"
-    },
     "RootRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -303,24 +193,7 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "ANY /",
-        "AuthorizationType": {
-          "Fn::If": [
-            "UseAuthorizer",
-            "CUSTOM",
-            "NONE"
-          ]
-        },
-        "AuthorizerId": {
-          "Fn::If": [
-            "UseAuthorizer",
-            {
-              "Ref": "LambdaAuthorizer"
-            },
-            {
-              "Ref": "AWS::NoValue"
-            }
-          ]
-        },
+        "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
             "/",
@@ -341,24 +214,7 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "ANY /{proxy+}",
-        "AuthorizationType": {
-          "Fn::If": [
-            "UseAuthorizer",
-            "CUSTOM",
-            "NONE"
-          ]
-        },
-        "AuthorizerId": {
-          "Fn::If": [
-            "UseAuthorizer",
-            {
-              "Ref": "LambdaAuthorizer"
-            },
-            {
-              "Ref": "AWS::NoValue"
-            }
-          ]
-        },
+        "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
             "/",

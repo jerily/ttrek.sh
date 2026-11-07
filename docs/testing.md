@@ -68,4 +68,4 @@ configuration isolation, and local counter expiry. `tests/lambda-valkey.tcl` nee
 `valkey-server` with TLS and runs two independent Lambda adapters against a disposable
 cache, checking shared history, cross-process rate limiting, and trusted source-IP
 handling. It uses synthetic credentials and makes no AWS calls. Infrastructure
-validation: `cfn-lint devops/infra/*.yml devops/infra/api-gateway.json devops/sam-template.yaml`.
+validation: `cfn-lint devops/infra/*.yml devops/infra/40-api-gateway.json devops/sam-template.yaml`.
