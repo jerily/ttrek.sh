@@ -41,4 +41,4 @@ by Git. No ACM private key is exported or stored in the repository.
 The existing request-monitor and debug routes have no authentication guard in
 this repository. Apply the deployment's access controls before exposing them.
 The mocks execute trusted local code and do not authenticate callers. They are
-development services. The HTTP API is public by default; its optional authorizer is disabled.
+development services. The website HTTP API is public and has no authorizer.

@@ -3,7 +3,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 HOSTED_ZONE_ID=$("${TCLSH:-tclsh}" "$SCRIPT_DIR/resolve-hosted-zone.tcl")
 aws cloudformation deploy \
-  --template-file "$SCRIPT_DIR/api-gateway.json" \
+  --template-file "$SCRIPT_DIR/40-api-gateway.json" \
   --stack-name Infra-DevOps-TTREK-Api \
   --parameter-overrides \
     "LambdaFunctionName=${LAMBDA_FUNCTION_NAME:-prod-Api-TtrekWebsite-Function}" \

@@ -3,11 +3,7 @@
   "timeoutMs": 30000,
   "apiGateway": {
     "name": "ttrek-sh",
-    "stage": "$default",
-    "authorizer": {
-      "function": "",
-      "excludePaths": []
-    }
+    "stage": "$default"
   },
   "routes": [
     {"method": "ANY", "path": "/", "function": "prod-Api-TtrekWebsite-Function"},

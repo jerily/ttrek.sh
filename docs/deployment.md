@@ -10,7 +10,7 @@ and [binary distributions](releases.md) for release download configuration.
 
 `devops/sam-template.yaml` deploys `prod-Api-TtrekWebsite-Function` on
 `provided.al2023`, with private VPC access, a scoped execution role, and 14-day
-log retention. `devops/infra/api-gateway.json` owns the HTTP API for `/` and
+log retention. `devops/infra/40-api-gateway.json` owns the HTTP API for `/` and
 `/{proxy+}` and its `https://ttrek.sh/` custom domain. SAM does not create a second
 API. `Architecture` must match the native libraries in the ZIP (x86_64 by default).
 
@@ -37,6 +37,8 @@ single point of failure. Shared history is bounded and is not a durable audit lo
 
 Use the same AWS account and region for all stacks. Scripts default to
 `AWS_PROFILE=ttrek-prod-neo` and `AWS_REGION=eu-central-1`; both are overridable.
+Before the first deployment, use an existing administrator profile to install
+the inline group policy described below.
 For a new deployment:
 
 1. Run `devops/infra/00-deploy-infra-keys.sh` and `10-deploy-infra-storage.sh`.
@@ -83,6 +85,46 @@ domains/DNS records must be migrated or imported before creating resources with
 the same names; these templates do not take over unmanaged resources.
 See [ACM CloudFormation DNS validation](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-certificatemanager-certificate.html)
 and [HTTP API custom domains](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-custom-domain-names.html).
+
+### Deployment IAM policy
+
+`devops/infra/00-iam-policy.json` is the inline policy for the existing IAM group
+`ttrek_prod_admin_group`. Before `00-deploy-infra-keys.sh`, run:
+
+```bash
+AWS_PROFILE=admin devops/infra/00-deploy-iam-policy.sh --dry-run
+AWS_PROFILE=admin devops/infra/00-deploy-iam-policy.sh
+```
+
+Replace `admin` with an administrator profile in the deployment account. The
+script resolves its account ID with STS, substitutes the selected region, and
+sets the group's `TTrekInfrastructureDeploy` policy with `iam:PutGroupPolicy`.
+It updates that policy in place; it does not create the group. `--dry-run` prints
+the rendered JSON without changing IAM. The source JSON contains placeholders
+and must be rendered before it is submitted to IAM.
+
+The policy covers the numbered infrastructure deployment scripts: stack change
+sets, KMS keys and aliases, the S3 bucket, isolated VPC, Valkey, ACM/DNS, CodeBuild
+and its role, and the public API's Lambda invocation permission. Most resource
+operations require CloudFormation's [forward access session](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/fas-requests-and-permission-evaluation.html).
+The cache script can read and decrypt only `/ttrek_sh/prod/redis/password`;
+DNS changes are limited to A/CNAME records at `ttrek.sh` and `_*.ttrek.sh`.
+Passing the build role is limited to CodeBuild. The first deployment can create
+the ElastiCache and API Gateway service-linked roles.
+
+This is an infrastructure administrator policy: it uses broader regional access
+through CloudFormation for generated EC2, KMS, ACM and cache resource IDs, and
+the deployer can edit the build role's inline permissions. It is not a permissions
+boundary. Its fixed names match the templates' defaults; adjust it when changing
+the application, bucket, domain or Lambda name. SSM writes, GitHub connection
+setup, starting builds, and manual SAM deployments need separate permissions.
+Stacks must use the caller's credentials, as the supplied scripts do; an existing
+CloudFormation service role needs its own resource permissions.
+
+The rendered default policy is 5,006 characters. IAM allows a combined
+[5,120 characters of inline policies per group](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html).
+The script rejects an oversized document; AWS also enforces the combined limit
+if the group already has other inline policies.
 
 ## Production and local configuration
 
@@ -230,20 +272,17 @@ replacement and preserve needed cache data before updating an existing cache.
 
 ```sh
 ttrek install -force -registry ../private-ttrek-registry -add-pubreg tdevops mock-proxy-app
-ttrek run -package tdevops -script generate-api-gateway
+python3 devops/generate-api-gateway.py
 ```
 
-This writes a generic `dist/api-gateway.json` from `etc/routes.json`, selected by
-`routes` in `etc/tdevops.tcl`. Deployment defaults live
-under `apiGateway`; the CLI only selects input/output files. The template exposes
-API name, stage, timeout, backend function and `AuthorizerFunction` parameters.
-Authorization starts disabled because `authorizer.function` is empty. Supply an
-existing Lambda name or ARN there, or through the CloudFormation parameter, to
-enable it. `authorizer.excludePaths` lists exact configured paths that stay public
-for every method. Add explicit routes for public pages beneath a protected catch-all.
-The local mock ignores these deployment settings. Template generation does not deploy AWS resources.
+The site generator calls tdevops with `etc/routes.json`, selected by `routes` in
+`etc/tdevops.tcl`. It removes the shared generator's optional authorizer and sets
+every route to `AuthorizationType: NONE`. The website has no authorizer parameter,
+resource or permission. Deployment defaults live under `apiGateway`; the template
+exposes API name, stage, timeout and backend function parameters.
 
-Deploy the maintained copy at `devops/infra/api-gateway.json`. It adds the domain,
-certificate selection, root API mapping and optional Route 53 alias to the generated
-base. When routes change, compare the generated template and carry the route and
-integration changes into the maintained copy; do not overwrite its domain resources.
+The generator preserves the deployed logical IDs and the domain, certificate,
+mapping, DNS and related outputs maintained in `devops/infra/40-api-gateway.json`.
+It writes the complete result to `dist/api-gateway.json` and copies it to that
+tracked template. Review the diff before deploying with `40-deploy-api-gateway.sh`.
+The local mock ignores deployment settings. Generation does not deploy AWS resources.
