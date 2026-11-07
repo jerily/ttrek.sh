@@ -66,7 +66,7 @@ try {
     }
     foreach {path expected} {
         /docs {Getting started} /blog {ttrek 1.0.0 is now public}
-        /blog/2026-11-07-ttrek-100-is-now-public {Konstantin Kushnir}
+        /blog/2026-11-07-ttrek-100-is-now-public {Kostiantyn Kushnir}
         /docs/getting-started {ttrek init -y} /docs/registries private-ttrek-registry
         /docs/_assets/style.css .cards /packages tjson /search?q=web twebserver
         /registry/autocomplete?q=web twebserver /package/tcl 9.1.0
