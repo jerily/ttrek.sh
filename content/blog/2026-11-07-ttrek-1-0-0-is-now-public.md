@@ -9,7 +9,7 @@ You can get started at [ttrek.sh](https://ttrek.sh) and explore the code in the
 The team is just one person at the moment: **Neofytos Dimitriou**, ttrek's main
 author. Most of the code was written from scratch, with AI helping in the final
 stretch. Copyright in this work is held by **Neofytos Dimitriou and Jerily LTD**.
-Thank you to **Konstantin Kushnir** for his help in developing ttrek.
+Thank you to **Kostiantyn Kushnir** for his help in developing ttrek.
 
 We look forward to community contributions. Bug reports, testing on different
 platforms, documentation improvements, package recipes, and code contributions
