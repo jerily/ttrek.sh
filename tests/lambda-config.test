@@ -1,0 +1,59 @@
+package require tcltest 2
+package require tconfig::decrypt
+namespace import ::tcltest::test
+source [file join [file dirname [info script]] .. tcl config.tcl]
+source [file join [file dirname [info script]] .. tcl local-ratelimit.tcl]
+set saved_env [array get ::env]
+set root [::tcltest::makeDirectory lambda-config-fixture]
+file mkdir [file join $root etc]
+set prod [file join $root etc config.ini]
+
+test lambda-config-1 {Production fails closed without an encrypted password} -body {
+    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example password plaintext}} $prod
+    ::app_config::validate_lambda_config $prod
+} -returnCodes error -match glob -result {*redis.enc:password*}
+
+test lambda-config-2 {Plaintext password alongside ciphertext is rejected} -body {
+    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy password plaintext}} $prod
+    ::app_config::validate_lambda_config $prod
+} -returnCodes error -match glob -result {*plaintext passwords*}
+
+test lambda-config-3 {Encrypted input is accepted without making a KMS call} -body {
+    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy}} $prod
+    ::app_config::validate_lambda_config $prod
+} -result {}
+
+test lambda-config-4 {Local mode ignores bundled production config and uses the selected local INI} -body {
+    set ::env(ENV) LOCAL
+    set ::env(TTREK_LOCAL_CONFIG) [file join $root etc config.local.ini]
+    ::tconfig::write_config {ratelimit {limit 2 window_millis 1000}} $::env(TTREK_LOCAL_CONFIG)
+    set settings [::app_config::lambda_middleware [::app_config::lambda_config $root]]
+    list [dict keys [dict get $settings tratelimit store]] [dict keys [dict get $settings treqmon store]] \
+        [dict get $settings tratelimit global_limits by_ip limit]
+} -result {localstore tsvstore 2}
+
+test lambda-config-5 {Production requires authenticated TLS for both shared stores} -body {
+    set ::env(ENV) PROD
+    set settings [::app_config::lambda_middleware {redis {host cache.example port 6379 password dummy ssl false}}]
+    set rate [dict get $settings tratelimit store valkeystore]
+    set monitor [dict get $settings treqmon store valkeystore]
+    list [dict get $rate ssl] [dict get $monitor ssl] [dict get $rate host] [dict get $monitor host]
+} -result {true true cache.example cache.example}
+
+test lambda-config-6 {Invalid local limits fail before serving requests} -body {
+    set ::env(ENV) LOCAL
+    ::app_config::lambda_middleware {ratelimit {limit 0}}
+} -returnCodes error -result {ratelimit.limit must be a positive integer}
+
+test lambda-config-7 {Local store counts simultaneous requests and expires the old window} -body {
+    ::tratelimit::middleware::localstore::init {}
+    ::tratelimit::middleware::localstore::add_request test 0 100
+    ::tratelimit::middleware::localstore::add_request test 0 100
+    list [::tratelimit::middleware::localstore::get_requests_made test 0 200] \
+        [::tratelimit::middleware::localstore::get_requests_made test 101 200]
+} -result {2 0}
+
+array unset ::env
+array set ::env $saved_env
+::tcltest::removeDirectory $root
+::tcltest::cleanupTests

@@ -43,7 +43,7 @@ Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor st
 
 | Service | Default port | Responsibility |
 | --- | --- | --- |
-| mock-proxy-app | 8080 | Routes HTTP requests to the `ttrek-sh` Lambda function |
+| mock-proxy-app | 8080 | Routes HTTP requests to the `prod-Api-TtrekWebsite-Function` Lambda function |
 | mock-lambda-app | 3001 | Runs the packaged custom runtime and HTTP event adapter |
 | mock-s3-app | 3015 | Serves public assets and the locally built release executable |
 
@@ -63,7 +63,10 @@ The release bucket contains this host's `ttrek` executable, not a published rele
 `--local-only` selects the host ABI; no archive is uploaded or deployed.
 
 The Lambda runtime uses directory snapshots, a disposable telemetry database and
-per-process request-monitor history. Local mock mode has no Valkey rate limiter.
+per-process request-monitor history and rate limits in memory. Copy
+`etc/config.local.ini.example` to ignored `etc/config.local.ini` to adjust limits;
+`TTREK_LOCAL_CONFIG` selects an alternative host file. Local files are never
+packaged, and local mocks do not load the production config or call AWS.
 Mock object uploads and runtime state are disposable. Repackage after source
 changes and restart the services to load the new snapshots.
 

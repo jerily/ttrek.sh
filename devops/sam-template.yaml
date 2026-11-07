@@ -5,7 +5,7 @@ Description: ttrek registry and website using the shared tdevops Lambda runtime.
 Parameters:
   FunctionName:
     Type: String
-    Default: ttrek-sh
+    Default: prod-Api-TtrekWebsite-Function
     AllowedPattern: '[A-Za-z0-9_-]{1,54}'
   Architecture:
     Type: String
@@ -32,6 +32,20 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
+        - PolicyName: DecryptProductionConfig
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: !ImportValue Infra-DevOps-TTREK-Keys-KMSMasterKeyArn
+        - PolicyName: LambdaVpcAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [ec2:CreateNetworkInterface, ec2:DescribeNetworkInterfaces, ec2:DescribeSubnets, ec2:DeleteNetworkInterface, ec2:AssignPrivateIpAddresses, ec2:UnassignPrivateIpAddresses]
+                Resource: '*'
         - PolicyName: WriteFunctionLogs
           PolicyDocument:
             Version: '2012-10-17'
@@ -39,11 +53,6 @@ Resources:
               - Effect: Allow
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
                 Resource: !GetAtt SiteLogs.Arn
-
-  SiteApi:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      StageName: $default
 
   SiteFunction:
     Type: AWS::Serverless::Function
@@ -56,30 +65,16 @@ Resources:
       Role: !GetAtt SiteRole.Arn
       MemorySize: 1024
       Timeout: 30
+      VpcConfig:
+        SubnetIds:
+          - !ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet1Id
+          - !ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet2Id
+        SecurityGroupIds:
+          - !ImportValue Infra-DevOps-TTREK-Base-LambdaSecurityGroupId
       Environment:
         Variables:
           ENV: PROD
-      Events:
-        Root:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref SiteApi
-            Path: /
-            Method: ANY
-            PayloadFormatVersion: '2.0'
-            TimeoutInMillis: 29000
-        Proxy:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref SiteApi
-            Path: /{proxy+}
-            Method: ANY
-            PayloadFormatVersion: '2.0'
-            TimeoutInMillis: 29000
 
 Outputs:
-  SiteUrl:
-    Description: Registry and website HTTP API endpoint.
-    Value: !Sub https://${SiteApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/
   FunctionArn:
     Value: !GetAtt SiteFunction.Arn

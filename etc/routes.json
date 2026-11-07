@@ -10,7 +10,7 @@
     }
   },
   "routes": [
-    {"method": "ANY", "path": "/", "function": "ttrek-sh"},
-    {"method": "ANY", "path": "/{proxy+}", "function": "ttrek-sh"}
+    {"method": "ANY", "path": "/", "function": "prod-Api-TtrekWebsite-Function"},
+    {"method": "ANY", "path": "/{proxy+}", "function": "prod-Api-TtrekWebsite-Function"}
   ]
 }

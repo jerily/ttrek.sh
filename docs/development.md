@@ -51,7 +51,7 @@
 
 `tdevops` 0.2.0 owns the shared Lambda runtime, packaging and local service supervision; `etc/tdevops.tcl` supplies
 application staging, S3 seeds and release configuration. `etc/lambda.json` selects
-`ttrek-sh`, `tcl/lambda.tcl`, its initializer and request handler. The application
+`prod-Api-TtrekWebsite-Function`, `tcl/lambda.tcl`, its initializer and request handler. The application
 keeps its HTTP event mapping, telemetry and release settings; tdevops supplies the
 bootstrap, Runtime API loop, package-path setup and generated local template.
 There is no app-local `lambda/` directory. `devops/prepare-lambda.tcl` builds the

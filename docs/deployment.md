@@ -8,13 +8,106 @@ and [binary distributions](releases.md) for release download configuration.
 
 ## Lambda and CodeBuild
 
-`devops/sam-template.yaml` deploys the packaged Tcl Lambda on `provided.al2023`,
-with an HTTP API for `/` and `/{proxy+}`, a scoped logging role, and 14-day log
-retention. `Architecture` must match the native libraries in the ZIP (x86_64 by
-default). Public assets, content, and the built search indexes are included in
-the archive. The existing Lambda adapter keeps telemetry and request-monitor
-state local to each execution environment; it does not use the direct server's
-Valkey configuration or enable production release downloads.
+`devops/sam-template.yaml` deploys `prod-Api-TtrekWebsite-Function` on
+`provided.al2023`, with private VPC access, a scoped execution role, and 14-day
+log retention. `devops/infra/api-gateway.json` owns the HTTP API for `/` and
+`/{proxy+}` and its `https://ttrek.sh/` custom domain. SAM does not create a second
+API. `Architecture` must match the native libraries in the ZIP (x86_64 by default).
+
+Production uses TLS Valkey for shared request-monitor history and global per-IP
+rate limits (1000 requests per 10 seconds by default). The adapter uses API
+Gateway's `requestContext.http.sourceIp`, not a caller-supplied forwarded header.
+Download telemetry still uses SQLite in each execution environment, and production
+release downloads remain disabled by the Lambda adapter.
+
+Lambda and Valkey use isolated subnets. There is no NAT gateway, internet gateway,
+public subnet, load balancer or Fargate service. A private KMS interface endpoint
+allows tconfig to decrypt the packaged configuration at startup. Lambda has no
+runtime SSM access: SSM values are resolved by the build outside the VPC. The
+security groups allow Lambda to reach only Valkey on 6379 and KMS on 443. Future
+outbound AWS service calls need matching endpoints and policies; calls to public
+third-party services would need internet egress. API Gateway invocation and
+Lambda's normal stdout/stderr logging do not need a NAT gateway.
+
+The subnets and KMS endpoint span two availability zones. Valkey remains one
+`cache.t4g.micro` node, without a replica or automatic failover; the cache is a
+single point of failure. Shared history is bounded and is not a durable audit log.
+
+## Infrastructure and DNS
+
+Use the same AWS account and region for all stacks. Scripts default to
+`AWS_PROFILE=ttrek-prod-neo` and `AWS_REGION=eu-central-1`; both are overridable.
+For a new deployment:
+
+1. Run `devops/infra/00-deploy-infra-keys.sh` and `10-deploy-infra-storage.sh`.
+2. Run `devops/infra/20-deploy-infra-vpc0.sh`.
+3. Create the SSM password described below, then run `25-deploy-infra-cache.sh`.
+4. Set the SSM cache host to the cache stack's `TTrekValkeyClusterEndpointAddress` output.
+5. Run `15-deploy-infra-certificate.sh` and complete DNS validation.
+6. Deploy `30-codebuild.yml`, then run the build (or use the manual Lambda steps below).
+7. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.
+
+The keys template creates the customer-managed key used by tconfig and the SSM
+password. Key rotation is enabled. `DeletionPolicy` and `UpdateReplacePolicy`
+retain the key, since deleting it would make existing encrypted configuration
+unreadable. The S3 bucket is also retained, blocks public access, and uses SSE-S3.
+The Lambda runtime gets only `kms:Decrypt` on this key; the build gets
+`kms:Encrypt`/`kms:Decrypt` and `ssm:GetParameter` under `/ttrek_sh/prod/`.
+
+`15-infra-certificate.yml` requests an ACM public certificate for `ttrek.sh` using
+DNS validation in the API's region. No personal name, email or country is needed.
+If DNS is in a public Route 53 zone in the same account, set
+`TTREK_HOSTED_ZONE_ID=Z...` for both certificate and API deployment. ACM then adds
+the validation record, and the API stack adds an apex A alias. Otherwise leave
+that variable unset: add ACM's validation CNAME at your DNS provider while the
+certificate stack waits, then point the apex to the API stack's
+`RegionalDomainName` output using your provider's ALIAS/ANAME or CNAME-flattening
+feature. A normal CNAME cannot be used at the zone apex. Keep ACM's validation
+record for renewal. Do not use a fixed IP address for API Gateway.
+
+The API imports `Infra-DevOps-TTREK-Certificate-CertificateArn` by default.
+`TTREK_CERTIFICATE_ARN` can select an already issued certificate in the same
+region instead. The certificate must cover `ttrek.sh` itself. Existing custom
+domains/DNS records must be migrated or imported before creating resources with
+the same names; these templates do not take over unmanaged resources.
+See [ACM CloudFormation DNS validation](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-certificatemanager-certificate.html)
+and [HTTP API custom domains](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-custom-domain-names.html).
+
+## Production and local configuration
+
+You manage the SSM values; none of these scripts creates or updates them.
+`devops/config.prod.ini` is a secret-free input template. tconfig resolves
+`/ttrek_sh/prod/<section>/<key>` and encrypts SecureString values into the generated
+`build/prod/config.ini`. That generated file is copied to `etc/config.ini` inside
+the Lambda ZIP. The build fails if the password is missing, is not encrypted, or
+the cache endpoint is missing. No plaintext secret is committed or printed.
+
+| SSM parameter | Type | Value |
+| --- | --- | --- |
+| `/ttrek_sh/prod/redis/password` | SecureString | Required; 16–128 characters, encrypted with the Keys stack KMS key |
+| `/ttrek_sh/prod/redis/host` | String | Required; cache primary endpoint from stack outputs |
+| `/ttrek_sh/prod/redis/port` | String | Optional; default `6379` |
+| `/ttrek_sh/prod/redis/username` | String | Optional; must match the cache user, currently `appuser` |
+| `/ttrek_sh/prod/redis/ssl_ca_file` | String | Optional; AL2023 default `/etc/pki/tls/certs/ca-bundle.crt` |
+| `/ttrek_sh/prod/ratelimit/window_millis` | String | Optional; default `10000` |
+| `/ttrek_sh/prod/ratelimit/limit` | String | Optional; default `1000` |
+| `/ttrek_sh/prod/request_monitor/history_max_events` | String | Optional; default `100000` |
+
+The cache deployment script reads that same password with decryption and supplies
+the `NoEcho` CloudFormation parameter through a mode-restricted temporary JSON
+file, removed on exit. It does not put the password in command arguments or an
+environment variable. Do not run secret-handling commands with AWS CLI debug
+logging. Updating SSM alone does not update a running deployment: password
+rotation requires a coordinated cache update and Lambda rebuild/deployment.
+
+For local Lambda mocks, copy `etc/config.local.ini.example` to the ignored
+`etc/config.local.ini`. `TTREK_LOCAL_CONFIG` can select another local file.
+The mocks read it directly from the host; it is never packaged. Both local
+request monitoring and rate limiting use memory, independent for each worker.
+Local mode ignores any packaged production configuration and makes no SSM/KMS
+calls. Direct server development still uses its existing Valkey configuration.
+
+## CodeBuild
 
 CodeBuild reads `devops/buildspec.yml`, selected by `Source.BuildSpec` in
 `devops/infra/30-codebuild.yml`. The AL2023 x86_64 build image matches Lambda's
@@ -24,7 +117,7 @@ native-library ABI. The build:
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).
 3. Runs the project's asset and search builds, then the application checks.
-4. Packages with tdevops, leaving its AL2023 compatibility check enabled.
+4. Generates encrypted production config from SSM, packages with tdevops, and sets executable ZIP attributes. The AL2023 compatibility check remains enabled.
 5. Validates and deploys `devops/sam-template.yaml` with SAM.
 
 CodeBuild checks out `PrivateRegistry` as a secondary source. Its GitHub
@@ -79,7 +172,13 @@ For a manual deployment from an AL2023 build host with dependencies installed:
 
 ```bash
 ttrek run -script build-assets
-ttrek run -script package-lambda
+export AWS_PROFILE=ttrek-prod-neo AWS_REGION=eu-central-1
+export TTREK_CONFIG_KMS_KEY=$(aws cloudformation describe-stacks \
+  --stack-name Infra-DevOps-TTREK-Keys \
+  --query 'Stacks[0].Outputs[?OutputKey==`TTrekKMSMasterKeyArn`].OutputValue | [0]' --output text)
+bash devops/generate-prod-config.sh
+TTREK_PRODUCTION_CONFIG="$PWD/build/prod/config.ini" ttrek run -script package-lambda
+python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
 sam deploy --template-file devops/sam-template.yaml \
   --stack-name Infra-DevOps-TTREK-Lambda \
@@ -89,50 +188,30 @@ sam deploy --template-file devops/sam-template.yaml \
 ```
 
 Use a normal AL2023 package for AWS; `--local-only` skips the ABI check and is
-only for local tests. This workflow does not rewrite archive execution bits.
-The ZIP produced by the current packager needs executable permissions on
-`bootstrap` and `local/bin/tclsh` before AWS can invoke it; that permission step
-remains caller-managed.
+only for local tests. `finalize-lambda.py` sets the executable ZIP attributes for
+`bootstrap` and `local/bin/tclsh`. CodeBuild performs this step automatically.
 
-The existing EC2/CodeDeploy and Fargate templates remain under `devops/` for
-those deployments. They are not used by the Lambda build. The source AppSpec
-is `devops/appspec.yml`; a CodeDeploy revision must stage it at the archive root
-alongside `codedeploy-scripts/` and `ttrek-app/`. Existing deployment scripts use
-the `ttrek-prod-neo` profile and `eu-central-1`.
+## Updating an existing deployment
 
-The cache follows the Valkey 8.2 setup with one `cache.t4g.micro` node, TLS
-required, an `appuser` account, and a disabled default user. Set
-`TTREK_VALKEY_PASSWORD` (16-128 characters) before running the cache deployment
-script; it supplies the `NoEcho` CloudFormation password parameter. User and
-user-group IDs include `AppName` to avoid collisions with other deployments.
-The cache stack exports `Infra-DevOps-TTREK-Cache-ValkeyClusterId` and
-`Infra-DevOps-TTREK-Cache-ValkeyClusterEndpointAddress`.
+The API stack and Lambda stack now have separate ownership. Updating an older
+SAM stack removes its generated API and replaces the function when renaming it.
+Plan the cutover and perform the first migration using an administrative deployment
+role that can also remove the old `ttrek-sh` function, role and log group; the new
+CodeBuild role is scoped to `prod-Api-TtrekWebsite-Function`. An already existing
+function with that name must be imported or otherwise reconciled before deployment.
 
-`valkey-tcl` 1.0.3, `tratelimit` 1.0.1, and `treqmon` 2.0.0 are direct application
-dependencies. The registry and build use libvalkey 0.5.0 with TLS enabled.
-Production rate-limit counters and request-monitor history both use Valkey over
-verified TLS with `appuser`. Configure `[redis]` keys `host`, `port`, `username`,
-`password` and `ssl_ca_file`. Production's CA file defaults to `/etc/ssl/certs/ca-certificates.crt`;
-set `/ttrek_sh/prod/redis/password` as an SSM SecureString before building the
-encrypted config. The password must match the cache deployment password.
+Retire the old Fargate stack before applying the VPC changes: it imports the public
+subnet export being removed. The VPC stack retains its name
+`Infra-DevOps-TTREK-Base` and existing private subnet/cache security-group exports.
+The storage template no longer creates ECR. If an old repository contains images
+you need, apply a retain policy or migrate it before updating the storage stack.
+The old Fargate template and launcher have been removed. No deployment script
+automatically deletes stacks or migrates existing resources/data.
 
-Previously `valkey-tcl` was installed transitively through `tratelimit` and
-`treqmon`. Rate limits used sorted sets under `__RL__/...`; request history used
-the `history_events` list, not the optional memory store. Download telemetry
-uses SQLite. The registered `tsession-valkey` package was not a site dependency.
-
-The VPC uses one availability zone. The load balancer and a single NAT gateway
-have public IPs in the public subnet; Fargate and Valkey use the private subnet.
-Outbound traffic uses NAT instead of VPC endpoints. Egress therefore depends
-on that one availability zone.
-
-The VPC deployment retains the `Infra-DevOps-TTREK-Base` stack name and its
-remaining exports. For an existing deployment, migrate the ECR repository and
-S3 bucket into `Infra-DevOps-TTREK-Storage` using CloudFormation resource
-refactoring or retain/import before applying the split templates; a normal
-deployment cannot move existing resources between stacks. The cache stack
-creates a new Valkey replication group, so migrate any required Redis data
-before retiring the old cache.
+If the bucket or repository still belongs to the original combined Base stack,
+use CloudFormation resource refactoring or retain/import before applying split
+templates. The cache now enables encryption at rest; review the change set for
+replacement and preserve needed cache data before updating an existing cache.
 
 ## API Gateway template
 
@@ -141,7 +220,7 @@ ttrek install -force -registry ../private-ttrek-registry -add-pubreg tdevops moc
 ttrek run -package tdevops -script generate-api-gateway
 ```
 
-This writes `dist/api-gateway.json` from `etc/routes.json`, selected by
+This writes a generic `dist/api-gateway.json` from `etc/routes.json`, selected by
 `routes` in `etc/tdevops.tcl`. Deployment defaults live
 under `apiGateway`; the CLI only selects input/output files. The template exposes
 API name, stage, timeout, backend function and `AuthorizerFunction` parameters.
@@ -150,3 +229,8 @@ existing Lambda name or ARN there, or through the CloudFormation parameter, to
 enable it. `authorizer.excludePaths` lists exact configured paths that stay public
 for every method. Add explicit routes for public pages beneath a protected catch-all.
 The local mock ignores these deployment settings. Template generation does not deploy AWS resources.
+
+Deploy the maintained copy at `devops/infra/api-gateway.json`. It adds the domain,
+certificate selection, root API mapping and optional Route 53 alias to the generated
+base. When routes change, compare the generated template and carry the route and
+integration changes into the maintained copy; do not overwrite its domain resources.

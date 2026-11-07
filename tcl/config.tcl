@@ -66,6 +66,66 @@ proc ::app_config::valkey {config} {
     return $settings
 }
 
+# Only encrypted production configuration is allowed into a Lambda artifact.
+proc ::app_config::validate_lambda_config {path} {
+    package require tconfig::decrypt
+    set config [::tconfig::read_config $path]
+    foreach keys {{tconfig tink_keyset} {redis enc:password} {redis host}} {
+        if {![dict exists $config {*}$keys] || [dict get $config {*}$keys] eq {}} {
+            error "Production configuration requires [join $keys .] from tconfig/SSM"
+        }
+    }
+    if {[dict exists $config redis password] || [dict exists $config ssl]} {
+        error "Production Lambda configuration must not contain plaintext passwords or TLS private keys"
+    }
+    if {[dict get $config redis host] in {localhost 127.0.0.1 ::1}} {
+        error "Production redis.host must be the ElastiCache endpoint"
+    }
+}
+
+proc ::app_config::lambda_config {root} {
+    package require tconfig::decrypt
+    if {[mode] eq "PROD"} {
+        set path [file join $root etc config.ini]
+        validate_lambda_config $path
+        return [::tconfig::load_config $path]
+    }
+    set path [file join $root etc config.local.ini]
+    if {[info exists ::env(TTREK_LOCAL_CONFIG)] && $::env(TTREK_LOCAL_CONFIG) ne {}} {
+        set path $::env(TTREK_LOCAL_CONFIG)
+        if {![file isfile $path]} {error "Local configuration does not exist: $path"}
+    }
+    if {[file isfile $path]} {return [::tconfig::read_config $path]}
+    return {}
+}
+
+proc ::app_config::lambda_middleware {config} {
+    set limits [dict create window_millis 10000 limit 1000]
+    if {[dict exists $config ratelimit]} {set limits [dict merge $limits [dict get $config ratelimit]]}
+    foreach key {window_millis limit} {
+        set value [dict get $limits $key]
+        if {![string is integer -strict $value] || $value < 1} {error "ratelimit.$key must be a positive integer"}
+    }
+    set history 100000
+    if {[dict exists $config request_monitor history_max_events]} {
+        set history [dict get $config request_monitor history_max_events]
+    }
+    if {![string is integer -strict $history] || $history < 1} {
+        error "request_monitor.history_max_events must be a positive integer"
+    }
+    if {[mode] eq "LOCAL"} {
+        set rateStore {localstore {}}
+        set monitorStore [dict create tsvstore [dict create history_max_events $history]]
+    } else {
+        set cache [valkey $config]
+        set rateStore [dict create valkeystore $cache]
+        set monitorStore [dict create valkeystore [dict merge $cache [dict create history_max_events $history]]]
+    }
+    return [dict create \
+        tratelimit [dict create store $rateStore global_limits [dict create by_ip $limits] route_limits {}] \
+        treqmon [dict create store $monitorStore]]
+}
+
 proc ::app_config::releases {config} {
     set settings [dict create bucket {} region {} prefix ttrek/1.0.0 version 1.0.0 url_expiry_seconds 300 checksums_file {} checksums {}]
     if {[dict exists $config releases]} {
