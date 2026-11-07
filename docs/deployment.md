@@ -38,7 +38,7 @@ single point of failure. Shared history is bounded and is not a durable audit lo
 Use the same AWS account and region for all stacks. Scripts default to
 `AWS_PROFILE=ttrek-prod-neo` and `AWS_REGION=eu-central-1`; both are overridable.
 Before the first deployment, use an existing administrator profile to install
-the inline group policy described below.
+the group policies described below.
 For a new deployment:
 
 1. Run `devops/infra/00-deploy-infra-keys.sh` and `10-deploy-infra-storage.sh`.
@@ -88,8 +88,10 @@ and [HTTP API custom domains](https://docs.aws.amazon.com/apigateway/latest/deve
 
 ### Deployment IAM policy
 
-`devops/infra/00-iam-policy.json` is the inline policy for the existing IAM group
-`ttrek_prod_admin_group`. Before `00-deploy-infra-keys.sh`, run:
+The existing IAM group `ttrek_prod_admin_group` receives two customer managed
+policies: `00-iam-policy-deploy.json` covers deployment commands, DNS and SSM;
+`00-iam-policy-resources.json` covers CloudFormation resource operations.
+Both files live in `devops/infra`. Before `00-deploy-infra-keys.sh`, run:
 
 ```bash
 AWS_PROFILE=admin devops/infra/00-deploy-iam-policy.sh --dry-run
@@ -98,33 +100,41 @@ AWS_PROFILE=admin devops/infra/00-deploy-iam-policy.sh
 
 Replace `admin` with an administrator profile in the deployment account. The
 script resolves its account ID with STS, substitutes the selected region, and
-sets the group's `TTrekInfrastructureDeploy` policy with `iam:PutGroupPolicy`.
-It updates that policy in place; it does not create the group. `--dry-run` prints
-the rendered JSON without changing IAM. The source JSON contains placeholders
-and must be rendered before it is submitted to IAM.
+deploys `Infra-DevOps-TTREK-Permissions`. CloudFormation creates or updates
+`TTrekInfrastructureDeploy` and `TTrekInfrastructureResources` and attaches them
+to the group. It manages policy versions on subsequent updates. The administrator
+needs CloudFormation deployment and IAM managed-policy/attachment permissions.
+The group must already exist; the script does not create it.
 
-The policy covers the numbered infrastructure deployment scripts: stack change
+After deployment, the script verifies both attachments and removes the old
+`TTrekInfrastructureDeploy` inline policy if present. This migration also needs
+`iam:ListAttachedGroupPolicies`, `iam:ListGroupPolicies` and `iam:DeleteGroupPolicy`.
+Other group policies are preserved. `--dry-run` prints the complete rendered
+CloudFormation template without changing AWS. The source JSON contains
+placeholders and must be rendered before it is submitted to IAM.
+
+The policies cover the application infrastructure scripts (Keys through Api): stack change
 sets, KMS keys and aliases, the S3 bucket, isolated VPC, Valkey, ACM/DNS, CodeBuild
 and its role, and the public API's Lambda invocation permission. Most resource
 operations require CloudFormation's [forward access session](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/fas-requests-and-permission-evaluation.html).
-The cache script can read and decrypt only `/ttrek_sh/prod/redis/password`;
+SSM reads and decryption through SSM are scoped to `/ttrek_sh/*`;
 DNS changes are limited to A/CNAME records at `ttrek.sh` and `_*.ttrek.sh`.
 Passing the build role is limited to CodeBuild. The first deployment can create
 the ElastiCache and API Gateway service-linked roles.
 
-This is an infrastructure administrator policy: it uses broader regional access
+These are infrastructure administrator policies: they use broader regional access
 through CloudFormation for generated EC2, KMS, ACM and cache resource IDs, and
-the deployer can edit the build role's inline permissions. It is not a permissions
-boundary. Its fixed names match the templates' defaults; adjust it when changing
+the deployer can edit the build role's inline permissions. These policies are not
+permissions boundaries. Their fixed names match the templates' defaults; adjust them when changing
 the application, bucket, domain or Lambda name. SSM writes, GitHub connection
 setup, starting builds, and manual SAM deployments need separate permissions.
 Stacks must use the caller's credentials, as the supplied scripts do; an existing
 CloudFormation service role needs its own resource permissions.
 
-The rendered default policy is 5,006 characters. IAM allows a combined
-[5,120 characters of inline policies per group](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html).
-The script rejects an oversized document; AWS also enforces the combined limit
-if the group already has other inline policies.
+IAM's [5,120-character inline group limit is cumulative](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html),
+so multiple inline policies would still hit it. Each managed policy has its own
+6,144-character limit; the script checks both documents before deployment.
+The two attachments use two of the group's ten managed-policy slots.
 
 ## Production and local configuration
 

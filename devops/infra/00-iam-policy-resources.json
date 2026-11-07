@@ -4,18 +4,6 @@
     {
       "Effect": "Allow",
       "Action": [
-        "cloudformation:CreateChangeSet",
-        "cloudformation:DeleteChangeSet",
-        "cloudformation:DescribeChangeSet",
-        "cloudformation:DescribeStackEvents",
-        "cloudformation:DescribeStacks",
-        "cloudformation:ExecuteChangeSet"
-      ],
-      "Resource": "arn:aws:cloudformation:__REGION__:__ACCOUNT_ID__:stack/Infra-DevOps-TTREK-*/*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
         "ec2:Describe*",
         "ec2:CreateVpc",
         "ec2:DeleteVpc",
@@ -166,51 +154,6 @@
         "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/elasticache.amazonaws.com/AWSServiceRoleForElastiCache*",
         "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway"
       ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "route53:ListHostedZones",
-        "route53:GetHostedZone",
-        "route53:ListResourceRecordSets",
-        "route53:GetChange"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "route53:ChangeResourceRecordSets",
-      "Resource": "arn:aws:route53:::hostedzone/*",
-      "Condition": {
-        "ForAllValues:StringLike": {
-          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
-            "ttrek.sh",
-            "_*.ttrek.sh"
-          ]
-        },
-        "ForAllValues:StringEquals": {
-          "route53:ChangeResourceRecordSetsRecordTypes": [
-            "A",
-            "CNAME"
-          ]
-        }
-      }
-    },
-    {
-      "Effect": "Allow",
-      "Action": "ssm:GetParameter",
-      "Resource": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/prod/redis/password"
-    },
-    {
-      "Effect": "Allow",
-      "Action": "kms:Decrypt",
-      "Resource": "arn:aws:kms:__REGION__:__ACCOUNT_ID__:key/*",
-      "Condition": {
-        "StringEquals": {
-          "kms:ViaService": "ssm.__REGION__.amazonaws.com",
-          "kms:EncryptionContext:PARAMETER_ARN": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/prod/redis/password"
-        }
-      }
     }
   ]
 }
