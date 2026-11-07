@@ -18,6 +18,12 @@
   `web-static-blog` at `/blog`, mounted on the host's `tpathexp` router.
   Packages read Markdown directories into immutable snapshots per worker.
   The host supplies trusted layouts. Restart workers to publish source changes.
+- Home, registry, documentation and blog pages share `www/master.html.jinja` and
+  `public/css/styles.css` for
+  typography, navigation, content width and footer layout. The wiki/blog host
+  layouts use scoped `docs.css` for package-rendered content, without loading
+  the packages' standalone site styles. Search styles contain only search and
+  homepage components.
 - Direct HTTP and Lambda HTTP events share `tcl/site.tcl`, `tcl/routes.tcl`
   and `tcl/handlers.tcl`. Mock applications own local HTTP transport and S3 storage.
 - Release checksums live in a versioned JSON manifest, separated by environment.
@@ -284,9 +290,11 @@ ENV=LOCAL ttrek run -script start-direct
 ```
 
 The **Documentation** and **Blog** links open `/docs` and `/blog`. Each worker owns
-its router and directory snapshots. Mounts receive `-store`, `-prefix`, `-navigation`
-and `-config master_template`; only the shared master is supplied as an additional
-template. Direct serving uses the configured Valkey service and TLS settings below.
+its router and directory snapshots. Mounts receive `-store`, `-prefix`, and
+`-config` with `master_template` (the docs/blog bridge) and `templates` (the shared
+host master). The packages retain their index, card, article and Markdown rendering;
+the host master owns site navigation, so content layouts do not repeat it.
+Direct serving uses the configured Valkey service and TLS settings below.
 
 `tdevops` 0.2.0 owns the shared Lambda runtime, packaging and local service supervision; `etc/tdevops.tcl` supplies
 application staging, S3 seeds and release configuration. `etc/lambda.json` selects

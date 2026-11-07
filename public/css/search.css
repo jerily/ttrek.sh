@@ -1,18 +1,8 @@
-/* Shared registry search, with the existing navy and blue ttrek palette. */
-.home-page, .registry-page { color: #536176; background: #f5f7fb; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
-.home-page .home-menu, .registry-page .home-menu { display: flex; align-items: center; justify-content: space-between; padding: .7rem max(1rem, calc((100vw - 1120px) / 2)); background: #172b46; }
-.home-page .pure-menu-heading, .registry-page .pure-menu-heading { padding: 0; font-size: 1.7rem; font-weight: 750; letter-spacing: -.06em; }
-.brand-dot { color: #6dc7ff; }
-.home-page .pure-menu-link, .registry-page .pure-menu-link { color: #c5d6e9; font-size: .9rem; padding: .6rem .8rem; }
-.home-page .pure-menu-selected .pure-menu-link, .registry-page .pure-menu-selected .pure-menu-link { color: white; }
-.home-page a, .registry-page a { text-underline-offset: .2em; }
-.home-page .footer, .registry-page .footer { position: static; background: #172b46; color: #bdcadb; padding: 1.3rem; font-size: .8rem; }
-.home-page .footer a, .registry-page .footer a { color: #d5e9ff; }
-.home-page .splash-container { position: relative !important; overflow: visible; display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 65px); height: auto; padding: 8rem 1.5rem 5rem; background: radial-gradient(ellipse at 75% 5%, #285780, transparent 60%), #172b46; }
-.home-page .splash { position: static; width: min(100%, 780px); height: auto; margin: 0; text-align: center; }
-.eyebrow { font-size: .75rem; font-weight: 700; letter-spacing: .16em; color: #2768a7; }
+/* Homepage and registry search components; shared layout lives in styles.css. */
+.home-page .splash-container { display: flex; align-items: center; justify-content: center; padding: 5rem 1.5rem; background: radial-gradient(ellipse at 75% 5%, #285780, transparent 60%), #172b46; }
+.home-page .splash { width: min(100%, 780px); text-align: center; }
 .home-page .eyebrow { color: #92d0ff; margin: 0 0 1.5rem; }
-.home-page .splash-head { border: 0; padding: 0; margin: 0; font-size: clamp(2.6rem, 7vw, 4.6rem); font-weight: 750; letter-spacing: -.05em; line-height: 1.15; text-transform: none; }
+.home-page .splash-head { color: white; padding: 0; margin: 0; font-size: clamp(2.6rem, 7vw, 4.6rem); font-weight: 750; letter-spacing: -.05em; line-height: 1.15; }
 .home-page .splash-subhead { color: #c7d7e8; opacity: 1; font-size: 1.1rem; line-height: 1.7; letter-spacing: 0; text-transform: none; margin: 1.5rem 0 2.5rem; }
 .registry-search { position: relative; text-align: left; width: 100%; max-width: 780px; }
 .registry-search > label { display: block; font-weight: 650; font-size: .85rem; margin: 0 0 .5rem; color: #34455d; }
@@ -30,7 +20,6 @@
 .install-panel { margin: 3rem auto 0; padding-top: 1.7rem; border-top: 1px solid #ffffff25; color: #d0e0f0; }
 .install-panel > p { font-size: .8rem; margin: 0 0 .8rem; color: #b7cde3; }
 .install-panel code { white-space: normal; overflow-wrap: anywhere; font-size: .85rem; text-transform: none; }
-.registry-main { max-width: 1120px; min-height: calc(100vh - 65px); margin: auto; padding: 7.5rem 1.5rem 4rem; }
 .registry-intro h1 { margin: .7rem 0; color: #213851; font-size: clamp(1.8rem, 4vw, 2.7rem); line-height: 1.25; letter-spacing: -.04em; }
 .registry-intro > p:last-child { margin: 0 0 2rem; }
 .results-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin: 3rem 0 1.2rem; }
@@ -60,13 +49,10 @@
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (max-width: 760px) {
     .package-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .home-page .home-menu, .registry-page .home-menu { flex-wrap: wrap; justify-content: center; gap: .4rem 2rem; }
-    .home-page .pure-menu-link, .registry-page .pure-menu-link { font-size: .8rem; padding: .4rem .5rem; }
 }
 @media (max-width: 480px) {
     .package-grid { grid-template-columns: 1fr; }
-    .home-page .splash-container { padding: 8rem 1rem 3rem; }
-    .registry-main { padding: 8rem 1rem 3rem; }
+    .home-page .splash-container { padding: 3rem 1rem; }
     .search-field { gap: .4rem; }
     .search-field svg { display: none; }
     .search-field input { padding-left: .4rem; font-size: .9rem; }

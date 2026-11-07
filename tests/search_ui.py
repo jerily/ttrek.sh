@@ -1,6 +1,34 @@
 """Optional Playwright checks, run by local-stack.tcl with TTREK_BROWSER_TESTS=1."""
 import time
+from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
+
+
+def check_layout(page, base):
+    # Measure the rendered layout; a shared template alone does not prevent CSS drift.
+    metrics_script = (Path(__file__).parent / "fixtures/layout-metrics.js").read_text()
+    routes = {
+        "/": "/", "/packages": "/packages", "/search?q=web": "/packages",
+        "/package/tcl": "/packages", "/package/tcl/9.1.0": "/packages",
+        "/docs": "/docs", "/docs/getting-started": "/docs", "/blog": "/blog",
+    }
+    for width in (320, 390, 768, 1440):
+        page.set_viewport_size({"width": width, "height": 900})
+        shared = None
+        for path, selected in routes.items():
+            page.goto(base + path)
+            expect(page.get_by_role("navigation", name="Site", exact=True)).to_have_count(1)
+            expect(page.locator("main")).to_have_count(1)
+            expect(page.locator(".footer")).to_have_count(1)
+            expect(page.locator(".home-menu .pure-menu-selected a")).to_have_attribute("href", selected)
+            metrics = page.evaluate(metrics_script)
+            if shared is None:
+                shared = metrics["shared"]
+            assert metrics["shared"] == shared, (width, path, metrics["shared"], shared)
+            assert not metrics["overflow"], (width, path)
+            assert metrics["main"]["top"] >= metrics["header"]["bottom"] - 1, (width, path)
+            assert metrics["footer"]["top"] >= metrics["main"]["bottom"] - 1, (width, path)
+    print("PASS shared public layout, active navigation and non-overlapping content at mobile/desktop widths")
 
 
 def check(base):
@@ -85,11 +113,7 @@ def check(base):
             query.press("Enter")
             expect(page).to_have_url(base + "/search?q=offline")
 
-            for width in (390, 768, 1440):
-                page.set_viewport_size({"width": width, "height": 900})
-                for path in ("/", "/search?q=web", "/packages"):
-                    page.goto(base + path)
-                    assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), (width, path)
+            check_layout(page, base)
             assert not errors, errors
 
             plain = browser.new_context(java_script_enabled=False)

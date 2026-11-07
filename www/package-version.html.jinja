@@ -4,7 +4,7 @@
 {% block packages_selected %} pure-menu-selected{% endblock %}
 {% block content %}
 {% include 'bashline.html.jinja' %}
-    <div class="content-wrapper">
+    <main class="site-main">
         <div class="content">
             <h2 class="content-head is-center text-normal">{{ package_name }}@{{ package_version }}</h2>
             <p class="content-subhead">Install:</p>
@@ -48,5 +48,5 @@
                 </table>
             {% endif %}
         </div>
-    </div>
+    </main>
 {% endblock %}
