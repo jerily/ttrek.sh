@@ -1,50 +1,11 @@
-package require Tcl 8.6 9
-source [file join [file dirname [info script]] paths.tcl]
-package require http
-
+# Application policy for the shared tdevops Lambda runtime.
 namespace eval ::site_lambda {}
 
-proc ::site_lambda::request {path args} {
-    set url http://$::env(AWS_LAMBDA_RUNTIME_API)/2018-06-01/runtime/$path
-    # Close each completed Runtime API connection so local shutdown does not
-    # wait for idle keepalive sockets to expire during the mock server's drain.
-    set headers {}
-    if {[dict exists $args -headers]} {set headers [dict get $args -headers]}
-    dict set args -headers [concat $headers {Connection close}]
-    set token [::http::geturl $url -binary 1 -keepalive 0 {*}$args]
-    try {
-        if {[::http::status $token] ne "ok" || [::http::ncode $token] ni {200 202}} {
-            error "Lambda Runtime API request failed: [::http::status $token] [::http::ncode $token]"
-        }
-        set headers {}
-        foreach {key value} [::http::meta $token] {dict set headers [string tolower $key] $value}
-        return [list [::http::data $token] $headers]
-    } finally {::http::cleanup $token}
-}
-
-proc ::site_lambda::post {path json {headers {}}} {
-    request $path -method POST -timeout 10000 -type application/json \
-        -headers $headers -query [encoding convertto utf-8 $json]
-}
-
-proc ::site_lambda::report_error {path message {headers {}}} {
-    # Work even when loading tjson failed during initialization.
-    set escaped {}
-    foreach character [split $message {}] {
-        scan $character %c code
-        if {$character in {\" \\} || $code < 32} {
-            append escaped [format {\u%04x} $code]
-        } else {append escaped $character}
-    }
-    set json [format {"errorMessage":"%s","errorType":"TtrekSiteError"} $escaped]
-    post $path \{$json\} [concat $headers {Lambda-Runtime-Function-Error-Type Runtime.TtrekSiteError}]
-}
-
-proc ::site_lambda::initialize {} {
+proc ::site_lambda::initialize {root} {
     variable router
-    source [file join $::siteRoot tcl site.tcl]
-    source [file join $::siteRoot tcl config.tcl]
-    source [file join $::siteRoot tcl telemetry.tcl]
+    source [file join $root tcl site.tcl]
+    source [file join $root tcl config.tcl]
+    source [file join $root tcl telemetry.tcl]
     set dataDirectory /tmp
     if {[info exists ::env(TTREK_LOCAL_RUNTIME_DATA)]} {
         set dataDirectory $::env(TTREK_LOCAL_RUNTIME_DATA)
@@ -52,13 +13,13 @@ proc ::site_lambda::initialize {} {
     file mkdir $dataDirectory
     set channel [file tempfile telemetry [file join $dataDirectory ttrek-telemetry-XXXXXX.sqlite3]]
     close $channel
-    file copy -force [file join $::siteRoot data telemetry.sqlite3] $telemetry
-    set settings [dict create rootdir $::siteRoot registry_dir [file join $::siteRoot registry] \
+    file copy -force [file join $root data telemetry.sqlite3] $telemetry
+    set settings [dict create rootdir $root registry_dir [file join $root registry] \
         releases [::app_config::releases {}] \
         treqmon {store {tsvstore {history_max_events 10000}}}]
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
         set ::env(ENV) LOCAL
-        source [file join $::siteRoot tcl local-assets.tcl]
+        source [file join $root tcl local-assets.tcl]
         set release {}
         if {[info exists ::env(TTREK_LOCAL_RELEASES)]} {set release $::env(TTREK_LOCAL_RELEASES)}
         dict set release bucket ttrek-local
@@ -133,36 +94,4 @@ proc ::site_lambda::handle {payload context} {
     return [::tjson::typed_to_json [list M [dict create \
         statusCode [list N [dict get $response statusCode]] headers [list M $headers] \
         body [list S $body] isBase64Encoded {BOOL 1}]]]
-}
-
-proc ::site_lambda::run {} {
-    if {![info exists ::env(AWS_LAMBDA_RUNTIME_API)] || $::env(AWS_LAMBDA_RUNTIME_API) eq {}} {
-        error "AWS_LAMBDA_RUNTIME_API is required"
-    }
-    if {[catch {initialize} message]} {
-        report_error init/error $message
-        error $message
-    }
-    while {1} {
-        # No timeout: Lambda may freeze this process while /next is waiting.
-        lassign [request invocation/next -timeout 0] payload context
-        set id [dict get $context lambda-runtime-aws-request-id]
-        set headers {}
-        if {[dict exists $context lambda-runtime-invocation-id]} {
-            lappend headers Lambda-Runtime-Invocation-Id [dict get $context lambda-runtime-invocation-id]
-        }
-        unset -nocomplain ::env(_X_AMZN_TRACE_ID)
-        if {[dict exists $context lambda-runtime-trace-id]} {
-            set ::env(_X_AMZN_TRACE_ID) [dict get $context lambda-runtime-trace-id]
-        }
-        if {[catch {handle $payload $context} response options]} {
-            puts stderr [dict get $options -errorinfo]
-            report_error invocation/$id/error $response $headers
-        } else {post invocation/$id/response $response $headers}
-    }
-}
-
-if {[catch {::site_lambda::run} message]} {
-    puts stderr $message
-    exit 1
 }

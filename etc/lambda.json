@@ -1,0 +1,6 @@
+{
+  "function": "ttrek-sh",
+  "entrypoint": "tcl/lambda.tcl",
+  "initialize": "::site_lambda::initialize",
+  "handler": "::site_lambda::handle"
+}

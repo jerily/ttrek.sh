@@ -35,6 +35,6 @@
   "devDependencies": {
     "tcllib": "^2.0.0",
     "twebserver": "^1.47.54",
-    "tdevops": "^0.1.0"
+    "tdevops": "^0.2.0"
   }
 }

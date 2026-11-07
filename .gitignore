@@ -19,4 +19,4 @@ etc/config.local.ini
 public/js/chart.umd.js
 var/
 
-/search-index.json
+/etc/search-index.json

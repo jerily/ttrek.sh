@@ -18,7 +18,8 @@ phases:
       - export APP_NAME=ttrek-app
       - chmod 755 -R build.sh
       - mkdir -p ../ttrek-app/artifacts/
-      - cp -R codedeploy-scripts/ ../ttrek-app/artifacts/
+      - cp -R devops/codedeploy-scripts/ ../ttrek-app/artifacts/
+      - cp devops/appspec.yml ../ttrek-app/artifacts/
       - cp -R . ../ttrek-app/artifacts/ttrek-app
       - apt-get update && apt-get install build-essential cmake npm pkg-config git curl patch python3 zlib1g-dev -y
       - ./build.sh
@@ -27,10 +28,9 @@ phases:
       - export CURRENT_DIR=`pwd`
       - export INSTALL_DIR=$CURRENT_DIR/build/install
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
-      - cp search-index.json ../ttrek-app/artifacts/ttrek-app/
       # copy dependencies
       - cp -R build ../ttrek-app/artifacts/ttrek-app/
-      # copy the encrypted config file
+      # copy configuration and the generated search index
       - cp -R etc ../ttrek-app/artifacts/ttrek-app/
       # Validate and render the Jinja templates before packaging.
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 tests/all.tcl

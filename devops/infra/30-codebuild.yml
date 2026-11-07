@@ -157,6 +157,7 @@ Resources:
             Value: !Sub ${AWS::Region}
 
       Source:
+        BuildSpec: devops/buildspec.yml
         Type: GITHUB
         Location: https://github.com/jerily/ttrek.sh.git
         InsecureSsl: true
