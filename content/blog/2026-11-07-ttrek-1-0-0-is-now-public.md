@@ -19,3 +19,17 @@ shape what comes next.
 This release is still a **proof of concept**. Please be patient as we work
 through initial issues; with a one-person team, fixes may take time. Try it,
 tell us what works and what doesn't, and help us make ttrek better for everyone.
+
+## Example
+
+Start a local personal site with an editable wiki and blog:
+
+```sh
+mkdir -p example-personal-site
+cd example-personal-site
+ttrek init -y
+ttrek install -y example-personal-site
+ttrek run -package example-personal-site -script start
+```
+
+Open [http://localhost:8080](http://localhost:8080) to explore and edit your site.
