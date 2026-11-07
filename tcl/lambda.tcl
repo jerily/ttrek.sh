@@ -19,7 +19,8 @@ proc ::site_lambda::initialize {root} {
     close $channel
     file copy -force [file join $root data telemetry.sqlite3] $telemetry
     set settings [dict merge [dict create rootdir $root registry_dir [file join $root registry] \
-        releases [::app_config::releases {}]] [::app_config::lambda_middleware $config]]
+        releases [::app_config::releases {}] \
+        request_monitor [::app_config::request_monitor $config]] [::app_config::lambda_middleware $config]]
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
         set ::env(ENV) LOCAL
         source [file join $root tcl local-assets.tcl]

@@ -9,7 +9,8 @@ Complete [setup](install.md) first. Run these commands from the website checkout
 Documentation lives in `content/docs/`; dated blog posts live in `content/blog/`.
 The public packages `web-static-wiki` and `web-static-blog` serve these directories
 without a content database or browser write routes. Blog filenames use
-`YYYY-MM-DD-title.md`. The empty blog directory displays an empty publication index.
+`YYYY-MM-DD-title.md`. The first announcement is
+`content/blog/2026-11-07-ttrek-1-0-0-is-now-public.md`.
 
 Edit Markdown files locally and restart the direct server to publish changes:
 
@@ -23,6 +24,17 @@ its router and directory snapshots. Mounts receive `-store`, `-prefix`, and
 host master). The packages retain their index, card, article and Markdown rendering;
 the host master owns site navigation, so content layouts do not repeat it.
 Direct serving uses the configured Valkey service and TLS settings below.
+
+The footer's **Request Monitor** link opens `/request-monitor`. Its shared site
+layout is selected by `[request_monitor] master_template` in the INI configuration,
+defaulting to `request-monitor-master.html.jinja` in `www/`. Custom monitor masters
+provide a `body` block and load the chart assets, as the default bridge does.
+The `treqmon` package mounts the page and serves its chart script. Set
+`[request_monitor] store=memory` for local history without a monitoring database,
+or `store=valkey` to use the `[redis]` host, port, credentials and TLS options.
+Omitting `store` selects memory in LOCAL mode and Valkey in PROD mode.
+`history_max_events` sets the retained event limit. The direct server's rate
+limiter still uses the configured Valkey connection independently of monitoring.
 
 ## Package and run the local services
 

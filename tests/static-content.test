@@ -4,7 +4,9 @@ namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl site.tcl]
 source [file join $root tcl config.tcl]
-::site::init_worker [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}]]
+set settings [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}] \
+    treqmon {store {tsvstore {history_max_events 100}}}]
+::site::init_worker $settings
 proc request {path {method GET}} {
     ::site::dispatch $::site::router [dict create method $method path $path]
 }
@@ -12,7 +14,7 @@ test static-1 {documentation and blog mount with the host layout} -body {
     set docs [request /docs/getting-started]
     set blog [request /blog]
     list [dict get $docs statusCode] [string match {*ttrek init -y*} [dict get $docs body]] \
-        [dict get $blog statusCode] [string match {*No published content yet.*} [dict get $blog body]] \
+        [dict get $blog statusCode] [string match {*ttrek 1.0.0 is now public*} [dict get $blog body]] \
         [string match {*href="/blog"*} [dict get $docs body]]
 } -result {200 1 200 1 1}
 test static-2 {homepage has documentation and blog navigation without signup} -body {
@@ -39,6 +41,38 @@ test static-4 {HEAD and safe content headers} -body {
     list [dict get $response statusCode] [dict get $response body] \
         [dict get $response headers x-content-type-options]
 } -result {200 {} nosniff}
+test static-5 {The package-owned monitor uses the shared site layout and assets} -body {
+    set response [request /request-monitor]
+    set html [dict get $response body]
+    list [dict get $response statusCode] [regexp -all {<canvas } $html] \
+        [string match {*class="site-header"*} $html] [string match {*href="/css/styles.css"*} $html] \
+        [string match {*class="footer is-center"*} $html] \
+        [string match {*<title>Request Monitor · ttrek</title>*} $html] \
+        [string match {*src="/request-monitor/_assets/charts.js"*} $html] \
+        [dict get [request /request-monitor/_assets/charts.js] statusCode] \
+        [dict get [request /request-monitor HEAD] body] \
+        [dict get [request /request-monitor POST] statusCode]
+} -result {200 6 1 1 1 1 1 200 {} 405}
+test static-6 {The configured monitor master is passed to the package mount} -setup {
+    set router [::tpathexp::router]
+} -body {
+    ::site::configure [dict replace $settings request_monitor {master_template blog-master.html.jinja}]
+    ::site::mount $router
+    set html [dict get [::site::dispatch $router {method GET path /request-monitor}] body]
+    list [string match {*class="site-main documentation"*} $html] [regexp -all {<canvas } $html]
+} -cleanup {
+    $router destroy
+    ::site::configure $settings
+} -result {1 6}
+test static-7 {A missing monitor master fails before the server begins dispatching} -setup {
+    set router [::tpathexp::router]
+} -body {
+    ::site::configure [dict replace $settings request_monitor {master_template missing.html.jinja}]
+    ::site::mount $router
+} -cleanup {
+    $router destroy
+    ::site::configure $settings
+} -returnCodes error -match glob -result {*missing.html.jinja*}
 $::site::router destroy
 set failed $::tcltest::numTests(Failed)
 cleanupTests

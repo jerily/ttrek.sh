@@ -1,6 +1,5 @@
 # Shared by the direct HTTP server and the Lambda HTTP-event adapter.
 return {
-    GET /request-monitor get_stats_handler get_stats
     GET /debug get_debug_handler get_debug
     GET / get_index_page_handler get_index
     GET /init get_ttrek_init_handler get_ttrek_init

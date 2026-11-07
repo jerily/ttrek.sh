@@ -16,7 +16,7 @@
   `web-static-blog` at `/blog`, mounted on the host's `tpathexp` router.
   Packages read Markdown directories into immutable snapshots per worker.
   The host supplies trusted layouts. Restart workers to publish source changes.
-- Home, registry, documentation and blog pages share `www/master.html.jinja` and
+- Home, registry, documentation, blog and request-monitor pages share `www/master.html.jinja` and
   `public/css/styles.css` for
   typography, navigation, content width and footer layout. The wiki/blog host
   layouts use scoped `docs.css` for package-rendered content, without loading
@@ -83,9 +83,27 @@ this typed JSON contract.
 
 ## Request monitoring and shared layout
 
-The request-monitor page uses treqmon 2.0.0's Jinja templates and statistics APIs,
-with the website's layout and local Chart.js asset. The host renders the footer
-year from the system clock on each request, including documentation and blog pages.
+The request-monitor page is mounted by treqmon 2.1.0 on the site's `tpathexp`
+router, with the website's layout and local Chart.js asset. There is no site-local
+monitor handler, rendering module or monitoring middleware. Set `master_template` in the
+INI's `[request_monitor]` section to a trusted filename in `www/`; the default is
+`request-monitor-master.html.jinja`. Both the direct server and Lambda pass this
+setting to the package's `-config master_template`, along with the shared named
+templates, just like the wiki/blog mounts. The selected master supplies a `body`
+block and is resolved and validated at startup.
+The default bridge inherits the shared site master and loads the monitor's scoped
+CSS and the package's `/request-monitor/_assets/charts.js`. Missing templates fail startup.
+Chart colors come from the site's `--treqmon-chart-color` and `--treqmon-chart-fill`.
+
+`[request_monitor] store` selects `memory` or `valkey`; the default is memory in
+LOCAL mode and Valkey in PROD mode. `history_max_events` bounds retained history.
+Both direct HTTP and Lambda use the package's middleware and store implementations.
+The Valkey store receives `[redis]` connection, ACL and TLS settings. Memory uses
+treqmon's shared-variable store within a process; different processes have separate history.
+
+The shared footer links to the CLI source, public registry and request monitor.
+The host renders the footer year from the system clock on each request, including
+documentation, blog and monitor pages.
 
 See [setup](install.md) for dependencies, [testing](testing.md) for validation,
 and [security](security.md) for trust boundaries and current limitations.

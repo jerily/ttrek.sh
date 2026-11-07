@@ -25,7 +25,7 @@
     "tink-tcl": "^20240704.0.1",
     "aws-sdk-tcl": "^1.0.12",
     "tratelimit": "^1.0.1",
-    "treqmon": "^2.0.0",
+    "treqmon": "^2.1.0",
     "tsession": "^1.0.3",
     "tpersist": "^0.1.0",
     "tconfig": "^1.0.0",

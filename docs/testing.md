@@ -35,7 +35,9 @@ homes to verify all supported targets, endpoints, Rosetta detection and override
 it does not download real distributions or modify the user's installation.
 The rendering tests validate all templates and exercise the real request handlers and
 renderer with isolated service fixtures, including empty collections, dependency
-conditions, version ordering, HTML/URL escaping and monitor chart data. They do
+conditions, version ordering and HTML/URL escaping. `tests/static-content.test`
+exercises the package-mounted monitor, shared layout, configured master and asset
+routes. Chart data and monitor routing internals are tested in treqmon itself. They do
 not connect to Valkey, AWS or the telemetry database. CI runs them before packaging.
 
 Integration tests use Tcl 9.1 and the development dependency `trequests` 1.1.0

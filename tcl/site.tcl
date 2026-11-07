@@ -3,7 +3,7 @@ package require twebserver
 package require tjson
 package require thread
 package require tratelimit 1.0.1
-package require treqmon 2.0.0
+package require treqmon 2.1.0
 package require web-static-wiki 0.1.0
 package require web-static-blog 0.1.0
 package require tpathexp 1.1.0
@@ -13,7 +13,7 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {templates request-monitor releases request-validation search handlers} {
+foreach module {templates releases request-validation search handlers} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -42,6 +42,14 @@ proc ::site::mount {router} {
             -config [dict create master_template [dict get $templates ${directory}-master.html.jinja] \
                 templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
     }
+    set monitor_master request-monitor-master.html.jinja
+    if {[dict exists [config] request_monitor master_template]} {
+        set monitor_master [dict get [config] request_monitor master_template]
+    }
+    ::treqmon::mount $router -prefix /request-monitor \
+        -include_active_users [expr {![catch {package present tsession}]}] \
+        -config [dict create master_template [dict get $templates $monitor_master] \
+            templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {
         $router add $method $pattern [list ::site::invoke $handler $name] -strict true
     }

@@ -99,6 +99,29 @@ proc ::app_config::lambda_config {root} {
     return {}
 }
 
+proc ::app_config::request_monitor {config} {
+    set settings [dict create master_template request-monitor-master.html.jinja]
+    if {[dict exists $config request_monitor]} {
+        set settings [dict merge $settings [dict get $config request_monitor]]
+    }
+    return $settings
+}
+
+proc ::app_config::monitor_store {config} {
+    set settings [dict merge [dict create history_max_events 100000 \
+        store [expr {[mode] eq "LOCAL" ? "memory" : "valkey"}]] [request_monitor $config]]
+    set history [dict get $settings history_max_events]
+    if {![string is integer -strict $history] || $history < 1} {
+        error "request_monitor.history_max_events must be a positive integer"
+    }
+    switch -- [dict get $settings store] {
+        memory {return [dict create tsvstore [dict create history_max_events $history]]}
+        valkey {return [dict create valkeystore [dict merge [valkey $config] \
+            [dict create history_max_events $history]]]}
+        default {error "request_monitor.store must be memory or valkey"}
+    }
+}
+
 proc ::app_config::lambda_middleware {config} {
     set limits [dict create window_millis 10000 limit 1000]
     if {[dict exists $config ratelimit]} {set limits [dict merge $limits [dict get $config ratelimit]]}
@@ -106,20 +129,11 @@ proc ::app_config::lambda_middleware {config} {
         set value [dict get $limits $key]
         if {![string is integer -strict $value] || $value < 1} {error "ratelimit.$key must be a positive integer"}
     }
-    set history 100000
-    if {[dict exists $config request_monitor history_max_events]} {
-        set history [dict get $config request_monitor history_max_events]
-    }
-    if {![string is integer -strict $history] || $history < 1} {
-        error "request_monitor.history_max_events must be a positive integer"
-    }
+    set monitorStore [monitor_store $config]
     if {[mode] eq "LOCAL"} {
         set rateStore {localstore {}}
-        set monitorStore [dict create tsvstore [dict create history_max_events $history]]
     } else {
-        set cache [valkey $config]
-        set rateStore [dict create valkeystore $cache]
-        set monitorStore [dict create valkeystore [dict merge $cache [dict create history_max_events $history]]]
+        set rateStore [dict create valkeystore [valkey $config]]
     }
     return [dict create \
         tratelimit [dict create store $rateStore global_limits [dict create by_ip $limits] route_limits {}] \

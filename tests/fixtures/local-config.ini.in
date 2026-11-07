@@ -1,6 +1,11 @@
 [registry]
 directory = {registry_dir}
 
+[request_monitor]
+# This smoke test deliberately verifies Valkey, including in LOCAL mode.
+store = valkey
+history_max_events = 100000
+
 [redis]
 host = localhost
 port = {port}

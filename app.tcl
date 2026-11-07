@@ -38,12 +38,6 @@ set tratelimit_config {
                 limit 100
             }
         }
-        get_stats {
-            by_ip {
-                window_millis 10000
-                limit 5
-            }
-        }
         get_catchall {
             by_ip {
                 window_millis 10000
@@ -55,9 +49,7 @@ set tratelimit_config {
 
 dict set tratelimit_config store valkeystore $valkey_config
 
-set treqmon_config {}
-dict set treqmon_config store valkeystore [dict merge $valkey_config \
-    [dict create history_max_events 100000]]
+set treqmon_config [dict create store [::app_config::monitor_store $config]]
 
 
 
@@ -69,6 +61,7 @@ set config_dict [dict create \
     rootdir [file dirname [info script]] \
     registry_dir [dict get $config registry directory] \
     releases $releases_config \
+    request_monitor [::app_config::request_monitor $config] \
     gzip on \
     gzip_types [list text/plain application/json] \
     gzip_min_length 8192 \

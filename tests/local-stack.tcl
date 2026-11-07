@@ -65,13 +65,16 @@ try {
         exec $python [file join $root tests search_ui.py] $base >@stdout 2>@stderr
     }
     foreach {path expected} {
-        /docs {Getting started} /blog {No published content yet.}
+        /docs {Getting started} /blog {ttrek 1.0.0 is now public}
+        /blog/2026-11-07-ttrek-100-is-now-public {Konstantin Kushnir}
         /docs/getting-started {ttrek init -y} /docs/registries private-ttrek-registry
         /docs/_assets/style.css .cards /packages tjson /search?q=web twebserver
         /registry/autocomplete?q=web twebserver /package/tcl 9.1.0
         /package/web-static-blog 0.1.0 /registry/web-static-wiki 0.1.0
+        /package/treqmon 2.1.0 /registry/treqmon 2.1.0
         /registry/tcl 9.1.0 /registry/search?q=web twebserver
-        /request-monitor data-chart-config /init TTREK_UPDATE_ROOT
+        /request-monitor data-chart-config /request-monitor/_assets/charts.js treqmon-chart-color
+        /init TTREK_UPDATE_ROOT
     } {
         assert {[::test_support::contains [request $path] $expected]} "unexpected response for $path"
         puts "PASS GET $path"
