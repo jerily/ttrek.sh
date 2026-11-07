@@ -56,10 +56,21 @@ The Lambda runtime gets only `kms:Decrypt` on this key; the build gets
 
 `15-infra-certificate.yml` requests an ACM public certificate for `ttrek.sh` using
 DNS validation in the API's region. No personal name, email or country is needed.
-If DNS is in a public Route 53 zone in the same account, set
-`TTREK_HOSTED_ZONE_ID=Z...` for both certificate and API deployment. ACM then adds
-the validation record, and the API stack adds an apex A alias. Otherwise leave
-that variable unset: add ACM's validation CNAME at your DNS provider while the
+Both deployment scripts automatically find the matching public Route 53 zone in
+the selected account using `route53:ListHostedZones`. For subdomains, the most
+specific matching zone is selected; private zones are ignored. Duplicate public
+zones require `TTREK_HOSTED_ZONE_ID=Z...` to select one explicitly. ACM then adds
+the validation record, and the API stack adds an apex A alias.
+The lookup uses Tcl 8.6+ and the AWS CLI, with no application packages required;
+set `TCLSH` to select a specific interpreter.
+
+CloudFormation's DNS record resource supports zone names, but ACM validation
+requires a zone ID. The scripts resolve it before deployment, avoiding a custom
+Lambda resource just for the lookup. Direct CloudFormation deployments still
+need the `HostedZoneId` parameter for automatic DNS configuration.
+
+If there is no matching public zone, or you explicitly set
+`TTREK_HOSTED_ZONE_ID=''` to skip lookup, add ACM's validation CNAME at your DNS provider while the
 certificate stack waits, then point the apex to the API stack's
 `RegionalDomainName` output using your provider's ALIAS/ANAME or CNAME-flattening
 feature. A normal CNAME cannot be used at the zone apex. Keep ACM's validation
