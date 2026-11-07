@@ -2,16 +2,12 @@
   "name": "ttrek_sh",
   "version": "1.0.0",
   "scripts": {
-    "init-docs": "exec \"$PROJECT_HOME/bin/docs.sh\" init \"$@\"",
-    "sync-docs": "exec \"$PROJECT_HOME/bin/docs.sh\" sync \"$@\"",
     "start-direct": "exec \"$PROJECT_HOME/run.sh\" \"$@\"",
     "package": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\"",
     "start-local": "exec \"$PROJECT_HOME/bin/start-local.sh\" \"$@\"",
     "start-lambda": "exec \"$PROJECT_HOME/bin/start-lambda.sh\" \"$@\"",
     "start-proxy": "exec \"$PROJECT_HOME/bin/start-proxy.sh\" \"$@\"",
     "start-s3": "exec \"$PROJECT_HOME/bin/start-s3.sh\" \"$@\"",
-    "edit-direct": "exec \"$PROJECT_HOME/run.sh\" -authorize \"$@\"",
-    "edit-local": "exec \"$PROJECT_HOME/bin/start-local.sh\" --edit \"$@\"",
     "package-lambda": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\""
   },
   "dependencies": {
@@ -32,7 +28,8 @@
     "tpersist": "^0.1.0",
     "tconfig": "^1.0.0",
     "tsession-dynamodb": "^1.0.0",
-    "web-wiki": "^0.1.0"
+    "web-static-blog": "^0.1.0",
+    "web-static-wiki": "^0.1.0"
   },
   "devDependencies": {
     "tcllib": "^2.0.0",

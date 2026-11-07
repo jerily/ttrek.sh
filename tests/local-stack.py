@@ -85,13 +85,18 @@ with tempfile.TemporaryDirectory(prefix="local stack ", dir=ROOT / "build") as t
                         raise
                     time.sleep(0.2)
             assert b'href="/docs"' in homepage
+            assert b'href="/blog"' in homepage
+            assert b"Sign Up" not in homepage
             for path, expected in {
                 "/docs": b"Getting started",
+                "/blog": b"No published content yet.",
                 "/docs/getting-started": b"ttrek init -y",
                 "/docs/registries": b"private-ttrek-registry",
                 "/docs/_assets/style.css": b".cards",
                 "/packages": b"tjson",
                 "/package/tcl": b"9.1.0",
+                "/package/web-static-blog": b"0.1.0",
+                "/registry/web-static-wiki": b"0.1.0",
                 "/registry/tcl": b"9.1.0",
                 "/registry/search?q=web": b"twebserver",
                 "/request-monitor": b"data-chart-config",
@@ -107,10 +112,13 @@ with tempfile.TemporaryDirectory(prefix="local stack ", dir=ROOT / "build") as t
             assert request("/docs", method="HEAD")[0] == b""
             request("/docs/missing", 404)
             request("/docs/_edit/getting-started", 404)
+            request("/docs/_new", 404)
+            request("/blog/_new", 404)
+            request("/blog/_edit/post", 404)
             request("/docs", 405, method="POST", data=b"")
             request("/registry/search?q=one&q=two", 400)
             request("/telemetry/collect/demo/1.0.0", 400, method="POST", data=b"invalid")
-            print("PASS wiki navigation, HEAD, disabled editor and request validation")
+            print("PASS static content, HEAD, read-only routes and request validation")
 
             def invoke(event, status=200):
                 body, headers = request(

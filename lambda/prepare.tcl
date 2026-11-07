@@ -6,20 +6,15 @@ source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
 source [file join $siteRoot tcl telemetry.tcl]
 file mkdir [file join $siteRoot data]
-set connection [::tpersist::db_connect -database [file join $siteRoot data docs.sqlite3] -autobegin 0]
+::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
+    releases [::app_config::releases {}]]
+set router [::tpathexp::router]
 try {
-    ::site::initdb $connection
-    puts [::site::sync $connection [file join $siteRoot content docs]]
-    ::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
-        releases [::app_config::releases {}]]
-    set router [::tpathexp::router]
-    try {
-        ::site::mount $router $connection
-        foreach path {/ /docs /docs/getting-started /packages} {
-            set response [::site::dispatch $router [dict create method GET path $path]]
-            if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}
-        }
-    } finally {$router destroy}
-} finally {::tpersist::db_disconnect $connection}
+    ::site::mount $router
+    foreach path {/ /docs /docs/getting-started /blog /packages} {
+        set response [::site::dispatch $router [dict create method GET path $path]]
+        if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}
+    }
+} finally {$router destroy}
 ::telemetry::init -file [file join $siteRoot data telemetry.sqlite3]
 ::db close

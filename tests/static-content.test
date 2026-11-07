@@ -1,0 +1,45 @@
+package require Tcl 9.1
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl site.tcl]
+source [file join $root tcl config.tcl]
+::site::init_worker [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}]]
+proc request {path {method GET}} {
+    ::site::dispatch $::site::router [dict create method $method path $path]
+}
+test static-1 {documentation and blog mount with the host layout} -body {
+    set docs [request /docs/getting-started]
+    set blog [request /blog]
+    list [dict get $docs statusCode] [string match {*ttrek init -y*} [dict get $docs body]] \
+        [dict get $blog statusCode] [string match {*No published content yet.*} [dict get $blog body]] \
+        [string match {*href="/blog"*} [dict get $docs body]]
+} -result {200 1 200 1 1}
+test static-2 {homepage has documentation and blog navigation without signup} -body {
+    set html [dict get [request /] body]
+    list [string match {*href="/docs"*} $html] [string match {*href="/blog"*} $html] \
+        [string match {*Sign Up*} $html]
+} -result {1 1 0}
+test static-3 {authoring routes cannot be enabled by environment variables} -body {
+    set ::env(TTREK_EDITOR_PASSWORD) arbitrary
+    set ::env(TTREK_LOCAL_EDIT_DATABASE) /missing
+    set codes {}
+    foreach path {/docs/_new /docs/_edit/getting-started /blog/_new /blog/_edit/post /docs/_assets/editor.css} {
+        lappend codes [dict get [request $path] statusCode]
+    }
+    foreach path {/docs /docs/_new /blog /blog/_edit/post} {
+        lappend codes [dict get [request $path POST] statusCode]
+    }
+    set codes
+} -cleanup {
+    unset ::env(TTREK_EDITOR_PASSWORD) ::env(TTREK_LOCAL_EDIT_DATABASE)
+} -result {404 404 404 404 404 405 405 405 405}
+test static-4 {HEAD and safe content headers} -body {
+    set response [request /docs/getting-started HEAD]
+    list [dict get $response statusCode] [dict get $response body] \
+        [dict get $response headers x-content-type-options]
+} -result {200 {} nosniff}
+$::site::router destroy
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

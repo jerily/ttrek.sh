@@ -1,8 +1,6 @@
 Usage: start-local.sh [options]
        start-lambda.sh|start-proxy.sh|start-s3.sh [options]
 
-  --edit              Enable editing using TTREK_EDITOR_PASSWORD
-  --database FILE     Persistent docs database; requires --edit
   --zip FILE          Packaged site (default: dist/ttrek-sh.zip)
   --routes FILE       Proxy routes (default: routes.json)
   --s3-dir DIRECTORY  Public asset and release buckets (default: dist/s3)
@@ -15,14 +13,11 @@ Usage: start-local.sh [options]
   --help              Show this help
 
 Run the package script before starting. These services execute trusted local
-code. Ordinary startup serves the packaged documentation read-only. With --edit,
-changes persist in var/docs-lambda.sqlite3 (or --database). Set [content]
-allow_create = true in etc/config.local.ini to allow new pages. Runtime
-state and uploaded mock objects are disposable; the archive and source files
-remain unchanged. Stop with Ctrl-C; the supervisor stops all three services.
+code. Content is served from the directories in the archive. Runtime state
+and uploaded mock objects are disposable. Stop with Ctrl-C; the supervisor stops all three services.
 
 TTREK_SITE_PREFIX selects installed dependencies. TTREK_SITE_ZIP,
 TTREK_SITE_PORT, TTREK_LAMBDA_PORT and TTREK_LOCAL_DIR supply defaults.
 MOCK_LAMBDA_APP, MOCK_PROXY_APP and MOCK_S3_APP can select package directories.
 
-TTREK_LOCAL_CONFIG selects another local INI for the content creation policy.
+TTREK_LOCAL_CONFIG selects another local INI for public release settings.

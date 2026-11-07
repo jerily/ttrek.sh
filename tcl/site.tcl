@@ -4,16 +4,16 @@ package require tjson
 package require thread
 package require tratelimit 1.0.1
 package require treqmon 2.0.0
-package require web-wiki 0.1.0
+package require web-static-wiki 0.1.0
+package require web-static-blog 0.1.0
 package require tpathexp 1.1.0
 
 namespace eval ::site {
     variable settings
     variable router
-    variable connection
 }
 
-foreach module {editor templates request-monitor releases request-validation search handlers} {
+foreach module {templates request-monitor releases request-validation search handlers} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -32,46 +32,27 @@ proc ::site::configure {config} {
     }
 }
 
-# The host owns the connection and router; the wiki owns schema and content.
-proc ::site::initdb {connection} {::web::wiki::initdb $connection}
-
-proc ::site::sync {connection directory} {
-    set store [::web::wiki::create -connection $connection -domain ttrek.sh -title Documentation]
-    ::web::wiki::sync $store $directory
-}
-
-proc ::site::mount {router connection} {
-    set store [::web::wiki::create -connection $connection -domain ttrek.sh -title Documentation]
+# Each worker owns a router and immutable directory snapshots.
+proc ::site::mount {router} {
     set templates $::views::templates
-    set settings [config]
-    set allowCreate false
-    if {[dict exists $settings content allow_create]} {set allowCreate [dict get $settings content allow_create]}
-    set editor {}
-    if {[dict exists $settings editor] && [dict get $settings editor] ne {}} {
-        set policy [dict get $settings editor]
-        set editor [list -authorize [list ::site::editor::authorize $policy] \
-            -csrf [list ::site::editor::csrf $policy]]
+    foreach {kind title prefix} {wiki Documentation /docs blog Blog /blog} {
+        set directory [expr {$kind eq "wiki" ? "docs" : "blog"}]
+        set store [::web::static::${kind}::create -directory [file join [root] content $directory] -title $title]
+        ::web::static::${kind}::mount $router -store $store -prefix $prefix \
+            -navigation {{Home /} {Documentation /docs} {Blog /blog} {Packages /packages}} \
+            -config [dict create master_template [dict get $templates ${directory}-master.html.jinja] \
+                templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
     }
-    ::web::wiki::mount $router -store $store -prefix /docs \
-        -navigation {{Home /} {Documentation /docs} {Packages /packages}} \
-        -config [dict create allow_create $allowCreate master_template [dict get $templates docs-master.html.jinja] \
-            templates [dict create master.html.jinja [dict get $templates master.html.jinja]]] {*}$editor
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {
         $router add $method $pattern [list ::site::invoke $handler $name] -strict true
     }
 }
 
 proc ::site::init_worker {settings} {
-    variable connection
     variable router
-    set database [dict get $settings docs_database]
-    if {![file isfile $database]} {
-        error "Documentation database is missing; run ttrek run -script init-docs first"
-    }
     configure $settings
-    set connection [::tpersist::db_connect -database $database -autobegin 0 -timeout 5000]
     set router [::tpathexp::router]
-    mount $router $connection
+    mount $router
 }
 
 proc ::site::invoke {handler name request context params} {
@@ -96,13 +77,7 @@ proc ::site::dispatch {router request {context {}}} {
         }
         set request $result
     }
-    if {[dict exists $settings editor] && [dict get $settings editor] ne {} &&
-        [regexp {^/docs/(_edit/|_new(/|$))} [dict get $request path]] &&
-        ![::site::editor::authorize [dict get $settings editor] $request $context edit /]} {
-        set response [dict create statusCode 401 body {Sign in as admin to edit.} \
-            headers {content-type {text/plain; charset=utf-8} cache-control no-store \
-                www-authenticate {Basic realm="Documentation editor", charset="UTF-8"}}]
-    } else {set response [$router dispatch $request $context]}
+    set response [$router dispatch $request $context]
     if {[dict exists $settings treqmon]} {
         set response [::treqmon::middleware::leave $context $request $response]
     }

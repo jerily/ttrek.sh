@@ -10,6 +10,20 @@ curl --proto '=https' --tlsv1.2 -sSf https://ttrek.sh/init | sh
 
 Open a new terminal after installation so your shell picks up the executable.
 
+## Install build tools
+
+Before installing packages on Ubuntu/Debian:
+
+```sh
+sudo apt update
+sudo apt install build-essential cmake bash curl git patch pkg-config perl tar gzip ca-certificates
+```
+
+`build-essential` supplies GCC, G++ and Make. For a newer CMake, use
+`sudo snap install cmake --classic` and include `/snap/bin` on `PATH`.
+`ttrek install` and `ttrek update` report missing external tools before changing
+the project environment. Individual package recipes may need additional tools.
+
 ## Create a project
 
 ```sh

@@ -1,0 +1,16 @@
+{% extends 'master.html.jinja' %}
+{% block home_selected %}{% endblock %}
+{% block blog_selected %} pure-menu-selected{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="{{ assets }}/style.css" />
+<link rel="stylesheet" href="/css/docs.css" />
+{% endblock %}
+{% block content %}
+<main class="documentation">
+    <nav class="docs-navigation" aria-label="Blog">
+        {% for link in navigation %}<a href="{{ link.href }}">{{ link.label }}</a>{% endfor %}
+    </nav>
+    {% block body %}{% endblock %}
+</main>
+{% endblock %}
+{% block scripts %}{% endblock %}
