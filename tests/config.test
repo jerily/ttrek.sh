@@ -216,42 +216,13 @@ test releases-config-8 {Local stack reads the same versioned manifest through th
     dict get [::app_config::releases_from_ini $path $root] checksums linux-amd64-glibc
 } -result [string repeat b 64]
 
-test releases-config-9 {Local content-only configuration keeps default release settings} -body {
-    set path [file join $root etc content-only.ini]
+test releases-config-9 {Unrelated local configuration keeps default release settings} -body {
+    set path [file join $root etc registry-only.ini]
     set channel [open $path w]
-    puts $channel "\[content\]\nallow_create=true"
+    puts $channel "\[registry\]\ndirectory=registry"
     close $channel
     dict get [::app_config::releases_from_ini $path $root] version
 } -result 1.0.0
-
-test content-config-1 {creation defaults off and requires an explicit boolean} -body {
-    set result [list [dict get [::app_config::content {}] allow_create]]
-    foreach value {true false 1 0 yes no invalid {}} {
-        lappend result [catch {::app_config::content [dict create content [dict create allow_create $value]]}]
-    }
-    set result
-} -result {false 0 0 0 0 0 0 1 1}
-
-test content-config-2 {local INI loading extracts and validates the content policy} -body {
-    set path [file join $root etc content.ini]
-    set result {}
-    foreach text {{[content]
-# Explicit creation policy
-allow_create = true
-} {[registry]
-directory = registry
-} {[content]
-allow_create = invalid
-}} {
-        set channel [open $path w]
-        puts $channel $text
-        close $channel
-        if {[catch {::app_config::content_from_ini $path} config]} {
-            lappend result invalid
-        } else {lappend result [dict get $config allow_create]}
-    }
-    set result
-} -result {true false invalid}
 
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env

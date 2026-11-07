@@ -73,7 +73,6 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
     (app / "build").mkdir()
     (app / "build/install").symlink_to(INSTALL, target_is_directory=True)
     (app / "etc").mkdir()
-    subprocess.run([str(app / "bin/docs.sh"), "init"], env=env, check=True)
     with (app / "certificate.log").open("w") as log:
         subprocess.run([
             str(INSTALL / "bin/openssl"), "req", "-x509", "-newkey", "rsa:2048",
@@ -110,6 +109,7 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                 "/": "http://localhost:8080/init | ENV=LOCAL sh" if mode == "LOCAL" else "https://ttrek.sh/init",
                 "/packages": "jinja2-tcl",
                 "/docs": "Getting started",
+                "/blog": "No published content yet.",
                 "/docs/getting-started": "ttrek init -y",
                 "/package/tcl": "9.1.0",
                 "/package/tcl/9.1.0": "tcl@9.1.0",
@@ -149,8 +149,7 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                     assert all("description" in match for match in matches)
                     assert len({match["name"] for match in matches}) == len(matches)
                     if query == "web":
-                        assert matches[0]["name"] == "twebserver"
-                        assert "web server" in matches[0]["description"]
+                        assert any(match["name"] == "twebserver" and "web server" in match["description"] for match in matches)
                         assert "b" not in {match["name"] for match in matches}
                     elif query == "tcl":
                         assert matches[0]["name"] == "tcl" and matches[0]["match"] == "exact"

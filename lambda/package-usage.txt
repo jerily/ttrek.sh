@@ -3,12 +3,12 @@ Usage: package-lambda.sh --local-only [options]
   --output FILE       ZIP destination (default: dist/ttrek-sh.zip)
   --prefix DIRECTORY  Installed dependency prefix (default: ttrek-venv/local)
   --tclsh NAME        Interpreter filename under PREFIX/bin (default: tclsh9.1)
-  --content-dir DIR   Source root containing docs/ (default: content)
+  --content-dir DIR   Source root containing docs/ and blog/ (default: content)
   --s3-dir DIR        Asset and local release buckets (default: dist/s3)
   --local-only        Package for this Linux host, skipping the AL2023 ABI check
   --help              Show this help
 
-Builds a fresh documentation database and telemetry schema, validates the staged
+Stages Markdown directories and a fresh telemetry schema, validates the staged
 site, and writes a Lambda custom-runtime archive. Copies public assets and the
 local ttrek executable into mock S3 seed buckets. Host configuration, TLS keys,
 Git metadata and working databases are excluded. No AWS deployment occurs.

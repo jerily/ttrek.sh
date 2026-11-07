@@ -14,11 +14,10 @@
 - Each worker loads and validates the complete template dictionary at startup.
   Restart the server after editing templates. Missing includes and invalid
   templates fail startup.
-- Documentation uses `web-wiki` at `/docs`, mounted on the host's `tpathexp`
-  router in the same way as `jerily-company-site`. The host supplies its layout
-  and owns the SQLite connection; the package owns its schema, routes and content.
-- Documentation initialization and Markdown imports are explicit maintenance
-  operations. Request workers never import content or create its schema.
+- Documentation and blog content use `web-static-wiki` at `/docs` and
+  `web-static-blog` at `/blog`, mounted on the host's `tpathexp` router.
+  Packages read Markdown directories into immutable snapshots per worker.
+  The host supplies trusted layouts. Restart workers to publish source changes.
 - Direct HTTP and Lambda HTTP events share `tcl/site.tcl`, `tcl/routes.tcl`
   and `tcl/handlers.tcl`. Mock applications own local HTTP transport and S3 storage.
 - Release checksums live in a versioned JSON manifest, separated by environment.
@@ -241,62 +240,28 @@ ttrek sync
 ttrek install -y -registry ../private-ttrek-registry -add-pubreg
 ```
 
-To enable browser creation in local edit mode, set this in `etc/config.local.ini`:
+Documentation lives in `content/docs/`; dated blog posts live in `content/blog/`.
+The public packages `web-static-wiki` and `web-static-blog` serve these directories
+without a content database or browser write routes. Blog filenames use
+`YYYY-MM-DD-title.md`. The empty blog directory displays an empty publication index.
 
-```ini
-[content]
-allow_create = true
-```
-
-The flag defaults to `false` and must be a boolean. It only permits creation when
-editing is explicitly enabled. For the direct server, set `ENV=LOCAL` and
-`TTREK_EDITOR_PASSWORD`, then run `ttrek run -script edit-direct`. For the local
-Lambda stack, rebuild the ZIP with updated web-wiki, set `TTREK_EDITOR_PASSWORD`,
-and run `ttrek run -script edit-local`. Sign in as **admin** with that password.
-The docs index and page toolbar expose **New page**, using the local Markdown
-editor and the same authorization/CSRF checks as revision saves.
-
-The local launcher reads only this content policy from `etc/config.local.ini`;
-`TTREK_LOCAL_CONFIG` may select another INI. It passes the validated flag to the
-runtime without packaging host configuration or credentials. Local edit mode
-uses `var/docs-lambda.sqlite3`, overridden by `--database FILE`. It seeds the file
-once from the ZIP; all workers share the database and a startup CSRF token.
-Edits and new pages survive restarts. Ordinary `start-local` stays read-only and
-serves its disposable packaged seed. `--database` requires `--edit`.
-
-Browser-created pages have title-derived URLs and revision history in SQLite.
-They do not write source files. Sync preserves them and their containing folders;
-a conflicting source URL fails instead of replacing browser-created content.
-Duplicate creation returns 409. Existing-page editing remains available in edit
-mode when `allow_create` is false.
-
-`web-wiki`, `tpersist` and `tpathexp` are runtime dependencies. The local launcher uses Tcllib's `inifile` package to read the creation policy. `twebserver`,
-`tdevops` and `tcllib` are `devDependencies`. The three mocks are regular
-dependencies of tdevops and install transitively into this project's prefix.
-`etc/tdevops.tcl` owns the application staging, S3 seeds and local policy. Installed
-tdevops owns packaging, ZIP extraction and service supervision. The project
-exports `package-lambda` with `package` as its short alias; the installed command
-is `ttrek run -package tdevops -script package-lambda`.
-The private source checkout supplies the wiki and mock recipes; Git needs access
-to their source repositories. The public source supplies the other packages.
-
-The **Documentation** navigation link opens `/docs`. Its starter guides live in
-`content/docs/*.md`. The host mounts the wiki with `-store`, `-prefix`,
-`-navigation` and `-config master_template`, following the company-site example.
-Only the shared master template is passed as an additional template, so host
-page names cannot override the wiki's index or item templates. Editing is disabled unless explicitly started in edit mode.
-
-For the direct server, initialize once and import changes explicitly:
+Edit Markdown files locally and restart the direct server to publish changes:
 
 ```sh
-ttrek run -script init-docs
-ttrek run -script sync-docs
 ENV=LOCAL ttrek run -script start-direct
 ```
 
-The direct documentation database is `data/docs.sqlite3`. Each worker owns a
-connection with a busy timeout and its own router. Direct serving still uses
-the configured Valkey service and TLS settings described below.
+The **Documentation** and **Blog** links open `/docs` and `/blog`. Each worker owns
+its router and directory snapshots. Mounts receive `-store`, `-prefix`, `-navigation`
+and `-config master_template`; only the shared master is supplied as an additional
+template. Direct serving uses the configured Valkey service and TLS settings below.
+
+`tdevops` owns packaging and local service supervision; `etc/tdevops.tcl` supplies
+application staging, S3 seeds and release configuration. The private registry
+supplies the local mock tooling; the public registry supplies the static content
+packages. `TTREK_LOCAL_CONFIG` may select a local INI for release settings.
+The `package` and `package-lambda` scripts package both content directories.
+Repackage the site after changing Markdown for the local Lambda stack or deployment.
 
 To run the website through all three mocks, without Valkey or AWS:
 
@@ -316,22 +281,22 @@ Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor st
 `routes.json` maps `/` and `/{proxy+}` to the function. The Lambda adapter supports
 payloads 1.0 and 2.0, preserves query/body data and returns base64-encoded response
 bytes. Static website assets are fetched from S3 through Lambda, retaining the
-browser's origin and the wiki's content security policy. Wiki-owned assets remain
-owned by the wiki package. Release redirects and checksum metadata use the mock
+browser's origin and content security policy. Package CSS is served by each
+content package. Release redirects and checksum metadata use the mock
 S3 endpoint and local credentials. HTTP S3 endpoints are accepted only on loopback
 in LOCAL mode; production signing still requires HTTPS.
 
-Packaging creates `dist/ttrek-sh.zip`, with a fresh documentation database and
+Packaging creates `dist/ttrek-sh.zip`, with Markdown directories and a fresh
 telemetry schema, plus `dist/s3/ttrek-assets` and `dist/s3/ttrek-local` seed buckets.
 It includes installed runtime libraries, templates and public registry recipes;
 it excludes host configuration, TLS keys, Git metadata and working databases.
 The release bucket contains this host's `ttrek` executable, not a published release.
 `--local-only` selects the host ABI; no archive is uploaded or deployed.
 
-The Lambda runtime uses disposable documentation/telemetry database copies and
+The Lambda runtime uses directory snapshots, a disposable telemetry database and
 per-process request-monitor history. Local mock mode has no Valkey rate limiter.
 Mock object uploads and runtime state are disposable. Repackage after source
-changes and restart the services; serving never rebuilds or imports content.
+changes and restart the services to load the new snapshots.
 
 All services bind to loopback. Custom ports and paths can be passed together:
 
@@ -373,7 +338,7 @@ comes with the Tcl runtime.
 `tink-tcl` 20240704.0.1 with Tcl stubs. Tink and RapidJSON patches live in
 `registry/tink-cc/2.1.1/`. Completed installs are reused. Set `TTREK_MAKE_THREADS`
 to control parallelism (default: 4). Its final package check now also expects the
-wiki and mock packages; use the ttrek installation above for the complete site.
+static content and mock packages; use the ttrek installation above for the complete site.
 
 Configure the Valkey service and `etc/config.ini` before running the application.
 Encrypted configuration additionally requires the configured AWS credentials
@@ -399,7 +364,7 @@ All assets are served locally; no template compiler or JavaScript bundler is use
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
-ttrek run tclsh9.1 "$PWD/tests/editor.test"
+ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 python3 tests/installer.py
 python3 tests/runtime-smoke.py
 python3 tests/local-stack.py
@@ -512,7 +477,6 @@ deployment cannot move existing resources between stacks. The cache stack
 creates a new Valkey replication group, so migrate any required Redis data
 before retiring the old cache.
 
-`python3 tests/local-editor.py --zip /path/to/ttrek-sh.zip` verifies configured creation, both Lambda event formats, authentication/CSRF, shared workers, persistence and read-only startup against a freshly packaged local ZIP.
 
 ## Security
 
@@ -520,7 +484,7 @@ before retiring the old cache.
 
 Registry metadata and request-monitor statistics are rendered into HTML. The
 application also exposes registry, telemetry and static-file endpoints, a public
-documentation wiki with optional local editing and creation, and local mock service endpoints.
+read-only documentation and blog, and local mock service endpoints.
 
 ### Protections
 
@@ -532,10 +496,10 @@ metadata includes an executable checksum; no bucket listing or upload route is e
 Production Valkey connections require TLS and verify the CA and hostname,
 including reconnects. LOCAL mode can use plain TCP only against localhost.
 
-Wiki content uses `web-wiki`'s bound SQL and safe-mode Markdown rendering. The
-host supplies trusted layout templates. Explicit local edit mode supplies host-owned
-Basic authentication and CSRF callbacks; creation additionally requires `allow_create`.
-Local launchers bind the mocks to loopback and keep host secrets out of packages.
+Content packages read validated Markdown snapshots, escape metadata and render
+Markdown in safe mode. They expose only read routes and a CSS asset. The host
+supplies trusted layouts. Local launchers bind mocks to loopback and keep host
+secrets out of packages.
 
 Template lookup is restricted to the dictionary loaded from the application's
 `www` directory and treqmon's installed templates. jinja2-tcl never evaluates Tcl from templates. Contexts retain
@@ -547,8 +511,7 @@ attributes before JavaScript parses it; it is never inserted as executable scrip
 The existing request-monitor and debug routes have no authentication guard in
 this repository. Apply the deployment's access controls before exposing them.
 The mocks execute trusted local code and do not authenticate callers. They are
-development services. Production wiki editing and deployment configuration remain outside this local integration.
-Persistent editing databases are supported only by the explicit local edit launcher.
+development services. Deployment configuration remains outside this local integration.
 
 ## API Gateway template
 

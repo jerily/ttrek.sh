@@ -2,6 +2,8 @@
 # SPDX-FileCopyrightText: 2024 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
 
+if {$argv ne {}} {error "Usage: app.tcl"}
+
 package require Tcl 9.1
 package require twebserver
 package require thread
@@ -11,9 +13,6 @@ set dir [file dirname [info script]]
 
 source [file join $dir tcl config.tcl]
 set config [::app_config::load $dir]
-source [file join $dir tcl editor.tcl]
-if {$argv ni {{} -authorize}} {error "Usage: app.tcl ?-authorize?"}
-set editor_config [::site::editor::settings [expr {$argv eq "-authorize"}]]
 
 # Shared TLS connection settings for both middleware stores.
 set valkey_config [::app_config::valkey $config]
@@ -69,10 +68,7 @@ set telemetry_thread_id [thread::create thread::wait]
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
     registry_dir [dict get $config registry directory] \
-    docs_database [file normalize [file join $dir data docs.sqlite3]] \
     releases $releases_config \
-    content [::app_config::content $config] \
-    editor $editor_config \
     gzip on \
     gzip_types [list text/plain application/json] \
     gzip_min_length 8192 \

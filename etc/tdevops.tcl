@@ -2,14 +2,12 @@
 ::tdevops::configure {
     archive ttrek-sh.zip
     files {tcl www schemas registry public LICENSE lambda/runtime.tcl lambda/paths.tcl lambda/prepare.tcl}
-    content-collections {docs}
+    content-collections {docs blog}
     prepare lambda/prepare.tcl
     services {s3 lambda proxy}
-    required-files {lambda/runtime.tcl data/docs.sqlite3}
+    required-files {lambda/runtime.tcl content/docs/getting-started.md}
     environment {TTREK_SITE_ZIP --zip TTREK_SITE_PORT --port
         TTREK_LAMBDA_PORT --lambda-port TTREK_LOCAL_DIR --state-dir}
-    editor {password-env TTREK_EDITOR_PASSWORD database var/docs-lambda.sqlite3
-        seed data/docs.sqlite3 database-env TTREK_LOCAL_EDIT_DATABASE csrf-env TTREK_LOCAL_CSRF_SECRET}
     package-help lambda/package-usage.txt
     local-help lambda/local-usage.txt
     local-hook ::project_devops::local
@@ -18,16 +16,13 @@
 namespace eval ::project_devops {}
 proc ::project_devops::local {options work} {
     set root $::tdevops::root
-    # Read only the content policy from the checkout's local INI.
+    # Read public release settings from the checkout's local INI.
     source [file join $root tcl config.tcl]
-    set contentPolicy [::app_config::content {}]
     set configPath [file join $root etc config.local.ini]
     if {[info exists ::env(TTREK_LOCAL_CONFIG)] && $::env(TTREK_LOCAL_CONFIG) ne {}} {
         set configPath [file normalize $::env(TTREK_LOCAL_CONFIG)]
         if {![file isfile $configPath]} {error "local configuration does not exist: $configPath"}
     }
-    if {[file isfile $configPath]} {set contentPolicy [::app_config::content_from_ini $configPath]}
-    set ::env(TTREK_LOCAL_ALLOW_CREATE) [dict get $contentPolicy allow_create]
     set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $work data]
     set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:[dict get $options --s3-port]
     set ::env(ENV) LOCAL

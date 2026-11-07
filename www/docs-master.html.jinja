@@ -2,7 +2,6 @@
 {% block home_selected %}{% endblock %}
 {% block docs_selected %} pure-menu-selected{% endblock %}
 {% block styles %}
-{% if editing %}<link rel="stylesheet" href="{{ assets }}/editor.css" />{% endif %}
 <link rel="stylesheet" href="{{ assets }}/style.css" />
 <link rel="stylesheet" href="/css/docs.css" />
 {% endblock %}
@@ -14,4 +13,4 @@
     {% block body %}{% endblock %}
 </main>
 {% endblock %}
-{% block scripts %}{% if editing %}<script defer src="{{ assets }}/markdown-editor.bundle.js"></script>{% endif %}{% endblock %}
+{% block scripts %}{% endblock %}
