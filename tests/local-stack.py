@@ -131,7 +131,9 @@ with tempfile.TemporaryDirectory(prefix="local stack ", dir=ROOT / "build") as t
 
             event = {"httpMethod": "GET", "path": "/registry/search", "headers": None,
                      "queryStringParameters": {"q": "web"}, "multiValueQueryStringParameters": None}
-            assert json.loads(invoke(event))[0]["name"] == "twebserver"
+            names = [match["name"] for match in json.loads(invoke(event))]
+            for name in ("web-static-blog", "web-static-wiki"):
+                assert names.index(name) < names.index("twebserver")
             event["multiValueQueryStringParameters"] = {"q": ["web", "server"]}
             invoke(event, 400)
             telemetry = {"action": "install", "outcome": "success", "is_toplevel": True,
