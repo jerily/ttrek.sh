@@ -11,7 +11,7 @@ set test_releases [::app_config::releases {}]
 # Stub external services, but exercise the real handlers, serializer and renderer.
 package provide twebserver 1.47.54
 package provide tratelimit 1.0.1
-package require treqmon 2.0.0
+package require treqmon 2.1.0
 namespace eval ::twebserver {
     proc get_rootdir {} {return $::test_root}
     proc get_config_dict {} {
@@ -174,7 +174,7 @@ proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
     dict size $::views::templates
-} -result 15
+} -result 11
 
 test templates-2 {Index layout and literal clipboard command} -setup {
     set saved_env [array get ::env ENV]
@@ -443,50 +443,6 @@ test registry-5 {Latest recipe and patches use the configured directory with lit
     list [dict get $response status] [dict get $spec version] \
         [contains $patch {GenericStringRef& operator=}]
 } -result {200 2.0.0 1}
-
-# A deterministic sample matching treqmon's public statistics shape.
-proc monitor_stats {metric top_key} {
-    set stats {}
-    foreach {interval step} {second 1 minute 60 hour 3600} {
-        dict set stats $interval [dict create xrange [list 0 [expr {2 * $step}]] \
-            $metric [dict create $step [list $step 7]] $top_key [list [list $step 7]]]
-    }
-    return $stats
-}
-proc ::treqmon::get_history_events {} {return {}}
-proc ::treqmon::get_summary {events} {
-    return {last_minute_avg_response_time 0 last_half_hour_avg_response_time 1.5 last_hour_avg_response_time 2 last_day_avg_response_time 3}
-}
-proc ::treqmon::get_page_views {events} {monitor_stats page_views top_k_views}
-proc ::treqmon::get_response_times {events} {monitor_stats response_times top_k_times}
-proc ::treqmon::get_active_users {events} {monitor_stats active_users top_k_users}
-
-test monitor-1 {Charts fill missing buckets with zero for every interval} -body {
-    set result {}
-    foreach interval {second minute hour} {
-        set chart [::treqmon::view::chart [monitor_stats page_views top_k_views] $interval page_views {Page Views} Views top_k_views]
-        set chart [::tjson::json_to_simple [::tjson::typed_to_json $chart]]
-        set config [::tjson::json_to_simple [dict get $chart config]]
-        lappend result [dict get [lindex [dict get $config data datasets] 0] data]
-    }
-    set result
-} -result {{0 7 0} {0 7 0} {0 7 0}}
-
-test monitor-2 {Monitor has six charts without a session package} -body {
-    set html [body [get_stats_handler {} {}]]
-    list [regexp -all {<canvas } $html] [contains $html {Last 30 minutes: 1.5}] \
-        [contains $html {src="/js/chart.umd.js"}] [contains $html {&quot;type&quot;}] \
-        [contains $html {Active Users}]
-} -result {6 1 1 1 0}
-
-test monitor-3 {Active user charts appear when sessions are present} -setup {
-    package provide tsession 1.0.0
-} -body {
-    set html [body [get_stats_handler {} {}]]
-    list [regexp -all {<canvas } $html] [contains $html {Active Users}]
-} -cleanup {
-    package forget tsession
-} -result {9 1}
 
 test templates-5 {Template data cannot execute Tcl or inject HTML} -body {
     set ::executed 0

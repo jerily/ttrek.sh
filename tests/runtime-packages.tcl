@@ -24,7 +24,7 @@ foreach name $packages {
             ttrie {package require ttrie 0.2.0}
             ttrigrams {package require ttrigrams 0.2.0}
             trequests {package require trequests 1.1.0}
-            treqmon {package require treqmon 2.0.0}
+            treqmon {package require treqmon 2.1.0}
             tratelimit {package require tratelimit 1.0.1}
             awss3 - awskms - awsssm - awsdynamodb {package require $name 1.0.12}
             default {package require $name}

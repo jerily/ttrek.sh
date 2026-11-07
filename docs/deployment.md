@@ -103,6 +103,8 @@ the cache endpoint is missing. No plaintext secret is committed or printed.
 | `/ttrek_sh/prod/ratelimit/window_millis` | String | Optional; default `10000` |
 | `/ttrek_sh/prod/ratelimit/limit` | String | Optional; default `1000` |
 | `/ttrek_sh/prod/request_monitor/history_max_events` | String | Optional; default `100000` |
+| `/ttrek_sh/prod/request_monitor/master_template` | String | Optional; default `request-monitor-master.html.jinja` from `www/` |
+| `/ttrek_sh/prod/request_monitor/store` | String | Optional; default `valkey`; `memory` keeps history within each process |
 
 The cache deployment script reads that same password with decryption and supplies
 the `NoEcho` CloudFormation parameter through a mode-restricted temporary JSON
