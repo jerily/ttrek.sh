@@ -97,13 +97,13 @@ proc get_release_handler {ctx req} {
         return [::twebserver::build_response 404 text/plain "Unsupported distribution"]
     }
     set settings [dict get [::site::config] releases]
-    if {[dict get $settings bucket] eq "" || ![dict exists $settings sha256_$target] ||
+    if {[dict get $settings bucket] eq "" || ![dict exists $settings checksums $target] ||
         [catch {::releases::signed_url $target} url]} {
         set response [::twebserver::build_response 503 text/plain "Release metadata is unavailable"]
     } else {
         set data [list M [dict create version [list S [dict get $settings version]] \
             target [list S $target] url [list S $url] \
-            sha256 [list S [string tolower [dict get $settings sha256_$target]]]]]
+            sha256 [list S [string tolower [dict get $settings checksums $target]]]]]
         set response [::twebserver::build_response 200 application/json [::tjson::typed_to_json $data]]
     }
     dict set response headers Cache-Control no-store

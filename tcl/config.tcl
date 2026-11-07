@@ -37,6 +37,9 @@ proc ::app_config::load {root} {
     }
     if {$registry_dir eq ""} {error "registry.directory must not be empty"}
     dict set config registry directory [file normalize [file join $root $registry_dir]]
+    if {[dict exists $config releases checksums_file] && [dict get $config releases checksums_file] ne {}} {
+        dict set config releases checksums_file [file normalize [file join $root [dict get $config releases checksums_file]]]
+    }
     return $config
 }
 
@@ -64,7 +67,7 @@ proc ::app_config::valkey {config} {
 }
 
 proc ::app_config::releases {config} {
-    set settings [dict create bucket {} region {} prefix ttrek/1.0.0 version 1.0.0 url_expiry_seconds 300]
+    set settings [dict create bucket {} region {} prefix ttrek/1.0.0 version 1.0.0 url_expiry_seconds 300 checksums_file {} checksums {}]
     if {[dict exists $config releases]} {
         set settings [dict merge $settings [dict get $config releases]]
     }
@@ -96,13 +99,66 @@ proc ::app_config::releases {config} {
     if {![regexp {^[0-9]+\.[0-9]+\.[0-9]+$} [dict get $settings version]]} {
         error "releases.version must be a stable major.minor.patch version"
     }
-    foreach target {linux-amd64-glibc linux-arm64-glibc linux-amd64-musl linux-arm64-musl macos-arm64 macos-x86_64 macos-universal2} {
-        set key sha256_$target
-        if {[dict exists $settings $key] && ![regexp {^[0-9a-fA-F]{64}$} [dict get $settings $key]]} {
-            error "releases.$key must be a SHA-256 hex digest"
+    if {[dict get $settings checksums_file] ne {}} {
+        dict set settings checksums [release_checksums [dict get $settings checksums_file] [dict get $settings version]]
+    }
+    dict for {target checksum} [dict get $settings checksums] {
+        if {$target ni {linux-amd64-glibc linux-arm64-glibc linux-amd64-musl linux-arm64-musl macos-arm64 macos-x86_64 macos-universal2} ||
+            ![regexp {^[0-9a-fA-F]{64}$} $checksum]} {
+            error "release checksums must map supported targets to SHA-256 hex digests"
         }
     }
     return $settings
+}
+
+proc ::app_config::release_checksums {path version} {
+    package require tjson
+    set channel [open $path r]
+    try {
+        set manifest [::tjson::json_to_typed [read $channel]]
+    } finally {close $channel}
+    if {[lindex $manifest 0] ne "M"} {error "release checksums file must contain a JSON object"}
+    set selected {}
+    dict for {environment versions} [lindex $manifest 1] {
+        if {$environment ni {local prod} || [lindex $versions 0] ne "M"} {
+            error "release checksums must contain local/prod version objects"
+        }
+        dict for {release targets} [lindex $versions 1] {
+            if {![regexp {^[0-9]+\.[0-9]+\.[0-9]+$} $release] || [lindex $targets 0] ne "M"} {
+                error "release checksums must map stable versions to target objects"
+            }
+            dict for {target checksum} [lindex $targets 1] {
+                if {$target ni {linux-amd64-glibc linux-arm64-glibc linux-amd64-musl linux-arm64-musl macos-arm64 macos-x86_64 macos-universal2} ||
+                    [lindex $checksum 0] ne "S" || ![regexp {^[0-9a-fA-F]{64}$} [lindex $checksum 1]]} {
+                    error "release checksums must map supported targets to SHA-256 strings"
+                }
+                if {$environment eq [string tolower [mode]] && $release eq $version} {
+                    dict set selected $target [string tolower [lindex $checksum 1]]
+                }
+            }
+        }
+    }
+    return $selected
+}
+
+# Read only the public release settings for the local mock stack.
+proc ::app_config::releases_from_ini {path root} {
+    package require inifile
+    set comment [::ini::commentchar]
+    set ini {}
+    try {
+        ::ini::commentchar #
+        set ini [::ini::open $path r]
+        set settings {}
+        if {"releases" in [::ini::sections $ini]} {set settings [::ini::get $ini releases]}
+    } finally {
+        if {$ini ne {}} {::ini::close $ini}
+        ::ini::commentchar $comment
+    }
+    if {[dict exists $settings checksums_file] && [dict get $settings checksums_file] ne {}} {
+        dict set settings checksums_file [file normalize [file join $root [dict get $settings checksums_file]]]
+    }
+    return [releases [dict create releases $settings]]
 }
 
 proc ::app_config::content {config} {

@@ -21,6 +21,9 @@
   operations. Request workers never import content or create its schema.
 - Direct HTTP and Lambda HTTP events share `tcl/site.tcl`, `tcl/routes.tcl`
   and `tcl/handlers.tcl`. Mock applications own local HTTP transport and S3 storage.
+- Release checksums live in a versioned JSON manifest, separated by environment.
+  Configuration selects the version; hashes from another version never substitute
+  for a missing target.
 - The package registry contains published package specifications independently
   of the website's own dependencies. It lives in
   [jerily/ttrek-registry](https://github.com/jerily/ttrek-registry), included here
@@ -143,7 +146,7 @@ region = eu-central-1
 prefix = ttrek/1.0.0
 version = 1.0.0
 url_expiry_seconds = 300
-# sha256_linux-amd64-glibc = <64-character SHA-256 of the executable>
+checksums_file = etc/releases.json
 ```
 
 The [portable release build](https://github.com/jerily/ttrek/pull/33) exports
@@ -171,13 +174,51 @@ install command passes that environment setting into the script. To use local
 HTTPS, set `TTREK_UPDATE_ROOT=https://localhost:4433` and trust the local certificate
 through the downloader's CA configuration.
 
-Set `sha256_<target>` for each published executable (use `sha256sum` on Linux or
-`shasum -a 256` on macOS). `GET /releases/latest/<target>` then returns JSON with
+`checksums_file` is a JSON file resolved relative to the application root (or an
+absolute path). The tracked `etc/releases.json` starts empty; the release upload
+script in the sibling `ttrek` checkout merges SHA-256 hashes into it after all
+selected uploads succeed. Its structure is environment → version → target → hash:
+
+```json
+{
+  "local": {},
+  "prod": {
+    "1.0.0": {
+      "linux-amd64-glibc": "<64-character SHA-256 of the executable>"
+    }
+  }
+}
+```
+
+The placeholder above illustrates the structure; real entries require a valid
+64-character hexadecimal digest. `ENV=LOCAL` selects `local`; production selects
+`prod`. `releases.version` selects the exact version in that section. Missing
+versions or targets have no checksum; malformed JSON, invalid entries, and
+missing configured files fail startup. Inline `sha256_<target>` settings are
+replaced by this manifest.
+
+From the `ttrek` checkout, run `ttrek run -script upload-local -- 1.0.0` or
+`ttrek run -script upload-prod -- 1.0.0`; optionally append target names.
+The script defaults to this checkout's `etc/releases.json` when the repositories
+are siblings. Otherwise set `TTREK_CHECKSUMS_FILE` to the configured file.
+It preserves previous versions and targets and rejects changed bytes for an
+already recorded production version/target. Run uploads sequentially and commit
+the resulting manifest with the configuration change.
+
+`GET /releases/latest/<target>` returns JSON with
 `version`, canonical `target`, `sha256`, and a signed `url` for `ttrek self-update`.
 It returns 503 if the bucket or that checksum is missing. Use an immutable prefix
-per release and update the version, prefix and hashes together after uploading.
+per release and update the version and prefix together after uploading. Ship the
+manifest with the configuration; the production build already packages `etc/`.
 Both endpoints send `Cache-Control: no-store` so cached redirects cannot outlive
-their signatures. Restart the application after changing configuration.
+their signatures. Restart the application after changing configuration or hashes.
+The local mock stack reads the same INI reference and `local` section at startup,
+using its `ttrek-local` bucket. Packaged 1.0.0 seed binaries supply hashes only for
+targets without uploaded metadata; uploaded hashes take precedence. Repackage
+after runtime code changes, and restart the local stack after uploads.
+Local uploads also update the S3 seed directory (`dist/s3` here by default),
+because the mock's object database is disposable. Packaging preserves existing
+release seed binaries; remove a seed explicitly to refresh it from the host CLI.
 
 `aws-sdk-tcl` ^1.0.12 is a direct dependency, using AWS SDK C++ ^1.11.921 in the
 registry. `build.sh` builds 1.0.12 against SDK C++ 1.11.921 and upgrades older
@@ -371,6 +412,9 @@ S3-backed asset changes, binary objects, signed release downloads and checksums,
 Lambda payload 1.0 query/body handling, an unchanged archive, and shutdown cleanup.
 Package before running this test. Package checks include `awss3`; release-handler tests cover target selection, signing
 arguments, metadata, disabled downloads, invalid requests and signer failures.
+Config tests cover manifest validation, paths, and exact environment/version
+selection. The local stack test checks that uploaded metadata takes precedence
+over seed hashes and the production section of the manifest.
 The Python installer test uses mocked platform/download commands and disposable
 homes to verify all supported targets, endpoints, Rosetta detection and overrides;
 it does not download real distributions or modify the user's installation.

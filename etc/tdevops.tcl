@@ -30,11 +30,20 @@ proc ::project_devops::local {options work} {
     set ::env(TTREK_LOCAL_ALLOW_CREATE) [dict get $contentPolicy allow_create]
     set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $work data]
     set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:[dict get $options --s3-port]
-    foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.0.0/*/ttrek] {
-        set ::env(TTREK_LOCAL_RELEASE_TARGET) [file tail [file dirname $binary]]
-        set ::env(TTREK_LOCAL_RELEASE_SHA256) [lindex [exec sha256sum $binary] 0]
-        break
+    set ::env(ENV) LOCAL
+    set releases [::app_config::releases {}]
+    if {[file isfile $configPath]} {set releases [::app_config::releases_from_ini $configPath $root]}
+    # Seed binaries are only a fallback for targets without uploaded metadata.
+    if {[dict get $releases version] eq "1.0.0" && [dict get $releases prefix] eq "ttrek/1.0.0"} {
+        foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.0.0/*/ttrek] {
+            set target [file tail [file dirname $binary]]
+            if {![dict exists $releases checksums $target]} {
+                dict set releases checksums $target [lindex [exec sha256sum $binary] 0]
+            }
+        }
     }
+    dict set releases checksums_file {}
+    set ::env(TTREK_LOCAL_RELEASES) $releases
 }
 
 ::tdevops::configure {package-hook ::project_devops::seed_s3}
@@ -50,5 +59,8 @@ proc ::project_devops::seed_s3 {options architecture} {
     set target linux-[expr {$architecture eq "x86_64" ? "amd64" : "arm64"}]-glibc
     set release [file join $seed ttrek-local ttrek 1.0.0 $target]
     file mkdir $release
-    file copy -force [lindex $cli 0] [file join $release ttrek]
+    # Preserve binaries written by the release upload script across packaging.
+    if {![file exists [file join $release ttrek]]} {
+        file copy [lindex $cli 0] [file join $release ttrek]
+    }
 }

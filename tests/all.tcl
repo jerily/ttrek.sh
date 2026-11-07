@@ -114,18 +114,26 @@ test releases-4 {Invalid signing results never become redirects} -setup {
 } -result {503 503 503 503 503}
 
 test releases-5 {Metadata contains the configured version, target, checksum and signed URL} -setup {
-    dict set test_releases sha256_linux-arm64-musl [string repeat B 64]
+    set saved_release_env [array get ::env ENV]
+    set ::env(ENV) PROD
+    set test_releases [::app_config::releases [dict create releases [dict create \
+        bucket public-releases region us-east-1 version 1.1.0 prefix ttrek/1.1.0 \
+        checksums_file [file join $root tests fixtures release-checksums.json]]]]
     set s3_url "https://public-releases.s3.amazonaws.com/ttrek?X-Amz-Signature=[string repeat a 64]"
 } -body {
-    set response [get_release_handler {} {pathParameters {target aarch64-unknown-linux-musl}}]
+    set response [get_release_handler {} {pathParameters {target aarch64-apple-darwin}}]
     set metadata [::tjson::json_to_simple [dict get $response body]]
     list [dict get $response status] [dict get $metadata version] [dict get $metadata target] \
-        [expr {[dict get $metadata sha256] eq [string repeat b 64]}] \
-        [expr {[dict get $metadata url] eq $s3_url}] [dict get $response headers Cache-Control]
-} -result {200 1.0.0 linux-arm64-musl 1 1 no-store}
+        [expr {[dict get $metadata sha256] eq [string repeat c 64]}] \
+        [expr {[dict get $metadata url] eq $s3_url}] [dict get $response headers Cache-Control] \
+        [lindex [lindex $s3_calls end] end]
+} -cleanup {
+    unset -nocomplain ::env(ENV)
+    array set ::env $saved_release_env
+} -result {200 1.1.0 macos-arm64 1 1 no-store ttrek/1.1.0/macos-arm64/ttrek}
 
 test releases-6 {Metadata requires a published checksum and supported target} -body {
-    list [dict get [get_release_handler {} {pathParameters {target macos-arm64}}] status] \
+    list [dict get [get_release_handler {} {pathParameters {target linux-amd64-glibc}}] status] \
         [dict get [get_release_handler {} {pathParameters {target ../secret}}] status]
 } -result {503 404}
 
