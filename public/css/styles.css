@@ -41,7 +41,22 @@ a:focus-visible, button:focus-visible { outline: 3px solid #58aafa; outline-offs
 .bash { display: block; min-width: 0; padding: .5rem; margin: auto 0; font-size: 90%; white-space: nowrap; border: 1px solid #e1e1e1; border-radius: 4px; overflow: auto; text-transform: none; text-align: center; }
 .bash-wrapper { display: flex; margin: auto; }
 .bash-wrapper-center { justify-content: center; }
-.clipboard { flex-shrink: 0; width: 32px; height: 32px; margin: auto 0; padding: .5rem; background: none; cursor: pointer; border: 0; color: inherit; }
+.clipboard { position: relative; flex-shrink: 0; width: 32px; height: 32px; margin: auto 0; padding: .5rem; background: none; cursor: pointer; border: 0; color: inherit; }
+.clipboard-tooltip {
+    position: absolute;
+    bottom: calc(100% + .4rem);
+    right: 0;
+    z-index: 1;
+    padding: .3rem .6rem;
+    border-radius: 4px;
+    background: #172b46;
+    color: white;
+    font: 500 .8rem/1.4 system-ui, sans-serif;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+}
+.clipboard-tooltip:not(:empty) { opacity: 1; }
 
 @media (max-width: 760px) {
     .home-menu { flex-wrap: wrap; justify-content: center; gap: .4rem 2rem; }
