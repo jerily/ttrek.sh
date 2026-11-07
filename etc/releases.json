@@ -1,4 +1,9 @@
 {
   "local": {},
-  "prod": {}
+  "prod": {
+    "1.0.0": {
+      "linux-amd64-glibc": "2257816f3e2a9152e6f0f7a9ad3b028772bf969a1616bb69410e9bd2f80c145f",
+      "linux-amd64-musl": "d0e091a41eec958f1276ab8ddc15fa46a43956f36fcac8b6e54b2c0a93f5711b"
+    }
+  }
 }
