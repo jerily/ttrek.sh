@@ -1,4 +1,7 @@
+source [file join $root tcl search-build.tcl]
 set search_fixture [::tcltest::makeDirectory search-registry]
+set search_artifacts [::tcltest::makeDirectory search-artifacts]
+set search_snapshot [file join $search_artifacts search.json]
 proc search_recipe {root name version {description {}}} {
     set directory [file join $root $name $version]
     file mkdir $directory
@@ -22,7 +25,8 @@ rename ::recipe_search::index ::recipe_search::original_index
 rename ::recipe_search::descriptions ::recipe_search::original_descriptions
 set saved_entries $::recipe_search::entries
 set saved_documents $::recipe_search::documents
-::recipe_search::init $search_fixture
+::recipe_search::build $search_fixture $search_snapshot
+::recipe_search::load $search_snapshot
 proc search_names {query} {
     lmap match [::recipe_search::search $query] {dict get $match name}
 }
@@ -66,7 +70,10 @@ test search-7 {Invalid queries return 400 and no matches is an empty JSON array}
     list [lsort -unique $statuses] [dict get [get_search_handler {} {queryStringParameters {q unknown}}] body]
 } -result {400 {[]}}
 
-test search-8 {Bad descriptions fail refresh without replacing the working index} -body {
+test search-8 {Bad descriptions preserve the artifact and working indexes} -body {
+    set channel [open $search_snapshot rb]
+    set before [read $channel]
+    close $channel
     set invalid [file join $search_fixture bad 1.0.0]
     file mkdir $invalid
     set rejected {}
@@ -74,22 +81,78 @@ test search-8 {Bad descriptions fail refresh without replacing the working index
         set channel [open [file join $invalid ttrek.json] w]
         puts $channel \{$json\}
         close $channel
-        lappend rejected [catch {::recipe_search::init $search_fixture} message]
+        lappend rejected [catch {::recipe_search::build $search_fixture $search_snapshot} message]
         if {![string match {*description must be*} $message]} {error $message}
     }
     file delete -force [file join $search_fixture bad]
-    list [lsort -unique $rejected] [lindex [search_names web] 0]
-} -result {1 web}
+    set channel [open $search_snapshot rb]
+    set after [read $channel]
+    close $channel
+    list [lsort -unique $rejected] [expr {$before eq $after}] [lindex [search_names web] 0]
+} -result {1 1 web}
 
-test search-9 {Requests reuse the startup indexes after registry files disappear} -body {
+test search-snapshot-1 {Builds are deterministic and do not change the active index} -body {
+    set channel [open $search_snapshot rb]
+    set before [read $channel]
+    close $channel
+    ::recipe_search::build $search_fixture $search_snapshot
+    set channel [open $search_snapshot rb]
+    set after [read $channel]
+    close $channel
+    list [expr {$before eq $after}] [search_names compression]
+} -result {1 twebserver}
+
+test search-snapshot-2 {Invalid loads preserve both active indexes and clean up temporary commands} -body {
+    set channel [open $search_snapshot r]
+    set json [read $channel]
+    close $channel
+    ::tjson::parse $json snapshot
+    set fields [lindex [::tjson::to_typed $snapshot] 1]
+    set rejected {}
+    foreach {field invalid} {format {N 2} entries {L {}} documents {L {{L {{S missing} {S text}}}}} \
+            documents {L {}} names {S invalid!} descriptions {S invalid!}} {
+        set broken [dict replace $fields $field $invalid]
+        set channel [open [file join $search_artifacts broken.json] w]
+        puts $channel [::tjson::typed_to_json [list M $broken]]
+        close $channel
+        lappend rejected [catch {::recipe_search::load [file join $search_artifacts broken.json]}]
+    }
+    list [lsort -unique $rejected] [lindex [search_names web] 0] [search_names compression] \
+        [info commands ::recipe_search::next_*]
+} -result {1 web twebserver {}}
+
+test search-9 {Fresh workers load without registry files or index construction} -body {
+    set expected [lmap query {web TCL a_c encrytion compression {web server} unknown} {
+        ::recipe_search::search $query
+    }]
     file delete -force $search_fixture
-    list [lindex [search_names web] 4] [search_names compression]
-} -result {twebserver twebserver}
+    interp create worker
+    try {
+        worker eval [list set auto_path $auto_path]
+        worker eval [list source [file join $root tcl search.tcl]]
+        worker eval {
+            foreach name {ttrie ttrigrams} {
+                rename ::${name}::create {}
+                proc ::${name}::create {args} {error "Index construction is forbidden at runtime"}
+            }
+        }
+        worker eval [list ::recipe_search::load $search_snapshot]
+        set actual [worker eval {
+            lmap query {web TCL a_c encrytion compression {web server} unknown} {::recipe_search::search $query}
+        }]
+    } finally {interp delete worker}
+    expr {$expected eq $actual}
+} -result 1
 
-test search-10 {Missing registry fails initialization} -body {
-    ::recipe_search::init $search_fixture
+test search-10 {Missing registry fails the build} -body {
+    ::recipe_search::build $search_fixture $search_snapshot
 } -returnCodes error -result {Search registry directory does not exist}
 
+test search-snapshot-3 {Missing snapshot fails loading without rebuilding} -body {
+    ::recipe_search::load [file join $search_artifacts missing.json]
+} -returnCodes error -result {Search snapshot is missing; run the build-search script}
+
+::tcltest::removeDirectory search-artifacts
 ::recipe_search::index destroy
 ::recipe_search::descriptions destroy
 rename ::recipe_search::original_index ::recipe_search::index

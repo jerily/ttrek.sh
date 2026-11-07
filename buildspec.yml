@@ -27,6 +27,7 @@ phases:
       - export CURRENT_DIR=`pwd`
       - export INSTALL_DIR=$CURRENT_DIR/build/install
       - LD_LIBRARY_PATH=$INSTALL_DIR/lib $INSTALL_DIR/bin/tclsh9.1 $INSTALL_DIR/bin/tconfig-encrypt.tcl -app ttrek_sh -env prod -aws_kms_key alias/ttrek-app-kms-key etc/config.ini > etc/config.enc
+      - cp search-index.json ../ttrek-app/artifacts/ttrek-app/
       # copy dependencies
       - cp -R build ../ttrek-app/artifacts/ttrek-app/
       # copy the encrypted config file

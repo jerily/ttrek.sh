@@ -21,8 +21,8 @@ foreach name $packages {
             }
             tink {package require tink 20240704.0.1}
             topenapi {package require topenapi 0.2.0}
-            ttrie {package require ttrie 0.1.1}
-            ttrigrams {package require ttrigrams 0.1.0}
+            ttrie {package require ttrie 0.2.0}
+            ttrigrams {package require ttrigrams 0.2.0}
             treqmon {package require treqmon 2.0.0}
             tratelimit {package require tratelimit 1.0.1}
             awss3 - awskms - awsssm - awsdynamodb {package require $name 1.0.12}
