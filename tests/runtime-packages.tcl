@@ -7,7 +7,7 @@ if {![llength $packages]} {
         awss3 awskms awsssm awsdynamodb tconfig::decrypt tconfig::encrypt
         tratelimit treqmon tsession tsession-dynamodb
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3
-        mock-proxy-app mock-lambda-app mock-s3-app
+        mock-proxy-app mock-lambda-app mock-s3-app trequests
     }
 }
 set failed 0
@@ -23,6 +23,7 @@ foreach name $packages {
             topenapi {package require topenapi 0.2.0}
             ttrie {package require ttrie 0.2.0}
             ttrigrams {package require ttrigrams 0.2.0}
+            trequests {package require trequests 1.1.0}
             treqmon {package require treqmon 2.0.0}
             tratelimit {package require tratelimit 1.0.1}
             awss3 - awskms - awsssm - awsdynamodb {package require $name 1.0.12}

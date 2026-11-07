@@ -180,3 +180,50 @@ proc get_search_handler {ctx req} {
     return [::twebserver::build_response 200 application/json \
         [::tjson::typed_to_json [list L $matches]]]
 }
+
+# Both the JSON suggestions and HTML results read the loaded build snapshot.
+proc get_autocomplete_handler {ctx req} {
+    if {[catch {::recipe_search::request_query $req} query]} {
+        return [::twebserver::build_response 400 text/plain "Invalid search query"]
+    }
+    set suggestions {}
+    foreach match [lrange [::recipe_search::search $query] 0 7] {
+        lappend suggestions [list M [dict create name [list S [dict get $match name]] \
+            description [list S [dict get $match description]]]]
+    }
+    return [::twebserver::build_response 200 application/json \
+        [::tjson::typed_to_json [list L $suggestions]]]
+}
+
+proc ::recipe_search::cards {matches} {
+    set cards {}
+    foreach match $matches {
+        set fields [dict create name [list S [dict get $match name]] \
+            description [list S [dict get $match description]]]
+        if {[dict exists $match tier]} {
+            dict set fields match_label [list S [lindex \
+                {{Exact match} {Name match} {Name match} {Description match} {Similar name} {Similar description}} \
+                [dict get $match tier]]]
+        }
+        lappend cards [list M $fields]
+    }
+    return [list L $cards]
+}
+
+proc get_search_page_handler {ctx req} {
+    set status 200
+    set matches {}
+    set message {}
+    if {[catch {::recipe_search::request_query $req} query]} {
+        set status 400
+        set query {}
+        set message {Use 1–255 letters, numbers, spaces, dots, underscores, plus signs or hyphens.}
+    } else {
+        set matches [::recipe_search::search $query]
+    }
+    set data [dict create title {S {Search packages}} query [list S $query] \
+        is_search {BOOL 1} error [list S $message] result_count [list N [llength $matches]] \
+        packages [::recipe_search::cards $matches]]
+    return [::twebserver::build_response $status "text/html; charset=utf-8" \
+        [::views::render packages.html.jinja $data]]
+}

@@ -29,8 +29,14 @@ proc ::views::init {directory} {
 proc ::views::render {name fields} {
     variable templates
     dict set fields pagetitle {S {ttrek: registry, website, and command-line interface}}
-    return [::jinja2::render [dict get $templates $name] \
-        [::tjson::typed_to_json [list M $fields]] -templates $templates -path $name]
+    return [stamp_year [::jinja2::render [dict get $templates $name] \
+        [::tjson::typed_to_json [list M $fields]] -templates $templates -path $name]]
+}
+
+# Content packages render their own JSON contexts. Fill the host layout's
+# trusted marker after rendering so every page uses the clock on each request.
+proc ::views::stamp_year {html} {
+    string map [list {<!-- ttrek-current-year -->} [clock format [clock seconds] -format %Y]] $html
 }
 
 proc ::views::strings {values} {

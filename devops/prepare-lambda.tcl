@@ -1,6 +1,11 @@
 package require Tcl 9.1
 source [file join [file dirname [file dirname [info script]]] runtime paths.tcl]
 set siteRoot $::tdevops::runtime::root
+foreach asset {public/js/search.js public/js/chart.umd.js} {
+    if {![file isfile [file join $siteRoot $asset]]} {
+        error "Missing browser asset $asset; run ttrek run -script build-assets before packaging"
+    }
+}
 package require http
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]

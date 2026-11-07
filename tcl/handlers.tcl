@@ -182,7 +182,16 @@ proc get_packages_page_handler {ctx req} {
     foreach path [glob -nocomplain -type d -directory [get_registry_dir] *] {
         lappend package_names [file tail $path]
     }
-    set data [dict create title {S Packages} package_names [::views::strings [lsort $package_names]]]
+    set packages {}
+    foreach name [lsort $package_names] {
+        set description {}
+        if {[dict exists $::recipe_search::entries $name description]} {
+            set description [dict get $::recipe_search::entries $name description]
+        }
+        lappend packages [dict create name $name description $description]
+    }
+    set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
+        result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}}]
     set html [::views::render packages.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
