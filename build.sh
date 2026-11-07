@@ -167,17 +167,17 @@ if ! package_installed topenapi; then
 fi
 
 if ! package_installed ttrie; then
-    echo "Build ttrie 0.1.1 ..."
-    fetch_source ttrie-0.1.1 https://github.com/jerily/ttrie/releases/download/v0.1.1/ttrie-0.1.1.tar.gz
-    tcl_cmake_install ttrie-0.1.1
-    ctest --test-dir "$BUILD_DIR/ttrie-0.1.1" --output-on-failure
+    echo "Build ttrie 0.2.0 ..."
+    fetch_source ttrie-0.2.0 https://github.com/jerily/ttrie/releases/download/v0.2.0/ttrie-0.2.0.tar.gz
+    tcl_cmake_install ttrie-0.2.0
+    ctest --test-dir "$BUILD_DIR/ttrie-0.2.0" --output-on-failure
 fi
 
 if ! package_installed ttrigrams; then
-    echo "Build ttrigrams 0.1.0 ..."
-    fetch_source ttrigrams-0.1.0 https://github.com/jerily/ttrigrams/releases/download/v0.1.0/ttrigrams-0.1.0.tar.gz
-    tcl_cmake_install ttrigrams-0.1.0
-    ctest --test-dir "$BUILD_DIR/ttrigrams-0.1.0" --output-on-failure
+    echo "Build ttrigrams 0.2.0 ..."
+    fetch_source ttrigrams-0.2.0 https://github.com/jerily/ttrigrams/releases/download/v0.2.0/ttrigrams-0.2.0.tar.gz
+    tcl_cmake_install ttrigrams-0.2.0
+    ctest --test-dir "$BUILD_DIR/ttrigrams-0.2.0" --output-on-failure
 fi
 
 if ! pkg-config --exact-version=0.5.0 valkey || ! pkg-config --exists valkey_tls; then
@@ -285,6 +285,8 @@ install_tcl_package tconfig-1.0.0 tconfig1.0.0 https://github.com/jerily/tconfig
 install_tcl_package tsession-dynamodb-main tsession-dynamodb1.0.0 https://github.com/jerily/tsession-dynamodb/archive/refs/heads/main.tar.gz
 
 "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl"
+
+"$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/bin/build-search.tcl"
 
 if [ ! -e "$SELF_DIR/certs/cert.pem" ]; then
     echo "Generate certificates ..."

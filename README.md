@@ -62,8 +62,8 @@ directory = registry
 The default is the `registry` submodule. Relative paths resolve against the
 application root, and absolute paths can point to a separate registry checkout.
 Set this in `etc/config.local.ini` for LOCAL mode or the production configuration
-for PROD mode, then restart the server. All package pages and registry API routes
-use this directory. The build still uses the pinned submodule for its patch files.
+for PROD mode. Build search with the same registry directory, then restart the
+server. All package pages and registry API routes use this directory. The build still uses the pinned submodule for its patch files.
 
 Recipe scripts can reference files beside their spec, for example
 `"scripts": {"demo": {"file": "demo.sh"}}`. The API reads these UTF-8 files
@@ -91,11 +91,35 @@ three characters allow one edit, longer queries two. Description suggestions
 require a shared trigram and a verified substring distance; below three
 characters descriptions match literally.
 
-Each worker builds ttrie 0.1.1 and ttrigrams 0.1.0 indexes at startup. All version
-descriptions are indexed, with one result per package. Description hits display
-the matched text; name hits use the first nonempty description in alphabetical
-order. Missing descriptions are allowed. Requests reuse the snapshot; restart
-after registry edits. `build.sh` installs both extensions using Tcl stubs.
+`ttrek.sh` builds and serializes both indexes **at build time**, using ttrie and
+ttrigrams 0.2.0. Workers call `::recipe_search::load` to restore the trie nodes
+and sorted trigram postings directly; they never scan recipes or construct an
+index. All version descriptions are indexed, with one result per package.
+Description hits display the matched text; name hits use the first nonempty
+description in alphabetical order. Missing descriptions are allowed.
+
+For direct serving, build after installing dependencies and whenever recipes change:
+
+```sh
+ttrek run -script build-search
+# Custom [registry] directory: use the same directory as the server configuration.
+ttrek run -script build-search -- /path/to/registry
+```
+
+`bin/build-search.tcl ?registry_directory? ?output_file?` defaults to the pinned
+`registry` and `search-index.json` in the application root. `build.sh` runs it
+for the pinned registry; CodeBuild copies the artifact into the application.
+Lambda packaging builds it from the staged registry in `lambda/prepare.tcl`.
+Restart workers after rebuilding, or repackage and restart the local mock stack.
+
+The artifact is one versioned JSON document with display metadata and Base64
+binary snapshots. Binary indexes preserve the native structures without pointer,
+alignment or host-endian dependencies. JSON keeps metadata inspectable; putting
+both snapshots in one atomically replaced file prevents partial publication.
+The artifact is generated, not committed. Missing/invalid snapshots fail startup;
+failed builds and loads preserve the previous artifact or active indexes.
+Only trusted build output should be loaded. `build.sh` installs both extensions
+using Tcl stubs.
 
 The recipe API returns the selected version's `scripts` object together with
 its dependencies, build instructions, USE flags and patches. Both registry
@@ -361,6 +385,7 @@ All assets are served locally; no template compiler or JavaScript bundler is use
 ## Validation
 
 ```bash
+ttrek run -script build-search
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
@@ -487,6 +512,9 @@ application also exposes registry, telemetry and static-file endpoints, a public
 read-only documentation and blog, and local mock service endpoints.
 
 ### Protections
+
+Search workers load validated binary indexes and typed JSON metadata from a trusted
+build artifact. Snapshot loading never evaluates scripts or indexes registry inputs.
 
 Distribution targets are allowlisted and only configured object keys can be
 signed. Redirects require a signed HTTPS URL and disable caching. Failed signing

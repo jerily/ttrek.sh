@@ -70,6 +70,8 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
     search_recipe = app / registry_dir / "tclx" / "1.0.0"
     search_recipe.mkdir(parents=True, exist_ok=True)
     (search_recipe / "ttrek.json").write_text('{}')
+    subprocess.run([str(INSTALL / "bin/tclsh9.1"), str(app / "bin/build-search.tcl"),
+                    str(app / registry_dir)], env=env, check=True)
     (app / "build").mkdir()
     (app / "build/install").symlink_to(INSTALL, target_is_directory=True)
     (app / "etc").mkdir()

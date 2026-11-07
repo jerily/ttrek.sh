@@ -1,9 +1,10 @@
-package require ttrie 0.1.1
-package require ttrigrams 0.1.0
+package require tjson
+package require ttrie 0.2.0
+package require ttrigrams 0.2.0
 
 namespace eval ::recipe_search {
-    variable entries {}
-    variable documents {}
+    variable entries
+    variable documents
 }
 
 proc ::recipe_search::fold {text} {
@@ -24,55 +25,50 @@ proc ::recipe_search::query {text} {
     return $text
 }
 
-proc ::recipe_search::description {path} {
-    set channel [open $path r]
-    try {::tjson::parse [read $channel] spec} finally {close $channel}
-    if {![::tjson::is_object $spec]} {error "Invalid JSON object in $path"}
-    if {![::tjson::has_object_item $spec description]} {return {}}
-    set item [::tjson::get_object_item $spec description]
-    if {![::tjson::is_string $item]} {error "description must be a string in $path"}
-    set text [::tjson::get_valuestring $item]
-    if {[string length [encoding convertto utf-8 $text]] > 4096 || [regexp {[\x00-\x1f\x7f]} $text]} {
-        error "description must be a single line of at most 4096 bytes in $path"
-    }
-    return $text
+# Snapshot metadata uses typed JSON so malformed shapes cannot become Tcl data.
+proc ::recipe_search::snapshot_value {value type} {
+    if {[llength $value] != 2 || [lindex $value 0] ne $type} {error "Invalid search snapshot metadata"}
+    return [lindex $value 1]
 }
 
-proc ::recipe_search::init {directory} {
+proc ::recipe_search::load {path} {
     variable entries
     variable documents
-    if {![file isdirectory $directory]} {error "Search registry directory does not exist"}
-    set catalog {}
-    set docs {}
-    set texts {}
-    set names {}
-    foreach path [lsort -ascii [glob -nocomplain -type d -directory $directory *]] {
-        set name [file tail $path]
-        if {![valid_name $name]} {continue}
-        set descriptions {}
-        set has_recipe 0
-        foreach version [lsort -ascii [glob -nocomplain -type d -directory $path *]] {
-            set recipe [file join $version ttrek.json]
-            if {[valid_name [file tail $version]] && [file isfile $recipe]} {
-                set has_recipe 1
-                set text [description $recipe]
-                if {$text ne {}} {lappend descriptions $text}
-            }
-        }
-        if {!$has_recipe} {continue}
-        set descriptions [lsort -ascii -unique $descriptions]
-        set normalized [fold $name]
-        lappend names $normalized
-        dict set catalog $name [dict create normalized $normalized description [lindex $descriptions 0]]
-        foreach text $descriptions {
-            lappend docs [list $name $text]
-            lappend texts [fold $text]
-        }
-    }
-    # Install both indexes together; a failed refresh leaves the old snapshot usable.
+    if {![file isfile $path]} {error "Search snapshot is missing; run the build-search script"}
+    set channel [open $path r]
     try {
-        ::ttrie::create ::recipe_search::next_names $names
-        ::ttrigrams::create ::recipe_search::next_descriptions $texts
+        fconfigure $channel -encoding utf-8
+        ::tjson::parse [read $channel] snapshot
+    } finally {close $channel}
+    set fields [snapshot_value [::tjson::to_typed $snapshot] M]
+    if {[snapshot_value [dict get $fields format] N] ne "1"} {error "Unsupported search snapshot format"}
+    set catalog {}
+    dict for {name value} [snapshot_value [dict get $fields entries] M] {
+        set data [snapshot_value $value M]
+        set normalized [snapshot_value [dict get $data normalized] S]
+        set description [snapshot_value [dict get $data description] S]
+        if {![valid_name $name] || $normalized ne [fold $name]} {error "Invalid search snapshot package"}
+        dict set catalog $name [dict create normalized $normalized description $description]
+    }
+    set docs {}
+    foreach value [snapshot_value [dict get $fields documents] L] {
+        set pair [snapshot_value $value L]
+        if {[llength $pair] != 2} {error "Invalid search snapshot document"}
+        set name [snapshot_value [lindex $pair 0] S]
+        set description [snapshot_value [lindex $pair 1] S]
+        if {![dict exists $catalog $name]} {error "Unknown search snapshot package"}
+        lappend docs [list $name $description]
+    }
+    # Publish both loaded indexes and their metadata together, after validation.
+    try {
+        ::ttrie::load ::recipe_search::next_names \
+            [binary decode base64 -strict [snapshot_value [dict get $fields names] S]]
+        ::ttrigrams::load ::recipe_search::next_descriptions \
+            [binary decode base64 -strict [snapshot_value [dict get $fields descriptions] S]]
+        if {[next_descriptions count] != [llength $docs]} {error "Search snapshot document count mismatch"}
+        dict for {name data} $catalog {
+            if {![next_names contains [dict get $data normalized]]} {error "Search snapshot package is not indexed"}
+        }
         foreach command {index descriptions} {
             if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
         }

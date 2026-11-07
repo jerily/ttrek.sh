@@ -5,6 +5,8 @@ package require http
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
 source [file join $siteRoot tcl telemetry.tcl]
+source [file join $siteRoot tcl search-build.tcl]
+::recipe_search::build [file join $siteRoot registry] [file join $siteRoot search-index.json]
 file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
     releases [::app_config::releases {}]]

@@ -2,6 +2,7 @@
   "name": "ttrek_sh",
   "version": "1.0.0",
   "scripts": {
+    "build-search": "exec \"$PROJECT_HOME/bin/build-search.sh\" \"$@\"",
     "start-direct": "exec \"$PROJECT_HOME/run.sh\" \"$@\"",
     "package": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\"",
     "start-local": "exec \"$PROJECT_HOME/bin/start-local.sh\" \"$@\"",
@@ -17,8 +18,8 @@
     "tjson": "^1.0.26",
     "topenapi": "^0.2.0",
     "tpathexp": "^1.1.0",
-    "ttrie": "=0.1.1",
-    "ttrigrams": "=0.1.0",
+    "ttrie": "=0.2.0",
+    "ttrigrams": "=0.2.0",
     "valkey-tcl": "^1.0.3",
     "tink-tcl": "^20240704.0.1",
     "aws-sdk-tcl": "^1.0.12",
