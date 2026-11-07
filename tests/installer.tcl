@@ -59,7 +59,7 @@ try {
         if {$executable eq {}} {error "missing test prerequisite: $command"}
         file link -symbolic [file join $tools $command] [lindex $executable 0]
     }
-    foreach name {uname ldd sysctl sw_vers} {
+    foreach name {uname ldd sysctl sw_vers ps} {
         file copy $fixture [file join $tools $name]
         file attributes [file join $tools $name] -permissions 0755
     }
@@ -72,6 +72,7 @@ try {
         {Darwin arm64 {} 1 aarch64-apple-darwin}
         {Darwin x86_64 {} 0 x86_64-apple-darwin}
         {Darwin x86_64 {} 1 aarch64-apple-darwin}
+        {FreeBSD amd64 {} 0 x86_64-unknown-freebsd}
     }
     foreach client {curl wget} {
         set other [expr {$client eq "curl" ? "wget" : "curl"}]
@@ -83,8 +84,8 @@ try {
             lassign $case system cpu libc arm64 triple
             set installHome [file join $temporary "$client [incr number]"]
             file mkdir $installHome
-            set command [list {*}$envCommand -u TTREK_UPDATE_ROOT -u TTREK_HOME -u ENV \
-                PATH=$tools HOME=$installHome TEST_OS=$system TEST_CPU=$cpu \
+            set command [list {*}$envCommand -u TTREK_UPDATE_ROOT -u TTREK_HOME -u ENV -u ZDOTDIR \
+                PATH=$tools HOME=$installHome SHELL=/bin/sh TEST_PARENT_SHELL= TEST_OS=$system TEST_CPU=$cpu \
                 TEST_LIBC=$libc TEST_ARM64=$arm64 TEST_TCLSH=[info nameofexecutable] \
                 TEST_DOWNLOAD=[file join $installHome download.args]]
             foreach mode {production override local} {
@@ -122,6 +123,58 @@ try {
                     } -result {{ttrek test distribution} 1}
             }
         }
+    }
+
+    # Exercise startup-file selection without touching the user's shell setup.
+    foreach case {
+        {bash /bin/bash {} {} {} {.profile .bashrc}}
+        {bash-profile /bin/bash {} {.profile .bash_login .bash_profile} {} {.bash_profile .bashrc}}
+        {bash-login /bin/bash {} {.profile .bash_login} {} {.bash_login .bashrc}}
+        {zsh /bin/zsh {} {} {} {.zshrc}}
+        {zdotdir /bin/zsh {} {} {zsh config} {{zsh config/.zshrc}}}
+        {parent-bash /bin/zsh bash {} {} {.profile .bashrc}}
+        {parent-zsh /bin/bash -zsh {} {} {.zshrc}}
+        {parent-full-path /bin/bash /usr/local/bin/zsh {} {} {.zshrc}}
+        {non-shell-parent /bin/zsh tclsh {} {} {.zshrc}}
+        {sh /bin/sh {} {} {} {.profile}}
+        {no-shell {} {} {} {} {.profile}}
+    } {
+        lassign $case name shell parent existing zdotdir expected
+        test installer-profile-$name "startup files for $name, including repeat installation" -body {
+            set installHome [file join $temporary "profile $name"]
+            file mkdir $installHome
+            foreach profile $existing {
+                set channel [open [file join $installHome $profile] w]
+                puts -nonewline $channel {# existing startup file}
+                close $channel
+            }
+            set command [list {*}$envCommand -u TTREK_UPDATE_ROOT -u TTREK_HOME -u ENV -u ZDOTDIR -u SHELL \
+                PATH=$tools HOME=$installHome TEST_PARENT_SHELL=$parent \
+                TEST_OS=Darwin TEST_CPU=arm64 TEST_LIBC= TEST_ARM64=1 \
+                TEST_TCLSH=[info nameofexecutable] TEST_DOWNLOAD=[file join $installHome download.args]]
+            if {$shell ne {}} {lappend command SHELL=$shell}
+            if {$zdotdir ne {}} {lappend command ZDOTDIR=[file join $installHome $zdotdir]}
+            set invocation [list {*}$command /bin/sh [file join $sourceRoot public ttrek-init] -y]
+            ::installer_test::run $invocation
+            ::installer_test::run $invocation
+            foreach profile [lsort -unique [concat $expected $existing {.profile .bash_profile .bash_login .bashrc .zshrc}]] {
+                set path [file join $installHome $profile]
+                if {$profile in $expected} {
+                    set content [::installer_test::read_file $path]
+                    set matches [lsearch -all -exact [split $content \n] {. "$HOME/.ttrek/env"}]
+                    if {[llength $matches] != 1} {error "expected one source line in $profile: $content"}
+                } elseif {$profile in $existing} {
+                    if {[::installer_test::read_file $path] ne {# existing startup file}} {
+                        error "modified unused profile $profile"
+                    }
+                } elseif {[file exists $path]} {error "created unused profile $profile"}
+            }
+            # Both Bash startup files may source env; PATH must stay deduplicated.
+            set path [::installer_test::run [list {*}$command /bin/sh -c \
+                {. "$1"; . "$1"; printf '%s' "$PATH"} sh [file join $installHome [lindex $expected end]]]]
+            if {$path ne "[file join $installHome .ttrek bin]:$tools"} {error "unexpected PATH: $path"}
+            set result ok
+        } -result ok
     }
     set failed $::tcltest::numTests(Failed)
 } finally {

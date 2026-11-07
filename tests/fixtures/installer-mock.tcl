@@ -15,6 +15,10 @@ switch -- [file tail $argv0] {
     ldd {puts $::env(TEST_LIBC)}
     sysctl {puts "[lindex $argv 0]: $::env(TEST_ARM64)"}
     sw_vers {puts 14.0}
+    ps {
+        if {$::env(TEST_PARENT_SHELL) eq {}} {exit 1}
+        puts $::env(TEST_PARENT_SHELL)
+    }
     curl - wget {
         if {"--help" in $argv} {
             puts {--proto --tlsv1.2 --ciphers --retry --continue-at --https-only --secure-protocol}
