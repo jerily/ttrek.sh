@@ -8,7 +8,9 @@
   "prod": {
     "1.0.0": {
       "linux-amd64-glibc": "06a2ad47508e2a139d478c05c12bb28f8019afff0e87345a64f6c1726d8b4996",
-      "linux-amd64-musl": "c02d5568923c8eb9d485a3bd57a309b497e5973294b2e276adc8a18c4e5259c7"
+      "linux-amd64-musl": "c02d5568923c8eb9d485a3bd57a309b497e5973294b2e276adc8a18c4e5259c7",
+      "macos-arm64": "55faf1eb108361b4855b811c8bbdfdc880e5e03324cc53f0cf197ee884f68e40",
+      "macos-x86_64": "055ee9926c96d5e7fe6fa259a518bc087fee894beed2d5f5108fa2fde071d672"
     }
   }
 }
