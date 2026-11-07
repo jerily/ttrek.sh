@@ -165,15 +165,51 @@ main() {
     ensure mkdir -p "${_ttrek_dir}/bin"
     ensure cp "$_file" "${_ttrek_dir}/bin/ttrek${_ext}"
 
-    ensure echo "#!/bin/sh\nexport PATH=\"\$HOME/.ttrek/bin:\$PATH\"" > "${_ttrek_dir}/env"
+    ensure printf '%s\n' '#!/bin/sh' \
+        'case ":$PATH:" in' \
+        '    *":$HOME/.ttrek/bin:"*) ;;' \
+        '    *) export PATH="$HOME/.ttrek/bin:$PATH" ;;' \
+        'esac' > "${_ttrek_dir}/env"
 
-    # check if ".profile" file exists
-    if [ -f "$HOME/.profile" ]; then
-        # check if the line is already in the file
-        if ! grep -q ". \"\$HOME/.ttrek/env\"" "$HOME/.profile"; then
-            ensure echo ". \"\$HOME/.ttrek/env\"" >> "$HOME/.profile"
-        fi
+    # The installer usually runs under sh; prefer its parent terminal shell,
+    # falling back to the user's default shell when ps is unavailable.
+    local _shell="${SHELL:-sh}"
+    local _parent_shell=""
+    if check_cmd ps && [ -n "${PPID:-}" ]; then
+        _parent_shell=$(ps -p "$PPID" -o comm= 2>/dev/null) || _parent_shell=""
+        case "$_parent_shell" in
+            bash|-bash|*/bash|zsh|-zsh|*/zsh) _shell="$_parent_shell" ;;
+        esac
     fi
+    _shell="${_shell##*/}"
+    _shell="${_shell#-}"
+
+    local _profile="$HOME/.profile"
+    local _rc=""
+    case "$_shell" in
+        bash)
+            # Bash uses .bashrc for interactive shells and the first existing
+            # login profile below. Do not create a file that masks another one.
+            _rc="$HOME/.bashrc"
+            if [ -f "$HOME/.bash_profile" ]; then
+                _profile="$HOME/.bash_profile"
+            elif [ -f "$HOME/.bash_login" ]; then
+                _profile="$HOME/.bash_login"
+            fi
+            ;;
+        zsh)
+            ensure mkdir -p "${ZDOTDIR:-$HOME}"
+            _profile="${ZDOTDIR:-$HOME}/.zshrc"
+            ;;
+    esac
+
+    local _source='. "$HOME/.ttrek/env"'
+    for _profile in "$_profile" "$_rc"; do
+        [ -n "$_profile" ] || continue
+        if [ ! -f "$_profile" ] || ! grep -Fqx "$_source" "$_profile"; then
+            printf '\n%s\n' "$_source" >> "$_profile" || err "could not update $_profile"
+        fi
+    done
 
     ensure echo "ttrek has been installed successfully"
 
