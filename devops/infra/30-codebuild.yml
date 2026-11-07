@@ -28,7 +28,7 @@ Parameters:
     Default: Infra-DevOps-TTREK-Lambda
   LambdaFunctionName:
     Type: String
-    Default: ttrek-sh
+    Default: prod-Api-TtrekWebsite-Function
     AllowedPattern: '[A-Za-z0-9_-]{1,54}'
 
 Conditions:
@@ -105,14 +105,17 @@ Resources:
                   StringEquals:
                     iam:PassedToService: lambda.amazonaws.com
               - Effect: Allow
-                Action: [apigateway:GET, apigateway:POST, apigateway:PATCH, apigateway:PUT, apigateway:DELETE]
-                Resource:
-                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis
-                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/*
-                  - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/*
-              - Effect: Allow
                 Action: [logs:CreateLogGroup, logs:DeleteLogGroup, logs:PutRetentionPolicy, logs:DeleteRetentionPolicy, logs:TagResource, logs:UntagResource, logs:ListTagsForResource]
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${LambdaFunctionName}:*
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ttrek_sh/prod/*
+              - Effect: Allow
+                Action: [kms:Encrypt, kms:Decrypt]
+                Resource: !ImportValue Infra-DevOps-TTREK-Keys-KMSMasterKeyArn
+              - Effect: Allow
+                Action: [ec2:DescribeSecurityGroups, ec2:DescribeSubnets, ec2:DescribeVpcs, ec2:GetSecurityGroupsForVpc, ec2:DescribeNetworkInterfaces]
+                Resource: '*'
               - Effect: Allow
                 Action: logs:DescribeLogGroups
                 Resource: '*'
@@ -131,6 +134,8 @@ Resources:
         Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
         PrivilegedMode: false
         EnvironmentVariables:
+          - Name: TTREK_CONFIG_KMS_KEY
+            Value: !ImportValue Infra-DevOps-TTREK-Keys-KMSMasterKeyArn
           - Name: SAM_STACK_NAME
             Value: !Ref LambdaStackName
           - Name: SAM_ARTIFACT_BUCKET

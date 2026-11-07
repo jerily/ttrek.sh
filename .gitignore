@@ -16,6 +16,8 @@ node_modules
 __pycache__/
 bundle
 etc/config.local.ini
+etc/config.enc
+etc/config.prod.ini
 
 var/
 

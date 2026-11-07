@@ -25,6 +25,7 @@ proc ::project_devops::local {options work} {
         set configPath [file normalize $::env(TTREK_LOCAL_CONFIG)]
         if {![file isfile $configPath]} {error "local configuration does not exist: $configPath"}
     }
+    if {[file isfile $configPath]} {set ::env(TTREK_LOCAL_CONFIG) $configPath}
     set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $work data]
     set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:[dict get $options --s3-port]
     set ::env(ENV) LOCAL

@@ -1,26 +1,19 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "KMS Key, ECR Repository, S3 Bucket, and VPC for TTrek"
+Description: "KMS key for TTrek production configuration"
 
 Metadata:
-  StackName: "Infra-DevOps-TTREK-Base"
+  StackName: "Infra-DevOps-TTREK-Keys"
 
 Parameters:
-  S3Prefix:
-    Type: String
-    Default: "jerily"
   AppName:
     Type: String
     Default: "ttrek-app"
-  Vpc0CIDR:
-    Type: String
-    Default: 10.0.0.0/16
-  PublicSubnetCIDR:
-    Type: String
-    Default: 10.0.1.0/24
 
 Resources:
   TTrekKMSMasterKey:
     Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       Description: "KMS Key for TTrek"
       Enabled: true
@@ -30,11 +23,11 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+              AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
             Action:
               - "kms:*"
             Resource: "*"
-          - Sid: Encrypt Cloudwatch Logs
+          - Sid: EncryptCloudWatchLogs
             Effect: Allow
             Principal:
               Service: !Sub 'logs.${AWS::Region}.amazonaws.com'
@@ -47,7 +40,7 @@ Resources:
             Resource: '*'
             Condition:
               ArnLike:
-                'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+                'kms:EncryptionContext:aws:logs:arn': !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*'
 
   TTrekKMSKeyAlias:
     Type: AWS::KMS::Alias

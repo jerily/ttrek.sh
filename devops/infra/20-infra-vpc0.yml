@@ -1,22 +1,19 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: "VPC for TTrek"
-
-Metadata:
-  StackName: "Infra-DevOps-TTREK-Base"
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Isolated Lambda and Valkey network with private KMS access; no NAT or internet gateway.
 
 Parameters:
   AppName:
     Type: String
-    Default: "ttrek-app"
+    Default: ttrek-app
   Vpc0CIDR:
     Type: String
     Default: 10.0.0.0/16
-  PublicSubnet1CIDR:
-    Type: String
-    Default: 10.0.1.0/24
   PrivateSubnet1CIDR:
     Type: String
     Default: 10.0.3.0/24
+  PrivateSubnet2CIDR:
+    Type: String
+    Default: 10.0.4.0/24
 
 Resources:
   TTrekVpc0:
@@ -27,66 +24,91 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub "${AppName}-vpc0"
+          Value: !Sub ${AppName}-vpc0
 
+  # Preserve the cache security group and its export when updating the VPC stack.
   TTrekVpc0SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: "TTrek-Vpc0-SecurityGroup"
+      GroupDescription: TTrek-Vpc0-SecurityGroup
       VpcId: !Ref TTrekVpc0
-      SecurityGroupIngress:
-        - IpProtocol: -1
-          FromPort: -1
-          ToPort: -1
-          CidrIp: 0.0.0.0/0
+      # Suppress EC2's default allow-all egress. Replies are stateful.
       SecurityGroupEgress:
-        - IpProtocol: -1
-          FromPort: -1
-          ToPort: -1
-          CidrIp: 0.0.0.0/0
-      Tags:
-          - Key: Name
-            Value: "TTrek-Vpc0-SecurityGroup"
+        - IpProtocol: tcp
+          FromPort: 1
+          ToPort: 1
+          CidrIp: 127.0.0.1/32
 
-  # allow 443 traffic inside the VPC
-  TTrekHttpsVpc0SecurityGroupIngress:
+  TTrekKmsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private KMS endpoint
+      VpcId: !Ref TTrekVpc0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 1
+          ToPort: 1
+          CidrIp: 127.0.0.1/32
+
+  TTrekLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Lambda access to Valkey and KMS only
+      VpcId: !Ref TTrekVpc0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          DestinationSecurityGroupId: !Ref TTrekVpc0SecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          DestinationSecurityGroupId: !Ref TTrekKmsSecurityGroup
+
+  TTrekValkeyIngress:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       GroupId: !Ref TTrekVpc0SecurityGroup
+      IpProtocol: tcp
+      FromPort: 6379
+      ToPort: 6379
+      SourceSecurityGroupId: !Ref TTrekLambdaSecurityGroup
+
+  TTrekKmsIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TTrekKmsSecurityGroup
       IpProtocol: tcp
       FromPort: 443
       ToPort: 443
-      CidrIp: !Ref Vpc0CIDR
-
-  TTrekHttpVpc0SecurityGroupIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref TTrekVpc0SecurityGroup
-      IpProtocol: tcp
-      FromPort: 80
-      ToPort: 80
-      CidrIp: !Ref Vpc0CIDR
+      SourceSecurityGroupId: !Ref TTrekLambdaSecurityGroup
 
   TTrekPrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref TTrekVpc0
-      AvailabilityZone: !Select
-        - 0
-        - Fn::GetAZs: !Ref AWS::Region
+      AvailabilityZone: !Select [0, !GetAZs '']
       CidrBlock: !Ref PrivateSubnet1CIDR
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub "${AppName}-private-subnet-1"
+          Value: !Sub ${AppName}-private-subnet-1
+
+  TTrekPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-private-subnet-2
 
   TTrekPrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref TTrekVpc0
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-private-route-table"
 
   TTrekPrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -94,93 +116,47 @@ Resources:
       RouteTableId: !Ref TTrekPrivateRouteTable
       SubnetId: !Ref TTrekPrivateSubnet1
 
-  TTrekPublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref TTrekVpc0
-      AvailabilityZone: !Select
-        - 0
-        - Fn::GetAZs: !Ref AWS::Region
-      CidrBlock: !Ref PublicSubnet1CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-public-subnet-1"
-
-  TTrekPublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref TTrekVpc0
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-public-route-table"
-
-  TTrekPublicSubnet1RouteTableAssociation:
+  TTrekPrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref TTrekPublicRouteTable
-      SubnetId: !Ref TTrekPublicSubnet1
-
-  TTrekInternetGateway:
-    Type: AWS::EC2::InternetGateway
-
-  TTrekInternetGatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      InternetGatewayId: !Ref TTrekInternetGateway
-      VpcId: !Ref TTrekVpc0
-
-  TTrekDefaultPublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: TTrekInternetGatewayAttachment
-    Properties:
-      RouteTableId: !Ref TTrekPublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref TTrekInternetGateway
-
-  TTrekNatGatewayEip:
-    Type: AWS::EC2::EIP
-    DependsOn: TTrekInternetGatewayAttachment
-    Properties:
-      Domain: vpc
-
-  TTrekNatGateway:
-    Type: AWS::EC2::NatGateway
-    DependsOn:
-      - TTrekDefaultPublicRoute
-      - TTrekPublicSubnet1RouteTableAssociation
-    Properties:
-      AllocationId: !GetAtt TTrekNatGatewayEip.AllocationId
-      SubnetId: !Ref TTrekPublicSubnet1
-
-  TTrekDefaultPrivateRoute:
-    Type: AWS::EC2::Route
-    Properties:
       RouteTableId: !Ref TTrekPrivateRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref TTrekNatGateway
+      SubnetId: !Ref TTrekPrivateSubnet2
+
+  TTrekKmsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.kms
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref TTrekPrivateSubnet1, !Ref TTrekPrivateSubnet2]
+      SecurityGroupIds: [!Ref TTrekKmsSecurityGroup]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: kms:Decrypt
+            Resource: !ImportValue Infra-DevOps-TTREK-Keys-KMSMasterKeyArn
 
 Outputs:
   TTrekVpc0Id:
-    Description: "TTrek Vpc0"
     Value: !Ref TTrekVpc0
     Export:
-      Name: !Sub "${AWS::StackName}-Vpc0Id"
-
-  TTrekPublicSubnet1Id:
-    Description: "TTrek Public Subnet 1"
-    Value: !Ref TTrekPublicSubnet1
-    Export:
-      Name: !Sub "${AWS::StackName}-PublicSubnet1Id"
-
+      Name: !Sub ${AWS::StackName}-Vpc0Id
   TTrekPrivateSubnet1Id:
-    Description: "TTrek Private Subnet 1"
     Value: !Ref TTrekPrivateSubnet1
     Export:
-      Name: !Sub "${AWS::StackName}-PrivateSubnet1Id"
-
+      Name: !Sub ${AWS::StackName}-PrivateSubnet1Id
+  TTrekPrivateSubnet2Id:
+    Value: !Ref TTrekPrivateSubnet2
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnet2Id
   TTrekVpc0SecurityGroupId:
-    Description: "TTrek Vpc0 Security Group"
     Value: !GetAtt TTrekVpc0SecurityGroup.GroupId
     Export:
-      Name: !Sub "${AWS::StackName}-Vpc0SecurityGroupId"
+      Name: !Sub ${AWS::StackName}-Vpc0SecurityGroupId
+  TTrekLambdaSecurityGroupId:
+    Value: !GetAtt TTrekLambdaSecurityGroup.GroupId
+    Export:
+      Name: !Sub ${AWS::StackName}-LambdaSecurityGroupId

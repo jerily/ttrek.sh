@@ -12,6 +12,8 @@ ttrek run -script build-search
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
+ttrek run tclsh9.1 "$PWD/tests/lambda-config.test"
+ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/installer.tcl"
 ttrek run tclsh9.1 "$PWD/tests/runtime-smoke.tcl"
@@ -58,3 +60,10 @@ It launches a disposable copy of the app with an isolated Valkey process, test
 certificates and its own SQLite database under `build/`. It uses disposable ports,
 checks Valkey-backed history/counters and reconnects, and never uses your config
 or AWS. Run it with `ENV=LOCAL` and `ENV=PROD` to check both modes.
+
+`tests/lambda-config.test` checks production rejection of plaintext secrets, local
+configuration isolation, and local counter expiry. `tests/lambda-valkey.tcl` needs
+`valkey-server` with TLS and runs two independent Lambda adapters against a disposable
+cache, checking shared history, cross-process rate limiting, and trusted source-IP
+handling. It uses synthetic credentials and makes no AWS calls. Infrastructure
+validation: `cfn-lint devops/infra/*.yml devops/infra/api-gateway.json devops/sam-template.yaml`.

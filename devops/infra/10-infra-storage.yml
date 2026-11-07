@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "ECR Repository and S3 Bucket for TTrek"
+Description: "S3 artifact and distribution bucket for TTrek"
 
 Metadata:
   StackName: "Infra-DevOps-TTREK-Storage"
@@ -13,29 +13,26 @@ Parameters:
     Default: "ttrek-app"
 
 Resources:
-  TTrekRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      RepositoryName: !Sub "${AppName}-repo"
-      LifecyclePolicy:
-        LifecyclePolicyText: "{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep at most 3 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":3},\"action\":{\"type\":\"expire\"}}]}"
-
   TTrekBucket:
     Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub "${S3Prefix}-${AppName}"
-      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
       Tags:
         - Key: Name
           Value: !Ref AppName
 
 Outputs:
-  TTrekRepositoryArn:
-    Description: "TTrek ECR Repository"
-    Value: !GetAtt TTrekRepository.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-RepositoryArn"
-
   TTrekBucketArn:
     Description: "TTrek S3 Bucket"
     Value: !GetAtt TTrekBucket.Arn

@@ -9,6 +9,10 @@ foreach asset {public/js/search.js public/js/chart.umd.js} {
 package require http
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
+if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONFIG) ne {}} {
+    ::app_config::validate_lambda_config $::env(TTREK_PRODUCTION_CONFIG)
+    file copy -force $::env(TTREK_PRODUCTION_CONFIG) [file join $siteRoot etc config.ini]
+}
 source [file join $siteRoot tcl telemetry.tcl]
 source [file join $siteRoot tcl search-build.tcl]
 ::recipe_search::build [file join $siteRoot registry] [file join $siteRoot etc search-index.json]
