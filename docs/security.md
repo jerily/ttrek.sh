@@ -31,9 +31,14 @@ Template lookup is restricted to the dictionary loaded from the application's
 JSON types, ordinary output is escaped, and chart JSON is escaped into HTML data
 attributes before JavaScript parses it; it is never inserted as executable script.
 
+Production secrets are supplied by user-managed SSM SecureString parameters.
+tconfig encrypts them before packaging; Lambda decrypts through the private KMS
+endpoint. Generated production files, local INI files and ZIP artifacts are ignored
+by Git. No ACM private key is exported or stored in the repository.
+
 ## Pending
 
 The existing request-monitor and debug routes have no authentication guard in
 this repository. Apply the deployment's access controls before exposing them.
 The mocks execute trusted local code and do not authenticate callers. They are
-development services. The SAM API is public; it does not add an authorizer.
+development services. The HTTP API is public by default; its optional authorizer is disabled.

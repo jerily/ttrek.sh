@@ -1,0 +1,503 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "TTrek regional HTTP API, Lambda integration and custom domain; based on dist/api-gateway.json.",
+  "Parameters": {
+    "ApiName": {
+      "Type": "String",
+      "Default": "ttrek-sh",
+      "MinLength": 1,
+      "MaxLength": 128
+    },
+    "StageName": {
+      "Type": "String",
+      "Default": "$default",
+      "AllowedPattern": "\\$default|[A-Za-z0-9_-]{1,128}"
+    },
+    "IntegrationTimeoutMs": {
+      "Type": "Number",
+      "Default": 30000,
+      "MinValue": 50,
+      "MaxValue": 30000
+    },
+    "LambdaFunctionName": {
+      "Type": "String",
+      "Default": "prod-Api-TtrekWebsite-Function",
+      "Description": "Existing website Lambda name or ARN",
+      "AllowedPattern": "(arn:aws[a-z0-9-]*:lambda:[a-z0-9-]+:[0-9]{12}:function:)?[A-Za-z0-9_-]{1,64}(:[A-Za-z0-9_-]{1,128})?"
+    },
+    "AuthorizerFunction": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Authorizer Lambda name or ARN; leave empty to disable authorization",
+      "AllowedPattern": "((arn:aws[a-z0-9-]*:lambda:[a-z0-9-]+:[0-9]{12}:function:)?[A-Za-z0-9_-]{1,64}(:[A-Za-z0-9_-]{1,128})?)?"
+    },
+    "DomainName": {
+      "Type": "String",
+      "Default": "ttrek.sh"
+    },
+    "CertificateStackName": {
+      "Type": "String",
+      "Default": "Infra-DevOps-TTREK-Certificate"
+    },
+    "CertificateArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional existing ACM certificate ARN in this region; otherwise import the certificate stack output."
+    },
+    "HostedZoneId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Optional public Route 53 zone ID for the apex A alias; otherwise configure DNS externally."
+    }
+  },
+  "Conditions": {
+    "DefaultStage": {
+      "Fn::Equals": [
+        {
+          "Ref": "StageName"
+        },
+        "$default"
+      ]
+    },
+    "LambdaFunctionIsArn": {
+      "Fn::Equals": [
+        {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::Split": [
+                ":",
+                {
+                  "Ref": "LambdaFunctionName"
+                }
+              ]
+            }
+          ]
+        },
+        "arn"
+      ]
+    },
+    "AuthorizerFunctionIsArn": {
+      "Fn::Equals": [
+        {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::Split": [
+                ":",
+                {
+                  "Ref": "AuthorizerFunction"
+                }
+              ]
+            }
+          ]
+        },
+        "arn"
+      ]
+    },
+    "UseAuthorizer": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AuthorizerFunction"
+            },
+            ""
+          ]
+        }
+      ]
+    },
+    "UseRoute53": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "HostedZoneId"
+            },
+            ""
+          ]
+        }
+      ]
+    },
+    "UseExistingCertificate": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "CertificateArn"
+            },
+            ""
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "HttpApi": {
+      "Type": "AWS::ApiGatewayV2::Api",
+      "Properties": {
+        "Name": {
+          "Ref": "ApiName"
+        },
+        "ProtocolType": "HTTP"
+      }
+    },
+    "ApiStage": {
+      "Type": "AWS::ApiGatewayV2::Stage",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "StageName": {
+          "Ref": "StageName"
+        },
+        "AutoDeploy": true
+      },
+      "DependsOn": [
+        "SitePermission",
+        "RootRoute",
+        "ProxyRoute"
+      ]
+    },
+    "SiteIntegration": {
+      "Type": "AWS::ApiGatewayV2::Integration",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "IntegrationType": "AWS_PROXY",
+        "IntegrationMethod": "POST",
+        "IntegrationUri": {
+          "Fn::If": [
+            "LambdaFunctionIsArn",
+            {
+              "Ref": "LambdaFunctionName"
+            },
+            {
+              "Fn::Sub": [
+                "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}",
+                {
+                  "FunctionName": {
+                    "Ref": "LambdaFunctionName"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "PayloadFormatVersion": "2.0",
+        "TimeoutInMillis": {
+          "Ref": "IntegrationTimeoutMs"
+        }
+      }
+    },
+    "SitePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::If": [
+            "LambdaFunctionIsArn",
+            {
+              "Ref": "LambdaFunctionName"
+            },
+            {
+              "Fn::Sub": [
+                "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}",
+                {
+                  "FunctionName": {
+                    "Ref": "LambdaFunctionName"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/${StageName}/*/*"
+        }
+      }
+    },
+    "LambdaAuthorizer": {
+      "Type": "AWS::ApiGatewayV2::Authorizer",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "Name": "LambdaAuthorizer",
+        "AuthorizerType": "REQUEST",
+        "AuthorizerUri": {
+          "Fn::Sub": [
+            "arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations",
+            {
+              "FunctionArn": {
+                "Fn::If": [
+                  "AuthorizerFunctionIsArn",
+                  {
+                    "Ref": "AuthorizerFunction"
+                  },
+                  {
+                    "Fn::Sub": [
+                      "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}",
+                      {
+                        "FunctionName": {
+                          "Ref": "AuthorizerFunction"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "AuthorizerPayloadFormatVersion": "2.0",
+        "IdentitySource": [
+          "$request.header.Authorization"
+        ],
+        "AuthorizerResultTtlInSeconds": 0,
+        "EnableSimpleResponses": false
+      },
+      "Condition": "UseAuthorizer"
+    },
+    "AuthorizerPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Fn::If": [
+            "AuthorizerFunctionIsArn",
+            {
+              "Ref": "AuthorizerFunction"
+            },
+            {
+              "Fn::Sub": [
+                "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}",
+                {
+                  "FunctionName": {
+                    "Ref": "AuthorizerFunction"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "Principal": "apigateway.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/authorizers/${LambdaAuthorizer}"
+        }
+      },
+      "Condition": "UseAuthorizer"
+    },
+    "RootRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "ANY /",
+        "AuthorizationType": {
+          "Fn::If": [
+            "UseAuthorizer",
+            "CUSTOM",
+            "NONE"
+          ]
+        },
+        "AuthorizerId": {
+          "Fn::If": [
+            "UseAuthorizer",
+            {
+              "Ref": "LambdaAuthorizer"
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "ProxyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "ANY /{proxy+}",
+        "AuthorizationType": {
+          "Fn::If": [
+            "UseAuthorizer",
+            "CUSTOM",
+            "NONE"
+          ]
+        },
+        "AuthorizerId": {
+          "Fn::If": [
+            "UseAuthorizer",
+            {
+              "Ref": "LambdaAuthorizer"
+            },
+            {
+              "Ref": "AWS::NoValue"
+            }
+          ]
+        },
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "SiteDomain": {
+      "Type": "AWS::ApiGatewayV2::DomainName",
+      "Properties": {
+        "DomainName": {
+          "Ref": "DomainName"
+        },
+        "DomainNameConfigurations": [
+          {
+            "CertificateArn": {
+              "Fn::If": [
+                "UseExistingCertificate",
+                {
+                  "Ref": "CertificateArn"
+                },
+                {
+                  "Fn::ImportValue": {
+                    "Fn::Sub": "${CertificateStackName}-CertificateArn"
+                  }
+                }
+              ]
+            },
+            "EndpointType": "REGIONAL",
+            "SecurityPolicy": "TLS_1_2"
+          }
+        ]
+      }
+    },
+    "SiteMapping": {
+      "Type": "AWS::ApiGatewayV2::ApiMapping",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "DomainName": {
+          "Ref": "SiteDomain"
+        },
+        "Stage": {
+          "Ref": "ApiStage"
+        }
+      }
+    },
+    "SiteDns": {
+      "Type": "AWS::Route53::RecordSet",
+      "Condition": "UseRoute53",
+      "Properties": {
+        "HostedZoneId": {
+          "Ref": "HostedZoneId"
+        },
+        "Name": {
+          "Ref": "DomainName"
+        },
+        "Type": "A",
+        "AliasTarget": {
+          "DNSName": {
+            "Fn::GetAtt": [
+              "SiteDomain",
+              "RegionalDomainName"
+            ]
+          },
+          "HostedZoneId": {
+            "Fn::GetAtt": [
+              "SiteDomain",
+              "RegionalHostedZoneId"
+            ]
+          },
+          "EvaluateTargetHealth": false
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ApiId": {
+      "Value": {
+        "Ref": "HttpApi"
+      }
+    },
+    "ApiEndpoint": {
+      "Value": {
+        "Fn::If": [
+          "DefaultStage",
+          {
+            "Fn::GetAtt": [
+              "HttpApi",
+              "ApiEndpoint"
+            ]
+          },
+          {
+            "Fn::Join": [
+              "/",
+              [
+                {
+                  "Fn::GetAtt": [
+                    "HttpApi",
+                    "ApiEndpoint"
+                  ]
+                },
+                {
+                  "Ref": "StageName"
+                }
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "SiteUrl": {
+      "Value": {
+        "Fn::Sub": "https://${DomainName}/"
+      }
+    },
+    "RegionalDomainName": {
+      "Description": "DNS alias target for external DNS providers.",
+      "Value": {
+        "Fn::GetAtt": [
+          "SiteDomain",
+          "RegionalDomainName"
+        ]
+      }
+    },
+    "RegionalHostedZoneId": {
+      "Value": {
+        "Fn::GetAtt": [
+          "SiteDomain",
+          "RegionalHostedZoneId"
+        ]
+      }
+    }
+  }
+}

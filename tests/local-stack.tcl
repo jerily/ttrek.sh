@@ -14,7 +14,7 @@ proc request {path args} {
     ::test_support::request $path {*}$args
 }
 proc invoke {event {status 200}} {
-    set response [request http://127.0.0.1:$::lambdaPort/2015-03-31/functions/ttrek-sh/invocations \
+    set response [request http://127.0.0.1:$::lambdaPort/2015-03-31/functions/prod-Api-TtrekWebsite-Function/invocations \
         200 POST [encoding convertto utf-8 [::tjson::typed_to_json [list M $event]]] application/json]
     assert {![dict exists $response headers x-amz-function-error]} [dict get $response body]
     set result [json $response]

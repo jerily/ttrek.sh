@@ -6,6 +6,10 @@ proc ::site_lambda::initialize {root} {
     source [file join $root tcl site.tcl]
     source [file join $root tcl config.tcl]
     source [file join $root tcl telemetry.tcl]
+    if {[::app_config::mode] eq "LOCAL"} {
+        source [file join $root tcl local-ratelimit.tcl]
+    }
+    set config [::app_config::lambda_config $root]
     set dataDirectory /tmp
     if {[info exists ::env(TTREK_LOCAL_RUNTIME_DATA)]} {
         set dataDirectory $::env(TTREK_LOCAL_RUNTIME_DATA)
@@ -14,9 +18,8 @@ proc ::site_lambda::initialize {root} {
     set channel [file tempfile telemetry [file join $dataDirectory ttrek-telemetry-XXXXXX.sqlite3]]
     close $channel
     file copy -force [file join $root data telemetry.sqlite3] $telemetry
-    set settings [dict create rootdir $root registry_dir [file join $root registry] \
-        releases [::app_config::releases {}] \
-        treqmon {store {tsvstore {history_max_events 10000}}}]
+    set settings [dict merge [dict create rootdir $root registry_dir [file join $root registry] \
+        releases [::app_config::releases {}]] [::app_config::lambda_middleware $config]]
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
         set ::env(ENV) LOCAL
         source [file join $root tcl local-assets.tcl]

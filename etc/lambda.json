@@ -1,5 +1,5 @@
 {
-  "function": "ttrek-sh",
+  "function": "prod-Api-TtrekWebsite-Function",
   "entrypoint": "tcl/lambda.tcl",
   "initialize": "::site_lambda::initialize",
   "handler": "::site_lambda::handle"

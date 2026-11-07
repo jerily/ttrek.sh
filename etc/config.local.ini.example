@@ -1,0 +1,12 @@
+# Copy to etc/config.local.ini (gitignored). Local Lambda mocks use memory stores.
+[ratelimit]
+window_millis=10000
+limit=1000
+
+[request_monitor]
+history_max_events=10000
+
+[releases]
+version=1.0.0
+prefix=ttrek/1.0.0
+checksums_file=etc/releases.json
