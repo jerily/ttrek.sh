@@ -23,7 +23,7 @@ proc ::site::root {} {dict get [config] rootdir}
 proc ::site::configure {config} {
     variable settings $config
     ::views::init [file join [root] www]
-    ::recipe_search::load [file join [root] search-index.json]
+    ::recipe_search::load [file join [root] etc search-index.json]
     if {[dict exists $settings tratelimit]} {
         ::tratelimit::init_middleware [dict get $settings tratelimit]
     }

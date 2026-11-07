@@ -2,7 +2,7 @@ Usage: start-local.sh [options]
        start-lambda.sh|start-proxy.sh|start-s3.sh [options]
 
   --zip FILE          Packaged site (default: dist/ttrek-sh.zip)
-  --routes FILE       Proxy routes (default: routes.json)
+  --routes FILE       Proxy routes (default: etc/routes.json)
   --s3-dir DIRECTORY  Public asset and release buckets (default: dist/s3)
   --state-dir DIR     Disposable service directories (default: var/local)
   --port PORT         Loopback proxy port (default: 8080)

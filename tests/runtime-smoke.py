@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix="runtime-smoke-", dir=ROOT / "build") as
                     str(app / registry_dir)], env=env, check=True)
     (app / "build").mkdir()
     (app / "build/install").symlink_to(INSTALL, target_is_directory=True)
-    (app / "etc").mkdir()
+    (app / "etc").mkdir(exist_ok=True)
     with (app / "certificate.log").open("w") as log:
         subprocess.run([
             str(INSTALL / "bin/openssl"), "req", "-x509", "-newkey", "rsa:2048",

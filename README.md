@@ -107,9 +107,9 @@ ttrek run -script build-search -- /path/to/registry
 ```
 
 `bin/build-search.tcl ?registry_directory? ?output_file?` defaults to the pinned
-`registry` and `search-index.json` in the application root. `build.sh` runs it
-for the pinned registry; CodeBuild copies the artifact into the application.
-Lambda packaging builds it from the staged registry in `lambda/prepare.tcl`.
+`registry` and `etc/search-index.json` relative to the application root.
+`build.sh` runs it for the pinned registry; CodeBuild copies the artifact into the application.
+Lambda packaging builds it from the staged registry in `devops/prepare-lambda.tcl`.
 Restart workers after rebuilding, or repackage and restart the local mock stack.
 
 The artifact is one versioned JSON document with display metadata and Base64
@@ -280,8 +280,21 @@ its router and directory snapshots. Mounts receive `-store`, `-prefix`, `-naviga
 and `-config master_template`; only the shared master is supplied as an additional
 template. Direct serving uses the configured Valkey service and TLS settings below.
 
-`tdevops` owns packaging and local service supervision; `etc/tdevops.tcl` supplies
-application staging, S3 seeds and release configuration. The private registry
+`tdevops` 0.2.0 owns the shared Lambda runtime, packaging and local service supervision; `etc/tdevops.tcl` supplies
+application staging, S3 seeds and release configuration. `etc/lambda.json` selects
+`ttrek-sh`, `tcl/lambda.tcl`, its initializer and request handler. The application
+keeps its HTTP event mapping, telemetry and release settings; tdevops supplies the
+bootstrap, Runtime API loop, package-path setup and generated local template.
+There is no app-local `lambda/` directory. `devops/prepare-lambda.tcl` builds the
+search snapshot and telemetry seed before packaging.
+
+After pulling this change, refresh the private development dependency:
+
+```sh
+ttrek install -y -D -registry ../private-ttrek-registry -add-pubreg tdevops
+```
+
+The private registry
 supplies the local mock tooling; the public registry supplies the static content
 packages. `TTREK_LOCAL_CONFIG` may select a local INI for release settings.
 The `package` and `package-lambda` scripts package both content directories.
@@ -302,7 +315,7 @@ Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor st
 | mock-lambda-app | 3001 | Runs the packaged custom runtime and HTTP event adapter |
 | mock-s3-app | 3015 | Serves public assets and the locally built release executable |
 
-`routes.json` maps `/` and `/{proxy+}` to the function. The Lambda adapter supports
+`etc/routes.json` maps `/` and `/{proxy+}` to the function. The Lambda adapter supports
 payloads 1.0 and 2.0, preserves query/body data and returns base64-encoded response
 bytes. Static website assets are fetched from S3 through Lambda, retaining the
 browser's origin and content security policy. Package CSS is served by each
@@ -454,13 +467,42 @@ working directory. TLS certificate options are omitted for plain TCP. Keep local
 certificates and keys under ignored `local/`, and keep the machine-specific
 configuration in ignored `etc/config.local.ini`.
 
+## Directory layout
+
+- `devops/`: deployment configuration (`appspec.yml`, `buildspec.yml`),
+  CodeDeploy hooks in `codedeploy-scripts/`, and CloudFormation templates and
+  launchers in `infra/`.
+- `etc/`: application configuration, proxy/API Gateway routes, release checksums,
+  and the generated, ignored `search-index.json`. Search workers load this file;
+  direct builds and Lambda packaging generate it before startup.
+- `bin/`: local command launchers. `tdevops` supplies the shared Lambda runtime;
+  `etc/lambda.json` declares the function and `tcl/lambda.tcl` owns app callbacks.
+- `tcl/`: application modules; `www/`: Jinja templates; `schemas/`: request schemas.
+- `content/` and `public/`: authored content and public assets; `registry/`: pinned
+  package recipes. `build/`, `dist/`, and `var/` contain generated output or state.
+
 ## Infrastructure
+
+CodeBuild reads `devops/buildspec.yml`, selected by `Source.BuildSpec` in
+`devops/infra/30-codebuild.yml`. Existing CodeBuild projects must update that
+setting before building this layout (redeploy the build stack or set the
+project's buildspec path). See the
+[AWS buildspec reference](https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html).
+
+The source AppSpec lives at `devops/appspec.yml`. The build stages it as
+`artifacts/appspec.yml`, alongside `artifacts/codedeploy-scripts/` and
+`artifacts/ttrek-app/`, preserving its relative hook and application paths.
+For EC2/On-Premises CodeDeploy, archive the contents of `artifacts/` so
+`appspec.yml` is at the revision root, as required by
+[CodeDeploy](https://docs.aws.amazon.com/codedeploy/latest/userguide/application-revisions-appspec-file.html).
+The container build uses the same staged hooks. Source-file locations and bundle
+locations are separate; the ECS build still publishes its container image.
 
 All deployment scripts use the AWS profile `ttrek-prod-neo`, configured for
 `eu-central-1`. The storage, build and application templates use the `jerily`
 S3 prefix, matching the private release bucket `jerily-ttrek-app`.
 
-For a new environment, run the scripts in `infra/` in numeric order: keys,
+For a new environment, run the scripts in `devops/infra/` in numeric order: keys,
 storage, VPC, cache, CodeBuild, then Fargate. `10-deploy-infra-storage.sh` deploys
 `10-infra-storage.yml` (ECR and S3) before `20-deploy-infra-vpc0.sh` deploys
 `20-infra-vpc0.yml` (networking). `25-deploy-infra-cache.sh` then deploys
@@ -548,7 +590,8 @@ ttrek install -force -registry ../private-ttrek-registry -add-pubreg tdevops moc
 ttrek run -package tdevops -script generate-api-gateway
 ```
 
-This writes `dist/api-gateway.json` from `routes.json`. Deployment defaults live
+This writes `dist/api-gateway.json` from `etc/routes.json`, selected by
+`routes` in `etc/tdevops.tcl`. Deployment defaults live
 under `apiGateway`; the CLI only selects input/output files. The template exposes
 API name, stage, timeout, backend function and `AuthorizerFunction` parameters.
 Authorization starts disabled because `authorizer.function` is empty. Supply an
