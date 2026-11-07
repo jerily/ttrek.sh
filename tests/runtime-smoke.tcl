@@ -64,7 +64,7 @@ try {
     set appProcess [::test_support::start [list [file join $app run.sh]] [file join $app app.log] $environment $app]
     ::test_support::wait_port $httpPort $appProcess
     set checks [dict create / [expr {$mode eq "LOCAL" ? "http://localhost:8080/init | ENV=LOCAL sh" : "https://ttrek.sh/init"}] \
-        /packages jinja2-tcl /docs {Getting started} /blog {No published content yet.} \
+        /packages jinja2-tcl /docs {Getting started} /blog {ttrek 1.0.0 is now public} \
         /docs/getting-started {ttrek init -y} /package/tcl 9.1.0 /package/tcl/9.1.0 tcl@9.1.0 \
         /package/tjson/1.0.26 tjson@1.0.26 /request-monitor data-chart-config \
         /js/chart.umd.js Chart.js /css/typebase.css Typebase /registry/tcl 9.1.0]

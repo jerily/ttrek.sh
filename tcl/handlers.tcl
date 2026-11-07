@@ -1,10 +1,3 @@
-proc get_stats_handler {ctx req} {
-    set data [::request_monitor::context]
-    set html [::views::render request-monitor.html.jinja $data]
-    set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
-    return $res
-}
-
 proc get_debug_handler {ctx req} {
     set data [dict merge $ctx $req]
     set res [::twebserver::build_response 200 "text/plain; charset=utf-8" $data]

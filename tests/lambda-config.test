@@ -53,6 +53,37 @@ test lambda-config-7 {Local store counts simultaneous requests and expires the o
         [::tratelimit::middleware::localstore::get_requests_made test 101 200]
 } -result {2 0}
 
+test lambda-config-8 {Monitor layout comes from the selected INI with a shared-site default} -body {
+    set ::env(ENV) LOCAL
+    set ::env(TTREK_LOCAL_CONFIG) [file join $root etc config.local.ini]
+    ::tconfig::write_config {request_monitor {master_template custom-master.html.jinja}} $::env(TTREK_LOCAL_CONFIG)
+    list [dict get [::app_config::request_monitor [::app_config::lambda_config $root]] master_template] \
+        [dict get [::app_config::request_monitor {}] master_template]
+} -result {custom-master.html.jinja request-monitor-master.html.jinja}
+
+test lambda-config-9 {Local memory monitoring needs no Valkey settings and honors history limits} -body {
+    set ::env(ENV) LOCAL
+    ::app_config::monitor_store {request_monitor {store memory history_max_events 42}}
+} -result {tsvstore {history_max_events 42}}
+
+test lambda-config-10 {An explicit local Valkey monitor receives INI connection details} -body {
+    set ::env(ENV) LOCAL
+    set store [::app_config::monitor_store {request_monitor {store valkey history_max_events 37} \
+        redis {host localhost port 6380 ssl true username monitor password test ssl_ca_file ca.pem timeout 1234}}]
+    set settings [dict get $store valkeystore]
+    list [dict get $settings host] [dict get $settings port] [dict get $settings ssl] \
+        [dict get $settings username] [dict get $settings password] [dict get $settings ssl_ca_file] \
+        [dict get $settings timeout] [dict get $settings history_max_events]
+} -result {localhost 6380 true monitor test ca.pem 1234 37}
+
+test lambda-config-11 {Invalid monitor store selection fails during configuration} -body {
+    ::app_config::monitor_store {request_monitor {store unknown}}
+} -returnCodes error -result {request_monitor.store must be memory or valkey}
+
+test lambda-config-12 {Invalid monitor history limits fail during configuration} -body {
+    ::app_config::monitor_store {request_monitor {store memory history_max_events 0}}
+} -returnCodes error -result {request_monitor.history_max_events must be a positive integer}
+
 array unset ::env
 array set ::env $saved_env
 ::tcltest::removeDirectory $root

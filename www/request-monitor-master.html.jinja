@@ -1,0 +1,18 @@
+{% extends 'master.html.jinja' %}
+{% block home_selected %}{% endblock %}
+{% block styles %}
+<link rel="stylesheet" href="/css/request-monitor.css" />
+{% endblock %}
+{% block content %}
+<main class="site-main request-monitor">
+    <div class="content">
+        <h1 class="content-head">Request Monitor</h1>
+        <p>Request volume and response times for ttrek.sh.</p>
+        {% block body %}{% endblock %}
+    </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script defer src="{{ chart_script }}"></script>
+<script defer src="{{ assets }}/charts.js"></script>
+{% endblock %}

@@ -11,6 +11,7 @@ def check_layout(page, base):
         "/": "/", "/packages": "/packages", "/search?q=web": "/packages",
         "/package/tcl": "/packages", "/package/tcl/9.1.0": "/packages",
         "/docs": "/docs", "/docs/getting-started": "/docs", "/blog": "/blog",
+        "/blog/2026-11-07-ttrek-100-is-now-public": "/blog", "/request-monitor": None,
     }
     for width in (320, 390, 768, 1440):
         page.set_viewport_size({"width": width, "height": 900})
@@ -20,7 +21,20 @@ def check_layout(page, base):
             expect(page.get_by_role("navigation", name="Site", exact=True)).to_have_count(1)
             expect(page.locator("main")).to_have_count(1)
             expect(page.locator(".footer")).to_have_count(1)
-            expect(page.locator(".home-menu .pure-menu-selected a")).to_have_attribute("href", selected)
+            selected_links = page.locator(".home-menu .pure-menu-selected a")
+            if selected is None:
+                expect(selected_links).to_have_count(0)
+            else:
+                expect(selected_links).to_have_attribute("href", selected)
+            if path == "/request-monitor":
+                expect(page.get_by_role("heading", name="Request Monitor", exact=True)).to_be_visible()
+                assert page.locator("canvas").count() == 6
+                assert page.locator("canvas").evaluate_all("""canvases => canvases.every(canvas => {
+                    const chart = Chart.getChart(canvas);
+                    return chart && chart.width > 0 && chart.height > 0;
+                })""")
+                assert page.locator("canvas").evaluate_all("""canvases => canvases.every(canvas =>
+                    Chart.getChart(canvas).data.datasets[0].borderColor === '#225d98')""")
             metrics = page.evaluate(metrics_script)
             if shared is None:
                 shared = metrics["shared"]
