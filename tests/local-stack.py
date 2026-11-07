@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import socket
 import subprocess
@@ -50,12 +51,26 @@ archive = ROOT / "dist/ttrek-sh.zip"
 before = hashlib.sha256(archive.read_bytes()).hexdigest()
 with tempfile.TemporaryDirectory(prefix="local stack ", dir=ROOT / "build") as temporary:
     state = Path(temporary) / "state"
+    seed = Path(temporary) / "s3"
+    shutil.copytree(ROOT / "dist/s3", seed)
+    extra_target = "macos-universal2"
+    extra_binary = b"uploaded release bytes\x00\xff"
+    extra_checksum = hashlib.sha256(extra_binary).hexdigest()
+    extra_seed = seed / "ttrek-local/ttrek/1.0.0" / extra_target / "ttrek"
+    extra_seed.parent.mkdir(parents=True, exist_ok=True)
+    extra_seed.write_bytes(b"old seed bytes")
+    manifest = Path(temporary) / "releases.json"
+    manifest.write_text(json.dumps({"local": {"1.0.0": {extra_target: extra_checksum}},
+                                    "prod": {"1.0.0": {extra_target: "a" * 64}}}))
+    config = Path(temporary) / "config.ini"
+    config.write_text(f"[releases]\nversion=1.0.0\nchecksums_file={manifest}\n")
     with (Path(temporary) / "services.log").open("w+") as log:
         process = subprocess.Popen([
             str(ROOT / "bin/start-local.sh"), "--zip", str(archive), "--port", str(port),
             "--lambda-port", str(lambda_port), "--s3-port", str(s3_port),
-            "--state-dir", str(state), "--lambda-workers", "2",
-        ], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            "--state-dir", str(state), "--s3-dir", str(seed), "--lambda-workers", "2",
+        ], cwd=ROOT, env={**os.environ, "TTREK_LOCAL_CONFIG": str(config)},
+            stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         try:
             deadline = time.monotonic() + 180
             while True:
@@ -139,6 +154,14 @@ with tempfile.TemporaryDirectory(prefix="local stack ", dir=ROOT / "build") as t
             assert metadata["sha256"] == hashlib.sha256(download).hexdigest()
             assert metadata["url"].startswith(s3 + "/ttrek-local/")
             print("PASS signed release redirect, exact executable bytes and checksum metadata")
+
+            request(f"{s3}/ttrek-local/ttrek/1.0.0/{extra_target}/ttrek", method="PUT", data=extra_binary)
+            download, _ = request(f"/dist/{extra_target}/ttrek")
+            metadata = json.loads(request(f"/releases/latest/{extra_target}")[0])
+            assert download == extra_binary
+            assert metadata["sha256"] == extra_checksum
+            assert metadata["version"] == "1.0.0"
+            print("PASS configured local checksum manifest takes precedence over seed and production hashes")
         except Exception:
             log.flush()
             log.seek(0)

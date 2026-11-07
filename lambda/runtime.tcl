@@ -77,11 +77,11 @@ proc ::site_lambda::initialize {} {
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
         set ::env(ENV) LOCAL
         source [file join $::siteRoot tcl local-assets.tcl]
-        set release [dict create bucket ttrek-local region us-east-1 prefix ttrek/1.0.0 \
-            endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)]
-        if {[info exists ::env(TTREK_LOCAL_RELEASE_TARGET)]} {
-            dict set release sha256_$::env(TTREK_LOCAL_RELEASE_TARGET) $::env(TTREK_LOCAL_RELEASE_SHA256)
-        }
+        set release {}
+        if {[info exists ::env(TTREK_LOCAL_RELEASES)]} {set release $::env(TTREK_LOCAL_RELEASES)}
+        dict set release bucket ttrek-local
+        dict set release region us-east-1
+        dict set release endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
         dict set settings releases [::app_config::releases [dict create releases $release]]
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }

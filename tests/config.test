@@ -125,7 +125,7 @@ test releases-config-1 {Downloads default to disabled with a short URL lifetime}
     list [dict get $settings bucket] [dict get $settings url_expiry_seconds]
 } -result {{} 300}
 
-test releases-config-2 {Release settings normalize prefixes and preserve hashes} -body {
+test releases-config-2 {Release settings normalize prefixes} -body {
     set settings [::app_config::releases {releases {bucket public-releases region eu-west-1 prefix /ttrek/1.0.0/}}]
     list [dict get $settings prefix] [dict get $settings region]
 } -result {ttrek/1.0.0 eu-west-1}
@@ -136,7 +136,7 @@ test releases-config-3 {Invalid release settings fail before serving requests} -
         {bucket https://bucket.example region us-east-1}
         {bucket public-releases region {}}
         {url_expiry_seconds 0} {url_expiry_seconds 604801} {url_expiry_seconds invalid}
-        {prefix ../secret} {version latest} {sha256_linux-amd64-glibc invalid}
+        {prefix ../secret} {version latest} {checksums {linux-amd64-glibc invalid}}
     } {
         lappend result [catch {::app_config::releases [dict create releases $settings]}]
     }
@@ -157,6 +157,72 @@ test releases-config-4 {Mock S3 endpoint is restricted to loopback in LOCAL mode
     }
     set result
 } -result {0 0 1 1 1}
+
+set checksums_fixture [file join [file dirname [info script]] fixtures release-checksums.json]
+test releases-config-5 {Checksums are selected by environment and version without falling back} -body {
+    set result {}
+    foreach {mode version} {LOCAL 1.0.0 PROD 1.0.0 PROD 1.1.0 PROD 9.0.0 LOCAL 1.1.0} {
+        set ::env(ENV) $mode
+        set settings [::app_config::releases [dict create releases [dict create checksums_file $checksums_fixture version $version]]]
+        lappend result [dict get $settings checksums]
+    }
+    set result
+} -result [list [dict create linux-amd64-glibc [string repeat b 64]] \
+    [dict create linux-amd64-glibc [string repeat a 64]] \
+    [dict create macos-arm64 [string repeat c 64]] {} {}]
+
+test releases-config-6 {Missing and malformed checksum manifests fail startup} -body {
+    set result [list [catch {::app_config::release_checksums [file join $root absent.json] 1.0.0}]]
+    foreach text [list "\{" {[]} {{"prod":[]}} {{"prod":{"latest":{}}}} \
+        {{"prod":{"1.0.0":{"linux-amd64-glibc":"bad"}}}} \
+        {{"prod":{"1.0.0":{"linux-amd64-glibc":123}}}} \
+        {{"other":{}}}] {
+        set path [file join $root invalid.json]
+        set channel [open $path w]
+        puts $channel $text
+        close $channel
+        lappend result [catch {::app_config::release_checksums $path 1.0.0}]
+    }
+    set result
+} -result {1 1 1 1 1 1 1 1}
+
+test releases-config-7 {Checksum paths resolve from the application root in both config modes} -setup {
+    file copy -force $checksums_fixture [file join $root etc releases.json]
+    rename ::tconfig::read_config ::tconfig::saved_read_config
+    proc ::tconfig::read_config {path} {dict create redis {host localhost} releases {checksums_file etc/releases.json}}
+    set saved_cwd [pwd]
+    cd /tmp
+} -body {
+    set result {}
+    foreach mode {LOCAL PROD} {
+        set ::env(ENV) $mode
+        set config [::app_config::load $root]
+        lappend result [expr {[dict get $config releases checksums_file] eq [file join $root etc releases.json]}]
+        lappend result [dict keys [dict get [::app_config::releases $config] checksums]]
+    }
+    set result
+} -cleanup {
+    cd $saved_cwd
+    rename ::tconfig::read_config {}
+    rename ::tconfig::saved_read_config ::tconfig::read_config
+} -result {1 linux-amd64-glibc 1 linux-amd64-glibc}
+
+test releases-config-8 {Local stack reads the same versioned manifest through the INI reference} -body {
+    set ::env(ENV) LOCAL
+    set path [file join $root etc release.ini]
+    set channel [open $path w]
+    puts $channel "\[releases\]\nversion=1.0.0\nchecksums_file=etc/releases.json"
+    close $channel
+    dict get [::app_config::releases_from_ini $path $root] checksums linux-amd64-glibc
+} -result [string repeat b 64]
+
+test releases-config-9 {Local content-only configuration keeps default release settings} -body {
+    set path [file join $root etc content-only.ini]
+    set channel [open $path w]
+    puts $channel "\[content\]\nallow_create=true"
+    close $channel
+    dict get [::app_config::releases_from_ini $path $root] version
+} -result 1.0.0
 
 test content-config-1 {creation defaults off and requires an explicit boolean} -body {
     set result [list [dict get [::app_config::content {}] allow_create]]
