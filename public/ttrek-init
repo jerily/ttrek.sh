@@ -92,21 +92,6 @@ main() {
 
     local _url="${TTREK_UPDATE_ROOT%/}/dist/${_arch}/ttrek${_ext}"
 
-    local _dir
-    if ! _dir="$(ensure mktemp -d)"; then
-        # Because the previous command ran in a subshell, we must manually
-        # propagate exit status.
-        exit 1
-    fi
-    local _file="${_dir}/ttrek${_ext}"
-
-#    echo "Do you want to proceed with the installation? [y/N]"
-#    read response
-#    if [ "$response" != "y" ]; then
-#        echo "Installation aborted"
-#        exit 1
-#    fi
-
     local _ansi_escapes_are_valid=false
     if [ -t 2 ]; then
         if [ "${TERM+set}" = 'set' ]; then
@@ -152,25 +137,7 @@ main() {
         esac
     done
 
-    if $_ansi_escapes_are_valid; then
-        printf "\33[1minfo:\33[0m downloading installer\n" 1>&2
-    else
-        printf '%s\n' 'info: downloading installer' 1>&2
-    fi
-
-    ensure mkdir -p "$_dir"
-    ensure downloader "$_url" "$_file" "$_arch"
-    ensure chmod u+x "$_file"
     local _ttrek_dir="${TTREK_HOME:-$HOME/.ttrek}"
-    ensure mkdir -p "${_ttrek_dir}/bin"
-    ensure cp "$_file" "${_ttrek_dir}/bin/ttrek${_ext}"
-
-    ensure printf '%s\n' '#!/bin/sh' \
-        'case ":$PATH:" in' \
-        '    *":$HOME/.ttrek/bin:"*) ;;' \
-        '    *) export PATH="$HOME/.ttrek/bin:$PATH" ;;' \
-        'esac' > "${_ttrek_dir}/env"
-
     # The installer usually runs under sh; prefer its parent terminal shell,
     # falling back to the user's default shell when ps is unavailable.
     local _shell="${SHELL:-sh}"
@@ -198,40 +165,71 @@ main() {
             fi
             ;;
         zsh)
-            ensure mkdir -p "${ZDOTDIR:-$HOME}"
             _profile="${ZDOTDIR:-$HOME}/.zshrc"
             ;;
     esac
+
+    if [ "$need_tty" = yes ]; then
+        # stdin may contain the installer itself (curl | sh), so use the terminal.
+        if ! (exec 3<>/dev/tty) 2>/dev/null; then
+            err "No terminal available for confirmation. Run with -y to install without prompting."
+        fi
+        exec 3<>/dev/tty
+        printf 'Install ttrek in %s and configure PATH in:\n' "$_ttrek_dir" >&3
+        printf '  %s\n' "$_profile" >&3
+        [ -z "$_rc" ] || printf '  %s\n' "$_rc" >&3
+        printf 'Continue? [y/N] ' >&3
+        local _answer=""
+        IFS= read -r _answer <&3 || _answer=""
+        exec 3>&-
+        case "$_answer" in
+            y|Y|yes|Yes|YES) ;;
+            *) say "Installation cancelled."; return 0 ;;
+        esac
+    fi
+
+    local _dir
+    if ! _dir="$(ensure mktemp -d)"; then
+        # Because the previous command ran in a subshell, we must manually
+        # propagate exit status.
+        exit 1
+    fi
+    local _file="${_dir}/ttrek${_ext}"
+
+    if $_ansi_escapes_are_valid; then
+        printf "\33[1minfo:\33[0m downloading installer\n" 1>&2
+    else
+        printf '%s\n' 'info: downloading installer' 1>&2
+    fi
+
+    ensure downloader "$_url" "$_file" "$_arch"
+    ensure chmod u+x "$_file"
+    ensure mkdir -p "${_ttrek_dir}/bin"
+    ensure cp "$_file" "${_ttrek_dir}/bin/ttrek${_ext}"
+
+    ensure printf '%s\n' '#!/bin/sh' \
+        'case ":$PATH:" in' \
+        '    *":$HOME/.ttrek/bin:"*) ;;' \
+        '    *) export PATH="$HOME/.ttrek/bin:$PATH" ;;' \
+        'esac' > "${_ttrek_dir}/env"
 
     local _source='. "$HOME/.ttrek/env"'
     for _profile in "$_profile" "$_rc"; do
         [ -n "$_profile" ] || continue
         if [ ! -f "$_profile" ] || ! grep -Fqx "$_source" "$_profile"; then
+            ensure mkdir -p "${_profile%/*}"
             printf '\n%s\n' "$_source" >> "$_profile" || err "could not update $_profile"
         fi
     done
 
     ensure echo "ttrek has been installed successfully"
-
+    ensure printf '\nTo use ttrek in this terminal, run:\n  %s\n' "$_source"
+    ensure printf '%s\n' 'Or open a new terminal to load the updated PATH.'
 
 #    if [ ! -x "$_file" ]; then
 #        printf '%s\n' "Cannot execute $_file (likely because of mounting /tmp as noexec)." 1>&2
 #        printf '%s\n' "Please copy the file to a location where you can execute binaries and run ./ttrek-init${_ext}." 1>&2
 #        exit 1
-#    fi
-
-#    if [ "$need_tty" = "yes" ] && [ ! -t 0 ]; then
-#        # The installer is going to want to ask for confirmation by
-#        # reading stdin.  This script was piped into `sh` though and
-#        # doesn't have stdin to pass to its children. Instead we're going
-#        # to explicitly connect /dev/tty to the installer's stdin.
-#        if [ ! -t 1 ]; then
-#            err "Unable to run interactively. Run with -y to accept defaults, --help for additional options"
-#        fi
-#
-#        ignore "$_file" "$@" < /dev/tty
-#    else
-#        ignore "$_file" "$@"
 #    fi
 
     local _retval=$?
