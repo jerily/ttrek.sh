@@ -10,8 +10,8 @@
         <title>{% if pagetitle %}{{ pagetitle }}{% else %}{{ title }} · ttrek{% endif %}</title>
     </head>
     <body class="{% block body_class %}{% endblock %}">
-        <div class="header">
-            <div class="home-menu pure-menu pure-menu-horizontal pure-menu-fixed">
+        <header class="site-header">
+            <nav class="home-menu pure-menu pure-menu-horizontal" aria-label="Site">
                 <a class="pure-menu-heading text-normal" href="/">ttrek<span class="brand-dot">.</span></a>
 
                 <ul class="pure-menu-list">
@@ -20,15 +20,15 @@
                     <li class="pure-menu-item{% block docs_selected %}{% endblock %}"><a href="/docs" class="pure-menu-link">Documentation</a></li>
                     <li class="pure-menu-item{% block blog_selected %}{% endblock %}"><a href="/blog" class="pure-menu-link">Blog</a></li>
                 </ul>
-            </div>
-        </div>
+            </nav>
+        </header>
         {% block content %}{% endblock %}
-        <div class="footer l-box is-center">
+        <footer class="footer is-center">
             &#169; <!-- ttrek-current-year --> JERILY LTD · <a href="https://github.com/jerily/ttrek">Source on GitHub</a>
-        </div>
+        </footer>
         {% block scripts %}
             <script src="/js/clipboard.min.js"></script>
-            <script>new ClipboardJS(".clipboard");</script>
+            <script src="/js/clipboard-init.js" defer></script>
         {% endblock %}
     </body>
 </html>

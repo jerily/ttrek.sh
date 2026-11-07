@@ -39,7 +39,6 @@ proc ::site::mount {router} {
         set directory [expr {$kind eq "wiki" ? "docs" : "blog"}]
         set store [::web::static::${kind}::create -directory [file join [root] content $directory] -title $title]
         ::web::static::${kind}::mount $router -store $store -prefix $prefix \
-            -navigation {{Home /} {Documentation /docs} {Blog /blog} {Packages /packages}} \
             -config [dict create master_template [dict get $templates ${directory}-master.html.jinja] \
                 templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
     }
