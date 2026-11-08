@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Set executable ZIP attributes required by the provided.al2023 runtime."""
+"""Check required runtime files and set executable ZIP attributes for Lambda."""
 import os
 from pathlib import Path
 import stat
@@ -13,7 +13,7 @@ def finalize(path):
     os.close(descriptor)
     try:
         with zipfile.ZipFile(path) as source, zipfile.ZipFile(temporary, "w") as target:
-            for required in ("bootstrap", "local/bin/tclsh", "etc/config.ini"):
+            for required in ("bootstrap", "local/bin/tclsh", "etc/config.ini", "etc/releases.json"):
                 source.getinfo(required)
             if "etc/config.local.ini" in source.namelist():
                 raise ValueError("Local configuration must not be in the deployment archive")

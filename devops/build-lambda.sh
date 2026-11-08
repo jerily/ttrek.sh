@@ -38,4 +38,5 @@ export TTREK_PRODUCTION_CONFIG="$SITE_ROOT/build/prod/config.ini"
 # Build on AL2023 and skip tdevops' numeric glibc cutoff, which rejects backports.
 ttrek run -script package-lambda -- --local-only
 python3 devops/finalize-lambda.py dist/ttrek-sh.zip
+"$TCLSH" tests/lambda-package.tcl dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
