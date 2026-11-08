@@ -62,7 +62,6 @@ Resources:
       Description: "TTrek Valkey Cache Subnet Group"
       SubnetIds:
         - !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet1Id'
-        - !ImportValue 'Infra-DevOps-TTREK-Base-PrivateSubnet2Id'
 
   TTrekValkeyReplicationGroup:
     Type: AWS::ElastiCache::ReplicationGroup
