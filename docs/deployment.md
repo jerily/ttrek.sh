@@ -48,7 +48,8 @@ For a new deployment:
 3. Create the SSM password described below, then run `25-deploy-infra-cache.sh`.
 4. Set the SSM cache host to the cache stack's `TTrekValkeyClusterEndpointAddress` output.
 5. Run `15-deploy-infra-certificate.sh` and complete DNS validation.
-6. Deploy `30-codebuild.yml`, then run the build (or use the manual Lambda steps below).
+6. Complete the GitHub connection setup below, run `30-deploy-codebuild.sh`, then
+   run the build (or use the manual Lambda steps below).
 7. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.
 
 If you deployed the previous two-zone network through step 2 but have not deployed
@@ -203,9 +204,15 @@ calls. Direct server development still uses its existing Valkey configuration.
 
 CodeBuild reads `devops/buildspec.yml`, selected by `Source.BuildSpec` in
 `devops/infra/30-codebuild.yml`. The AL2023 x86_64 build image matches Lambda's
-native-library ABI. The build:
+native-library ABI. Before running ttrek, the install phase installs GCC/G++,
+Make, Bash, curl, Git, patch, pkg-config, Perl, tar, gzip and CA certificates,
+plus ZIP and binary utilities for packaging. It installs CMake (`>=3.25,<5`)
+and SAM with pip, then checks the CMake and compiler versions. These tools are
+needed to build the site's dependencies even though ttrek itself is downloaded.
+The build:
 
-1. Compiles the `Ttrek` secondary source with its `build-ttrek.sh`.
+1. Downloads the ttrek 1.0.0 Linux AMD64 glibc binary from
+   `s3://jerily-ttrek-app/ttrek/1.0.0/linux-amd64-glibc/ttrek` and makes it executable.
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).
 3. Runs the project's asset and search builds, then the application checks.
@@ -219,46 +226,61 @@ helper for private recipe downloads. `PrivateRegistryRef` selects the registry
 branch/tag/commit. Node/npm are supplied by the build image, and SAM is installed
 as a build tool. Neither is a ttrek dependency.
 
-To authenticate the private registry, create an AWS CodeConnections connection
-to GitHub in the build's region and complete the GitHub App installation for the
-`jerily` organization. Grant it access to `ttrek.sh`, `ttrek`,
-`private-ttrek-registry`, `tdevops`, and any private source repositories referenced
-by those recipes, including the mock apps. Finish the connection handshake so
-its status is `AVAILABLE`, then pass its ARN when updating the build stack:
+To authenticate the private registry, install AWS Connector for GitHub on the
+personal account `jerily`. Authorizing the app to identify your GitHub account
+does not install it or grant repository access:
+
+1. Open [AWS Connector for GitHub in the Marketplace](https://github.com/marketplace/aws-connector-for-github).
+2. Click **Add**, then **Install it for free** if prompted.
+3. Select the personal GitHub account **jerily**.
+4. Choose **Only select repositories** and include `ttrek.sh`,
+   `private-ttrek-registry`, `tdevops`, `mock-lambda-app`, `mock-proxy-app`, and
+   `mock-s3-app`, plus any other private repositories referenced by build recipes.
+5. Click **Install**. The app appears under **Installed GitHub Apps**, where you
+   can manage repository access.
+6. Return to the AWS connection wizard in the build's region (`eu-central-1`
+   by default), select that installation, and complete the connection. Its
+   status must be **Available**.
+
+Export the resulting connection ARN, then deploy the build stack:
 
 ```bash
-aws cloudformation deploy --template-file devops/infra/30-codebuild.yml \
-  --stack-name Infra-DevOps-TTREK-Builds --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides GitHubConnectionArn=arn:aws:codeconnections:eu-central-1:ACCOUNT:connection/ID \
-  --region eu-central-1 --profile ttrek-prod-neo
+export TTREK_GITHUB_CONNECTION_ARN='arn:aws:codeconnections:eu-central-1:ACCOUNT_ID:connection/CONNECTION_ID'
+devops/infra/30-deploy-codebuild.sh
 ```
 
-The template applies that connection to all three GitHub sources and grants the
-build role `codeconnections:GetConnection` and `codeconnections:GetConnectionToken`
-for that ARN. Source credentials apply to the listed repositories. For HTTPS Git
+The script stops before calling AWS if `TTREK_GITHUB_CONNECTION_ARN` is unset or
+empty, prints the installation instructions, and otherwise passes the ARN as
+the `GitHubConnectionArn` template parameter. The template applies that
+connection to both GitHub sources and grants the build role
+`codeconnections:GetConnection` and `codeconnections:GetConnectionToken`
+for that ARN. The build role also has `s3:GetObject` on
+`arn:aws:s3:::jerily-ttrek-app/ttrek/*` to download published ttrek binaries.
+The ttrek source checkout and `TtrekRef` parameter are no longer needed.
+Source credentials apply to the listed repositories. For HTTPS Git
 clones of other private repositories run by recipes, register the same connection
 as CodeBuild's regional default GitHub credential:
 
 ```bash
 aws codebuild import-source-credentials --server-type GITHUB \
   --auth-type CODECONNECTIONS \
-  --token arn:aws:codeconnections:eu-central-1:ACCOUNT:connection/ID \
-  --region eu-central-1 --profile ttrek-prod-neo
+  --token "$TTREK_GITHUB_CONNECTION_ARN" \
+  --region eu-central-1 --profile admin
 ```
 
+Replace `admin` with a profile allowed to call `codebuild:ImportSourceCredentials`;
+the repository's deployment group policies do not include that setup permission.
 This sets the account default for CodeBuild projects in that region. The enabled
 `env.git-credential-helper: yes` supplies credentials to recipe Git clones; no
 token belongs in `ttrek.json`, a clone URL, or the build log.
-If `GitHubConnectionArn` is empty, CodeBuild uses the account's configured default
-GitHub source credentials instead. A private repository requires either setup.
 See [AWS's GitHub App connection instructions](https://docs.aws.amazon.com/codebuild/latest/userguide/connections-github-app.html)
 and [source credential selection](https://docs.aws.amazon.com/codebuild/latest/userguide/multiple-access-tokens.html).
 
-Redeploy `devops/infra/30-codebuild.yml` to apply the source, image, permissions
-and environment changes. `TtrekRef` selects the CLI branch/tag/commit;
-`LambdaStackName` and `LambdaFunctionName` select deployment targets. The existing
-`${S3Prefix}-${AppName}` bucket stores SAM artifacts. CodeBuild deploys only after
-all build commands succeed; it no longer publishes ECR images or updates ECS.
+Run `devops/infra/30-deploy-codebuild.sh` again to apply the source, image,
+permissions and environment changes. `LambdaStackName` and `LambdaFunctionName`
+select deployment targets. The existing `${S3Prefix}-${AppName}` bucket stores
+SAM artifacts. CodeBuild deploys only after all build commands succeed; it no
+longer publishes ECR images or updates ECS.
 
 For a manual deployment from an AL2023 build host with dependencies installed:
 

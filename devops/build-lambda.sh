@@ -2,18 +2,21 @@
 set -euo pipefail
 
 SITE_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-: "${CODEBUILD_SRC_DIR_Ttrek:?CodeBuild must check out the Ttrek secondary source}"
 : "${CODEBUILD_SRC_DIR_PrivateRegistry:?CodeBuild must check out the PrivateRegistry secondary source}"
 cd "$SITE_ROOT"
+
+# Use the published Linux AMD64 glibc binary for the AL2023 x86_64 build image.
+TTREK_BIN_DIR="$SITE_ROOT/build/ttrek"
+mkdir -p "$TTREK_BIN_DIR"
+aws s3 cp s3://jerily-ttrek-app/ttrek/1.0.0/linux-amd64-glibc/ttrek \
+  "$TTREK_BIN_DIR/ttrek" --only-show-errors
+chmod 0755 "$TTREK_BIN_DIR/ttrek"
+export PATH="$TTREK_BIN_DIR:$PATH"
+export JOBS=${TTREK_MAKE_THREADS:-4}
 
 # The private registry supplies build tools; the pinned public registry supplies
 # the site's runtime recipes. Keep both sources local during resolution.
 git submodule update --init --recursive -- registry
-export TTREK_BUILD_DIR="$SITE_ROOT/build/ttrek"
-export TTREK_INSTALL_DIR="$SITE_ROOT/build/ttrek-prefix"
-export JOBS=${TTREK_MAKE_THREADS:-4}
-bash "$CODEBUILD_SRC_DIR_Ttrek/build-ttrek.sh"
-export PATH="$TTREK_BUILD_DIR:$PATH"
 ttrek install -y -registry "$CODEBUILD_SRC_DIR_PrivateRegistry" -registry "$SITE_ROOT/registry"
 
 export TTREK_SITE_PREFIX="$SITE_ROOT/ttrek-venv/local"
