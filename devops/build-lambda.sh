@@ -18,7 +18,8 @@ export JOBS=${TTREK_MAKE_THREADS:-4}
 # The private registry supplies build tools; the pinned public registry supplies
 # the site's runtime recipes. Keep both sources local during resolution.
 git submodule update --init --recursive -- registry
-ttrek install -y -registry "$CODEBUILD_SRC_DIR_PrivateRegistry" -registry "$SITE_ROOT/registry"
+# Include the failing recipe's log in CodeBuild output for diagnosis.
+ttrek install -y -fail-verbose -registry "$CODEBUILD_SRC_DIR_PrivateRegistry" -registry "$SITE_ROOT/registry"
 
 export TTREK_SITE_PREFIX="$SITE_ROOT/ttrek-venv/local"
 export LD_LIBRARY_PATH="$TTREK_SITE_PREFIX/lib:$TTREK_SITE_PREFIX/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
