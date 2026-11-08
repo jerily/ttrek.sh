@@ -2,7 +2,12 @@
   "prod": {
     "1.0.0": {
       "linux-amd64-glibc": "38b65c03742e69f4d515dd378307ae1f12a26d03fd7f78fbb04d8919f4bea517",
-      "linux-amd64-musl": "50dda869f27d6c37537e36c75e9b40f311b6a9dc676eaea86fd18e5c8cd9d64b"
+      "linux-amd64-musl": "50dda869f27d6c37537e36c75e9b40f311b6a9dc676eaea86fd18e5c8cd9d64b",
+      "linux-arm64-glibc": "a283467d6a9b62c7c0cdb8eb986a3339d3c27ddfb9e57fdb8bc3fa9d54fe7697",
+      "linux-arm64-musl": "e0f9c027dff130b8d0f6ce96fe8605c53bdad7b60c2ea6b098dd9d82f5b277cf",
+      "macos-arm64": "7190ff3678bfaf42ef598faaa5398d0c999cf3c9bc116234c0fee3404c48a4d2",
+      "macos-universal2": "90b127a0ed571f18f74a98098656f0fda0682d823e7a967df930012b0750191c",
+      "macos-x86_64": "6d01fcbf9f2bf2d51d2300631e41e4a10918f4ed00f2a48232281d5bd14dd2e3"
     }
   }
 }
