@@ -15,10 +15,17 @@ Parameters:
 Resources:
   TTrekBucket:
     Type: AWS::S3::Bucket
+    Metadata:
+      cfn-lint:
+        config:
+          # Retain the deployed Private value: removing it triggers an ACL
+          # update that fails when S3 Object Ownership disables ACLs.
+          ignore_checks: [W3045]
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
       BucketName: !Sub "${S3Prefix}-${AppName}"
+      AccessControl: Private
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true

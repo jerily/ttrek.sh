@@ -73,6 +73,9 @@ unreadable. The S3 bucket is also retained, blocks public access, and uses SSE-S
 Its lifecycle rule expires `telemetry/backups/` objects after seven days. Redeploy
 the IAM policies and `10-deploy-infra-storage.sh` to apply this rule to an existing
 bucket. Release binaries and other artifact prefixes are unaffected.
+The template retains the deployed `AccessControl: Private` declaration because
+removing it can trigger a rejected ACL update on the existing ACL-disabled bucket.
+This preserves the declaration without enabling ACLs or granting public access.
 The Lambda runtime gets only `kms:Decrypt` on this key; the build gets
 `kms:Encrypt`/`kms:Decrypt` and `ssm:GetParameter` under `/ttrek_sh/prod/`.
 
