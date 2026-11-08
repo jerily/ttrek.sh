@@ -203,8 +203,8 @@ calls. Direct server development still uses its existing Valkey configuration.
 ## CodeBuild
 
 CodeBuild reads `devops/buildspec.yml`, selected by `Source.BuildSpec` in
-`devops/infra/30-codebuild.yml`. The AL2023 x86_64 build image matches Lambda's
-native-library ABI. Before running ttrek, the install phase installs GCC/G++,
+`devops/infra/30-codebuild.yml`. The AL2023 x86_64 build image targets Lambda's
+OS and architecture. Before running ttrek, the install phase installs GCC/G++,
 Make, Bash, curl, Git, patch, pkg-config, Perl, tar, gzip and CA certificates,
 plus ZIP and binary utilities for packaging. It installs CMake (`>=3.25,<5`)
 and SAM with pip, then checks the CMake and compiler versions. These tools are
@@ -217,7 +217,10 @@ The build:
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).
 3. Runs the project's asset and search builds, then the application checks.
-4. Generates encrypted production config from SSM, packages with tdevops, and sets executable ZIP attributes. The AL2023 compatibility check remains enabled.
+4. Generates encrypted production config from SSM, packages with tdevops using
+   `--local-only`, and sets executable ZIP attributes. This skips the numeric
+   glibc cutoff that rejects AL2023's backported symbols; architecture,
+   dependency resolution, and staged-site checks still run.
 5. Validates and deploys `devops/sam-template.yaml` with SAM.
 
 The rebuilt binary targets glibc 2.28 with static third-party dependencies;
@@ -309,7 +312,7 @@ export TTREK_CONFIG_KMS_KEY=$(aws cloudformation describe-stacks \
   --stack-name Infra-DevOps-TTREK-Keys \
   --query 'Stacks[0].Outputs[?OutputKey==`TTrekKMSMasterKeyArn`].OutputValue | [0]' --output text)
 bash devops/generate-prod-config.sh
-TTREK_PRODUCTION_CONFIG="$PWD/build/prod/config.ini" ttrek run -script package-lambda
+TTREK_PRODUCTION_CONFIG="$PWD/build/prod/config.ini" ttrek run -script package-lambda -- --local-only
 python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
 sam deploy --template-file devops/sam-template.yaml \
@@ -319,9 +322,12 @@ sam deploy --template-file devops/sam-template.yaml \
   --region eu-central-1 --profile ttrek-prod-neo
 ```
 
-Use a normal AL2023 package for AWS; `--local-only` skips the ABI check and is
-only for local tests. `finalize-lambda.py` sets the executable ZIP attributes for
-`bootstrap` and `local/bin/tclsh`. CodeBuild performs this step automatically.
+Build deployment packages and their native dependencies on AL2023 for the target
+Lambda architecture. Here `--local-only` bypasses the glibc version check; it
+does not change the production configuration or prevent deployment. Compatibility
+with the Lambda runtime is not verified by this packaging step.
+`finalize-lambda.py` sets the executable ZIP attributes for `bootstrap` and
+`local/bin/tclsh`. CodeBuild performs this step automatically.
 
 ## Updating an existing deployment
 
