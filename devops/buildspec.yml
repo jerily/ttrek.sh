@@ -10,8 +10,17 @@ phases:
       nodejs: 22
       python: 3.12
     commands:
-      - dnf install -y gcc gcc-c++ make git patch pkgconf-pkg-config perl tar gzip unzip zip binutils
+      # Install ttrek's external build tools and the Lambda packaging utilities.
+      # Allow the full curl package to replace AL2023's curl-minimal if present.
+      - >-
+        dnf install -y --allowerasing
+        bash ca-certificates curl gcc gcc-c++ make git patch
+        pkgconf-pkg-config perl tar gzip unzip zip binutils
+      # Use pip for a recent CMake, alongside the SAM deployment CLI.
       - python3 -m pip install 'cmake>=3.25,<5' 'aws-sam-cli>=1.135,<2'
+      - cmake --version
+      - gcc --version
+      - g++ --version
   build:
     on-failure: ABORT
     commands:

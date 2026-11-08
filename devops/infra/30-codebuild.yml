@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Compile ttrek, build the registry website and deploy its SAM application.
+Description: Download ttrek from S3, build the registry website and deploy its SAM application.
 
 Parameters:
   S3Prefix:
@@ -11,10 +11,6 @@ Parameters:
   BranchName:
     Type: String
     Default: main
-  TtrekRef:
-    Type: String
-    Default: main
-    Description: ttrek branch, tag or commit containing build-ttrek.sh.
   PrivateRegistryRef:
     Type: String
     Default: main
@@ -66,6 +62,9 @@ Resources:
               - Effect: Allow
                 Action: [s3:GetObject, s3:PutObject]
                 Resource: !Sub arn:${AWS::Partition}:s3:::${S3Prefix}-${AppName}/lambda/*
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::jerily-ttrek-app/ttrek/*
               - Effect: Allow
                 Action: cloudformation:CreateChangeSet
                 Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
@@ -153,19 +152,12 @@ Resources:
         ReportBuildStatus: false
       SourceVersion: !Ref BranchName
       SecondarySources:
-        - SourceIdentifier: Ttrek
-          Type: GITHUB
-          Auth: !If [HasGitHubConnection, {Type: CODECONNECTIONS, Resource: !Ref GitHubConnectionArn}, !Ref AWS::NoValue]
-          Location: https://github.com/jerily/ttrek.git
-          GitCloneDepth: 1
         - SourceIdentifier: PrivateRegistry
           Type: GITHUB
           Auth: !If [HasGitHubConnection, {Type: CODECONNECTIONS, Resource: !Ref GitHubConnectionArn}, !Ref AWS::NoValue]
           Location: https://github.com/jerily/private-ttrek-registry.git
           GitCloneDepth: 1
       SecondarySourceVersions:
-        - SourceIdentifier: Ttrek
-          SourceVersion: !Ref TtrekRef
         - SourceIdentifier: PrivateRegistry
           SourceVersion: !Ref PrivateRegistryRef
       TimeoutInMinutes: 300
