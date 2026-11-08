@@ -233,6 +233,11 @@ helper for private recipe downloads. `PrivateRegistryRef` selects the registry
 branch/tag/commit. Node/npm are supplied by the build image, and SAM is installed
 as a build tool. Neither is a ttrek dependency.
 
+The install command uses `-fail-verbose` so CodeBuild prints the failing recipe's
+log, including Git's error for a failed clone. The `Failed command` line alone
+does not identify whether the failure is authentication, repository access, or
+another Git error.
+
 To authenticate the private registry, install AWS Connector for GitHub on the
 personal account `jerily`. Authorizing the app to identify your GitHub account
 does not install it or grant repository access:
