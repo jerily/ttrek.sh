@@ -1,13 +1,13 @@
 # Application policy; packaging and service mechanics live in tdevops.
 ::tdevops::configure {
     archive ttrek-sh.zip
-    files {tcl www schemas registry public LICENSE etc/rds-global-bundle.pem devops/prepare-lambda.tcl}
+    files {tcl www schemas registry public LICENSE etc/rds-global-bundle.pem etc/releases.json devops/prepare-lambda.tcl}
     lambda-config etc/lambda.json
     routes etc/routes.json
     content-collections {docs blog}
     prepare devops/prepare-lambda.tcl
     services {s3 lambda proxy}
-    required-files {tcl/lambda.tcl content/docs/getting-started.md}
+    required-files {tcl/lambda.tcl content/docs/getting-started.md etc/releases.json}
     environment {TTREK_SITE_ZIP --zip TTREK_SITE_PORT --port
         TTREK_LAMBDA_PORT --lambda-port TTREK_LOCAL_DIR --state-dir}
     package-help devops/package-usage.txt
