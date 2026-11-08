@@ -67,15 +67,15 @@ content package. Release redirects and checksum metadata use the mock
 S3 endpoint and local credentials. HTTP S3 endpoints are accepted only on loopback
 in LOCAL mode; production signing still requires HTTPS.
 
-Packaging creates `dist/ttrek-sh.zip`, with Markdown directories and a fresh
-telemetry schema, plus `dist/s3/ttrek-assets` and `dist/s3/ttrek-local` seed buckets.
+Packaging creates `dist/ttrek-sh.zip`, with Markdown directories and the public
+RDS CA bundle, plus `dist/s3/ttrek-assets` and `dist/s3/ttrek-local` seed buckets.
 It includes installed runtime libraries, templates and public registry recipes;
 it excludes host configuration, TLS keys, Git metadata and working databases.
 The release bucket contains this host's `ttrek` executable, not a published release.
 `--local-only` selects the host ABI; no archive is uploaded or deployed.
 
-The Lambda runtime uses directory snapshots, a disposable telemetry database and
-per-process request-monitor history and rate limits in memory. Copy
+The Lambda runtime uses directory snapshots, a SQLite telemetry database shared
+within the local runtime data directory, and per-process request-monitor history and rate limits in memory. Copy
 `etc/config.local.ini.example` to ignored `etc/config.local.ini` to adjust limits;
 `TTREK_LOCAL_CONFIG` selects an alternative host file. Local files are never
 packaged, and local mocks do not load the production config or call AWS.

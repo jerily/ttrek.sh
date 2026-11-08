@@ -9,6 +9,9 @@ lassign [::test_support::ports 3] httpPort httpsPort valkeyPort
 set base http://127.0.0.1:$httpPort
 set mode [expr {[info exists ::env(ENV)] ? $::env(ENV) : "LOCAL"}]
 assert {$mode in {LOCAL PROD}} {ENV must be LOCAL or PROD}
+if {$mode eq "PROD" && ![info exists ::env(TTREK_TEST_POSTGRES)]} {
+    error "PROD smoke tests require TTREK_TEST_POSTGRES for a disposable PostgreSQL database and PGSSLROOTCERT for its CA"
+}
 set environment [dict create AWS_EC2_METADATA_DISABLED true ENV $mode TTREK_SITE_PREFIX $prefix \
     LD_LIBRARY_PATH $prefix/lib:$prefix/lib64]
 set envCommand [list {*}[auto_execok env]]
@@ -54,6 +57,12 @@ try {
         {{key}} [binary encode base64 -maxlen 0 [read_file [file join $app key.pem]]] \
         {{certificate}} [binary encode base64 -maxlen 0 [read_file [file join $app cert.pem]]]] \
         [read_file [file join $root tests fixtures local-config.ini.in]]]
+    if {$mode eq "PROD"} {
+        append config "\n\[postgres\]\n"
+        foreach {name option} {host host port port database database username user password password} {
+            append config "$name=[dict get $::env(TTREK_TEST_POSTGRES) $option]\n"
+        }
+    }
     write_file [file join $app etc [expr {$mode eq "LOCAL" ? "config.local.ini" : "config.ini"}]] $config
     write_file [file join $app users.acl] "user default off\nuser appuser on >tls-smoke-password ~* +@all\n"
     set valkeyProcess [::test_support::start [list $valkey --bind 127.0.0.1 --port 0 --tls-port $valkeyPort \

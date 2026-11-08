@@ -2,12 +2,13 @@
 # SPDX-FileCopyrightText: 2024 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
 
-package require sqlite3
+# Drivers are loaded by tpersist only when the selected backend connects.
+package require tpersist
 
 namespace eval ::telemetry {
-
-    # Define a list of known events and their parameters. This will be used
-    # to validate arguments.
+    namespace import ::tpersist::db_*
+    variable connection {}
+    variable dialect {}
     variable event_list {
         register_environment  {-env -description}
         req_dist_get          {-env -os -arch}
@@ -17,37 +18,6 @@ namespace eval ::telemetry {
         req_reg_get_pkg_spec  {-env -pkg_name -pkg_version -os -arch}
         req_reg_get_pkg       {-env -pkg_name}
         req_logo_get          {-env}
-    }
-
-    variable event_statements {
-        req_dist_get {
-            INSERT INTO req_dist_get (env_id, platform_id)
-            VALUES ($env_id, $platform_id)
-        }
-        req_pkg_get {
-            INSERT INTO req_pkg_get (env_id, pkg_name_id)
-            VALUES ($env_id, $pkg_name_id)
-        }
-        req_pkg_version_get {
-            INSERT INTO req_pkg_version_get (env_id, pkg_id)
-            VALUES ($env_id, $pkg_id)
-        }
-        req_pkg_install_event {
-            INSERT INTO req_pkg_install_event (env_id, pkg_id, platform_id, install_outcome, install_is_toplevel)
-            VALUES ($env_id, $pkg_id, $platform_id, $install_outcome, $install_is_toplevel)
-        }
-        req_reg_get_pkg_spec {
-            INSERT INTO req_reg_get_pkg_spec (env_id, pkg_id, platform_id)
-            VALUES ($env_id, $pkg_id, $platform_id)
-        }
-        req_reg_get_pkg {
-            INSERT INTO req_reg_get_pkg (env_id, pkg_name_id)
-            VALUES ($env_id, $pkg_name_id)
-        }
-        req_logo_get {
-            INSERT INTO req_logo_get (env_id)
-            VALUES ($env_id)
-        }
     }
 
     variable known_os {
@@ -65,280 +35,209 @@ namespace eval ::telemetry {
 
 }
 
-proc ::telemetry::init { args } {
-
+proc ::telemetry::init {settings} {
+    variable connection
+    variable dialect
     variable event_list
-
-    for { set i 0 } { $i < [llength $args] } { incr i } {
-        set arg [lindex $args $i]
-        switch -exact -- $arg {
-            -file {
-                set db_file [lindex $args [incr i]]
-            }
-            default {
-                return -code error "::telemetry::init error: unknown arg \"$arg\""
-            }
-        }
+    close
+    set dialect [dict get $settings dialect]
+    dict for {name parameters} $event_list {
+        dict set event_list $name [lsort $parameters]
     }
-
-    if { ![info exists db_file] } {
-        return -code error "::telemetry::init required -file arg is not specified"
+    set options {-autobegin false}
+    dict for {key value} $settings {lappend options -$key $value}
+    if {[catch {db_connect {*}$options} opened]} {
+        # Driver diagnostics can contain connection options. Do not propagate
+        # those details into Lambda logs or direct-server startup traces.
+        return -code error -errorcode {TELEMETRY CONNECT} "Could not connect to the telemetry database"
     }
-
-    # Now sort the event parameters for optimization, as we will be comparing
-    # them to the set parameters when the event was registered.
-    dict for { k v } $event_list {
-        dict set event_list $k [lsort $v]
+    set connection $opened
+    try {
+        transaction {create_schema} true
+    } on error {message opts} {
+        close
+        return -options $opts $message
     }
+}
 
-    sqlite3 db $db_file -fullmutex true
-    db timeout 5000
-
-    db eval {
-        PRAGMA foreign_keys = ON;
-    }
-
-    set actual_schema_version 3
-
-    while { [set current_schema_version [db eval "PRAGMA user_version"]] < $actual_schema_version } {
-
-        if { $current_schema_version == 0 } {
-            db eval {
-
-                CREATE TABLE environments (
-                    env_id INTEGER PRIMARY KEY,
-                    hash BLOB NOT NULL,
-                    description TEXT,
-                    last_seen INTEGER DEFAULT (unixepoch()) NOT NULL
-                ) STRICT;
-
-                CREATE INDEX idx_environments_hash ON environments(hash);
-
-                CREATE TABLE package_names (
-                    pkg_name_id INTEGER PRIMARY KEY,
-                    name TEXT UNIQUE NOT NULL
-                ) STRICT;
-
-                CREATE TABLE packages (
-                    pkg_id INTEGER PRIMARY KEY,
-                    pkg_name_id INTEGER NOT NULL,
-                    version TEXT NOT NULL,
-                    UNIQUE (pkg_name_id, version),
-                    FOREIGN KEY(pkg_name_id) REFERENCES package_names(pkg_name_id)
-                ) STRICT;
-
-                CREATE TABLE platforms (
-                    platform_id INTEGER PRIMARY KEY,
-                    os TEXT NOT NULL,
-                    arch TEXT NOT NULL,
-                    UNIQUE (os, arch)
-                ) STRICT;
-
-                CREATE TABLE req_dist_get (
-                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
-                    env_id INTEGER NOT NULL,
-                    platform_id INTEGER NOT NULL,
-                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
-                    FOREIGN KEY(platform_id) REFERENCES platforms(platform_id)
-                ) STRICT;
-
-                CREATE TABLE req_pkg_get (
-                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
-                    env_id INTEGER NOT NULL,
-                    pkg_name_id INTEGER NOT NULL,
-                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
-                    FOREIGN KEY(pkg_name_id) REFERENCES package_names(pkg_name_id)
-                ) STRICT;
-
-                CREATE TABLE req_reg_get_pkg_spec (
-                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
-                    env_id INTEGER NOT NULL,
-                    pkg_id INTEGER NOT NULL,
-                    platform_id INTEGER NOT NULL,
-                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
-                    FOREIGN KEY(pkg_id) REFERENCES packages(pkg_id),
-                    FOREIGN KEY(platform_id) REFERENCES platforms(platform_id)
-                ) STRICT;
-
-                CREATE TABLE req_reg_get_pkg (
-                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
-                    env_id INTEGER NOT NULL,
-                    pkg_name_id INTEGER NOT NULL,
-                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
-                    FOREIGN KEY(pkg_name_id) REFERENCES package_names(pkg_name_id)
-                ) STRICT;
-
-                CREATE TABLE req_logo_get (
-                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
-                    env_id INTEGER NOT NULL,
-                    FOREIGN KEY(env_id) REFERENCES environments(env_id)
-                ) STRICT;
-
-                PRAGMA user_version = 1;
-            }
-        }
-
-        if { $current_schema_version == 1 } {
-            db eval {
-                CREATE TABLE req_pkg_install_event (
-                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
-                    env_id INTEGER NOT NULL,
-                    platform_id INTEGER NOT NULL,
-                    pkg_id INTEGER NOT NULL,
-                    install_outcome INTEGER NOT NULL,
-                    install_is_toplevel INTEGER NOT NULL,
-                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
-                    FOREIGN KEY(pkg_id) REFERENCES packages(pkg_id)
-                    FOREIGN KEY(platform_id) REFERENCES platforms(platform_id)
-                ) STRICT;
-
-                PRAGMA user_version = 2;
-            }
-        }
-
-        if { $current_schema_version == 2 } {
-
-            db eval {
-                CREATE TABLE req_pkg_version_get (
-                    timestamp INTEGER DEFAULT (unixepoch()) NOT NULL,
-                    env_id INTEGER NOT NULL,
-                    pkg_id INTEGER NOT NULL,
-                    FOREIGN KEY(env_id) REFERENCES environments(env_id),
-                    FOREIGN KEY(pkg_id) REFERENCES packages(pkg_id)
-                ) STRICT;
-
-                PRAGMA user_version = 3;
-            }
+# Retry an entire rolled-back transaction, never just its last statement.
+# TDBC's SQLite adapter reports native lock failures without an SQLSTATE.
+proc ::telemetry::transaction {script {schema false}} {
+    variable connection
+    variable dialect
+    for {set attempt 0} {1} {incr attempt} {
+        try {
+            return [uplevel 1 [list ::tpersist::db_transaction $connection $script]]
+        } on error {message opts} {
+            set state [lindex [dict get $opts -errorcode] 2]
+            set retry [expr {($dialect eq "sqlite" && $message in {"database is locked" "database table is locked"}) ||
+                $state in {40001 40P01} || ($schema && $state in {23505 42P07 42710})}]
+            if {!$retry || $attempt >= 4} {return -options $opts $message}
+            after [expr {50 * ($attempt + 1)}]
         }
     }
 }
 
-proc ::telemetry::sql { sql vars } {
-    dict for { k v } $vars {
-        set $k $v
+proc ::telemetry::close {} {
+    variable connection
+    if {$connection ne {}} {
+        db_disconnect $connection
+        set connection {}
     }
-    db eval $sql
 }
 
-proc ::telemetry::event { event_type args } {
-
+proc ::telemetry::create_schema {} {
+    variable connection
     variable event_list
-    variable event_statements
+    set id {type integer primary_key 1 auto_increment 1}
+    set required {type integer not_null 1}
+    db_create_table $connection [db_define_table environments [dict create \
+        env_id $id hash {type binary not_null 1} description {type text not_null 1} \
+        last_seen {type bigint not_null 1}]] -if_not_exists true
+    # Serialize registrations per hash without indexing descriptions, which
+    # may be larger than PostgreSQL's B-tree index entry limit.
+    db_create_table $connection [db_define_table environment_keys [dict create \
+        key_id $id hash {type binary unique 1 not_null 1} touched {type bigint not_null 1}]] -if_not_exists true
+    db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
+    db_create_table $connection [db_define_table package_names [dict create \
+        pkg_name_id $id name {type text unique 1 not_null 1}]] -if_not_exists true
+    db_create_table $connection [db_define_table packages [dict create \
+        pkg_id $id pkg_name_id $required version {type text not_null 1}] \
+        -unique {{pkg_name_id version}} \
+        -foreign_keys {{columns pkg_name_id table package_names referenced_columns pkg_name_id}}] -if_not_exists true
+    db_create_table $connection [db_define_table platforms [dict create \
+        platform_id $id os {type text not_null 1} arch {type text not_null 1}] \
+        -unique {{os arch}}] -if_not_exists true
+    dict for {event parameters} $event_list {
+        if {$event eq "register_environment"} continue
+        set columns [dict create timestamp {type bigint not_null 1} env_id $required]
+        set foreignKeys {{columns env_id table environments referenced_columns env_id}}
+        if {"-pkg_version" in $parameters} {
+            dict set columns pkg_id $required
+            lappend foreignKeys {columns pkg_id table packages referenced_columns pkg_id}
+        } elseif {"-pkg_name" in $parameters} {
+            dict set columns pkg_name_id $required
+            lappend foreignKeys {columns pkg_name_id table package_names referenced_columns pkg_name_id}
+        }
+        if {"-os" in $parameters} {
+            dict set columns platform_id $required
+            lappend foreignKeys {columns platform_id table platforms referenced_columns platform_id}
+        }
+        if {$event eq "req_pkg_install_event"} {
+            dict set columns install_outcome $required
+            dict set columns install_is_toplevel $required
+        }
+        db_create_table $connection [db_define_table $event $columns -foreign_keys $foreignKeys] -if_not_exists true
+    }
+    db_create_index $connection idx_install_package req_pkg_install_event {pkg_id platform_id} -if_not_exists true
+}
+
+proc ::telemetry::rows {statement} {
+    variable connection
+    dict get [db_execute $connection $statement] rows
+}
+
+# Resolve shared dimensions using unique constraints. A savepoint keeps a
+# concurrent insert conflict from aborting the enclosing PostgreSQL transaction.
+proc ::telemetry::ensure_row {table key values {extra {}}} {
+    variable connection
+    set query [db_select $table -columns [list $key]]
+    dict for {column value} $values {
+        set query [db_where $query [db_eq [db_col $column] $value]]
+    }
+    set found [rows $query]
+    if {[llength $found]} {return [dict get [lindex $found 0] $key]}
+    try {
+        set found [db_transaction $connection {
+            rows [db_returning [db_values [db_insert $table] [dict merge $values $extra] -expressions] $key]
+        }]
+    } on error {message opts} {
+        if {[lindex [dict get $opts -errorcode] 2] ni {23000 23505}} {
+            return -options $opts $message
+        }
+        set found [rows $query]
+        if {![llength $found]} {return -options $opts $message}
+    }
+    return [dict get [lindex $found 0] $key]
+}
+
+proc ::telemetry::event {event_type args} {
+    variable connection
+    variable event_list
     variable known_arch
     variable known_os
-
-    if { $event_type ni [dict keys $event_list] } {
-        return -code error "::telemetry::event error: unknown event \"$event_type\""
+    if {![dict exists $event_list $event_type]} {error "unknown telemetry event: $event_type"}
+    if {[catch {dict size $args}] || [lsort [dict keys $args]] ne [dict get $event_list $event_type]} {
+        error "wrong arguments for telemetry event: $event_type"
     }
-
-    # Check if args is correct dict
-    if { [catch { dict size $args }] } {
-        return -code error "::telemetry::event error: event arguments must have\
-            an even number of parameters"
+    dict for {key value} $args {set [string range $key 1 end] $value}
+    if {![regexp -nocase {^[0-9a-f]{64}$} $env]} {error "invalid telemetry environment ID"}
+    set hash [db_value [binary decode hex $env] -type binary]
+    set now [db_value [clock seconds] -type bigint]
+    # Validate before writing any dimensions.
+    if {[info exists os]} {
+        if {$arch ni $known_arch} {error "unknown telemetry architecture: $arch"}
+        set normalized {}
+        dict for {pattern name} $known_os {
+            if {[string match $pattern $os]} {set normalized $name; break}
+        }
+        if {$normalized eq {}} {error "unknown telemetry OS: $os"}
+        set os $normalized
     }
-
-    # Check if arguments for given event are as expected
-    if { [lsort [dict keys $args]] != [dict get $event_list $event_type] } {
-        return -code error "::telemetry::event error: wrong args for event\
-            \"$event_type\": \"[lsort [dict keys $args]]\"; expected set\
-            of parameters: \"[dict get $event_list $event_type]\""
+    foreach key {install_outcome install_is_toplevel} {
+        if {[info exists $key] && [set $key] ni {0 1}} {error "$key must be 0 or 1"}
     }
-
-    # Convert dictionary to variables
-    dict for { k v } $args {
-        set [string range $k 1 end] $v
-    }
-
-    if { $event_type eq "register_environment" } {
-        set env_id [db eval {
-            SELECT env_id FROM environments WHERE hash = unhex($env) AND description = $description
-        }]
-        # If we already have this environment, then update the timestamp.
-        # If we don't have it, then add it.
-        if { [string length $env_id] } {
-            db eval {
-                UPDATE environments SET last_seen = unixepoch() WHERE env_id = $env_id
-            }
+    transaction {
+        if {$event_type eq "register_environment"} {
+            set key_id [ensure_row environment_keys key_id [dict create hash $hash] [dict create touched $now]]
+            db_execute $connection [db_where [db_values [db_update environment_keys] \
+                [dict create touched $now] -expressions] [db_eq [db_col key_id] [db_value $key_id -type integer]]]
+            set env_id [ensure_row environments env_id [dict create hash $hash \
+                description [db_value $description -type text]] [dict create last_seen $now]]
+            db_execute $connection [db_where [db_values [db_update environments] \
+                [dict create last_seen $now] -expressions] [db_eq [db_col env_id] [db_value $env_id -type integer]]]
         } else {
-            db eval {
-                INSERT INTO environments (hash, description) VALUES (unhex($env), $description)
+            set query [db_where [db_select environments -columns env_id] [db_eq [db_col hash] $hash]]
+            set found [rows [db_limit [db_order_by $query -expr {last_seen DESC, env_id DESC}] 1]]
+            if {![llength $found]} {error "unknown telemetry environment: $env"}
+            set values [dict create env_id [db_value [dict get [lindex $found 0] env_id] -type integer] timestamp $now]
+            if {[info exists pkg_name]} {
+                set pkg_name_id [ensure_row package_names pkg_name_id [dict create name [db_value $pkg_name -type text]]]
+                if {[info exists pkg_version]} {
+                    set pkg_id [ensure_row packages pkg_id [dict create \
+                        pkg_name_id [db_value $pkg_name_id -type integer] version [db_value $pkg_version -type text]]]
+                    dict set values pkg_id [db_value $pkg_id -type integer]
+                } else {dict set values pkg_name_id [db_value $pkg_name_id -type integer]}
             }
-        }
-        return
-    }
-
-    # All other events expect env_id as id from environment table
-    if { [info exists env] } {
-        set env_id [db eval {
-            SELECT env_id FROM environments WHERE hash = unhex($env) ORDER BY last_seen DESC LIMIT 1
-        }]
-        if { ![string length $env_id] } {
-            return -code error "::telemetry::event error: unknown environment \"$env\""
-        }
-    }
-
-    # If event uses pkg_name then convert it to pkg_name_id from the table package_names
-    if { [info exists pkg_name] } {
-        set pkg_name_id [db eval {
-            INSERT INTO package_names (name) VALUES ($pkg_name)
-            ON CONFLICT(name) DO UPDATE SET name=name
-            RETURNING pkg_name_id
-        }]
-        if { ![string length $pkg_name_id] } {
-            return -code error "::telemetry::event error: failed to get pkg_name_id"
-        }
-    }
-
-    # If event uses pkg_version then convert it to pkg_id from the table packages
-    if { [info exists pkg_version] } {
-        set pkg_id [db eval {
-            INSERT INTO packages (pkg_name_id, version) VALUES ($pkg_name_id, $pkg_version)
-            ON CONFLICT(pkg_name_id, version) DO UPDATE SET version=version
-            RETURNING pkg_id
-        }]
-        if { ![string length $pkg_id] } {
-            return -code error "::telemetry::event error: failed to get pkg_id"
-        }
-    }
-
-    # If event uses os/arch then convert them to platform_id from the table platforms
-    if { [info exists os] && [info exists arch] } {
-
-        if { $arch ni $known_arch } {
-            return -code error "::telemetry::event error: unknown arch \"$arch\""
-        }
-
-        if { $os in [dict keys $known_os] } {
-            set os [dict get $known_os $os]
-        } else {
-            set found 0
-            dict for { k v } $known_os {
-                if { [string match $k $os] } {
-                    set os $v
-                    set found 1
-                    break
-                }
+            if {[info exists os]} {
+                set platform_id [ensure_row platforms platform_id [dict create \
+                    os [db_value $os -type text] arch [db_value $arch -type text]]]
+                dict set values platform_id [db_value $platform_id -type integer]
             }
-            if { !$found } {
-                return -code error "::telemetry::event error: unknown os \"$os\""
+            foreach key {install_outcome install_is_toplevel} {
+                if {[info exists $key]} {dict set values $key [db_value [set $key] -type integer]}
             }
+            db_execute $connection [db_values [db_insert $event_type] $values -expressions]
         }
-
-        set platform_id [db eval {
-            INSERT INTO platforms (os, arch) VALUES ($os, $arch)
-            ON CONFLICT(os, arch) DO UPDATE SET os=os
-            RETURNING platform_id
-        }]
-        if { ![string length $platform_id] } {
-            return -code error "::telemetry::event error: failed to get platform_id"
-        }
-    } else {
-        # Both os and arch must be specified. Do not allow just one of these variables
-        # to be specified, as that value will not be filtered. So make sure we
-        # don't have these variables by unsetting them.
-        unset -nocomplain os arch
     }
+    return
+}
 
-    db eval [dict get $event_statements $event_type]
-
+proc ::telemetry::stats {package_name {package_version {}}} {
+    set query [db_select [db_table req_pkg_install_event -as ev] -expr {
+        pl.os AS os, pl.arch AS arch, COUNT(*) AS total,
+        SUM(ev.install_outcome) AS success, COUNT(*) - SUM(ev.install_outcome) AS failure
+    }]
+    set query [db_join $query [db_table packages -as p] -expr {ev.pkg_id = p.pkg_id}]
+    set query [db_join $query [db_table package_names -as n] -expr {p.pkg_name_id = n.pkg_name_id}]
+    set query [db_join $query [db_table platforms -as pl] -expr {ev.platform_id = pl.platform_id}]
+    set query [db_where $query [db_eq [db_col name -table n] [db_value $package_name -type text]]]
+    if {$package_version ne {}} {
+        set query [db_where $query [db_eq [db_col version -table p] [db_value $package_version -type text]]]
+    }
+    set query [db_order_by [db_group_by $query -expr {pl.os, pl.arch}] -expr {pl.os, pl.arch}]
+    lmap row [rows $query] {
+        list "[dict get $row os] [dict get $row arch]" [dict get $row total] \
+            [dict get $row success] [dict get $row failure]
+    }
 }

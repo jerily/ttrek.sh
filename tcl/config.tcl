@@ -66,16 +66,40 @@ proc ::app_config::valkey {config} {
     return $settings
 }
 
+# Backend selection belongs to the environment, never to an INI override.
+proc ::app_config::telemetry {config root {localDirectory {}}} {
+    if {[mode] eq "LOCAL"} {
+        if {$localDirectory eq {}} {set localDirectory [file join $root data]}
+        file mkdir $localDirectory
+        return [dict create dialect sqlite database [file join $localDirectory telemetry.sqlite3] timeout 5000]
+    }
+    foreach key {host database username password} {
+        if {![dict exists $config postgres $key] || [dict get $config postgres $key] eq {}} {
+            error "Set postgres.$key in production configuration (SSM: /ttrek_sh/prod/postgres/$key)"
+        }
+    }
+    set settings [dict merge {port 5432 timeout 5000} [dict get $config postgres]]
+    # libpq reads this when connecting; TDBC has no -sslrootcert option.
+    if {![info exists ::env(PGSSLROOTCERT)]} {
+        set ::env(PGSSLROOTCERT) [file join $root etc rds-global-bundle.pem]
+    }
+    return [dict create dialect postgresql database [dict get $settings database] \
+        host [dict get $settings host] port [dict get $settings port] \
+        user [dict get $settings username] password [dict get $settings password] \
+        timeout [dict get $settings timeout] sslmode verify-full]
+}
+
 # Only encrypted production configuration is allowed into a Lambda artifact.
 proc ::app_config::validate_lambda_config {path} {
     package require tconfig::decrypt
     set config [::tconfig::read_config $path]
-    foreach keys {{tconfig tink_keyset} {redis enc:password} {redis host}} {
+    foreach keys {{tconfig tink_keyset} {redis enc:password} {redis host} \
+        {postgres enc:password} {postgres host} {postgres database} {postgres username}} {
         if {![dict exists $config {*}$keys] || [dict get $config {*}$keys] eq {}} {
             error "Production configuration requires [join $keys .] from tconfig/SSM"
         }
     }
-    if {[dict exists $config redis password] || [dict exists $config ssl]} {
+    if {[dict exists $config redis password] || [dict exists $config postgres password] || [dict exists $config ssl]} {
         error "Production Lambda configuration must not contain plaintext passwords or TLS private keys"
     }
     if {[dict get $config redis host] in {localhost 127.0.0.1 ::1}} {

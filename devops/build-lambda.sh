@@ -29,6 +29,8 @@ ttrek run -script build-search
 "$TCLSH" tests/all.tcl
 "$TCLSH" tests/config.test
 "$TCLSH" tests/lambda-config.test
+"$TCLSH" tests/telemetry-config.test
+"$TCLSH" tests/telemetry.test
 "$TCLSH" tests/installer.tcl
 bash devops/generate-prod-config.sh
 export TTREK_PRODUCTION_CONFIG="$SITE_ROOT/build/prod/config.ini"

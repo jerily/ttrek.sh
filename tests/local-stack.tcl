@@ -22,13 +22,16 @@ proc invoke {event {status 200}} {
     binary decode base64 [dict get $result body]
 }
 set archive [file join $root dist ttrek-sh.zip]
+if {[info exists ::env(TTREK_TEST_SITE_ZIP)]} {set archive $::env(TTREK_TEST_SITE_ZIP)}
+set seedSource [file join $root dist s3]
+if {[info exists ::env(TTREK_TEST_S3_SEED)]} {set seedSource $::env(TTREK_TEST_S3_SEED)}
 set before [sha256 [read_file $archive]]
 set temporary [::test_support::temporary [file join $root build] {local stack-}]
 set state [file join $temporary state]
 set seed [file join $temporary s3]
 set process {}
 try {
-    file copy [file join $root dist s3] $seed
+    file copy $seedSource $seed
     set extraTarget macos-universal2
     set extraBinary [binary format a*c* {uploaded release bytes} {0 255}]
     set extraChecksum [sha256 $extraBinary]
@@ -118,7 +121,7 @@ try {
     assert {[dict get [request $s3/ttrek-local/binary.bin] body] eq $binary}
     puts {PASS S3-backed website assets and binary object storage}
 
-    set release [lindex [glob -directory [file join $root dist s3 ttrek-local ttrek 1.0.0] */ttrek] 0]
+    set release [lindex [glob -directory [file join $seedSource ttrek-local ttrek 1.0.0] */ttrek] 0]
     set target [file tail [file dirname $release]]
     set download [dict get [request /dist/$target/ttrek] body]
     assert {[sha256 $download] eq [sha256 [read_file $release]]}

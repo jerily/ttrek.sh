@@ -1,0 +1,343 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Single-AZ telemetry PostgreSQL with daily S3 pg_dump backups and morning vacuum.
+
+Parameters:
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 128
+    Description: Read from /ttrek_sh/prod/postgres/password (SecureString) by the deploy script.
+  DatabaseInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  BackupBucket:
+    Type: String
+    Default: jerily-ttrek-app
+  MaintenanceCodeKey:
+    Type: String
+    Description: Content-addressed S3 key produced by the deploy script.
+  ScheduleTimezone:
+    Type: String
+    Default: America/New_York
+  BackupSchedule:
+    Type: String
+    Default: cron(0 5 * * ? *)
+  VacuumSchedule:
+    Type: String
+    Default: cron(0 6 * * ? *)
+
+Resources:
+  PostgresSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Telemetry PostgreSQL; application and maintenance Lambda only
+      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 1
+          ToPort: 1
+          CidrIp: 127.0.0.1/32
+  ApplicationDatabaseIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PostgresSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !ImportValue Infra-DevOps-TTREK-Base-LambdaSecurityGroupId
+  ApplicationDatabaseEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !ImportValue Infra-DevOps-TTREK-Base-LambdaSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      DestinationSecurityGroupId: !Ref PostgresSecurityGroup
+  PostgresSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Two AZs required by RDS, one active database instance
+      SubnetIds:
+        - !ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet1Id
+        - !ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet2Id
+  PostgresParameters:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Require TLS and keep autovacuum enabled throughout the day
+      Family: postgres17
+      Parameters:
+        rds.force_ssl: '1'
+        autovacuum: '1'
+  PostgresDBInstance:
+    Type: AWS::RDS::DBInstance
+    Metadata:
+      cfn-lint:
+        config:
+          # A major-only version selects RDS's current default minor, not 17.0.
+          # The deploy script supplies SSM SecureString via stdin to NoEcho.
+          ignore_checks: [W3691, W1011]
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: ttrek-prod-postgres
+      DBName: ttrek_telemetry
+      Engine: postgres
+      EngineVersion: '17'
+      DBInstanceClass: !Ref DatabaseInstanceClass
+      AllocatedStorage: '20'
+      MaxAllocatedStorage: 100
+      StorageType: gp3
+      StorageEncrypted: true
+      MasterUsername: ttrek_admin
+      MasterUserPassword: !Ref DatabasePassword
+      Port: '5432'
+      PubliclyAccessible: false
+      MultiAZ: false
+      AvailabilityZone: !Select [0, !GetAZs '']
+      BackupRetentionPeriod: 7
+      PreferredBackupWindow: '07:00-07:30'
+      PreferredMaintenanceWindow: 'sun:08:00-sun:08:30'
+      CopyTagsToSnapshot: true
+      DeletionProtection: true
+      AutoMinorVersionUpgrade: true
+      DBSubnetGroupName: !Ref PostgresSubnetGroup
+      DBParameterGroupName: !Ref PostgresParameters
+      VPCSecurityGroups: [!Ref PostgresSecurityGroup]
+      EnableCloudwatchLogsExports: [postgresql]
+
+  # tconfig consumes these at build time. The password is created by the operator.
+  PostgresHostParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ttrek_sh/prod/postgres/host
+      Type: String
+      Value: !GetAtt PostgresDBInstance.Endpoint.Address
+  PostgresDatabaseParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ttrek_sh/prod/postgres/database
+      Type: String
+      Value: ttrek_telemetry
+  PostgresUsernameParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /ttrek_sh/prod/postgres/username
+      Type: String
+      Value: ttrek_admin
+
+  MaintenanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: PostgreSQL maintenance and private AWS API access
+      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          DestinationSecurityGroupId: !Ref PostgresSecurityGroup
+        # HTTPS goes through the SSM interface or regional S3 gateway endpoint.
+        # The private route table has no internet/NAT route.
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+  MaintenanceDatabaseIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref PostgresSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref MaintenanceSecurityGroup
+  SsmSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SSM endpoint for the maintenance password
+      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref MaintenanceSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 1
+          ToPort: 1
+          CidrIp: 127.0.0.1/32
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+      PrivateDnsEnabled: true
+      SubnetIds: [!ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet1Id]
+      SecurityGroupIds: [!Ref SsmSecurityGroup]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: ssm:GetParameter
+            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ttrek_sh/prod/postgres/password
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
+      VpcEndpointType: Gateway
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds: [!ImportValue Infra-DevOps-TTREK-Base-PrivateRouteTableId]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: [s3:PutObject, s3:AbortMultipartUpload]
+            Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
+
+  MaintenanceLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/ttrek-telemetry-maintenance
+      RetentionInDays: 14
+  MaintenanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ttrek-telemetry-maintenance
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: TelemetryMaintenance
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [ec2:CreateNetworkInterface, ec2:DescribeNetworkInterfaces, ec2:DescribeSubnets, ec2:DeleteNetworkInterface, ec2:AssignPrivateIpAddresses, ec2:UnassignPrivateIpAddresses]
+                Resource: '*'
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt MaintenanceLogs.Arn
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ttrek_sh/prod/postgres/password
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+                    kms:EncryptionContext:PARAMETER_ARN: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ttrek_sh/prod/postgres/password
+              - Effect: Allow
+                Action: [s3:PutObject, s3:AbortMultipartUpload]
+                Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
+  MaintenanceFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: [SsmEndpoint, S3Endpoint, MaintenanceDatabaseIngress]
+    Properties:
+      FunctionName: ttrek-telemetry-maintenance
+      Runtime: python3.13
+      Architectures: [x86_64]
+      Handler: maintenance.handler
+      Role: !GetAtt MaintenanceRole.Arn
+      Code:
+        S3Bucket: !Ref BackupBucket
+        S3Key: !Ref MaintenanceCodeKey
+      MemorySize: 1024
+      Timeout: 900
+      EphemeralStorage: {Size: 10240}
+      ReservedConcurrentExecutions: 1
+      VpcConfig:
+        SubnetIds: [!ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet1Id]
+        SecurityGroupIds: [!Ref MaintenanceSecurityGroup]
+      Environment:
+        Variables:
+          PGHOST: !GetAtt PostgresDBInstance.Endpoint.Address
+          PGPORT: '5432'
+          PGDATABASE: ttrek_telemetry
+          PGUSER: ttrek_admin
+          PASSWORD_PARAMETER: /ttrek_sh/prod/postgres/password
+          BACKUP_BUCKET: !Ref BackupBucket
+          LD_LIBRARY_PATH: /var/task/lib:/var/lang/lib:/lib64:/usr/lib64
+  MaintenanceAsyncConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      FunctionName: !Ref MaintenanceFunction
+      Qualifier: $LATEST
+      MaximumEventAgeInSeconds: 3600
+      MaximumRetryAttempts: 2
+  MaintenanceErrors:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: ttrek-telemetry-maintenance-errors
+      AlarmDescription: Inspect telemetry maintenance logs; backups or vacuum have failed.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref MaintenanceFunction}]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+  ScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ttrek-telemetry-schedule
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: scheduler.amazonaws.com}
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnEquals:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/default
+      Policies:
+        - PolicyName: InvokeMaintenance
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt MaintenanceFunction.Arn
+  DailyBackup:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: ttrek-telemetry-backup
+      ScheduleExpression: !Ref BackupSchedule
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      FlexibleTimeWindow: {Mode: 'OFF'}
+      Target:
+        Arn: !GetAtt MaintenanceFunction.Arn
+        RoleArn: !GetAtt ScheduleRole.Arn
+        Input: '{"action":"backup"}'
+  MorningVacuum:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: ttrek-telemetry-vacuum
+      ScheduleExpression: !Ref VacuumSchedule
+      ScheduleExpressionTimezone: !Ref ScheduleTimezone
+      FlexibleTimeWindow: {Mode: 'OFF'}
+      Target:
+        Arn: !GetAtt MaintenanceFunction.Arn
+        RoleArn: !GetAtt ScheduleRole.Arn
+        Input: '{"action":"vacuum"}'
+
+Outputs:
+  PostgresDBEndpointAddress:
+    Value: !GetAtt PostgresDBInstance.Endpoint.Address
+    Export:
+      Name: !Sub ${AWS::StackName}-PostgresDBEndpointAddress
+  PasswordParameter:
+    Value: /ttrek_sh/prod/postgres/password
+  BackupLocation:
+    Value: !Sub s3://${BackupBucket}/telemetry/backups/
+  MaintenanceFunction:
+    Value: !Ref MaintenanceFunction
