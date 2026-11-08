@@ -63,7 +63,7 @@ Resources:
       Runtime: provided.al2023
       Architectures: [!Ref Architecture]
       Role: !GetAtt SiteRole.Arn
-      MemorySize: 1024
+      MemorySize: 256
       Timeout: 30
       VpcConfig:
         SubnetIds:
