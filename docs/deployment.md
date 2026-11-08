@@ -173,6 +173,12 @@ the cache endpoint is missing. No plaintext secret is committed or printed.
 | `/ttrek_sh/prod/request_monitor/master_template` | String | Optional; default `request-monitor-master.html.jinja` from `www/` |
 | `/ttrek_sh/prod/request_monitor/store` | String | Optional; default `valkey`; `memory` keeps history within each process |
 
+The Valkey user group contains only the password-authenticated `appuser`.
+Valkey requires password or IAM authentication for each user and disables the
+built-in `default` user when this group is attached. A separate disabled default
+user with `no-password-required` is unsupported and unnecessary; see
+[Valkey RBAC](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.RBAC.html).
+
 The cache deployment script reads that same password with decryption into a pipe,
 validates it in memory, and supplies the `NoEcho` CloudFormation parameter through
 `file:///dev/stdin`. It does not put the password in temporary files, command
