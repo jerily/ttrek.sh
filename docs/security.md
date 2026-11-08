@@ -25,8 +25,8 @@ Source and binary URL expiration settings are independent.
 Production Valkey connections require TLS and verify the CA and hostname,
 including reconnects. Production PostgreSQL telemetry also requires verified
 TLS, uses bound values through tpersist, and loads no SQLite driver. Its SSM
-password is encrypted into the application artifact; the maintenance function
-reads that one SecureString at runtime. See [telemetry](telemetry.md). LOCAL mode can use plain TCP only against localhost.
+password is encrypted into the application artifact and reused by the private
+scheduled maintenance handler. No runtime SSM access is needed. See [telemetry](telemetry.md). LOCAL mode can use plain TCP only against localhost.
 
 Content packages read validated Markdown snapshots, escape metadata and render
 Markdown in safe mode. They expose only read routes and a CSS asset. The host

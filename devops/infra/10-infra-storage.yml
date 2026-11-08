@@ -28,6 +28,12 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireTelemetryBackupsAfterSevenDays
+            Status: Enabled
+            Prefix: telemetry/backups/
+            ExpirationInDays: 7
       Tags:
         - Key: Name
           Value: !Ref AppName

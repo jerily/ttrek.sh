@@ -85,6 +85,9 @@ runs four independent processes to exercise simultaneous cold starts and writes.
 Use only a disposable test database. `tests/telemetry-config.test` verifies ENV
 selection and required TLS without connecting to services.
 
-Run `python3 tests/telemetry-maintenance.py` with boto3 installed for backup/vacuum
-unit tests; all AWS and process calls are mocked. Build the actual maintenance
-artifact using `devops/package-telemetry-maintenance.sh` (Docker required).
+Run `ttrek run tclsh9.1 tests/telemetry-maintenance.test` for lazy-loading and
+private-event dispatch checks. With `TTREK_TEST_POSTGRES` pointing at a disposable
+database, it also checks JSONL backup/restore, binary/text round trips, cursor
+paging, truncated exports, sequence advancement, advisory locking, cleanup and
+combined backup/vacuum execution. S3 upload is stubbed; no AWS resources are used.
+No Docker or PostgreSQL command-line clients are required by the application.
