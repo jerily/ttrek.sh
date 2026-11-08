@@ -8,7 +8,9 @@ tells ttrek how to download and build them.
 Visit [ttrek.sh](https://ttrek.sh) to browse packages, download ttrek, and read
 guides and blog posts.
 
-This project is under active development.
+This project is under active development. Source archive fallbacks and binary
+downloads redirect to signed URLs in a private S3 bucket, with separate expiry
+settings; see [distributions](docs/releases.md) and [security](docs/security.md).
 
 ## Run locally
 
