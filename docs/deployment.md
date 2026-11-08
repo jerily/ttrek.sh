@@ -354,8 +354,11 @@ Build deployment packages and their native dependencies on AL2023 for the target
 Lambda architecture. Here `--local-only` bypasses the glibc version check; it
 does not change the production configuration or prevent deployment. Compatibility
 with the Lambda runtime is not verified by this packaging step.
-`finalize-lambda.py` sets the executable ZIP attributes for `bootstrap` and
-`local/bin/tclsh`. CodeBuild performs this step automatically.
+`finalize-lambda.py` requires the production configuration and release manifest,
+and sets the executable ZIP attributes for `bootstrap` and `local/bin/tclsh`.
+CodeBuild then checks that the packaged configuration loads the exact checkout
+manifest before deploying. The packaging file list explicitly includes
+`etc/releases.json`; staged validation catches missing or invalid checksum files.
 
 ## Updating an existing deployment
 

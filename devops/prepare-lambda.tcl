@@ -9,15 +9,18 @@ foreach asset {public/js/search.js public/js/chart.umd.js} {
 package require http
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
+set releases [::app_config::releases {}]
 if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONFIG) ne {}} {
     ::app_config::validate_lambda_config $::env(TTREK_PRODUCTION_CONFIG)
     file copy -force $::env(TTREK_PRODUCTION_CONFIG) [file join $siteRoot etc config.ini]
+    # Validate the staged public settings without decrypting secrets or calling AWS.
+    set releases [::app_config::releases_from_ini [file join $siteRoot etc config.ini] $siteRoot]
 }
 source [file join $siteRoot tcl search-build.tcl]
 ::recipe_search::build [file join $siteRoot registry] [file join $siteRoot etc search-index.json]
 file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
-    releases [::app_config::releases {}]]
+    releases $releases]
 set router [::tpathexp::router]
 try {
     ::site::mount $router
