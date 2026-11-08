@@ -155,6 +155,12 @@ try {
             if {$shell ne {}} {lappend command SHELL=$shell}
             if {$zdotdir ne {}} {lappend command ZDOTDIR=[file join $installHome $zdotdir]}
             set invocation [list {*}$command /bin/sh [file join $sourceRoot public ttrek-init] -y]
+            if {$shell eq {}} {
+                # Bash can recreate SHELL at startup even after env -u SHELL.
+                # Unset it in the running shell and source the installer there.
+                set invocation [list {*}$command /bin/sh -c {unset SHELL; . "$0"} \
+                    [file join $sourceRoot public ttrek-init] -y]
+            }
             ::installer_test::run $invocation
             ::installer_test::run $invocation
             foreach profile [lsort -unique [concat $expected $existing {.profile .bash_profile .bash_login .bashrc .zshrc}]] {
