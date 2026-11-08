@@ -20,7 +20,12 @@ Gateway's `requestContext.http.sourceIp`, not a caller-supplied forwarded header
 Telemetry uses tpersist with shared PostgreSQL in PROD and SQLite in LOCAL.
 See [telemetry storage and maintenance](telemetry.md) for the RDS deployment,
 password path, daily S3 backups and morning vacuum. Production release downloads
-remain disabled by the Lambda adapter.
+use the packaged `[releases]` configuration and `etc/releases.json` manifest.
+The execution role can read `ttrek/*` in `ReleaseBucket`, which must match
+`releases.bucket` (both default to `jerily-ttrek-app`). Binary and source requests
+redirect clients to signed S3 URLs; the clients download directly from S3.
+Generating these URLs does not require a Lambda network call to S3, so the
+backup-only S3 gateway endpoint policy does not need additional permissions.
 
 Lambda, Valkey and the Single-AZ RDS instance use the first isolated subnet.
 A second private subnet in another AZ satisfies RDS subnet-group requirements.

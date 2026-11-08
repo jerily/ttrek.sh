@@ -1,6 +1,7 @@
 package require tcltest 2
 package require tconfig::decrypt
 namespace import ::tcltest::test
+set sourceRoot [file dirname [file dirname [file normalize [info script]]]]
 source [file join [file dirname [info script]] .. tcl config.tcl]
 source [file join [file dirname [info script]] .. tcl local-ratelimit.tcl]
 set saved_env [array get ::env]
@@ -95,7 +96,85 @@ test lambda-config-12 {Invalid monitor history limits fail during configuration}
     ::app_config::monitor_store {request_monitor {store memory history_max_events 0}}
 } -returnCodes error -result {request_monitor.history_max_events must be a positive integer}
 
+# Run the real Lambda initializer with disposable configuration. Only KMS
+# decryption, database connections and router startup are replaced.
+file mkdir [file join $root tcl]
+foreach name {config local-ratelimit} {
+    file copy [file join $sourceRoot tcl $name.tcl] [file join $root tcl $name.tcl]
+}
+foreach {name script} {
+    site {
+        namespace eval ::site {variable router test_router}
+        proc ::site::init_worker {config} {variable settings $config}
+        proc ::site::config {} {variable settings; return $settings}
+    }
+    telemetry {
+        namespace eval ::telemetry {}
+        proc ::telemetry::init {settings} {}
+    }
+    telemetry-maintenance {}
+    local-assets {}
+} {
+    set channel [open [file join $root tcl $name.tcl] w]
+    puts $channel $script
+    close $channel
+}
+file copy [file join $sourceRoot tests fixtures release-checksums.json] [file join $root etc releases.json]
+set config [::tconfig::read_config [file join $sourceRoot devops config.prod.ini]]
+dict set config tconfig tink_keyset dummy
+foreach section {redis postgres} {
+    dict set config $section host "$section.example"
+    dict unset config $section password
+    dict set config $section enc:password dummy
+}
+::tconfig::write_config $config $prod
+rename ::tconfig::load_config ::tconfig::real_load_config
+proc ::tconfig::load_config {path} {
+    set config [read_config $path]
+    foreach section {redis postgres} {dict set config $section password dummy}
+    return $config
+}
+source [file join $sourceRoot tcl lambda.tcl]
+source [file join $sourceRoot tcl releases.tcl]
+
+test lambda-releases-1 {Production startup loads releases and resolves the manifest from the application root} -setup {
+    set ::env(ENV) PROD
+    unset -nocomplain ::env(TTREK_LOCAL_S3_ENDPOINT)
+    set ::releases::client [::aws::s3::create {region eu-central-1 aws_access_key_id test aws_secret_access_key test}]
+} -body {
+    ::site_lambda::initialize $root
+    set releases [dict get [::site::config] releases]
+    set artifact [::releases::artifact x86_64-unknown-linux-gnu]
+    set url [::releases::signed_url $artifact]
+    list [dict get $releases bucket] [dict get $releases version] \
+        [expr {[dict get $releases checksums_file] eq [file join $root etc releases.json]}] \
+        [expr {[dict get $releases checksums $artifact] eq [string repeat a 64]}] \
+        [string match {https://jerily-ttrek-app.s3.eu-central-1.amazonaws.com/ttrek/1.0.0/linux-amd64-glibc/ttrek?*} $url] \
+        [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
+} -cleanup {
+    ::aws::s3::destroy $::releases::client
+    set ::releases::client {}
+} -result {jerily-ttrek-app 1.0.0 1 1 1 1}
+
+test lambda-releases-2 {Local mock release overrides remain independent of the production configuration} -body {
+    set ::env(ENV) LOCAL
+    set ::env(TTREK_LOCAL_CONFIG) [file join $root etc config.local.ini]
+    ::tconfig::write_config {} $::env(TTREK_LOCAL_CONFIG)
+    set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:9999
+    set ::env(TTREK_LOCAL_RELEASES) [dict create prefix test/2.0.0 version 2.0.0 \
+        checksums [dict create linux-amd64-glibc [string repeat b 64]]]
+    ::site_lambda::initialize $root
+    set releases [dict get [::site::config] releases]
+    list [dict get $releases bucket] [dict get $releases version] [dict get $releases prefix] \
+        [dict get $releases endpoint] \
+        [expr {[dict get $releases checksums linux-amd64-glibc] eq [string repeat b 64]}]
+} -result {ttrek-local 2.0.0 test/2.0.0 http://127.0.0.1:9999 1}
+
+rename ::tconfig::load_config {}
+rename ::tconfig::real_load_config ::tconfig::load_config
 array unset ::env
 array set ::env $saved_env
 ::tcltest::removeDirectory $root
+set failed $::tcltest::numTests(Failed)
 ::tcltest::cleanupTests
+exit [expr {$failed > 0}]

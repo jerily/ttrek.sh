@@ -69,7 +69,8 @@ connection settings for a disposable PostgreSQL database and `PGSSLROOTCERT`
 pointing to its CA. PROD always verifies TLS.
 
 `tests/lambda-config.test` checks production rejection of plaintext secrets, local
-configuration isolation, and local counter expiry. `tests/lambda-valkey.tcl` needs
+configuration isolation, local counter expiry, and release configuration during
+Lambda startup, including manifest paths and signed download URLs. `tests/lambda-valkey.tcl` needs
 `valkey-server` with TLS and runs two independent Lambda adapters against a disposable
 cache, checking shared history, cross-process rate limiting, and trusted source-IP
 handling. It uses synthetic credentials and makes no AWS calls. Infrastructure

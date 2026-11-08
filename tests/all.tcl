@@ -95,6 +95,25 @@ test releases-2 {Unknown targets, path traversal and extensions cannot sign arbi
     list $result $s3_calls
 } -result {{404 404 404 404} {}}
 
+test releases-unsupported {Other targets emitted by the installer cannot select an incompatible binary} -body {
+    set s3_calls {}
+    set statuses {}
+    foreach arch {
+        i686-unknown-linux-gnu i686-unknown-linux-musl
+        arm-unknown-linux-gnueabihf armv7-unknown-linux-musleabihf
+        mips-unknown-linux-gnu mipsel-unknown-linux-gnu mips64el-unknown-linux-gnuabi64
+        powerpc64le-unknown-linux-gnu s390x-unknown-linux-gnu
+        riscv64gc-unknown-linux-gnu loongarch64-unknown-linux-gnu
+        aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+        x86_64-unknown-freebsd x86_64-unknown-netbsd x86_64-unknown-dragonfly x86_64-unknown-illumos
+        x86_64-pc-windows-gnu
+    } {
+        set ext [expr {[string match *windows* $arch] ? ".exe" : ""}]
+        lappend statuses [dict get [get_dist_handler {} [dict create pathParameters [dict create arch $arch ext $ext]]] status]
+    }
+    list [lsort -unique $statuses] $s3_calls
+} -result {404 {}}
+
 test releases-3 {Disabled downloads do not contact AWS} -setup {
     set test_releases [::app_config::releases {}]
     set s3_calls {}
