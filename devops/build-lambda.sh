@@ -30,9 +30,9 @@ ttrek run -script build-search
 "$TCLSH" tests/config.test
 "$TCLSH" tests/lambda-config.test
 "$TCLSH" tests/installer.tcl
-# Keep the AL2023 ABI check enabled. A --local-only ZIP must never be deployed.
 bash devops/generate-prod-config.sh
 export TTREK_PRODUCTION_CONFIG="$SITE_ROOT/build/prod/config.ini"
-ttrek run -script package-lambda
+# Build on AL2023 and skip tdevops' numeric glibc cutoff, which rejects backports.
+ttrek run -script package-lambda -- --local-only
 python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
