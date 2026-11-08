@@ -13,7 +13,6 @@ if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONF
     ::app_config::validate_lambda_config $::env(TTREK_PRODUCTION_CONFIG)
     file copy -force $::env(TTREK_PRODUCTION_CONFIG) [file join $siteRoot etc config.ini]
 }
-source [file join $siteRoot tcl telemetry.tcl]
 source [file join $siteRoot tcl search-build.tcl]
 ::recipe_search::build [file join $siteRoot registry] [file join $siteRoot etc search-index.json]
 file mkdir [file join $siteRoot data]
@@ -27,5 +26,3 @@ try {
         if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}
     }
 } finally {$router destroy}
-::telemetry::init -file [file join $siteRoot data telemetry.sqlite3]
-::db close

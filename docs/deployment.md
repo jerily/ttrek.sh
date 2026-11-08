@@ -17,14 +17,21 @@ API. `Architecture` must match the native libraries in the ZIP (x86_64 by defaul
 Production uses TLS Valkey for shared request-monitor history and global per-IP
 rate limits (1000 requests per 10 seconds by default). The adapter uses API
 Gateway's `requestContext.http.sourceIp`, not a caller-supplied forwarded header.
-Download telemetry still uses SQLite in each execution environment, and production
-release downloads remain disabled by the Lambda adapter.
+Telemetry uses tpersist with shared PostgreSQL in PROD and SQLite in LOCAL.
+See [telemetry storage and maintenance](telemetry.md) for the RDS deployment,
+password path, daily S3 backups and morning vacuum. Production release downloads
+remain disabled by the Lambda adapter.
 
-Lambda and Valkey use one isolated subnet. There is no NAT gateway, internet gateway,
+Lambda, Valkey and the Single-AZ RDS instance use the first isolated subnet.
+A second private subnet in another AZ satisfies RDS subnet-group requirements.
+There is no NAT gateway, internet gateway,
 public subnet, load balancer or Fargate service. A private KMS interface endpoint
-allows tconfig to decrypt the packaged configuration at startup. Lambda has no
+allows tconfig to decrypt the packaged configuration at startup. The website
+Lambda has no
 runtime SSM access: SSM values are resolved by the build outside the VPC. The
-security groups allow Lambda to reach only Valkey on 6379 and KMS on 443. Future
+security groups allow Lambda to reach Valkey on 6379, PostgreSQL on 5432 and KMS
+on 443. The separate maintenance
+Lambda uses private SSM and S3 endpoints for scheduled backups. Future
 outbound AWS service calls need matching endpoints and policies; calls to public
 third-party services would need internet egress. API Gateway invocation and
 Lambda's normal stdout/stderr logging do not need a NAT gateway.
@@ -47,23 +54,17 @@ For a new deployment:
 2. Run `devops/infra/20-deploy-infra-vpc0.sh`.
 3. Create the SSM password described below, then run `25-deploy-infra-cache.sh`.
 4. Set the SSM cache host to the cache stack's `TTrekValkeyClusterEndpointAddress` output.
-5. Run `15-deploy-infra-certificate.sh` and complete DNS validation.
-6. Complete the GitHub connection setup below, run `30-deploy-codebuild.sh`, then
+5. Follow the [telemetry deployment steps](telemetry.md#deploy): create the PostgreSQL
+   SecureString and deploy `38-deploy-infra-rds-postgres.sh` before building the website.
+6. Run `15-deploy-infra-certificate.sh` and complete DNS validation.
+7. Complete the GitHub connection setup below, run `30-deploy-codebuild.sh`, then
    run the build (or use the manual Lambda steps below).
-7. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.
+8. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.
 
-If you deployed the previous two-zone network through step 2 but have not deployed
-the cache or Lambda, rerun `devops/infra/20-deploy-infra-vpc0.sh`, then continue
-with `25-deploy-infra-cache.sh`. Updating `Infra-DevOps-TTREK-Base` removes the
-second endpoint interface, subnet, route-table association and subnet export.
-The first subnet and its export remain. The keys and storage stacks need no
-update for this change. New cache and Lambda deployments use only the first subnet.
-
-If cache or Lambda stacks already import `Infra-DevOps-TTREK-Base-PrivateSubnet2Id`,
-update those consumers to use the first subnet and wait for their resources to
-release the second subnet before updating Base. A cache node using the second
-subnet must be migrated before that subnet can be removed. CloudFormation
-[blocks removal of an imported export](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-stack-exports.html).
+When updating an existing deployment, redeploy the changed IAM policies first,
+then `20-deploy-infra-vpc0.sh`, then the new RDS stack. The network update adds a
+second private subnet and route-table export while retaining the first subnet,
+Lambda/Valkey security-group exports and the one-interface KMS endpoint.
 
 The keys template creates the customer-managed key used by tconfig and the SSM
 password. Key rotation is enabled. `DeletionPolicy` and `UpdateReplacePolicy`
@@ -105,8 +106,9 @@ and [HTTP API custom domains](https://docs.aws.amazon.com/apigateway/latest/deve
 ### Deployment IAM policy
 
 The existing IAM group `ttrek_prod_admin_group` receives two customer managed
-policies: `00-iam-policy-deploy.json` covers deployment commands, DNS and SSM;
-`00-iam-policy-resources.json` covers CloudFormation resource operations.
+policies: `00-iam-policy-deploy.json` covers deployment commands, DNS, SSM, log
+reads and maintenance resources; `00-iam-policy-resources.json` covers the
+remaining CloudFormation resource operations.
 Both files live in `devops/infra`. Before `00-deploy-infra-keys.sh`, run:
 
 ```bash
@@ -135,14 +137,18 @@ and its role, and the public API's Lambda invocation permission. Most resource
 operations require CloudFormation's [forward access session](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/fas-requests-and-permission-evaluation.html).
 SSM reads and decryption through SSM are scoped to `/ttrek_sh/*`;
 DNS changes are limited to A/CNAME records at `ttrek.sh` and `_*.ttrek.sh`.
-Passing the build role is limited to CodeBuild. The first deployment can create
-the ElastiCache and API Gateway service-linked roles.
+Role passing is scoped to CodeBuild, the maintenance Lambda and its scheduler.
+The policies also cover RDS and its service-linked role, maintenance schedules,
+alarms, artifact uploads and CloudFormation-managed PostgreSQL parameters. Both
+policy files changed for telemetry and must be redeployed. Direct log reads allow
+`aws logs tail /aws/lambda/prod-Api-TtrekWebsite-Function --follow`, and other
+`/aws/lambda/*` groups in the account.
 
 These are infrastructure administrator policies: they use broader regional access
 through CloudFormation for generated EC2, KMS, ACM and cache resource IDs, and
 the deployer can edit the build role's inline permissions. These policies are not
 permissions boundaries. Their fixed names match the templates' defaults; adjust them when changing
-the application, bucket, domain or Lambda name. SSM writes, GitHub connection
+the application, bucket, domain or Lambda name. Manual SSM writes, GitHub connection
 setup, starting builds, and manual SAM deployments need separate permissions.
 Stacks must use the caller's credentials, as the supplied scripts do; an existing
 CloudFormation service role needs its own resource permissions.
@@ -154,7 +160,8 @@ The two attachments use two of the group's ten managed-policy slots.
 
 ## Production and local configuration
 
-You manage the SSM values; none of these scripts creates or updates them.
+You manage the SSM passwords and cache endpoint. The RDS stack manages the
+PostgreSQL host, database and username String parameters.
 `devops/config.prod.ini` is a secret-free input template. tconfig resolves
 `/ttrek_sh/prod/<section>/<key>` and encrypts SecureString values into the generated
 `build/prod/config.ini`. That generated file is copied to `etc/config.ini` inside
@@ -163,6 +170,10 @@ the cache endpoint is missing. No plaintext secret is committed or printed.
 
 | SSM parameter | Type | Value |
 | --- | --- | --- |
+| `/ttrek_sh/prod/postgres/password` | SecureString | Required; see [telemetry deployment](telemetry.md#deploy) |
+| `/ttrek_sh/prod/postgres/host` | String | Managed by the RDS stack |
+| `/ttrek_sh/prod/postgres/database` | String | Managed by the RDS stack: `ttrek_telemetry` |
+| `/ttrek_sh/prod/postgres/username` | String | Managed by the RDS stack: `ttrek_admin` |
 | `/ttrek_sh/prod/redis/password` | SecureString | Required; 16–128 characters, encrypted with the Keys stack KMS key |
 | `/ttrek_sh/prod/redis/host` | String | Required; cache primary endpoint from stack outputs |
 | `/ttrek_sh/prod/redis/port` | String | Optional; default `6379` |
@@ -369,3 +380,38 @@ mapping, DNS and related outputs maintained in `devops/infra/40-api-gateway.json
 It writes the complete result to `dist/api-gateway.json` and copies it to that
 tracked template. Review the diff before deploying with `40-deploy-api-gateway.sh`.
 The local mock ignores deployment settings. Generation does not deploy AWS resources.
+
+## Existing apex A record blocks API deployment
+
+`SiteDns` creates an A alias for `ttrek.sh` only when `HostedZoneId` is nonempty.
+Removing `SiteDns` from the template does not add or update DNS. Deleting a
+conflicting record in Route 53, leaving `SiteDns` in the template, and successfully
+redeploying creates the new API Gateway alias; deletion can leave a DNS gap.
+
+To preserve an existing record during deployment:
+
+1. If `Infra-DevOps-TTREK-Api` is in `ROLLBACK_COMPLETE`, delete that failed stack
+   first using the CloudFormation console or an administrator profile. A failed
+   initial creation in that state cannot be updated. Do not delete the existing
+   Route 53 record as part of this cleanup.
+2. Run `TTREK_HOSTED_ZONE_ID='' devops/infra/40-deploy-api-gateway.sh` to deploy
+   the API and custom domain without managing DNS.
+3. Once the API is ready, edit the existing apex A record in Route 53 to an alias
+   using the stack's `RegionalDomainName` and `RegionalHostedZoneId` outputs,
+   with `EvaluateTargetHealth=false`. Preserve its previous value for rollback.
+4. Continue passing `TTREK_HOSTED_ZONE_ID=''` on subsequent API deployments while
+   DNS is managed separately. No template edit is required.
+
+The generic error's import suggestion does not mean Route 53 RecordSet supports
+CloudFormation import: it is absent from AWS's
+[import-supported resource list](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resource-import-supported-resources.html).
+Do not attempt to import the entire hosted zone just to resolve this record conflict.
+
+API Gateway's `TagResource` API uses HTTP-verb IAM actions:
+[`apigateway:POST` for HTTP/WebSocket APIs](https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/tags-resource-arn.html)
+and [`apigateway:PUT` for REST APIs](https://docs.aws.amazon.com/apigateway/latest/api/API_TagResource.html).
+The deploy policy permits both on `/tags/*`. The resource policy also includes
+`apigateway:TagResource` because the API stack's actual `ApiStage` failure reported
+an explicit authorization denial for that action on `/apis/.../stages`. Retain
+that permission alongside the documented HTTP-verb permissions. Some IAM linters
+may not recognize the action because it is absent from the published action list.

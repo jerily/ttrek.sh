@@ -64,7 +64,17 @@
         "acm:UpdateCertificateOptions",
         "ec2:AuthorizeSecurityGroup*",
         "ec2:RevokeSecurityGroup*",
-        "ec2:UpdateSecurityGroupRuleDescriptions*"
+        "ec2:UpdateSecurityGroupRuleDescriptions*",
+        "rds:*DBInstance*",
+        "rds:*DBSubnetGroup*",
+        "rds:*DBParameterGroup*",
+        "rds:Describe*",
+        "rds:CreateDBSnapshot",
+        "rds:AddTagsToResource",
+        "rds:RemoveTagsFromResource",
+        "rds:ListTagsForResource",
+        "kms:CreateGrant",
+        "logs:DescribeLogGroups"
       ],
       "Resource": "*",
       "Condition": {
@@ -108,6 +118,7 @@
         "apigateway:PATCH",
         "apigateway:PUT",
         "apigateway:DELETE",
+        "apigateway:TagResource",
         "lambda:AddPermission",
         "lambda:RemovePermission",
         "lambda:GetPolicy",
@@ -126,7 +137,8 @@
         "arn:aws:apigateway:__REGION__::/domainnames/ttrek.sh",
         "arn:aws:apigateway:__REGION__::/domainnames/ttrek.sh/*",
         "arn:aws:apigateway:__REGION__::/tags/*",
-        "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:function:prod-Api-TtrekWebsite-Function"
+        "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:function:prod-Api-TtrekWebsite-Function",
+        "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-telemetry-*"
       ],
       "Condition": {
         "ForAnyValue:StringEquals": {
@@ -148,11 +160,13 @@
       "Effect": "Allow",
       "Action": [
         "iam:CreateServiceLinkedRole",
-        "iam:PutRolePolicy"
+        "iam:PutRolePolicy",
+        "iam:GetRole"
       ],
       "Resource": [
         "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/elasticache.amazonaws.com/AWSServiceRoleForElastiCache*",
-        "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway"
+        "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway",
+        "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS"
       ]
     }
   ]

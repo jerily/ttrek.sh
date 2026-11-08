@@ -1,0 +1,147 @@
+# Real SQLite by default; opt into a disposable PostgreSQL database with
+# TTREK_TEST_POSTGRES='database telemetry_test host 127.0.0.1 port ... user postgres password ... sslmode disable'.
+package require tcltest 2
+namespace import ::tcltest::test
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl telemetry.tcl]
+namespace import ::tpersist::db_*
+
+if {[llength $argv] && [lindex $argv 0] eq "--worker"} {
+    ::telemetry::init [lindex $argv 1]
+    set identity [string repeat f 64]
+    ::telemetry::event register_environment -env $identity -description concurrent
+    for {set i 0} {$i < 15} {incr i} {
+        ::telemetry::event req_pkg_install_event -env $identity -pkg_name concurrent -pkg_version 1.0 \
+            -os Linux -arch x86_64 -install_outcome 1 -install_is_toplevel 1
+    }
+    ::telemetry::close
+    puts done
+    exit
+}
+set unloaded [expr {[package provide sqlite3] eq {} && [package provide tdbc::sqlite3] eq {} && [package provide tdbc::postgres] eq {}}]
+set postgres [info exists ::env(TTREK_TEST_POSTGRES)]
+::tcltest::testConstraint postgres $postgres
+set admin {}
+if {$postgres} {
+    # All test tables are isolated in a fresh schema, removed in cleanup.
+    package require tdbc::postgres
+    set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    set options {}
+    dict for {key value} $::env(TTREK_TEST_POSTGRES) {lappend options -$key $value}
+    set admin [tdbc::postgres::connection new {*}$options]
+    set schema telemetry_test_[pid]_[clock clicks]
+    $admin allrows "CREATE SCHEMA $schema"
+    dict set settings options "-c search_path=$schema -c statement_timeout=10000"
+} else {
+    set path [::tcltest::makeFile {} telemetry-test.sqlite3]
+    set settings [dict create dialect sqlite database $path timeout 5000]
+}
+::telemetry::init $settings
+set identity [string repeat a 64]
+proc count_rows {table} {
+    dict get [lindex [::telemetry::rows [::tpersist::db_select $table -expr {COUNT(*) AS n}]] 0] n
+}
+
+test telemetry-1 {Sourcing telemetry does not load either backend driver} -body {set unloaded} -result 1
+
+test telemetry-2 {PostgreSQL telemetry never loads SQLite} -constraints postgres -body {
+    list [package provide sqlite3] [package provide tdbc::sqlite3]
+} -result {{} {}}
+
+test telemetry-3 {Registration is idempotent and retains distinct descriptions} -body {
+    ::telemetry::event register_environment -env $identity -description first
+    ::telemetry::event register_environment -env [string toupper $identity] -description first
+    ::telemetry::event register_environment -env $identity -description second
+    list [count_rows environments] [count_rows environment_keys]
+} -result {2 1}
+
+test telemetry-4 {Registration supports large descriptions without a text index limit} -body {
+    set description {}
+    for {set i 0} {$i < 1000} {incr i} {append description [format %064x [expr {$i ** 8}]]}
+    ::telemetry::event register_environment -env [string repeat b 64] -description $description
+    ::telemetry::event register_environment -env [string repeat b 64] -description $description
+    count_rows environments
+} -result 3
+
+test telemetry-5 {All event types record dimensions and explicit timestamps} -body {
+    foreach event {req_dist_get req_pkg_get req_pkg_version_get req_pkg_install_event req_reg_get_pkg_spec req_reg_get_pkg req_logo_get} {
+        set args [dict create -env $identity]
+        foreach key [dict get $::telemetry::event_list $event] {
+            if {$key eq "-env"} continue
+            dict set args $key [dict get {-os Linux -arch x86_64 -pkg_name tcl -pkg_version 9.1.0 -install_outcome 1 -install_is_toplevel 1} $key]
+        }
+        ::telemetry::event $event {*}$args
+        set row [lindex [::telemetry::rows [db_select $event]] 0]
+        if {[dict get $row timestamp] < [clock seconds] - 10} {error "missing timestamp"}
+    }
+    list [count_rows package_names] [count_rows packages] [count_rows platforms] [count_rows req_logo_get]
+} -result {1 1 1 1}
+
+test telemetry-6 {Cross-version and per-version totals match on both backends} -body {
+    ::telemetry::event req_pkg_install_event -env $identity -pkg_name tcl -pkg_version 9.1.0 \
+        -os Linux -arch x86_64 -install_outcome 0 -install_is_toplevel 1
+    ::telemetry::event req_pkg_install_event -env $identity -pkg_name tcl -pkg_version 9.2.0 \
+        -os Linux -arch x86_64 -install_outcome 1 -install_is_toplevel 0
+    ::telemetry::event req_pkg_install_event -env $identity -pkg_name tcl -pkg_version 9.2.0 \
+        -os Darwin -arch arm64 -install_outcome 1 -install_is_toplevel 1
+    list [::telemetry::stats tcl] [::telemetry::stats tcl 9.1.0] [::telemetry::stats missing]
+} -result {{{{Linux x86_64} 3 2 1} {{MacOS arm64} 1 1 0}} {{{Linux x86_64} 2 1 1}} {}}
+
+test telemetry-7 {Values are bound, including quote and SQL-like text} -body {
+    set name {x'); DROP TABLE packages; --}
+    ::telemetry::event req_pkg_install_event -env $identity -pkg_name $name -pkg_version 001 \
+        -os CYGWIN_NT-10.0 -arch x86_64 -install_outcome 1 -install_is_toplevel 1
+    list [::telemetry::stats $name 001] [count_rows package_names]
+} -result {{{{Cygwin x86_64} 1 1 0}} 2}
+
+test telemetry-8 {Invalid input creates no dimension or event rows} -body {
+    set before [count_rows package_names]
+    set failed [catch {::telemetry::event req_pkg_install_event -env $identity -pkg_name invalid -pkg_version 1 \
+        -os Linux -arch unsupported -install_outcome 1 -install_is_toplevel 1}]
+    set unknown [catch {::telemetry::event req_logo_get -env [string repeat c 64]}]
+    list $failed $unknown [expr {$before == [count_rows package_names]}]
+} -result {1 1 1}
+
+test telemetry-9 {Foreign-key failure rolls back the enclosing transaction} -body {
+    set connection $::telemetry::connection
+    catch {db_transaction $connection {
+        db_execute $connection [db_values [db_insert package_names] {name rolled_back}]
+        db_execute $connection [db_values [db_insert req_logo_get] {env_id -1 timestamp 1}]
+    }}
+    ::telemetry::rows [db_where [db_select package_names] -expr {name = 'rolled_back'}]
+} -result {}
+
+test telemetry-10 {Committed telemetry survives disconnect and schema reinitialization} -body {
+    ::telemetry::close
+    ::telemetry::init $settings
+    ::telemetry::stats tcl 9.1.0
+} -result {{{Linux x86_64} 2 1 1}}
+
+test telemetry-11 {Concurrent cold starts and writers share dimensions without losing events} -body {
+    ::telemetry::close
+    if {$postgres} {
+        $admin allrows "DROP SCHEMA $schema CASCADE"
+        $admin allrows "CREATE SCHEMA $schema"
+    } else {file delete $path}
+    set workers {}
+    for {set i 0} {$i < 4} {incr i} {
+        lappend workers [open [list | [info nameofexecutable] [info script] --worker $settings] r]
+    }
+    set errors {}
+    foreach worker $workers {
+        set output [read $worker]
+        if {[catch {close $worker} message]} {lappend errors $message}
+    }
+    if {[llength $errors]} {error $errors}
+    ::telemetry::init $settings
+    list [count_rows environments] [count_rows package_names] [count_rows packages] [::telemetry::stats concurrent]
+} -result {1 1 1 {{{Linux x86_64} 60 60 0}}}
+
+::telemetry::close
+if {$postgres} {
+    $admin allrows "DROP SCHEMA $schema CASCADE"
+    $admin close
+} else {::tcltest::removeFile telemetry-test.sqlite3}
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed != 0}]

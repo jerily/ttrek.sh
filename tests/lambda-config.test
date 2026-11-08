@@ -14,14 +14,25 @@ test lambda-config-1 {Production fails closed without an encrypted password} -bo
 } -returnCodes error -match glob -result {*redis.enc:password*}
 
 test lambda-config-2 {Plaintext password alongside ciphertext is rejected} -body {
-    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy password plaintext}} $prod
+    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy password plaintext} postgres {host db.example database test username test enc:password dummy}} $prod
     ::app_config::validate_lambda_config $prod
 } -returnCodes error -match glob -result {*plaintext passwords*}
 
 test lambda-config-3 {Encrypted input is accepted without making a KMS call} -body {
-    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy}} $prod
+    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy} postgres {host db.example database test username test enc:password dummy}} $prod
     ::app_config::validate_lambda_config $prod
 } -result {}
+
+test lambda-config-postgres-1 {Production rejects missing PostgreSQL credentials} -body {
+    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy}} $prod
+    ::app_config::validate_lambda_config $prod
+} -returnCodes error -match glob -result {*postgres.enc:password*}
+
+test lambda-config-postgres-2 {Production rejects plaintext PostgreSQL credentials} -body {
+    ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy} \
+        postgres {host db.example database test username test enc:password dummy password plaintext}} $prod
+    ::app_config::validate_lambda_config $prod
+} -returnCodes error -match glob -result {*plaintext passwords*}
 
 test lambda-config-4 {Local mode ignores bundled production config and uses the selected local INI} -body {
     set ::env(ENV) LOCAL

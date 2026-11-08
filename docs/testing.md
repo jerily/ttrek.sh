@@ -13,6 +13,8 @@ ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-config.test"
+ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
+ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/installer.tcl"
@@ -25,7 +27,8 @@ ttrek run tclsh9.1 "$PWD/tests/local-stack.tcl"
 services on temporary ports. It checks documentation, HEAD/error behavior,
 S3-backed asset changes, binary objects, signed release downloads and checksums,
 Lambda payload 1.0 query/body handling, an unchanged archive, and shutdown cleanup.
-Package before running this test. Package checks include `awss3`; release-handler tests cover target selection, signing
+Package before running this test. `TTREK_TEST_SITE_ZIP` and
+`TTREK_TEST_S3_SEED` can select an isolated archive and seed directory. Package checks include `awss3`; release-handler tests cover target selection, signing
 arguments, metadata, disabled downloads, invalid requests and signer failures.
 Config tests cover manifest validation, paths, and exact environment/version
 selection. The local stack test checks that uploaded metadata takes precedence
@@ -61,7 +64,9 @@ VALKEY_SERVER=/path/to/valkey-server ttrek run tclsh9.1 "$PWD/tests/runtime-smok
 It launches a disposable copy of the app with an isolated Valkey process, test
 certificates and its own SQLite database under `build/`. It uses disposable ports,
 checks Valkey-backed history/counters and reconnects, and never uses your config
-or AWS. Run it with `ENV=LOCAL` and `ENV=PROD` to check both modes.
+or AWS. LOCAL uses SQLite; PROD additionally requires `TTREK_TEST_POSTGRES`
+connection settings for a disposable PostgreSQL database and `PGSSLROOTCERT`
+pointing to its CA. PROD always verifies TLS.
 
 `tests/lambda-config.test` checks production rejection of plaintext secrets, local
 configuration isolation, and local counter expiry. `tests/lambda-valkey.tcl` needs
@@ -69,3 +74,17 @@ configuration isolation, and local counter expiry. `tests/lambda-valkey.tcl` nee
 cache, checking shared history, cross-process rate limiting, and trusted source-IP
 handling. It uses synthetic credentials and makes no AWS calls. Infrastructure
 validation: `cfn-lint devops/infra/*.yml devops/infra/40-api-gateway.json devops/sam-template.yaml`.
+
+`tests/telemetry.test` exercises real SQLite persistence, all event types,
+parameter binding, aggregate statistics, rollback and concurrent writers.
+Set `TTREK_TEST_POSTGRES` to a Tcl dictionary of connection settings (for example
+`database telemetry_test host localhost port 5432 user postgres password TEST_PASSWORD sslmode verify-full`)
+to run the same tests against PostgreSQL. That test creates a unique schema and
+removes it afterward. It also checks that PostgreSQL never loads SQLite and
+runs four independent processes to exercise simultaneous cold starts and writes.
+Use only a disposable test database. `tests/telemetry-config.test` verifies ENV
+selection and required TLS without connecting to services.
+
+Run `python3 tests/telemetry-maintenance.py` with boto3 installed for backup/vacuum
+unit tests; all AWS and process calls are mocked. Build the actual maintenance
+artifact using `devops/package-telemetry-maintenance.sh` (Docker required).

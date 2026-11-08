@@ -55,7 +55,9 @@ application staging, S3 seeds and release configuration. `etc/lambda.json` selec
 keeps its HTTP event mapping, telemetry and release settings; tdevops supplies the
 bootstrap, Runtime API loop, package-path setup and generated local template.
 There is no app-local `lambda/` directory. `devops/prepare-lambda.tcl` builds the
-search snapshot and telemetry seed before packaging.
+search snapshot before packaging; telemetry initializes its selected backend at
+runtime. [Telemetry](telemetry.md) uses tpersist with SQLite only in LOCAL and
+PostgreSQL only in PROD. Backend drivers are loaded only on connection.
 
 ## Request validation
 

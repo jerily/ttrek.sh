@@ -10,19 +10,15 @@ proc ::site_lambda::initialize {root} {
         source [file join $root tcl local-ratelimit.tcl]
     }
     set config [::app_config::lambda_config $root]
-    set dataDirectory /tmp
+    set dataDirectory /tmp/ttrek-local
     if {[info exists ::env(TTREK_LOCAL_RUNTIME_DATA)]} {
         set dataDirectory $::env(TTREK_LOCAL_RUNTIME_DATA)
     }
-    file mkdir $dataDirectory
-    set channel [file tempfile telemetry [file join $dataDirectory ttrek-telemetry-XXXXXX.sqlite3]]
-    close $channel
-    file copy -force [file join $root data telemetry.sqlite3] $telemetry
     set settings [dict merge [dict create rootdir $root registry_dir [file join $root registry] \
         releases [::app_config::releases {}] \
         request_monitor [::app_config::request_monitor $config]] [::app_config::lambda_middleware $config]]
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
-        set ::env(ENV) LOCAL
+        if {[::app_config::mode] ne "LOCAL"} {error "TTREK_LOCAL_S3_ENDPOINT requires ENV=LOCAL"}
         source [file join $root tcl local-assets.tcl]
         set release {}
         if {[info exists ::env(TTREK_LOCAL_RELEASES)]} {set release $::env(TTREK_LOCAL_RELEASES)}
@@ -32,7 +28,7 @@ proc ::site_lambda::initialize {root} {
         dict set settings releases [::app_config::releases [dict create releases $release]]
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
-    ::telemetry::init -file $telemetry
+    ::telemetry::init [::app_config::telemetry $config $root $dataDirectory]
     ::site::init_worker $settings
     set router $::site::router
 }
