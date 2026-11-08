@@ -2,6 +2,8 @@ version: 0.2
 
 env:
   shell: bash
+  variables:
+    SHELL: /bin/bash
   git-credential-helper: yes
 phases:
   install:
