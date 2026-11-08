@@ -53,7 +53,9 @@ Resources:
   TTrekLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Lambda access to private application services
+      # Keep the deployed description: changing it replaces the group and breaks
+      # the ID export imported by Lambda. The RDS stack adds PostgreSQL egress.
+      GroupDescription: Lambda access to Valkey and KMS only
       VpcId: !Ref TTrekVpc0
       SecurityGroupEgress:
         - IpProtocol: tcp
