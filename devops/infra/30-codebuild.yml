@@ -31,6 +31,14 @@ Conditions:
   HasGitHubConnection: !Not [!Equals [!Ref GitHubConnectionArn, '']]
 
 Resources:
+  GitHubSourceCredential:
+    Type: AWS::CodeBuild::SourceCredential
+    Condition: HasGitHubConnection
+    Properties:
+      ServerType: GITHUB
+      AuthType: CODECONNECTIONS
+      Token: !Ref GitHubConnectionArn
+
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
