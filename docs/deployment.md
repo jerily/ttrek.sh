@@ -326,6 +326,11 @@ select deployment targets. The existing `${S3Prefix}-${AppName}` bucket stores
 SAM artifacts. CodeBuild deploys only after all build commands succeed; it no
 longer publishes ECR images or updates ECS.
 
+The build role's Put/Get/DeleteFunctionEventInvokeConfig permissions cover both
+the function ARN and its `:$LATEST` qualifier, which SAM uses for asynchronous
+invocation settings. Apply the CodeBuild stack update before retrying a Lambda
+deployment or rollback that failed on these actions.
+
 For a manual deployment from an AL2023 build host with dependencies installed:
 
 ```bash
