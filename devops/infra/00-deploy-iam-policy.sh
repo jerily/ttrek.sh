@@ -73,9 +73,10 @@ aws cloudformation deploy \
   --no-fail-on-empty-changeset \
   "${AWS_OPTIONS[@]}"
 
+# Keep AWS CLI stdout on a pipe; the Snap launcher fails with a regular output file.
 aws iam list-attached-group-policies --group-name ttrek_prod_admin_group \
   --query 'AttachedPolicies[].PolicyArn' --output json \
-  "${AWS_OPTIONS[@]}" > "$WORK/attached.json"
+  "${AWS_OPTIONS[@]}" | cat > "$WORK/attached.json"
 python3 - "$WORK/attached.json" "$ACCOUNT_ID" <<'PY'
 import json
 import pathlib

@@ -20,7 +20,7 @@ Gateway's `requestContext.http.sourceIp`, not a caller-supplied forwarded header
 Download telemetry still uses SQLite in each execution environment, and production
 release downloads remain disabled by the Lambda adapter.
 
-Lambda and Valkey use isolated subnets. There is no NAT gateway, internet gateway,
+Lambda and Valkey use one isolated subnet. There is no NAT gateway, internet gateway,
 public subnet, load balancer or Fargate service. A private KMS interface endpoint
 allows tconfig to decrypt the packaged configuration at startup. Lambda has no
 runtime SSM access: SSM values are resolved by the build outside the VPC. The
@@ -29,9 +29,11 @@ outbound AWS service calls need matching endpoints and policies; calls to public
 third-party services would need internet egress. API Gateway invocation and
 Lambda's normal stdout/stderr logging do not need a NAT gateway.
 
-The subnets and KMS endpoint span two availability zones. Valkey remains one
-`cache.t4g.micro` node, without a replica or automatic failover; the cache is a
-single point of failure. Shared history is bounded and is not a durable audit log.
+Lambda, Valkey and the KMS endpoint use the first availability zone returned by
+CloudFormation's `Fn::GetAZs`. The endpoint has one network interface. Valkey is
+one `cache.t4g.micro` node without a replica or automatic failover. An outage of
+that zone interrupts the website. Shared history is bounded and is not a durable
+audit log.
 
 ## Infrastructure and DNS
 
@@ -48,6 +50,19 @@ For a new deployment:
 5. Run `15-deploy-infra-certificate.sh` and complete DNS validation.
 6. Deploy `30-codebuild.yml`, then run the build (or use the manual Lambda steps below).
 7. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.
+
+If you deployed the previous two-zone network through step 2 but have not deployed
+the cache or Lambda, rerun `devops/infra/20-deploy-infra-vpc0.sh`, then continue
+with `25-deploy-infra-cache.sh`. Updating `Infra-DevOps-TTREK-Base` removes the
+second endpoint interface, subnet, route-table association and subnet export.
+The first subnet and its export remain. The keys and storage stacks need no
+update for this change. New cache and Lambda deployments use only the first subnet.
+
+If cache or Lambda stacks already import `Infra-DevOps-TTREK-Base-PrivateSubnet2Id`,
+update those consumers to use the first subnet and wait for their resources to
+release the second subnet before updating Base. A cache node using the second
+subnet must be migrated before that subnet can be removed. CloudFormation
+[blocks removal of an imported export](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-stack-exports.html).
 
 The keys template creates the customer-managed key used by tconfig and the SSM
 password. Key rotation is enabled. `DeletionPolicy` and `UpdateReplacePolicy`
@@ -158,12 +173,18 @@ the cache endpoint is missing. No plaintext secret is committed or printed.
 | `/ttrek_sh/prod/request_monitor/master_template` | String | Optional; default `request-monitor-master.html.jinja` from `www/` |
 | `/ttrek_sh/prod/request_monitor/store` | String | Optional; default `valkey`; `memory` keeps history within each process |
 
-The cache deployment script reads that same password with decryption and supplies
-the `NoEcho` CloudFormation parameter through a mode-restricted temporary JSON
-file, removed on exit. It does not put the password in command arguments or an
-environment variable. Do not run secret-handling commands with AWS CLI debug
-logging. Updating SSM alone does not update a running deployment: password
-rotation requires a coordinated cache update and Lambda rebuild/deployment.
+The cache deployment script reads that same password with decryption into a pipe,
+validates it in memory, and supplies the `NoEcho` CloudFormation parameter through
+`file:///dev/stdin`. It does not put the password in temporary files, command
+arguments or an environment variable. Do not run secret-handling commands with
+AWS CLI debug logging. Updating SSM alone does not update a running deployment:
+password rotation requires a coordinated cache update and Lambda rebuild/deployment.
+
+The Snap AWS CLI launcher can report `Exception ignored while flushing sys.stdout:
+OSError: [Errno 9] Bad file descriptor` when stdout is redirected to a regular
+file. This was reproducible with `aws --version > file`, without an AWS request.
+The cache script uses pipes for AWS CLI input/output and forwards deployment
+output through Python, avoiding that failure while preserving command exit codes.
 
 For local Lambda mocks, copy `etc/config.local.ini.example` to the ignored
 `etc/config.local.ini`. `TTREK_LOCAL_CONFIG` can select another local file.

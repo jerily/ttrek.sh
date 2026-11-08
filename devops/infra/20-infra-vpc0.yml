@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Isolated Lambda and Valkey network with private KMS access; no NAT or internet gateway.
+Description: Single-AZ isolated Lambda and Valkey network with private KMS access; no NAT or internet gateway.
 
 Parameters:
   AppName:
@@ -11,9 +11,6 @@ Parameters:
   PrivateSubnet1CIDR:
     Type: String
     Default: 10.0.3.0/24
-  PrivateSubnet2CIDR:
-    Type: String
-    Default: 10.0.4.0/24
 
 Resources:
   TTrekVpc0:
@@ -94,17 +91,6 @@ Resources:
         - Key: Name
           Value: !Sub ${AppName}-private-subnet-1
 
-  TTrekPrivateSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref TTrekVpc0
-      AvailabilityZone: !Select [1, !GetAZs '']
-      CidrBlock: !Ref PrivateSubnet2CIDR
-      MapPublicIpOnLaunch: false
-      Tags:
-        - Key: Name
-          Value: !Sub ${AppName}-private-subnet-2
-
   TTrekPrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -116,12 +102,6 @@ Resources:
       RouteTableId: !Ref TTrekPrivateRouteTable
       SubnetId: !Ref TTrekPrivateSubnet1
 
-  TTrekPrivateSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref TTrekPrivateRouteTable
-      SubnetId: !Ref TTrekPrivateSubnet2
-
   TTrekKmsEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -129,7 +109,7 @@ Resources:
       VpcEndpointType: Interface
       ServiceName: !Sub com.amazonaws.${AWS::Region}.kms
       PrivateDnsEnabled: true
-      SubnetIds: [!Ref TTrekPrivateSubnet1, !Ref TTrekPrivateSubnet2]
+      SubnetIds: [!Ref TTrekPrivateSubnet1]
       SecurityGroupIds: [!Ref TTrekKmsSecurityGroup]
       PolicyDocument:
         Version: '2012-10-17'
@@ -148,10 +128,6 @@ Outputs:
     Value: !Ref TTrekPrivateSubnet1
     Export:
       Name: !Sub ${AWS::StackName}-PrivateSubnet1Id
-  TTrekPrivateSubnet2Id:
-    Value: !Ref TTrekPrivateSubnet2
-    Export:
-      Name: !Sub ${AWS::StackName}-PrivateSubnet2Id
   TTrekVpc0SecurityGroupId:
     Value: !GetAtt TTrekVpc0SecurityGroup.GroupId
     Export:
