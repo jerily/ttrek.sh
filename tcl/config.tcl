@@ -141,7 +141,7 @@ proc ::app_config::lambda_middleware {config} {
 }
 
 proc ::app_config::releases {config} {
-    set settings [dict create bucket {} region {} prefix ttrek/1.0.0 version 1.0.0 url_expiry_seconds 300 checksums_file {} checksums {}]
+    set settings [dict create bucket {} region {} prefix ttrek/1.0.0 source_prefix ttrek/sources version 1.0.0 url_expiry_seconds 300 source_url_expiry_seconds 300 checksums_file {} checksums {}]
     if {[dict exists $config releases]} {
         set settings [dict merge $settings [dict get $config releases]]
     }
@@ -160,16 +160,21 @@ proc ::app_config::releases {config} {
             error "releases.region is required when releases.bucket is set"
         }
     }
-    set expiry [dict get $settings url_expiry_seconds]
-    if {![string is integer -strict $expiry] || $expiry < 1 || $expiry > 604800} {
-        error "releases.url_expiry_seconds must be between 1 and 604800"
+    foreach name {url_expiry_seconds source_url_expiry_seconds} {
+        set expiry [dict get $settings $name]
+        if {![string is integer -strict $expiry] || $expiry < 1 || $expiry > 604800} {
+            error "releases.$name must be between 1 and 604800"
+        }
     }
-    set prefix [string trim [dict get $settings prefix] /]
-    if {![regexp {^[a-zA-Z0-9._/-]*$} $prefix] ||
-        "." in [split $prefix /] || ".." in [split $prefix /]} {
-        error "releases.prefix must be an S3 key prefix without dot segments"
+    foreach name {prefix source_prefix} {
+        set prefix [string trim [dict get $settings $name] /]
+        if {![regexp {^[a-zA-Z0-9._/-]*$} $prefix] ||
+            "." in [split $prefix /] || ".." in [split $prefix /] ||
+            ($name eq "source_prefix" && $prefix eq {})} {
+            error "releases.$name must be an S3 key prefix without dot segments"
+        }
+        dict set settings $name $prefix
     }
-    dict set settings prefix $prefix
     if {![regexp {^[0-9]+\.[0-9]+\.[0-9]+$} [dict get $settings version]]} {
         error "releases.version must be a stable major.minor.patch version"
     }

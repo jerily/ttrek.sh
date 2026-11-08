@@ -137,6 +137,50 @@ test releases-6 {Metadata requires a published checksum and supported target} -b
         [dict get [get_release_handler {} {pathParameters {target ../secret}}] status]
 } -result {503 404}
 
+test source-download-1 {Archive signing has its own expiry and filename is only log metadata} -setup {
+    set test_releases [::app_config::releases {releases {bucket public-releases region eu-west-1 \
+        prefix ttrek/1.0.0 source_prefix ttrek/sources url_expiry_seconds 120 source_url_expiry_seconds 60}}]
+    set s3_calls {}
+    set s3_url "https://public-releases.s3.eu-west-1.amazonaws.com/source?X-Amz-Signature=[string repeat a 64]"
+    set artifact "aws-sdk-cpp-core-1.11.924-[string repeat b 64].archive"
+} -body {
+    get_dist_handler {} {pathParameters {arch linux-amd64-glibc ext {}}}
+    set response [get_source_download_handler {} [dict create pathParameters [dict create artifact $artifact] \
+        queryStringParameters [dict create filename "subdir/file name.tar.gz"]]]
+    list [dict get $response status] [dict get $response headers Cache-Control] \
+        [expr {[dict get $response headers Location] eq $s3_url}] \
+        [lindex [lindex $s3_calls 0] 3] [lindex [lindex $s3_calls 1] 3] \
+        [expr {[lindex [lindex $s3_calls 1] end] eq "ttrek/sources/$artifact"}]
+} -result {302 no-store 1 120 60 1}
+
+test source-download-2 {Invalid names cannot select arbitrary private objects} -body {
+    set s3_calls {}
+    set result {}
+    foreach artifact [list ../private no-digest.archive "../x-[string repeat a 64].archive" \
+        "x-[string repeat a 63].archive" "x-[string repeat a 64].tar.gz"] {
+        lappend result [dict get [get_source_download_handler {} [dict create pathParameters [dict create artifact $artifact]]] status]
+    }
+    list $result $s3_calls
+} -result {{404 404 404 404 404} {}}
+
+test source-download-3 {Archive downloads fail closed if disabled or signing fails} -body {
+    set req [dict create pathParameters [dict create artifact "s3-1.0.0-[string repeat a 64].archive"]]
+    set test_releases [::app_config::releases {}]
+    set s3_calls {}
+    set disabled [get_source_download_handler {} $req]
+    set untouched [expr {![llength $s3_calls]}]
+    set test_releases [::app_config::releases {releases {bucket public-releases region eu-west-1}}]
+    set s3_url https://example.com/unsigned
+    set unsigned [get_source_download_handler {} $req]
+    list [dict get $disabled status] $untouched [dict get $unsigned status] [dict get $unsigned headers Cache-Control]
+} -result {503 1 503 no-store}
+
+test source-download-4 {Archive expiry and prefix are independently validated} -body {
+    list [catch {::app_config::releases {releases {source_url_expiry_seconds 0}}}] \
+        [catch {::app_config::releases {releases {source_prefix ../private}}}] \
+        [catch {::app_config::releases {releases {source_prefix {}}}}]
+} -result {1 1 1}
+
 rename ::aws::s3::create {}
 rename ::aws::s3::real_create ::aws::s3::create
 rename ::aws::s3::generate_presigned_url {}

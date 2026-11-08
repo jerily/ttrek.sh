@@ -94,8 +94,29 @@ Local uploads also update the S3 seed directory (`dist/s3` here by default),
 because the mock's object database is disposable. Packaging preserves existing
 release seed binaries; remove a seed explicitly to refresh it from the host CLI.
 
-`aws-sdk-tcl` ^1.0.12 is a direct dependency, using AWS SDK C++ ^1.11.921 in the
-registry. `build.sh` builds 1.0.12 against SDK C++ 1.11.921 and upgrades older
+Source archive fallbacks use `GET /download/<recipe>-<version>-<url-sha256>.archive`.
+The SHA-256 identifies the exact upstream URL; it is not a content checksum.
+A recipe's optional `filename` is URL-encoded in `?filename=...` for JSON logging
+only. It never changes the S3 key or the signed URL.
+
+Upload mirrored archives to `<source_prefix>/<recipe>-<version>-<url-sha256>.archive`
+in the configured private bucket. These redirects use the same S3 client, with
+independent settings:
+
+```ini
+[releases]
+source_prefix = ttrek/sources
+source_url_expiry_seconds = 300
+```
+
+`url_expiry_seconds` continues to control binary releases. Source redirects
+require a signed URL, use `Cache-Control: no-store`, and return 503 if disabled
+or signing fails. The endpoint neither fetches upstream URLs nor populates S3;
+missing mirrored objects return S3's error after the redirect.
+
+`aws-sdk-tcl-s3` ^1.0.14 is the direct AWS dependency, using AWS SDK C++
+1.11.924. KMS/SSM are supplied by `tconfig`; the session backend supplies
+DynamoDB. The registry dependency graph does not install the SDK umbrellas. `build.sh` builds 1.0.12 against SDK C++ 1.11.921 and upgrades older
 installed SDK modules and bindings. Each worker lazily creates an S3 client
 using the configured region and the SDK's default credential provider. Configure
 an AWS profile/environment locally or an ECS task role in production with

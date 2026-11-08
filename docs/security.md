@@ -17,6 +17,10 @@ Distribution targets are allowlisted and only configured object keys can be
 signed. Redirects require a signed HTTPS URL and disable caching. Failed signing
 returns a generic 503 without exposing credentials or SDK diagnostics. Release
 metadata includes an executable checksum; no bucket listing or upload route is exposed.
+Source archive names must contain a recipe identifier and a SHA-256 URL digest;
+they are signed only below the configured source prefix. The optional filename
+is JSON-escaped log metadata and cannot select an object or alter a signature.
+Source and binary URL expiration settings are independent.
 
 Production Valkey connections require TLS and verify the CA and hostname,
 including reconnects. LOCAL mode can use plain TCP only against localhost.

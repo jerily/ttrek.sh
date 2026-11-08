@@ -19,6 +19,23 @@ proc ::releases::artifact {target} {
 }
 
 proc ::releases::signed_url {artifact} {
+    set settings [dict get [::site::config] releases]
+    set key "$artifact/ttrek"
+    if {[dict get $settings prefix] ne ""} {
+        set key "[dict get $settings prefix]/$key"
+    }
+    return [signed_key $key [dict get $settings url_expiry_seconds]]
+}
+
+proc ::releases::source_url {artifact} {
+    if {![regexp {^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,199}-[0-9a-f]{64}\.archive$} $artifact]} {
+        error "Invalid source archive name"
+    }
+    set settings [dict get [::site::config] releases]
+    return [signed_key "[dict get $settings source_prefix]/$artifact" [dict get $settings source_url_expiry_seconds]]
+}
+
+proc ::releases::signed_key {key expiry} {
     variable client
     set settings [dict get [::site::config] releases]
     if {$client eq ""} {
@@ -31,12 +48,8 @@ proc ::releases::signed_url {artifact} {
         }
         set client [::aws::s3::create $client_settings]
     }
-    set key "$artifact/ttrek"
-    if {[dict get $settings prefix] ne ""} {
-        set key "[dict get $settings prefix]/$key"
-    }
     set url [::aws::s3::generate_presigned_url -method GET \
-        -expire [dict get $settings url_expiry_seconds] $client [dict get $settings bucket] $key]
+        -expire $expiry $client [dict get $settings bucket] $key]
     # The SDK can return an empty or unsigned URL when credentials are unavailable.
     set valid_origin [string match {https://*} $url]
     if {[dict exists $settings endpoint] && [dict get $settings endpoint] ne ""} {

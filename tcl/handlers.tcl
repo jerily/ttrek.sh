@@ -84,6 +84,27 @@ proc get_dist_handler {ctx req} {
     return $response
 }
 
+proc get_source_download_handler {ctx req} {
+    set artifact [::twebserver::get_path_param $req artifact]
+    if {![regexp {^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,199}-[0-9a-f]{64}\.archive$} $artifact]} {
+        return [::twebserver::build_response 404 text/plain "Invalid source archive"]
+    }
+    # filename is diagnostic metadata only: never use it to select or sign an S3 key.
+    if {![catch {::twebserver::get_query_param $req filename} filename]} {
+        set entry [list M [dict create event [list S source_download] \
+            artifact [list S $artifact] filename [list S $filename]]]
+        puts [::tjson::typed_to_json $entry]
+    }
+    set settings [dict get [::site::config] releases]
+    if {[dict get $settings bucket] eq "" || [catch {::releases::source_url $artifact} url]} {
+        set response [::twebserver::build_response 503 text/plain "Source downloads are temporarily unavailable"]
+    } else {
+        set response [::twebserver::build_redirect 302 $url]
+    }
+    dict set response headers Cache-Control no-store
+    return $response
+}
+
 proc get_release_handler {ctx req} {
     set target [::releases::artifact [::twebserver::get_path_param $req target]]
     if {$target eq ""} {

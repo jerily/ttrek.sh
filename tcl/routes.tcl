@@ -6,6 +6,7 @@ return {
     GET /packages get_packages_page_handler get_packages
     GET /search get_search_page_handler get_search_page
     GET /:type(css|js|assets)/:path(.*) get_assets_handler get_assets
+    GET /download/:artifact get_source_download_handler get_source_download
     GET /dist/:arch/ttrek:ext? get_dist_handler get_dist
     GET /releases/latest/:target get_release_handler get_release
     GET /package/:package_name get_package_page_handler get_package
