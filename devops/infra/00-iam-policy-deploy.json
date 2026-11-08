@@ -63,15 +63,6 @@
     {
       "Effect": "Allow",
       "Action": [
-        "s3:PutObject",
-        "s3:GetObject",
-        "s3:AbortMultipartUpload"
-      ],
-      "Resource": "arn:aws:s3:::jerily-ttrek-app/lambda/telemetry-maintenance/*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
         "lambda:CreateFunction",
         "lambda:DeleteFunction",
         "lambda:GetFunction",

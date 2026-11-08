@@ -86,28 +86,27 @@ proc ::telemetry::close {} {
     }
 }
 
-proc ::telemetry::create_schema {} {
-    variable connection
+proc ::telemetry::table_definitions {} {
     variable event_list
+    set definitions {}
     set id {type integer primary_key 1 auto_increment 1}
     set required {type integer not_null 1}
-    db_create_table $connection [db_define_table environments [dict create \
+    dict set definitions environments [db_define_table environments [dict create \
         env_id $id hash {type binary not_null 1} description {type text not_null 1} \
-        last_seen {type bigint not_null 1}]] -if_not_exists true
+        last_seen {type bigint not_null 1}]]
     # Serialize registrations per hash without indexing descriptions, which
     # may be larger than PostgreSQL's B-tree index entry limit.
-    db_create_table $connection [db_define_table environment_keys [dict create \
-        key_id $id hash {type binary unique 1 not_null 1} touched {type bigint not_null 1}]] -if_not_exists true
-    db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
-    db_create_table $connection [db_define_table package_names [dict create \
-        pkg_name_id $id name {type text unique 1 not_null 1}]] -if_not_exists true
-    db_create_table $connection [db_define_table packages [dict create \
+    dict set definitions environment_keys [db_define_table environment_keys [dict create \
+        key_id $id hash {type binary unique 1 not_null 1} touched {type bigint not_null 1}]]
+    dict set definitions package_names [db_define_table package_names [dict create \
+        pkg_name_id $id name {type text unique 1 not_null 1}]]
+    dict set definitions packages [db_define_table packages [dict create \
         pkg_id $id pkg_name_id $required version {type text not_null 1}] \
         -unique {{pkg_name_id version}} \
-        -foreign_keys {{columns pkg_name_id table package_names referenced_columns pkg_name_id}}] -if_not_exists true
-    db_create_table $connection [db_define_table platforms [dict create \
+        -foreign_keys {{columns pkg_name_id table package_names referenced_columns pkg_name_id}}]
+    dict set definitions platforms [db_define_table platforms [dict create \
         platform_id $id os {type text not_null 1} arch {type text not_null 1}] \
-        -unique {{os arch}}] -if_not_exists true
+        -unique {{os arch}}]
     dict for {event parameters} $event_list {
         if {$event eq "register_environment"} continue
         set columns [dict create timestamp {type bigint not_null 1} env_id $required]
@@ -127,8 +126,17 @@ proc ::telemetry::create_schema {} {
             dict set columns install_outcome $required
             dict set columns install_is_toplevel $required
         }
-        db_create_table $connection [db_define_table $event $columns -foreign_keys $foreignKeys] -if_not_exists true
+        dict set definitions $event [db_define_table $event $columns -foreign_keys $foreignKeys]
     }
+    return $definitions
+}
+
+proc ::telemetry::create_schema {} {
+    variable connection
+    dict for {table definition} [table_definitions] {
+        db_create_table $connection $definition -if_not_exists true
+    }
+    db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
     db_create_index $connection idx_install_package req_pkg_install_event {pkg_id platform_id} -if_not_exists true
 }
 

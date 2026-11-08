@@ -95,6 +95,7 @@
         "s3:PutBucketTagging",
         "s3:PutEncryptionConfiguration",
         "s3:PutBucketPublicAccessBlock",
+        "s3:PutLifecycleConfiguration",
         "codebuild:CreateProject",
         "codebuild:UpdateProject",
         "codebuild:DeleteProject",

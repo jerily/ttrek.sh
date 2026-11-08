@@ -30,8 +30,8 @@ allows tconfig to decrypt the packaged configuration at startup. The website
 Lambda has no
 runtime SSM access: SSM values are resolved by the build outside the VPC. The
 security groups allow Lambda to reach Valkey on 6379, PostgreSQL on 5432 and KMS
-on 443. The separate maintenance
-Lambda uses private SSM and S3 endpoints for scheduled backups. Future
+on 443. The website Lambda also reaches a free S3 gateway endpoint for scheduled
+JSONL backups. One private scheduled event performs backup and vacuum together. Future
 outbound AWS service calls need matching endpoints and policies; calls to public
 third-party services would need internet egress. API Gateway invocation and
 Lambda's normal stdout/stderr logging do not need a NAT gateway.
@@ -70,6 +70,9 @@ The keys template creates the customer-managed key used by tconfig and the SSM
 password. Key rotation is enabled. `DeletionPolicy` and `UpdateReplacePolicy`
 retain the key, since deleting it would make existing encrypted configuration
 unreadable. The S3 bucket is also retained, blocks public access, and uses SSE-S3.
+Its lifecycle rule expires `telemetry/backups/` objects after seven days. Redeploy
+the IAM policies and `10-deploy-infra-storage.sh` to apply this rule to an existing
+bucket. Release binaries and other artifact prefixes are unaffected.
 The Lambda runtime gets only `kms:Decrypt` on this key; the build gets
 `kms:Encrypt`/`kms:Decrypt` and `ssm:GetParameter` under `/ttrek_sh/prod/`.
 
@@ -137,9 +140,10 @@ and its role, and the public API's Lambda invocation permission. Most resource
 operations require CloudFormation's [forward access session](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/fas-requests-and-permission-evaluation.html).
 SSM reads and decryption through SSM are scoped to `/ttrek_sh/*`;
 DNS changes are limited to A/CNAME records at `ttrek.sh` and `_*.ttrek.sh`.
-Role passing is scoped to CodeBuild, the maintenance Lambda and its scheduler.
+Role passing is scoped to CodeBuild and the telemetry scheduler. Cleanup permissions
+for the removed maintenance Lambda are retained for existing stack upgrades.
 The policies also cover RDS and its service-linked role, maintenance schedules,
-alarms, artifact uploads and CloudFormation-managed PostgreSQL parameters. Both
+alarms and cleanup of the former stack-owned PostgreSQL parameters. Both
 policy files changed for telemetry and must be redeployed. Direct log reads allow
 `aws logs tail /aws/lambda/prod-Api-TtrekWebsite-Function --follow`, and other
 `/aws/lambda/*` groups in the account.
@@ -160,8 +164,8 @@ The two attachments use two of the group's ten managed-policy slots.
 
 ## Production and local configuration
 
-You manage the SSM passwords and cache endpoint. The RDS stack manages the
-PostgreSQL host, database and username String parameters.
+You manage the SSM passwords, cache endpoint, and PostgreSQL host, database and
+username String parameters. Copy PostgreSQL values from the RDS stack outputs.
 `devops/config.prod.ini` is a secret-free input template. tconfig resolves
 `/ttrek_sh/prod/<section>/<key>` and encrypts SecureString values into the generated
 `build/prod/config.ini`. That generated file is copied to `etc/config.ini` inside
@@ -171,9 +175,9 @@ the cache endpoint is missing. No plaintext secret is committed or printed.
 | SSM parameter | Type | Value |
 | --- | --- | --- |
 | `/ttrek_sh/prod/postgres/password` | SecureString | Required; see [telemetry deployment](telemetry.md#deploy) |
-| `/ttrek_sh/prod/postgres/host` | String | Managed by the RDS stack |
-| `/ttrek_sh/prod/postgres/database` | String | Managed by the RDS stack: `ttrek_telemetry` |
-| `/ttrek_sh/prod/postgres/username` | String | Managed by the RDS stack: `ttrek_admin` |
+| `/ttrek_sh/prod/postgres/host` | String | Operator-managed: RDS endpoint output |
+| `/ttrek_sh/prod/postgres/database` | String | Operator-managed: `ttrek_telemetry` |
+| `/ttrek_sh/prod/postgres/username` | String | Operator-managed: `ttrek_admin` |
 | `/ttrek_sh/prod/redis/password` | SecureString | Required; 16–128 characters, encrypted with the Keys stack KMS key |
 | `/ttrek_sh/prod/redis/host` | String | Required; cache primary endpoint from stack outputs |
 | `/ttrek_sh/prod/redis/port` | String | Optional; default `6379` |

@@ -95,6 +95,9 @@ Resources:
                   - lambda:GetFunctionConfiguration
                   - lambda:UpdateFunctionCode
                   - lambda:UpdateFunctionConfiguration
+                  - lambda:PutFunctionEventInvokeConfig
+                  - lambda:GetFunctionEventInvokeConfig
+                  - lambda:DeleteFunctionEventInvokeConfig
                   - lambda:AddPermission
                   - lambda:RemovePermission
                   - lambda:GetPolicy

@@ -12,6 +12,10 @@ Parameters:
     Default: x86_64
     AllowedValues: [x86_64, arm64]
     Description: Must match the native libraries in the packaged ZIP.
+  BackupBucket:
+    Type: String
+    Default: jerily-ttrek-app
+    Description: Must match BackupBucket in the PostgreSQL stack.
 
 Resources:
   SiteLogs:
@@ -46,6 +50,13 @@ Resources:
               - Effect: Allow
                 Action: [ec2:CreateNetworkInterface, ec2:DescribeNetworkInterfaces, ec2:DescribeSubnets, ec2:DeleteNetworkInterface, ec2:AssignPrivateIpAddresses, ec2:UnassignPrivateIpAddresses]
                 Resource: '*'
+        - PolicyName: WriteTelemetryBackups
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
         - PolicyName: WriteFunctionLogs
           PolicyDocument:
             Version: '2012-10-17'
@@ -64,7 +75,10 @@ Resources:
       Architectures: [!Ref Architecture]
       Role: !GetAtt SiteRole.Arn
       MemorySize: 256
-      Timeout: 30
+      Timeout: 300
+      EventInvokeConfig:
+        MaximumEventAgeInSeconds: 3600
+        MaximumRetryAttempts: 2
       VpcConfig:
         SubnetIds:
           - !ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet1Id
@@ -73,6 +87,7 @@ Resources:
       Environment:
         Variables:
           ENV: PROD
+          TELEMETRY_BACKUP_BUCKET: !Ref BackupBucket
 
 Outputs:
   FunctionArn:
