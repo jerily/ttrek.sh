@@ -16,6 +16,10 @@ Parameters:
     Type: String
     Default: jerily-ttrek-app
     Description: Must match BackupBucket in the PostgreSQL stack.
+  ReleaseBucket:
+    Type: String
+    Default: jerily-ttrek-app
+    Description: Must match releases.bucket in the packaged production configuration.
 
 Resources:
   SiteLogs:
@@ -50,6 +54,13 @@ Resources:
               - Effect: Allow
                 Action: [ec2:CreateNetworkInterface, ec2:DescribeNetworkInterfaces, ec2:DescribeSubnets, ec2:DeleteNetworkInterface, ec2:AssignPrivateIpAddresses, ec2:UnassignPrivateIpAddresses]
                 Resource: '*'
+        - PolicyName: ReadReleaseArtifacts
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseBucket}/ttrek/*
         - PolicyName: WriteTelemetryBackups
           PolicyDocument:
             Version: '2012-10-17'

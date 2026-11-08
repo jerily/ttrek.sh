@@ -17,7 +17,7 @@ proc ::site_lambda::initialize {root} {
         set dataDirectory $::env(TTREK_LOCAL_RUNTIME_DATA)
     }
     set settings [dict merge [dict create rootdir $root registry_dir [file join $root registry] \
-        releases [::app_config::releases {}] \
+        releases [::app_config::releases $config $root] \
         request_monitor [::app_config::request_monitor $config]] [::app_config::lambda_middleware $config]]
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
         if {[::app_config::mode] ne "LOCAL"} {error "TTREK_LOCAL_S3_ENDPOINT requires ENV=LOCAL"}

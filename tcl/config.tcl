@@ -164,7 +164,7 @@ proc ::app_config::lambda_middleware {config} {
         treqmon [dict create store $monitorStore]]
 }
 
-proc ::app_config::releases {config} {
+proc ::app_config::releases {config {root {}}} {
     set settings [dict create bucket {} region {} prefix ttrek/1.0.0 source_prefix ttrek/sources version 1.0.0 url_expiry_seconds 300 source_url_expiry_seconds 300 checksums_file {} checksums {}]
     if {[dict exists $config releases]} {
         set settings [dict merge $settings [dict get $config releases]]
@@ -203,6 +203,9 @@ proc ::app_config::releases {config} {
         error "releases.version must be a stable major.minor.patch version"
     }
     if {[dict get $settings checksums_file] ne {}} {
+        if {$root ne {}} {
+            dict set settings checksums_file [file normalize [file join $root [dict get $settings checksums_file]]]
+        }
         dict set settings checksums [release_checksums [dict get $settings checksums_file] [dict get $settings version]]
     }
     dict for {target checksum} [dict get $settings checksums] {
