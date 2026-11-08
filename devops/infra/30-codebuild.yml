@@ -95,6 +95,9 @@ Resources:
                   - lambda:GetFunctionConfiguration
                   - lambda:UpdateFunctionCode
                   - lambda:UpdateFunctionConfiguration
+                  - lambda:PutFunctionConcurrency
+                  - lambda:GetFunctionConcurrency
+                  - lambda:DeleteFunctionConcurrency
                   - lambda:AddPermission
                   - lambda:RemovePermission
                   - lambda:GetPolicy

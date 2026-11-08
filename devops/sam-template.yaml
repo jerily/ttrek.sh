@@ -87,6 +87,7 @@ Resources:
       Role: !GetAtt SiteRole.Arn
       MemorySize: 256
       Timeout: 300
+      ReservedConcurrentExecutions: 50
       EventInvokeConfig:
         MaximumEventAgeInSeconds: 3600
         MaximumRetryAttempts: 2

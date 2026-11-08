@@ -14,6 +14,10 @@ log retention. `devops/infra/40-api-gateway.json` owns the HTTP API for `/` and
 `/{proxy+}` and its `https://ttrek.sh/` custom domain. SAM does not create a second
 API. `Architecture` must match the native libraries in the ZIP (x86_64 by default).
 
+The website Lambda has `ReservedConcurrentExecutions: 50`, shared by HTTP requests
+and scheduled telemetry maintenance. Change this value in `devops/sam-template.yaml`
+and redeploy to adjust the cap.
+
 Production uses TLS Valkey for shared request-monitor history and global per-IP
 rate limits (1000 requests per 10 seconds by default). The adapter uses API
 Gateway's `requestContext.http.sourceIp`, not a caller-supplied forwarded header.
@@ -325,6 +329,12 @@ permissions and environment changes. `LambdaStackName` and `LambdaFunctionName`
 select deployment targets. The existing `${S3Prefix}-${AppName}` bucket stores
 SAM artifacts. CodeBuild deploys only after all build commands succeed; it no
 longer publishes ECR images or updates ECS.
+
+The build role has `lambda:PutFunctionConcurrency`, `lambda:GetFunctionConcurrency`
+and `lambda:DeleteFunctionConcurrency` permissions scoped to the website function
+ARN, covering deployment, inspection and rollback of the concurrency setting.
+Apply `devops/infra/30-deploy-codebuild.sh` before deploying the Lambda concurrency
+cap so CloudFormation can manage it using the updated build role.
 
 The build role's Put/Get/DeleteFunctionEventInvokeConfig permissions cover both
 the function ARN and its `:$LATEST` qualifier, which SAM uses for asynchronous
