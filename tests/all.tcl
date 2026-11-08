@@ -45,7 +45,7 @@ proc ::site::config {} {
 }
 ::site::configure [::site::config]
 proc telemetry_event_common {args} {}
-proc telemetry_sql {args} {return $::test_stats}
+proc telemetry_stats {args} {lmap {a b c d} $::test_stats {list $a $b $c $d}}
 
 source [file join $root tests search.test]
 source [file join $root tests request-validation.test]

@@ -73,13 +73,14 @@ set config_dict [dict create \
 # create the server
 set dir [file dirname [info script]]
 
-# Initialize the telemetry thread
-if { ![file exists [file join $dir data]] } {
-    file mkdir [file join $dir data]
-}
+# Initialize one database connection owned by the telemetry thread.
 thread::send $telemetry_thread_id [list source [file normalize [file join $dir tcl telemetry.tcl]]]
-thread::send $telemetry_thread_id [list ::telemetry::init \
-    -file [file normalize [file join $dir data telemetry.sqlite3]]]
+# Keep credentials out of a failed thread script's error trace.
+thread::send $telemetry_thread_id [list set ::telemetry_settings \
+    [::app_config::telemetry $config [file normalize $dir]]]
+thread::send $telemetry_thread_id {
+    try {::telemetry::init $::telemetry_settings} finally {unset ::telemetry_settings}
+}
 
 set init_script "source [file normalize [file join $dir tcl init-thread.tcl]]"
 set server_handle [::twebserver::create_server $config_dict process_conn $init_script]

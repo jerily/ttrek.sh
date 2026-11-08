@@ -28,6 +28,8 @@
     "treqmon": "^2.1.0",
     "tsession": "^1.0.3",
     "tpersist": "^0.1.0",
+    "tdbcpostgres": ">=1.1.8",
+    "libpq": "^16.15.0",
     "tconfig": "^1.0.0",
     "tsession-dynamodb": "^1.0.0",
     "web-static-blog": "^0.1.0",

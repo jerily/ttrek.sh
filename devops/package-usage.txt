@@ -8,7 +8,7 @@ Usage: package-lambda.sh --local-only [options]
   --local-only        Package for this Linux host, skipping the AL2023 ABI check
   --help              Show this help
 
-Stages Markdown directories and a fresh telemetry schema, validates the staged
+Stages Markdown directories and the public RDS CA bundle, validates the staged
 site, and writes a Lambda custom-runtime archive. Copies public assets and the
 local ttrek executable into mock S3 seed buckets. Host configuration, TLS keys,
 Git metadata and working databases are excluded. No AWS deployment occurs.

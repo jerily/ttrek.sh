@@ -12,20 +12,17 @@ proc telemetry_event { event_type args } {
     } else {::telemetry::event $event_type {*}$args}
 }
 
-proc telemetry_sql { sql args } {
-    if { [llength $args] == 1 } {
-        set args [lindex $args 0]
-    }
-    # Don't throw errors in case of any telemetry db issues so as not to break
-    # HTTP queries. Return an empty response and log the error to stdout.
-    if { [catch {
+proc telemetry_stats {package_name {package_version {}}} {
+    # Statistics must not break package pages when the database is unavailable.
+    if {[catch {
         set config [::site::config]
+        set command [list ::telemetry::stats $package_name $package_version]
         if {[dict exists $config telemetry_thread_id]} {
-            thread::send [dict get $config telemetry_thread_id] [list ::telemetry::sql $sql $args]
-        } else {::telemetry::sql $sql $args}
-    } result] } {
-        puts "Error while accessing telemetry db: $result\nSQL: $sql\nVariables: $args"
-        set result ""
+            thread::send [dict get $config telemetry_thread_id] $command
+        } else {{*}$command}
+    } result]} {
+        puts "Error while accessing telemetry db: $result"
+        return {}
     }
     return $result
 }
@@ -514,47 +511,11 @@ proc get_package_version_page_handler {ctx req} {
 }
 
 proc get_package_stats {package_name} {
-    set stat_platforms [telemetry_sql {
-        SELECT
-            pl.os || ' ' || pl.arch,
-            COUNT(*),
-            COUNT(CASE WHEN install_outcome = 1 THEN 1 END),
-            COUNT(CASE WHEN install_outcome = 0 THEN 1 END)
-        FROM req_pkg_install_event ev
-        INNER JOIN packages p USING (pkg_id)
-        INNER JOIN package_names n USING (pkg_name_id)
-        INNER JOIN platforms pl USING (platform_id)
-        WHERE n.name = $package_name
-        GROUP BY pl.os || pl.arch
-    } package_name $package_name]
-    # Convert from:
-    #     platform1 total1 success1 failure1 platform2 total2 success2 failure2 ...
-    # to:
-    #     {platform1 total1 success1 failure1} {platform2 total2 success2 failure2} ...
-    set stat_platforms [lmap { a b c d } $stat_platforms { list $a $b $c $d }]
-    return $stat_platforms
+    telemetry_stats $package_name
 }
 
 proc get_package_version_stats {package_name package_version} {
-    set stat_platforms [telemetry_sql {
-        SELECT
-            pl.os || ' ' || pl.arch,
-            COUNT(*),
-            COUNT(CASE WHEN install_outcome = 1 THEN 1 END),
-            COUNT(CASE WHEN install_outcome = 0 THEN 1 END)
-        FROM req_pkg_install_event ev
-        INNER JOIN packages p USING (pkg_id)
-        INNER JOIN package_names n USING (pkg_name_id)
-        INNER JOIN platforms pl USING (platform_id)
-        WHERE n.name = $package_name and p.version = $package_version
-        GROUP BY pl.os || pl.arch
-    } package_name $package_name package_version $package_version]
-    # Convert from:
-    #     platform1 total1 success1 failure1 platform2 total2 success2 failure2 ...
-    # to:
-    #     {platform1 total1 success1 failure1} {platform2 total2 success2 failure2} ...
-    set stat_platforms [lmap { a b c d } $stat_platforms { list $a $b $c $d }]
-    return $stat_platforms
+    telemetry_stats $package_name $package_version
 }
 
 proc get_catchall_handler {ctx req} {

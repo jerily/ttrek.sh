@@ -1,0 +1,41 @@
+package require tcltest 2
+namespace import ::tcltest::test
+source [file join [file dirname [info script]] .. tcl config.tcl]
+set saved [array get ::env]
+set directory [::tcltest::makeDirectory telemetry-config]
+test telemetry-config-1 {LOCAL selects SQLite even if PostgreSQL credentials exist} -body {
+    set ::env(ENV) LOCAL
+    set settings [::app_config::telemetry {postgres {host ignored password ignored}} $directory]
+    list [dict get $settings dialect] [file tail [dict get $settings database]] [package provide tdbc::postgres]
+} -result {sqlite telemetry.sqlite3 {}}
+test telemetry-config-2 {PROD selects PostgreSQL and requires verified TLS} -body {
+    set ::env(ENV) PROD
+    set settings [::app_config::telemetry {postgres {host db.example database telemetry username app password test sslmode disable}} $directory]
+    list [dict get $settings dialect] [dict get $settings sslmode] [dict get $settings user] [dict get $settings port]
+} -result {postgresql verify-full app 5432}
+test telemetry-config-3 {PROD fails closed if credentials are missing} -body {
+    set ::env(ENV) PROD
+    ::app_config::telemetry {} $directory
+} -returnCodes error -match glob -result {*postgres.host*}
+test telemetry-config-4 {Local Lambda database persists in its runtime data directory} -body {
+    set ::env(ENV) LOCAL
+    dict get [::app_config::telemetry {} ignored $directory] database
+} -result [file join $directory telemetry.sqlite3]
+test telemetry-config-5 {Connection failures redact driver diagnostics and credentials} -setup {
+    source [file join [file dirname [info script]] .. tcl telemetry.tcl]
+    rename ::tpersist::db_connect ::tpersist::db_connect_real
+    proc ::tpersist::db_connect {args} {error "driver diagnostic containing [dict get $args -password]"}
+} -body {
+    set marker [string repeat x 40]
+    catch {::telemetry::init [dict create dialect postgresql database test password $marker]} message options
+    list $message [dict get $options -errorcode] [expr {[string first $marker [dict get $options -errorinfo]] < 0}]
+} -cleanup {
+    rename ::tpersist::db_connect {}
+    rename ::tpersist::db_connect_real ::tpersist::db_connect
+} -result {{Could not connect to the telemetry database} {TELEMETRY CONNECT} 1}
+array unset ::env
+array set ::env $saved
+::tcltest::removeDirectory $directory
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed != 0}]

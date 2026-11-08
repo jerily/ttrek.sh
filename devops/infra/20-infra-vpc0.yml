@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Single-AZ isolated Lambda and Valkey network with private KMS access; no NAT or internet gateway.
+Description: Isolated Lambda, Valkey and RDS network; no NAT or internet gateway.
 
 Parameters:
   AppName:
@@ -11,6 +11,9 @@ Parameters:
   PrivateSubnet1CIDR:
     Type: String
     Default: 10.0.3.0/24
+  PrivateSubnet2CIDR:
+    Type: String
+    Default: 10.0.4.0/24
 
 Resources:
   TTrekVpc0:
@@ -50,7 +53,7 @@ Resources:
   TTrekLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Lambda access to Valkey and KMS only
+      GroupDescription: Lambda access to private application services
       VpcId: !Ref TTrekVpc0
       SecurityGroupEgress:
         - IpProtocol: tcp
@@ -96,6 +99,24 @@ Resources:
     Properties:
       VpcId: !Ref TTrekVpc0
 
+  # RDS requires two AZs even though the database is Single-AZ.
+  TTrekPrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-private-subnet-2
+
+  TTrekPrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref TTrekPrivateRouteTable
+      SubnetId: !Ref TTrekPrivateSubnet2
+
   TTrekPrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -128,6 +149,14 @@ Outputs:
     Value: !Ref TTrekPrivateSubnet1
     Export:
       Name: !Sub ${AWS::StackName}-PrivateSubnet1Id
+  TTrekPrivateSubnet2Id:
+    Value: !Ref TTrekPrivateSubnet2
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnet2Id
+  TTrekPrivateRouteTableId:
+    Value: !Ref TTrekPrivateRouteTable
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateRouteTableId
   TTrekVpc0SecurityGroupId:
     Value: !GetAtt TTrekVpc0SecurityGroup.GroupId
     Export:

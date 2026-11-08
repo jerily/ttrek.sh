@@ -59,6 +59,111 @@
           "kms:EncryptionContext:PARAMETER_ARN": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/*"
         }
       }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:AbortMultipartUpload"
+      ],
+      "Resource": "arn:aws:s3:::jerily-ttrek-app/lambda/telemetry-maintenance/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:GetFunctionConfiguration",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:ListTags",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:PutFunctionConcurrency",
+        "lambda:DeleteFunctionConcurrency",
+        "lambda:GetFunctionConcurrency",
+        "lambda:PutFunctionEventInvokeConfig",
+        "lambda:GetFunctionEventInvokeConfig",
+        "lambda:DeleteFunctionEventInvokeConfig",
+        "logs:CreateLogGroup",
+        "logs:DeleteLogGroup",
+        "logs:PutRetentionPolicy",
+        "logs:TagResource",
+        "logs:UntagResource",
+        "logs:ListTagsForResource",
+        "scheduler:CreateSchedule",
+        "scheduler:UpdateSchedule",
+        "scheduler:DeleteSchedule",
+        "scheduler:GetSchedule",
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:TagResource",
+        "cloudwatch:UntagResource",
+        "cloudwatch:ListTagsForResource",
+        "ssm:PutParameter",
+        "ssm:DeleteParameter",
+        "ssm:GetParameter",
+        "ssm:AddTagsToResource",
+        "ssm:RemoveTagsFromResource",
+        "ssm:ListTagsForResource",
+        "ssm:GetParameters",
+        "lambda:GetFunctionCodeSigningConfig",
+        "lambda:GetFunctionRecursionConfig",
+        "lambda:GetRuntimeManagementConfig",
+        "lambda:GetFunctionScalingConfig"
+      ],
+      "Resource": [
+        "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:function:ttrek-telemetry-maintenance",
+        "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:/aws/lambda/ttrek-telemetry-maintenance:*",
+        "arn:aws:scheduler:__REGION__:__ACCOUNT_ID__:schedule/default/ttrek-telemetry-*",
+        "arn:aws:cloudwatch:__REGION__:__ACCOUNT_ID__:alarm:ttrek-telemetry-maintenance-errors",
+        "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/prod/postgres/host",
+        "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/prod/postgres/database",
+        "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/prod/postgres/username"
+      ],
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "aws:CalledVia": "cloudformation.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-telemetry-*",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": [
+            "lambda.amazonaws.com",
+            "scheduler.amazonaws.com"
+          ]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": "logs:DescribeLogGroups",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogStreams",
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents"
+      ],
+      "Resource": "arn:aws:logs:*:__ACCOUNT_ID__:log-group:/aws/lambda/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:PUT",
+        "apigateway:POST"
+      ],
+      "Resource": "arn:aws:apigateway:__REGION__::/tags/*"
     }
   ]
 }
