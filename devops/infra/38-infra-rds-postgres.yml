@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Single-AZ telemetry PostgreSQL with daily S3 pg_dump backups and morning vacuum.
+Description: Single-AZ telemetry PostgreSQL with website-scheduled JSONL backups and vacuum.
 
 Parameters:
   DatabasePassword:
@@ -14,23 +14,21 @@ Parameters:
   BackupBucket:
     Type: String
     Default: jerily-ttrek-app
-  MaintenanceCodeKey:
+  WebsiteFunctionName:
     Type: String
-    Description: Content-addressed S3 key produced by the deploy script.
+    Default: prod-Api-TtrekWebsite-Function
   ScheduleTimezone:
     Type: String
     Default: America/New_York
-  BackupSchedule:
+  MaintenanceSchedule:
     Type: String
     Default: cron(0 5 * * ? *)
-  VacuumSchedule:
-    Type: String
-    Default: cron(0 6 * * ? *)
 
 Resources:
   PostgresSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      # Preserve the deployed description; changing it replaces the group.
       GroupDescription: Telemetry PostgreSQL; application and maintenance Lambda only
       VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
       SecurityGroupEgress:
@@ -106,81 +104,6 @@ Resources:
       VPCSecurityGroups: [!Ref PostgresSecurityGroup]
       EnableCloudwatchLogsExports: [postgresql]
 
-  # tconfig consumes these at build time. The password is created by the operator.
-  PostgresHostParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: /ttrek_sh/prod/postgres/host
-      Type: String
-      Value: !GetAtt PostgresDBInstance.Endpoint.Address
-  PostgresDatabaseParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: /ttrek_sh/prod/postgres/database
-      Type: String
-      Value: ttrek_telemetry
-  PostgresUsernameParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: /ttrek_sh/prod/postgres/username
-      Type: String
-      Value: ttrek_admin
-
-  MaintenanceSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: PostgreSQL maintenance and private AWS API access
-      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-          DestinationSecurityGroupId: !Ref PostgresSecurityGroup
-        # HTTPS goes through the SSM interface or regional S3 gateway endpoint.
-        # The private route table has no internet/NAT route.
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-  MaintenanceDatabaseIngress:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref PostgresSecurityGroup
-      IpProtocol: tcp
-      FromPort: 5432
-      ToPort: 5432
-      SourceSecurityGroupId: !Ref MaintenanceSecurityGroup
-  SsmSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: SSM endpoint for the maintenance password
-      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          SourceSecurityGroupId: !Ref MaintenanceSecurityGroup
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 1
-          ToPort: 1
-          CidrIp: 127.0.0.1/32
-  SsmEndpoint:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      VpcId: !ImportValue Infra-DevOps-TTREK-Base-Vpc0Id
-      VpcEndpointType: Interface
-      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
-      PrivateDnsEnabled: true
-      SubnetIds: [!ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet1Id]
-      SecurityGroupIds: [!Ref SsmSecurityGroup]
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: ssm:GetParameter
-            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ttrek_sh/prod/postgres/password
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -193,91 +116,27 @@ Resources:
         Statement:
           - Effect: Allow
             Principal: '*'
-            Action: [s3:PutObject, s3:AbortMultipartUpload]
+            Action: s3:PutObject
             Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
 
-  MaintenanceLogs:
-    Type: AWS::Logs::LogGroup
+  ApplicationS3Egress:
+    Type: AWS::EC2::SecurityGroupEgress
     Properties:
-      LogGroupName: /aws/lambda/ttrek-telemetry-maintenance
-      RetentionInDays: 14
-  MaintenanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: ttrek-telemetry-maintenance
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: {Service: lambda.amazonaws.com}
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: TelemetryMaintenance
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: [ec2:CreateNetworkInterface, ec2:DescribeNetworkInterfaces, ec2:DescribeSubnets, ec2:DeleteNetworkInterface, ec2:AssignPrivateIpAddresses, ec2:UnassignPrivateIpAddresses]
-                Resource: '*'
-              - Effect: Allow
-                Action: [logs:CreateLogStream, logs:PutLogEvents]
-                Resource: !GetAtt MaintenanceLogs.Arn
-              - Effect: Allow
-                Action: ssm:GetParameter
-                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ttrek_sh/prod/postgres/password
-              - Effect: Allow
-                Action: kms:Decrypt
-                Resource: '*'
-                Condition:
-                  StringEquals:
-                    kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
-                    kms:EncryptionContext:PARAMETER_ARN: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ttrek_sh/prod/postgres/password
-              - Effect: Allow
-                Action: [s3:PutObject, s3:AbortMultipartUpload]
-                Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
-  MaintenanceFunction:
-    Type: AWS::Lambda::Function
-    DependsOn: [SsmEndpoint, S3Endpoint, MaintenanceDatabaseIngress]
-    Properties:
-      FunctionName: ttrek-telemetry-maintenance
-      Runtime: python3.13
-      Architectures: [x86_64]
-      Handler: maintenance.handler
-      Role: !GetAtt MaintenanceRole.Arn
-      Code:
-        S3Bucket: !Ref BackupBucket
-        S3Key: !Ref MaintenanceCodeKey
-      MemorySize: 1024
-      Timeout: 900
-      EphemeralStorage: {Size: 10240}
-      ReservedConcurrentExecutions: 1
-      VpcConfig:
-        SubnetIds: [!ImportValue Infra-DevOps-TTREK-Base-PrivateSubnet1Id]
-        SecurityGroupIds: [!Ref MaintenanceSecurityGroup]
-      Environment:
-        Variables:
-          PGHOST: !GetAtt PostgresDBInstance.Endpoint.Address
-          PGPORT: '5432'
-          PGDATABASE: ttrek_telemetry
-          PGUSER: ttrek_admin
-          PASSWORD_PARAMETER: /ttrek_sh/prod/postgres/password
-          BACKUP_BUCKET: !Ref BackupBucket
-          LD_LIBRARY_PATH: /var/task/lib:/var/lang/lib:/lib64:/usr/lib64
-  MaintenanceAsyncConfig:
-    Type: AWS::Lambda::EventInvokeConfig
-    Properties:
-      FunctionName: !Ref MaintenanceFunction
-      Qualifier: $LATEST
-      MaximumEventAgeInSeconds: 3600
-      MaximumRetryAttempts: 2
+      GroupId: !ImportValue Infra-DevOps-TTREK-Base-LambdaSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      # This isolated route table reaches S3 through its gateway endpoint;
+      # there is no default internet/NAT route. The endpoint limits the bucket.
+      CidrIp: 0.0.0.0/0
   MaintenanceErrors:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: ttrek-telemetry-maintenance-errors
-      AlarmDescription: Inspect telemetry maintenance logs; backups or vacuum have failed.
+      AlarmDescription: Inspect website Lambda logs; an HTTP or maintenance invocation has failed.
       Namespace: AWS/Lambda
       MetricName: Errors
-      Dimensions: [{Name: FunctionName, Value: !Ref MaintenanceFunction}]
+      Dimensions: [{Name: FunctionName, Value: !Ref WebsiteFunctionName}]
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1
@@ -306,29 +165,19 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: lambda:InvokeFunction
-                Resource: !GetAtt MaintenanceFunction.Arn
-  DailyBackup:
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}
+  DailyMaintenance:
     Type: AWS::Scheduler::Schedule
     Properties:
-      Name: ttrek-telemetry-backup
-      ScheduleExpression: !Ref BackupSchedule
+      Name: ttrek-telemetry-maintenance
+      ScheduleExpression: !Ref MaintenanceSchedule
       ScheduleExpressionTimezone: !Ref ScheduleTimezone
       FlexibleTimeWindow: {Mode: 'OFF'}
       Target:
-        Arn: !GetAtt MaintenanceFunction.Arn
+        Arn: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}
         RoleArn: !GetAtt ScheduleRole.Arn
-        Input: '{"action":"backup"}'
-  MorningVacuum:
-    Type: AWS::Scheduler::Schedule
-    Properties:
-      Name: ttrek-telemetry-vacuum
-      ScheduleExpression: !Ref VacuumSchedule
-      ScheduleExpressionTimezone: !Ref ScheduleTimezone
-      FlexibleTimeWindow: {Mode: 'OFF'}
-      Target:
-        Arn: !GetAtt MaintenanceFunction.Arn
-        RoleArn: !GetAtt ScheduleRole.Arn
-        Input: '{"action":"vacuum"}'
+        Input: '{"source":"ttrek.telemetry","action":"backup-vacuum"}'
+        RetryPolicy: {MaximumEventAgeInSeconds: 3600, MaximumRetryAttempts: 2}
 
 Outputs:
   PostgresDBEndpointAddress:
@@ -339,5 +188,9 @@ Outputs:
     Value: /ttrek_sh/prod/postgres/password
   BackupLocation:
     Value: !Sub s3://${BackupBucket}/telemetry/backups/
-  MaintenanceFunction:
-    Value: !Ref MaintenanceFunction
+  WebsiteFunction:
+    Value: !Ref WebsiteFunctionName
+  DatabaseName:
+    Value: ttrek_telemetry
+  DatabaseUsername:
+    Value: ttrek_admin

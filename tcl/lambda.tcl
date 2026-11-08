@@ -3,9 +3,11 @@ namespace eval ::site_lambda {}
 
 proc ::site_lambda::initialize {root} {
     variable router
+    variable maintenanceSettings
     source [file join $root tcl site.tcl]
     source [file join $root tcl config.tcl]
     source [file join $root tcl telemetry.tcl]
+    source [file join $root tcl telemetry-maintenance.tcl]
     if {[::app_config::mode] eq "LOCAL"} {
         source [file join $root tcl local-ratelimit.tcl]
     }
@@ -28,7 +30,8 @@ proc ::site_lambda::initialize {root} {
         dict set settings releases [::app_config::releases [dict create releases $release]]
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
-    ::telemetry::init [::app_config::telemetry $config $root $dataDirectory]
+    set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]
+    ::telemetry::init $maintenanceSettings
     ::site::init_worker $settings
     set router $::site::router
 }
@@ -36,6 +39,16 @@ proc ::site_lambda::initialize {root} {
 proc ::site_lambda::handle {payload context} {
     variable router
     set event [::tjson::json_to_simple [encoding convertfrom utf-8 $payload]]
+    # Scheduler invokes Lambda directly under IAM. API Gateway supplies an HTTP
+    # envelope; request paths, headers and bodies never select this entry point.
+    if {[lsort [dict keys $event]] eq {action source} &&
+        [dict get $event source] eq "ttrek.telemetry" && [dict get $event action] eq "backup-vacuum"} {
+        variable maintenanceSettings
+        set result [::telemetry_maintenance::run $maintenanceSettings $context]
+        set typed {}
+        dict for {key value} $result {dict set typed $key [list S $value]}
+        return [::tjson::typed_to_json [list M $typed]]
+    }
     if {[dict exists $event version] && [dict get $event version] eq "2.0"} {
         dict set event method [dict get $event requestContext http method]
         dict set event path [dict get $event rawPath]

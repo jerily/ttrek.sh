@@ -1,0 +1,237 @@
+package require tcltest 2
+package require tjson
+namespace import ::tcltest::test
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl telemetry.tcl]
+source [file join $root tcl telemetry-maintenance.tcl]
+source [file join $root tcl lambda.tcl]
+set savedEnv [array get ::env]
+set work [::tcltest::makeDirectory telemetry-maintenance-fixture]
+set unloaded [expr {[package provide tdbc::postgres] eq {} && [package provide tdbc::sqlite3] eq {}}]
+
+test maintenance-lazy {Loading maintenance does not load database drivers} -body {
+    set unloaded
+} -result 1
+
+rename ::telemetry_maintenance::run ::telemetry_maintenance::real_run
+proc ::telemetry_maintenance::run {settings context} {incr ::calls; return {status completed}}
+set ::site_lambda::maintenanceSettings {}
+set calls 0
+test maintenance-invoke {An exact Scheduler event reaches maintenance} -body {
+    set result [::site_lambda::handle {{"source":"ttrek.telemetry","action":"backup-vacuum"}} {}]
+    list [dict get [::tjson::json_to_simple $result] status] $calls
+} -result {completed 1}
+test maintenance-http {HTTP envelopes and unrelated events cannot invoke maintenance} -body {
+    foreach event {
+        {"source":"ttrek.telemetry","action":"backup-vacuum","version":"2.0"}
+        {"source":"ttrek.telemetry","action":"backup-vacuum","httpMethod":"POST","path":"/telemetry/maintenance"}
+        {"body":"{\"source\":\"ttrek.telemetry\",\"action\":\"backup-vacuum\"}"}
+        {"source":"ttrek.telemetry","action":"delete"}
+    } {catch {::site_lambda::handle $event {}}}
+    set calls
+} -result 1
+rename ::telemetry_maintenance::run {}
+rename ::telemetry_maintenance::real_run ::telemetry_maintenance::run
+test maintenance-local {LOCAL maintenance is rejected before connecting} -body {
+    set ::env(ENV) LOCAL
+    ::telemetry_maintenance::run {dialect sqlite} {}
+} -returnCodes error -result {Scheduled telemetry maintenance requires PROD PostgreSQL}
+
+set postgres [info exists ::env(TTREK_TEST_POSTGRES)]
+::tcltest::testConstraint postgres $postgres
+if {$postgres} {
+    set ::env(ENV) PROD
+    set ::env(TELEMETRY_BACKUP_BUCKET) test-backups
+    set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    set admin [::telemetry_maintenance::connect $settings]
+    set sourceSchema telemetry_backup_[pid]
+    set targetSchema telemetry_restore_[pid]
+    $admin allrows "CREATE SCHEMA $sourceSchema"
+    $admin allrows "CREATE SCHEMA $targetSchema"
+    dict set settings options "-c search_path=$sourceSchema"
+    set targetSettings [dict replace $settings options "-c search_path=$targetSchema"]
+    ::telemetry::init $settings
+    set identity [string repeat ab 32]
+    set description "Quotes \" and newline\nUnicode λ 日本語"
+    ::telemetry::event register_environment -env $identity -description $description
+    foreach event [dict keys $::telemetry::event_list] {
+        if {$event eq "register_environment"} continue
+        set args [dict create -env $identity]
+        foreach key [dict get $::telemetry::event_list $event] {
+            if {$key eq "-env"} continue
+            dict set args $key [dict get {-os Linux -arch x86_64 -pkg_name tcl -pkg_version 001 -install_outcome 1 -install_is_toplevel 1} $key]
+        }
+        ::telemetry::event $event {*}$args
+    }
+    for {set i 0} {$i < 600} {incr i} {::telemetry::event req_logo_get -env $identity}
+    ::telemetry::close
+    set db [::telemetry_maintenance::connect $settings]
+    set dump [file join $work backup.jsonl.gz]
+    set deadline [expr {[clock milliseconds] + 60000}]
+    proc reset_target {} {
+        $::admin allrows "DROP SCHEMA $::targetSchema CASCADE"
+        $::admin allrows "CREATE SCHEMA $::targetSchema"
+        ::telemetry::init $::targetSettings
+        ::telemetry::close
+    }
+    proc read_dump {path} {
+        set ch [open $path rb]
+        try {return [encoding convertfrom utf-8 [zlib gunzip [read $ch]]]} finally {close $ch}
+    }
+    proc write_dump {path data} {
+        set ch [open $path wb]
+        try {puts -nonewline $ch [zlib gzip [encoding convertto utf-8 $data]]} finally {close $ch}
+    }
+}
+
+test maintenance-roundtrip {All tables, binary hashes, duplicate rows and text restore exactly across cursor pages} -constraints postgres -body {
+    ::telemetry_maintenance::backup $db $dump $deadline
+    reset_target
+    set target [::telemetry_maintenance::connect $targetSettings]
+    set counts [::telemetry_maintenance::restore $target $dump]
+    set matches {}
+    dict for {table definition} [::telemetry::table_definitions] {
+        lappend matches [expr {[lsort [$db allrows "SELECT * FROM $table"]] eq [lsort [$target allrows "SELECT * FROM $table"]]}]
+    }
+    $target close
+    list [lsort -unique $matches] [dict get $counts req_logo_get] [dict get $counts req_pkg_install_event]
+} -result {1 601 1}
+
+test maintenance-sequences {Restored identifiers do not collide with subsequent application inserts} -constraints postgres -body {
+    ::telemetry::init $targetSettings
+    ::telemetry::event register_environment -env [string repeat cd 32] -description another
+    set rows [::telemetry::rows [::tpersist::db_select environments -expr {COUNT(*) AS n}]]
+    ::telemetry::close
+    dict get [lindex $rows 0] n
+} -result 2
+
+test maintenance-nonempty {Restoring into a populated database fails without changing it} -constraints postgres -body {
+    set target [::telemetry_maintenance::connect $targetSettings]
+    set failed [catch {::telemetry_maintenance::restore $target $dump}]
+    set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
+    $target close
+    list $failed [dict get [lindex $rows 0] n]
+} -result {1 2}
+
+test maintenance-truncated {Missing footer rolls back every inserted row} -constraints postgres -body {
+    reset_target
+    set lines [split [string trimright [read_dump $dump] \n] \n]
+    set broken [file join $work broken.jsonl.gz]
+    write_dump $broken "[join [lrange $lines 0 end-1] \n]\n"
+    set target [::telemetry_maintenance::connect $targetSettings]
+    set failed [catch {::telemetry_maintenance::restore $target $broken}]
+    set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
+    $target close
+    list $failed [dict get [lindex $rows 0] n]
+} -result {1 0}
+
+test maintenance-counts {A changed row count prevents restoring a partial backup} -constraints postgres -body {
+    reset_target
+    set broken [file join $work counts.jsonl.gz]
+    write_dump $broken [string map {"\"req_logo_get\":601" "\"req_logo_get\":600"} [read_dump $dump]]
+    set target [::telemetry_maintenance::connect $targetSettings]
+    set failed [catch {::telemetry_maintenance::restore $target $broken}]
+    set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
+    $target close
+    list $failed [dict get [lindex $rows 0] n]
+} -result {1 0}
+
+test maintenance-corruption {A gzip checksum error rolls back the restore} -constraints postgres -body {
+    reset_target
+    set ch [open $dump rb]
+    set bytes [read $ch]
+    close $ch
+    # The final eight bytes hold CRC32 and uncompressed length.
+    set index [expr {[string length $bytes] - 8}]
+    binary scan [string index $bytes $index] cu value
+    set bytes [string replace $bytes $index $index [binary format cu [expr {$value ^ 255}]]]
+    set broken [file join $work corrupt.jsonl.gz]
+    set ch [open $broken wb]
+    puts -nonewline $ch $bytes
+    close $ch
+    set target [::telemetry_maintenance::connect $targetSettings]
+    set failed [catch {::telemetry_maintenance::restore $target $broken}]
+    set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
+    $target close
+    list $failed [dict get [lindex $rows 0] n]
+} -result {1 0}
+
+test maintenance-deadline {An expired export rolls back its snapshot} -constraints postgres -body {
+    set failed [catch {::telemetry_maintenance::backup $db [file join $work timeout.gz] 0}]
+    list $failed [$db allrows {SELECT 1 AS healthy}]
+} -result {1 {{healthy 1}}}
+
+if {$postgres} {
+    rename ::telemetry_maintenance::upload ::telemetry_maintenance::real_upload
+    proc ::telemetry_maintenance::upload {path bucket key} {
+        set ::uploaded $path
+        set records [split [string trimright [read_dump $path] \n] \n]
+        if {![dict get [::tjson::json_to_simple [lindex $records end]] complete]} {error "partial upload"}
+        if {$::failUpload} {error "internal diagnostics must not escape"}
+    }
+    set context [dict create lambda-runtime-aws-request-id test-invocation lambda-runtime-deadline-ms [expr {[clock milliseconds] + 300000}]]
+    set failUpload false
+}
+test maintenance-overlap {The PostgreSQL advisory lock prevents overlapping jobs} -constraints postgres -body {
+    $db allrows {SELECT pg_advisory_lock(208894771, 1)}
+    try {set result [::telemetry_maintenance::run $settings $context]} finally {
+        $db allrows {SELECT pg_advisory_unlock(208894771, 1)}
+    }
+    set result
+} -result {status skipped reason already-running}
+test maintenance-combined {One invocation exports, uploads, vacuums, removes its temp file and releases its lock} -constraints postgres -body {
+    set result [::telemetry_maintenance::run $settings $context]
+    set locked [dict get [lindex [$db allrows {SELECT pg_try_advisory_lock(208894771, 1) AS locked}] 0] locked]
+    $db allrows {SELECT pg_advisory_unlock(208894771, 1)}
+    list [dict get $result status] [file exists $uploaded] [expr {$locked in {1 t true}}]
+} -result {completed 0 1}
+test maintenance-upload-error {Upload failures are sanitized and temporary data is removed} -constraints postgres -body {
+    set failUpload true
+    catch {::telemetry_maintenance::run $settings $context} message options
+    list $message [dict get $options -errorcode] [file exists $uploaded] \
+        [string match {*internal diagnostics*} [dict get $options -errorinfo]]
+} -result {{Telemetry maintenance failed during upload} {TELEMETRY MAINTENANCE upload} 0 0}
+
+test maintenance-snapshot {Writes committed during export cannot mix dimensions and events from different snapshots} -constraints postgres -body {
+    set concurrent [::telemetry_maintenance::connect $settings]
+    rename ::telemetry_maintenance::write_record ::telemetry_maintenance::original_write_record
+    set wrote false
+    proc ::telemetry_maintenance::write_record {channel record} {
+        if {!$::wrote && [dict exists $record table]} {
+            set ::wrote true
+            $::concurrent allrows {INSERT INTO environments (env_id, hash, description, last_seen)
+                VALUES (999, decode(repeat('ef',32),'hex'), 'arrived during export', 1)}
+            $::concurrent allrows {INSERT INTO req_logo_get (env_id, timestamp) VALUES (999, 1)}
+        }
+        original_write_record $channel $record
+    }
+    try {
+        set snapshot [file join $work snapshot.jsonl.gz]
+        ::telemetry_maintenance::backup $db $snapshot [expr {[clock milliseconds]+60000}]
+        reset_target
+        set target [::telemetry_maintenance::connect $targetSettings]
+        set counts [::telemetry_maintenance::restore $target $snapshot]
+        $target close
+        list [dict get $counts environments] [dict get $counts req_logo_get] $wrote
+    } finally {
+        rename ::telemetry_maintenance::write_record {}
+        rename ::telemetry_maintenance::original_write_record ::telemetry_maintenance::write_record
+        $concurrent close
+    }
+} -result {1 601 true}
+
+if {$postgres} {
+    rename ::telemetry_maintenance::upload {}
+    rename ::telemetry_maintenance::real_upload ::telemetry_maintenance::upload
+    $db close
+    $admin allrows "DROP SCHEMA $sourceSchema CASCADE"
+    $admin allrows "DROP SCHEMA $targetSchema CASCADE"
+    $admin close
+}
+array unset ::env
+array set ::env $savedEnv
+::tcltest::removeDirectory telemetry-maintenance-fixture
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed != 0}]
