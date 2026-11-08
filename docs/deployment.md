@@ -211,8 +211,8 @@ and SAM with pip, then checks the CMake and compiler versions. These tools are
 needed to build the site's dependencies even though ttrek itself is downloaded.
 The build:
 
-1. Downloads the fully static ttrek 1.0.0 Linux AMD64 musl binary from
-   `s3://jerily-ttrek-app/ttrek/1.0.0/linux-amd64-musl/ttrek`, makes it executable,
+1. Downloads the rebuilt ttrek 1.0.0 Linux AMD64 glibc binary from
+   `s3://jerily-ttrek-app/ttrek/1.0.0/linux-amd64-glibc/ttrek`, makes it executable,
    and checks that it starts with `ttrek self-update -version`.
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).
@@ -220,8 +220,10 @@ The build:
 4. Generates encrypted production config from SSM, packages with tdevops, and sets executable ZIP attributes. The AL2023 compatibility check remains enabled.
 5. Validates and deploys `devops/sam-template.yaml` with SAM.
 
-The static musl build tool avoids the glibc release's `GLIBC_2.35` requirement;
+The rebuilt binary targets glibc 2.28 with static third-party dependencies;
 [AL2023 provides glibc 2.34](https://docs.aws.amazon.com/linux/al2023/ug/core-glibc.html).
+The CodeBuild role's existing `s3:GetObject` permission on
+`arn:aws:s3:::jerily-ttrek-app/ttrek/*` covers this artifact.
 The site's native dependencies are built with AL2023's compilers for Lambda.
 
 CodeBuild checks out `PrivateRegistry` as a secondary source. Its GitHub
