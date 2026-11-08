@@ -5,12 +5,14 @@ SITE_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 : "${CODEBUILD_SRC_DIR_PrivateRegistry:?CodeBuild must check out the PrivateRegistry secondary source}"
 cd "$SITE_ROOT"
 
-# Use the published Linux AMD64 glibc binary for the AL2023 x86_64 build image.
+# AL2023 has glibc 2.34; the glibc release requires 2.35. Use the fully static
+# musl release so the build tool does not depend on the host's libc version.
 TTREK_BIN_DIR="$SITE_ROOT/build/ttrek"
 mkdir -p "$TTREK_BIN_DIR"
-aws s3 cp s3://jerily-ttrek-app/ttrek/1.0.0/linux-amd64-glibc/ttrek \
+aws s3 cp s3://jerily-ttrek-app/ttrek/1.0.0/linux-amd64-musl/ttrek \
   "$TTREK_BIN_DIR/ttrek" --only-show-errors
 chmod 0755 "$TTREK_BIN_DIR/ttrek"
+"$TTREK_BIN_DIR/ttrek" self-update -version
 export PATH="$TTREK_BIN_DIR:$PATH"
 export JOBS=${TTREK_MAKE_THREADS:-4}
 
