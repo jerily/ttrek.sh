@@ -28,23 +28,13 @@ Resources:
         Passwords:
           - !Ref ValkeyPassword
 
-  TTrekValkeyDefaultUser:
-    Type: AWS::ElastiCache::User
-    Properties:
-      Engine: valkey
-      UserId: !Sub "${AppName}-valkey-default-disabled"
-      UserName: default
-      AccessString: 'off ~* -@all'
-      AuthenticationMode:
-        Type: no-password-required
-
   TTrekValkeyUserGroup:
     Type: AWS::ElastiCache::UserGroup
     Properties:
       Engine: valkey
       UserGroupId: !Sub "${AppName}-valkey-user-group"
+      # Valkey disables the built-in default user when this group is attached.
       UserIds:
-        - !Ref TTrekValkeyDefaultUser
         - !Ref TTrekValkeyUser
 
   TTrekValkeyCustomParameterGroup:
