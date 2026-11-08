@@ -48,8 +48,36 @@ install command passes that environment setting into the script. To use local
 HTTPS, set `TTREK_UPDATE_ROOT=https://localhost:4433` and trust the local certificate
 through the downloader's CA configuration.
 
+The detector also retains Rustup targets for which this project has no binary:
+
+| Detected platform | Example request target (unsupported) |
+| --- | --- |
+| 32-bit Linux x86 | `i686-unknown-linux-gnu`, `i686-unknown-linux-musl` |
+| 32-bit Linux ARM | `arm-unknown-linux-gnueabihf`, `armv7-unknown-linux-musleabihf` |
+| Other Linux CPUs | `mips-unknown-linux-gnu`, `mipsel-unknown-linux-gnu`, `mips64el-unknown-linux-gnuabi64`, `powerpc64le-unknown-linux-gnu`, `s390x-unknown-linux-gnu`, `riscv64gc-unknown-linux-gnu`, `loongarch64-unknown-linux-gnu` |
+| Android | `aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android` |
+| BSD / illumos | `x86_64-unknown-freebsd`, `x86_64-unknown-netbsd`, `x86_64-unknown-dragonfly`, `x86_64-unknown-illumos` |
+| Windows shells (MSYS / MinGW / Cygwin) | `x86_64-pc-windows-gnu` with `/ttrek.exe` |
+
+These requests return 404. They need compatible builds before adding aliases;
+CPU-name similarity alone is insufficient. The detector normalizes `amd64`,
+`x64`, and `x86-64` to `x86_64`, and `arm64` to `aarch64`. It never automatically
+selects universal2. The inherited `--default-host` and `--target` help options
+do not override detection. Linux libc detection assumes glibc unless
+`ldd --version` reports musl, and only glibc targets currently adjust for a
+64-bit kernel with a 32-bit userland.
+
+For Lambda deployment, `devops/config.prod.ini` supplies `[releases]`; the
+adapter resolves `checksums_file` from the packaged application root. Deploy the
+updated configuration, application ZIP and SAM execution-role policy together.
+A 503 from `/dist/<target>/ttrek` means the bucket is unset or signing failed;
+an unsupported target returns 404. A successful mapping returns 302, followed by
+the client's request to S3. A later S3 403 is a separate object-access failure.
+The Lambda execution role needs `s3:GetObject` on the configured prefixes for
+those signed URLs to work; see [AWS's presigned URL permissions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html#who-presigned-url).
+
 `checksums_file` is a JSON file resolved relative to the application root (or an
-absolute path). The tracked `etc/releases.json` starts empty; the release upload
+absolute path). The release upload
 script in the sibling `ttrek` checkout merges SHA-256 hashes into it after all
 selected uploads succeed. Its structure is environment → version → target → hash:
 
@@ -119,7 +147,7 @@ missing mirrored objects return S3's error after the redirect.
 DynamoDB. The registry dependency graph does not install the SDK umbrellas. `build.sh` builds 1.0.12 against SDK C++ 1.11.921 and upgrades older
 installed SDK modules and bindings. Each worker lazily creates an S3 client
 using the configured region and the SDK's default credential provider. Configure
-an AWS profile/environment locally or an ECS task role in production with
+an AWS profile/environment locally or the Lambda execution role in production with
 `s3:GetObject` on the release prefix. No credentials go in the release settings.
 The `jerily-ttrek-app` bucket remains private; download clients receive temporary
 access through signed URLs. The infrastructure declares private bucket access
