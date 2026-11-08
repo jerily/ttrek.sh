@@ -5,12 +5,6 @@ SITE_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 : "${CODEBUILD_SRC_DIR_PrivateRegistry:?CodeBuild must check out the PrivateRegistry secondary source}"
 cd "$SITE_ROOT"
 
-# Show the release URL's response headers and redirect chain from CodeBuild.
-printf '%s\n' 'Checking zlib download headers and redirects:'
-curl -I -L --silent --show-error --connect-timeout 10 --max-time 60 \
-  https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz \
-  || printf 'WARNING: zlib header diagnostic failed (curl exit %s); continuing build.\n' "$?" >&2
-
 # The rebuilt glibc release targets glibc 2.28, compatible with AL2023's 2.34.
 TTREK_BIN_DIR="$SITE_ROOT/build/ttrek"
 mkdir -p "$TTREK_BIN_DIR"
