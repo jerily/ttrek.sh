@@ -17,7 +17,7 @@ Parameters:
   GitHubConnectionArn:
     Type: String
     Default: ''
-    Description: Optional AWS CodeConnections GitHub App ARN; otherwise use the account's default GitHub credentials.
+    Description: Optional AWS CodeConnections GitHub App ARN to register as the regional default and grant the build role access to.
 
   LambdaStackName:
     Type: String
@@ -151,7 +151,8 @@ Resources:
           - Name: LAMBDA_FUNCTION_NAME
             Value: !Ref LambdaFunctionName
       Source:
-        Auth: !If [HasGitHubConnection, {Type: CODECONNECTIONS, Resource: !Ref GitHubConnectionArn}, !Ref AWS::NoValue]
+        # Use the regional default credential for checkouts and recipe clones.
+        # Source-level Auth overrides restrict credentials to the listed repositories.
         BuildSpec: devops/buildspec.yml
         Type: GITHUB
         Location: https://github.com/jerily/ttrek.sh.git
@@ -163,7 +164,6 @@ Resources:
       SecondarySources:
         - SourceIdentifier: PrivateRegistry
           Type: GITHUB
-          Auth: !If [HasGitHubConnection, {Type: CODECONNECTIONS, Resource: !Ref GitHubConnectionArn}, !Ref AWS::NoValue]
           Location: https://github.com/jerily/private-ttrek-registry.git
           GitCloneDepth: 1
       SecondarySourceVersions:

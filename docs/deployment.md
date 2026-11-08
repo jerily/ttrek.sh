@@ -263,28 +263,34 @@ devops/infra/30-deploy-codebuild.sh
 
 The script stops before calling AWS if `TTREK_GITHUB_CONNECTION_ARN` is unset or
 empty, prints the installation instructions, and otherwise passes the ARN as
-the `GitHubConnectionArn` template parameter. The template applies that
-connection to both GitHub sources and grants the build role
+the `GitHubConnectionArn` template parameter. The template registers that
+connection as CodeBuild's regional default GitHub credential through
+`GitHubSourceCredential` and grants the build role
 `codeconnections:GetConnection` and `codeconnections:GetConnectionToken`
 for that ARN. The build role also has `s3:GetObject` on
 `arn:aws:s3:::jerily-ttrek-app/ttrek/*` to download published ttrek binaries.
 The ttrek source checkout and `TtrekRef` parameter are no longer needed.
-Source credentials apply to the listed repositories. For HTTPS Git
-clones of other private repositories run by recipes, register the same connection
-as CodeBuild's regional default GitHub credential:
+Both project sources deliberately omit `Auth` so they use the regional default.
+Setting `Auth.Type: CODECONNECTIONS` on individual sources overrides that default
+with credentials scoped to those repositories; recipe clones of other private
+repositories can then fail with `GITHUB Git credential unavailable` even when
+the default credential is registered. Git's subsequent `could not read Username`
+message does not mean a GitHub username must be supplied.
+
+To inspect the registered default without displaying an access token:
 
 ```bash
-aws codebuild import-source-credentials --server-type GITHUB \
-  --auth-type CODECONNECTIONS \
-  --token "$TTREK_GITHUB_CONNECTION_ARN" \
-  --region eu-central-1 --profile admin
+aws codebuild list-source-credentials \
+  --region eu-central-1 --profile ttrek-prod-neo
 ```
 
-Replace `admin` with a profile allowed to call `codebuild:ImportSourceCredentials`;
-the repository's deployment group policies do not include that setup permission.
-This sets the account default for CodeBuild projects in that region. The enabled
-`env.git-credential-helper: yes` supplies credentials to recipe Git clones; no
-token belongs in `ttrek.json`, a clone URL, or the build log.
+The `GITHUB` entry must use `CODECONNECTIONS` and reference the connection ARN
+passed to the stack. The deployment caller needs permission to manage CodeBuild
+source credentials; the repository's deployment group policies do not include
+that setup permission. Registering the default affects CodeBuild projects across
+the account in that region. The enabled `env.git-credential-helper: yes` supplies
+credentials to recipe Git clones; no token belongs in `ttrek.json`, a clone URL,
+or the build log.
 See [AWS's GitHub App connection instructions](https://docs.aws.amazon.com/codebuild/latest/userguide/connections-github-app.html)
 and [source credential selection](https://docs.aws.amazon.com/codebuild/latest/userguide/multiple-access-tokens.html).
 
