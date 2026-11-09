@@ -7,6 +7,7 @@
     <main class="site-main">
         <div class="content">
             <h2 class="content-head is-center text-normal">{{ package_name }}</h2>
+            {% if description %}<p>{{ description }}</p>{% endif %}
             <p class="content-subhead">Install:</p>
             {{ bashline("ttrek install " ~ package_name) }}
             <p class="content-subhead">Versions:</p>

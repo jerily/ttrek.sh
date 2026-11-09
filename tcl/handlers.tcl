@@ -444,12 +444,29 @@ proc compare_versions {a b} {
 proc get_package_page_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_pkg_get -pkg_name $package_name
-    set versions [get_package_versions [get_registry_dir] $package_name]
+    set registry_dir [get_registry_dir]
+    set versions [get_package_versions $registry_dir $package_name]
+    set description {}
+    set spec_path [file join $registry_dir $package_name [lindex $versions 0] ttrek.json]
+    if {[llength $versions] && [file isfile $spec_path]} {
+        set channel [open $spec_path r]
+        try {
+            chan configure $channel -encoding utf-8
+            ::tjson::parse [read $channel] spec
+        } finally {close $channel}
+        if {[::tjson::has_object_item $spec description]} {
+            set item [::tjson::get_object_item $spec description]
+            if {[::tjson::is_string $item]} {
+                set description [string trim [::tjson::get_valuestring $item]]
+            }
+        }
+    }
 
     set stat_platforms [get_package_stats $package_name]
 
     set data [dict create \
         package_name [list S $package_name] \
+        description [list S $description] \
         versions [::views::strings $versions] \
         stat_platforms [::views::platform_stats $stat_platforms]]
     set html [::views::render package.html.jinja $data]
