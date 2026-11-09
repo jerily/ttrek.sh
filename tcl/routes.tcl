@@ -5,6 +5,7 @@ return {
     GET /init get_ttrek_init_handler get_ttrek_init
     GET /packages get_packages_page_handler get_packages
     GET /search get_search_page_handler get_search_page
+    GET /favicon.ico get_assets_handler get_assets
     GET /:type(css|js|assets)/:path(.*) get_assets_handler get_assets
     GET /download/:artifact get_source_download_handler get_source_download
     GET /dist/:arch/ttrek:ext? get_dist_handler get_dist

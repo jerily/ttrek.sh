@@ -151,6 +151,8 @@ proc get_assets_handler {ctx req} {
         set mimetype application/javascript
     } elseif { $ext eq {.svg} } {
         set mimetype image/svg+xml
+    } elseif { $ext eq {.ico} } {
+        set mimetype image/vnd.microsoft.icon
     } else {
         return [::assets::unavailable]
     }

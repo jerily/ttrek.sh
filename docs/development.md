@@ -73,6 +73,12 @@ must revalidate before reuse, so edits are visible immediately. Matching
 same ETag and cache policy. GET and HEAD work in direct HTTP and Lambda, including
 the mock-S3 backend. Changed bytes produce a new ETag and a `200` response.
 
+The shared layout links to `/assets/favicon.svg` and a `/favicon.ico` fallback
+with 16, 32 and 48 pixel sizes. Both use `Cache-Control: public, max-age=7776000`
+(three months, defined as 90 days), with the same ETag and GET/HEAD support.
+The authored SVG and ICO live under `public/` and are included in the Lambda
+archive and mock-S3 seed without an asset build.
+
 Verified fingerprint URLs use `Cache-Control: public, max-age=31536000, immutable`.
 An asset whose bytes do not match its filename is rejected with `404, no-store`.
 Ordinary host HTML uses `no-cache`; package-owned HTML keeps its stricter
