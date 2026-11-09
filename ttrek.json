@@ -12,31 +12,31 @@
     "package-lambda": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\""
   },
   "dependencies": {
+    "libpq": "^16.15.0",
     "tcl": "^9.1.0",
     "jinja2-tcl": "^0.1.0",
     "thread": "^3.0.7",
+    "tink-tcl": "^20240704.0.1",
     "tjson": "^1.0.26",
     "topenapi": "^0.2.0",
     "tpathexp": "^1.1.0",
     "ttrie": "=0.2.0",
     "ttrigrams": "=0.2.0",
     "valkey-tcl": "^1.0.3",
-    "tink-tcl": "^20240704.0.1",
-    "aws-sdk-tcl-s3": "^1.0.14",
+    "tdbcpostgres": ">=1.1.8",
+    "web-static-blog": "^0.1.0",
+    "web-static-wiki": "^0.1.0",
+    "tsession": "^1.0.3",
     "tratelimit": "^1.0.1",
     "treqmon": "^2.1.0",
-    "tsession": "^1.0.3",
+    "aws-sdk-tcl-s3": "^1.0.14",
     "tpersist": "^0.1.0",
-    "tdbcpostgres": ">=1.1.8",
-    "libpq": "^16.15.0",
-    "tconfig": "^1.0.0",
     "tsession-dynamodb": "^1.0.0",
-    "web-static-blog": "^0.1.0",
-    "web-static-wiki": "^0.1.0"
+    "tconfig": "^1.0.0"
   },
   "devDependencies": {
-    "trequests": "^1.1.0",
     "tcllib": "^2.0.0",
+    "trequests": "^1.1.0",
     "twebserver": "^1.47.55",
     "tdevops": "^0.2.0"
   }
