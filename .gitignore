@@ -24,6 +24,10 @@ var/
 /etc/search-index.json
 
 # Generated browser assets (npm run build).
+public/asset-manifest.json*
+public/assets/versioned/
+public/css/site.css
+public/js/site.js
 public/js/chart.umd.js
 public/js/chart.LICENSE.txt
 public/js/chart-color.LICENSE.txt

@@ -56,15 +56,13 @@ set treqmon_config [dict create store [::app_config::monitor_store $config]]
 # Create telemetry thread
 set telemetry_thread_id [thread::create thread::wait]
 
-# use threads and gzip compression
+# Compression is shared with Lambda in ::responses::prepare.
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
     registry_dir [dict get $config registry directory] \
     releases $releases_config \
     request_monitor [::app_config::request_monitor $config] \
-    gzip on \
-    gzip_types [list text/plain application/json] \
-    gzip_min_length 8192 \
+    gzip off \
     conn_timeout_millis 10000 \
     telemetry_thread_id $telemetry_thread_id \
     tratelimit $tratelimit_config \

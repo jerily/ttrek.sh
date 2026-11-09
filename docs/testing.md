@@ -8,6 +8,8 @@ The local stack test also needs a package built with
 additional requirements described below.
 
 ```bash
+ttrek run -script build-assets
+npm test
 ttrek run -script build-search
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
@@ -46,6 +48,14 @@ conditions, version ordering and HTML/URL escaping. `tests/static-content.test`
 exercises the package-mounted monitor, shared layout, configured master and asset
 routes. Chart data and monitor routing internals are tested in treqmon itself. They do
 not connect to Valkey, AWS or the telemetry database. CI runs them before packaging.
+
+`npm test` checks deterministic asset fingerprints, byte preservation, manifest
+updates, combined bundle startup and retained older files after rebuilds. `tests/static-content.test` also
+checks manifest URLs in every shared layout, ETags, weak/list/wildcard conditions,
+empty GET/HEAD `304` responses, missing/corrupt assets, cache policies, gzip
+negotiation and canonical-host redirects.
+The local stack checks these policies through the packaged Lambda and mock S3,
+including changed objects and both API Gateway payload versions.
 
 Integration tests use Tcl 9.1 and the development dependency `trequests` 1.1.0
 for HTTP, binary bodies and verified TLS. They need Linux `setsid` and OpenSSL

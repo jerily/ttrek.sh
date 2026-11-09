@@ -9,12 +9,26 @@ namespace eval ::views {
 # Load trusted application templates once in each worker interpreter.
 proc ::views::init {directory} {
     variable templates
+    ::assets::load [file dirname $directory]
+    set fields {}
+    dict for {path url} $::assets::manifest {dict set fields $path [list S $url]}
+    set asset_urls [::tjson::typed_to_json [list M $fields]]
     set templates {}
     foreach path [glob -directory $directory *.html.jinja] {
         set channel [open $path r]
         try {
             chan configure $channel -encoding utf-8
-            dict set templates [file tail $path] [read $channel]
+            set template [read $channel]
+            foreach {reference asset} [regexp -all -inline {asset_urls\['([^']+)'\]} $template] {
+                ::assets::url $asset
+            }
+            # The root layout binds the manifest for inherited blocks, including
+            # packages with independent contexts. Extending templates permit
+            # only blocks at their root in jinja2-tcl.
+            if {![regexp {\{%[-+]?\s*extends\M} $template]} {
+                set template "{% set asset_urls = $asset_urls %}$template"
+            }
+            dict set templates [file tail $path] $template
         } finally {
             close $channel
         }

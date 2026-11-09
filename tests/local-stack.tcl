@@ -110,10 +110,46 @@ try {
     puts {PASS payload 1.0 queries, duplicate validation and base64 request body}
 
     set original [read_file [file join $root public css docs.css]]
-    assert {[dict get [request /css/docs.css] body] eq $original}
+    set asset [request /css/docs.css]
+    assert {[dict get $asset body] eq $original}
+    assert {[dict get $asset headers cache-control] eq "no-cache"}
+    # trequests negotiates compression and decodes the body automatically.
+    set wire_etag [dict get $asset headers etag]
+    set etag "\"sha256-[sha256 $original]\""
+    set manifest [::tjson::json_to_simple [encoding convertfrom utf-8 [read_file [file join $root public asset-manifest.json]]]]
+    set versioned [dict get $manifest /css/docs.css]
+    set immutable [request $versioned]
+    assert {[dict get $immutable headers cache-control] eq "public, max-age=31536000, immutable"}
+    assert {[dict get $immutable body] eq $original}
+    set head [request $versioned 200 HEAD]
+    assert {[dict get $head body] eq {} && [dict get $head headers etag] eq $wire_etag}
+    # Both API Gateway payload versions must preserve validators and empty 304s.
+    set event [dict create httpMethod {S GET} path [list S $versioned] \
+        headers [list M [dict create If-None-Match [list S "\"old\", W/$etag"]]]]
+    assert {[invoke $event 304] eq {}}
+    set event2 [dict create version {S 2.0} rawPath [list S $versioned] rawQueryString {S {}} \
+        requestContext {M {http {M {method {S HEAD}}}}} headers [list M [dict create if-none-match [list S $etag]]]]
+    assert {[invoke $event2 304] eq {}}
+    dict set event headers {M {Accept-Encoding {S gzip}}}
+    dict set event path [list S [dict get $manifest /css/site.css]]
+    set zipped [invoke $event]
+    set combined [read_file [file join $root public css site.css]]
+    assert {[zlib gunzip $zipped] eq $combined}
+    dict set event headers [list M [dict create Accept-Encoding {S gzip} \
+        If-None-Match [list S "\"sha256-[sha256 $zipped]\""]]]
+    assert {[invoke $event 304] eq {}}
+    dict set event headers [list M [dict create If-None-Match [list S $etag]]]
     set changed "$original\n/* served from mock S3 */\n"
     request $s3/ttrek-assets/css/docs.css 200 PUT $changed text/css
-    assert {[dict get [request /css/docs.css] body] eq $changed}
+    set updated [request /css/docs.css]
+    assert {[dict get $updated body] eq $changed && [dict get $updated headers etag] ne $wire_etag}
+    dict set event path {S /css/docs.css}
+    assert {[invoke $event] eq $changed}
+    assert {[dict get [request $versioned] body] eq $original}
+    request $s3/ttrek-assets$versioned 200 PUT $changed text/css
+    set corrupt [request $versioned 404]
+    assert {[dict get $corrupt headers cache-control] eq "no-store"}
+    puts {PASS asset cache policies, gzip, ETags, conditional GET/HEAD and immutable integrity}
     set bytes {}
     for {set i 0} {$i < 256} {incr i} {lappend bytes $i}
     set binary [binary format c* [concat $bytes $bytes $bytes $bytes $bytes]]
