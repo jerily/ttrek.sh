@@ -144,7 +144,6 @@ proc get_assets_handler {ctx req} {
     set path [dict get $req path]
     set dir [file normalize [::site::root]]
     set filepath [path_join $dir public $path]
-#    puts filepath=$filepath
     set ext [file extension $filepath]
     if { $ext eq {.css} } {
         set mimetype text/css
@@ -153,12 +152,13 @@ proc get_assets_handler {ctx req} {
     } elseif { $ext eq {.svg} } {
         set mimetype image/svg+xml
     } else {
-        error "get_assets_handler: unsupported extension \"$ext\""
+        return [::assets::unavailable]
     }
     if {[dict exists [::site::config] assets_endpoint]} {
-        return [::site::s3_asset $path $mimetype]
+        return [::site::s3_asset $path $mimetype $req]
     }
-    return [::twebserver::build_response -return_file 200 $mimetype $filepath]
+    if {![file isfile $filepath]} {return [::assets::unavailable]}
+    return [::assets::respond $path $req $mimetype [::assets::read_bytes $filepath]]
 }
 
 proc get_ttrek_init_handler {ctx req} {

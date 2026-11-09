@@ -9,7 +9,7 @@ set test_stats {}
 source [file join $root tcl config.tcl]
 set test_releases [::app_config::releases {}]
 # Stub external services, but exercise the real handlers, serializer and renderer.
-package provide twebserver 1.47.54
+package require twebserver
 package provide tratelimit 1.0.1
 package require treqmon 2.1.0
 namespace eval ::twebserver {
@@ -326,11 +326,16 @@ test handlers-5 {No dependencies or statistics means no empty tables} -body {
     list [contains $html {Dependencies:}] [contains $html {Statistics (installations)}]
 } -result {0 0}
 
-test handlers-6 {Static paths use the server root without a template engine dependency} -body {
-    list [dict get [get_assets_handler {} {path /css/typebase.css}] file] \
+test handlers-6 {Static assets read exact bytes from the configured server root} -setup {
+    file mkdir $fixture/public/css
+    set channel [open $fixture/public/css/typebase.css wb]
+    puts -nonewline $channel {body {color: red;}}
+    close $channel
+} -body {
+    list [binary decode base64 [dict get [get_assets_handler {} {path /css/typebase.css}] body]] \
         [dict get [get_ttrek_init_handler {} {}] file] \
         [dict get [get_logo_handler {} {}] file]
-} -result [list $fixture/public/css/typebase.css $fixture/public/ttrek-init $fixture/www/plume.png]
+} -result [list {body {color: red;}} $fixture/public/ttrek-init $fixture/www/plume.png]
 
 test registry-1 {Static options are conditional USE flags} -setup {
     set test_registry [file join $root registry]

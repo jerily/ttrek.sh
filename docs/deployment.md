@@ -243,12 +243,23 @@ The build:
    and checks that it starts with `ttrek self-update -version`.
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).
-3. Runs the project's asset and search builds, then the application checks.
+3. Restores retained browser assets, runs the asset and search builds, then the
+   application and asset checks.
 4. Generates encrypted production config from SSM, packages with tdevops using
    `--local-only`, and sets executable ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,
    dependency resolution, and staged-site checks still run.
-5. Validates and deploys `devops/sam-template.yaml` with SAM.
+5. Validates the SAM template, preserves the new asset fingerprints, and deploys
+   `devops/sam-template.yaml` with SAM.
+
+Fingerprint history lives under `s3://$SAM_ARTIFACT_BUCKET/lambda/ttrek-sh-assets/`.
+CodeBuild downloads this directory before building and uploads it after successful
+validation, using its existing `lambda/*` S3 permissions. Every archive includes
+the retained files, allowing older open pages to request their assets after a
+deployment. Neither sync uses `--delete`. Do not apply a lifecycle expiration to
+this prefix without an explicit retention policy; old pages can outlive the HTML
+cache. History increases archive size over time, so monitor Lambda package limits.
+This S3 prefix is build storage; production assets still come from Lambda.
 
 The rebuilt binary targets glibc 2.28 with static third-party dependencies;
 [AL2023 provides glibc 2.34](https://docs.aws.amazon.com/linux/al2023/ug/core-glibc.html).
@@ -344,8 +355,11 @@ deployment or rollback that failed on these actions.
 For a manual deployment from an AL2023 build host with dependencies installed:
 
 ```bash
-ttrek run -script build-assets
 export AWS_PROFILE=ttrek-prod-neo AWS_REGION=eu-central-1
+mkdir -p public/assets/versioned
+aws s3 sync s3://jerily-ttrek-app/lambda/ttrek-sh-assets/ public/assets/versioned/ --only-show-errors
+ttrek run -script build-assets
+npm test
 export TTREK_CONFIG_KMS_KEY=$(aws cloudformation describe-stacks \
   --stack-name Infra-DevOps-TTREK-Keys \
   --query 'Stacks[0].Outputs[?OutputKey==`TTrekKMSMasterKeyArn`].OutputValue | [0]' --output text)
@@ -353,6 +367,7 @@ bash devops/generate-prod-config.sh
 TTREK_PRODUCTION_CONFIG="$PWD/build/prod/config.ini" ttrek run -script package-lambda -- --local-only
 python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
+aws s3 sync public/assets/versioned/ s3://jerily-ttrek-app/lambda/ttrek-sh-assets/ --only-show-errors
 sam deploy --template-file devops/sam-template.yaml \
   --stack-name Infra-DevOps-TTREK-Lambda \
   --s3-bucket jerily-ttrek-app --s3-prefix lambda/ttrek-sh \

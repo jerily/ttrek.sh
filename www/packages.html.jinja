@@ -2,7 +2,6 @@
 {% block body_class %}registry-page{% endblock %}
 {% block home_selected %}{% endblock %}
 {% block packages_selected %} pure-menu-selected{% endblock %}
-{% block styles %}<link rel="stylesheet" href="/css/search.css" />{% endblock %}
 {% block content %}
 <main class="site-main registry-main">
     <header class="registry-intro">
@@ -34,4 +33,3 @@
     {% if is_search %}<p class="browse-link"><a href="/packages">← Back to all packages</a></p>{% endif %}
 </main>
 {% endblock %}
-{% block scripts %}<script type="module" src="/js/search.js"></script>{% endblock %}

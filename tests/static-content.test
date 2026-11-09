@@ -7,8 +7,8 @@ source [file join $root tcl config.tcl]
 set settings [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}] \
     treqmon {store {tsvstore {history_max_events 100}}}]
 ::site::init_worker $settings
-proc request {path {method GET}} {
-    ::site::dispatch $::site::router [dict create method $method path $path]
+proc request {path {method GET} {headers {}}} {
+    ::site::dispatch $::site::router [dict create method $method path $path headers $headers]
 }
 test static-1 {documentation and blog mount with the host layout} -body {
     set docs [request /docs/getting-started]
@@ -45,7 +45,7 @@ test static-5 {The package-owned monitor uses the shared site layout and assets}
     set response [request /request-monitor]
     set html [dict get $response body]
     list [dict get $response statusCode] [regexp -all {<canvas } $html] \
-        [string match {*class="site-header"*} $html] [string match {*href="/css/styles.css"*} $html] \
+        [string match {*class="site-header"*} $html] [expr {[string first [::assets::url /css/site.css] $html] >= 0}] \
         [string match {*class="footer is-center"*} $html] \
         [string match {*<title>Request Monitor · ttrek</title>*} $html] \
         [string match {*src="/request-monitor/_assets/charts.js"*} $html] \
@@ -73,6 +73,225 @@ test static-7 {A missing monitor master fails before the server begins dispatchi
     $router destroy
     ::site::configure $settings
 } -returnCodes error -match glob -result {*missing.html.jinja*}
+test assets-fixed {Fixed assets carry a byte-based ETag and must revalidate} -body {
+    set response [request /css/styles.css]
+    set bytes [::assets::read_bytes [file join $root public css styles.css]]
+    list [dict get $response statusCode] [dict get $response headers Cache-Control] \
+        [dict get $response headers content-type] \
+        [expr {[binary decode base64 [dict get $response body]] eq $bytes}] \
+        [expr {[dict get $response headers ETag] eq "\"sha256-[::assets::digest $bytes]\""}]
+} -result {200 no-cache text/css 1 1}
+
+test assets-conditional {Strong, weak, list and wildcard validators return empty 304s} -body {
+    set etag [dict get [request /css/styles.css] headers ETag]
+    set result {}
+    foreach validator [list $etag W/$etag "\"old\", W/$etag" * " , $etag , "] {
+        set response [request /css/styles.css GET [dict create If-None-Match $validator]]
+        lappend result [list [dict get $response statusCode] [dict get $response body] \
+            [expr {[dict get $response headers ETag] eq $etag}] [dict get $response headers Cache-Control]]
+    }
+    lsort -unique $result
+} -result {{304 {} 1 no-cache}}
+
+test assets-nonmatching {Nonmatching or malformed validators do not suppress content} -body {
+    set etag [dict get [request /css/styles.css] headers ETag]
+    set result {}
+    foreach validator [list {"old"} {} [string trim $etag \"] "garbage, $etag" "$etag garbage" "\"prefix,$etag\""] {
+        lappend result [dict get [request /css/styles.css GET [dict create if-none-match $validator]] statusCode]
+    }
+    lsort -unique $result
+} -result 200
+
+test assets-repeated {Repeated header fields use the complete validator list} -body {
+    set etag [dict get [request /css/styles.css] headers ETag]
+    set response [::site::dispatch $::site::router [dict create method GET path /css/styles.css \
+        headers {if-none-match {"old"}} multiValueHeaders [dict create If-None-Match [list {"old"} W/$etag]]]]
+    dict get $response statusCode
+} -result 304
+
+test assets-versioned {Every manifest URL serves exact bytes with immutable caching} -body {
+    set results {}
+    dict for {original versioned} $::assets::manifest {
+        set response [request $versioned]
+        lappend results [list [dict get $response statusCode] [dict get $response headers Cache-Control] \
+            [expr {[dict get $response body] eq [dict get [request $original] body]}]]
+    }
+    lsort -unique $results
+} -result {{200 {public, max-age=31536000, immutable} 1}}
+
+test assets-head {HEAD uses GET cache headers and never returns a body, including 304} -body {
+    set path [::assets::url /js/search.js]
+    set get [request $path]
+    set head [request $path HEAD]
+    set conditional [request $path HEAD [dict create if-none-match [dict get $get headers ETag]]]
+    list [dict get $head statusCode] [dict get $head body] \
+        [expr {[dict get $head headers] eq [dict get $get headers]}] \
+        [dict get $conditional statusCode] [dict get $conditional body] \
+        [dict get $conditional headers Cache-Control]
+} -result {200 {} 1 304 {} {public, max-age=31536000, immutable}}
+
+test assets-missing {Wildcard conditions cannot turn a missing asset into a 304} -body {
+    set results {}
+    foreach path {/css/missing.css /assets/versioned/js/missing.0123456789abcdef.js /assets/missing.txt} {
+        set response [request $path GET {if-none-match *}]
+        lappend results [list [dict get $response statusCode] [dict get $response headers Cache-Control] \
+            [dict exists $response headers ETag]]
+    }
+    lsort -unique $results
+} -result {{404 no-store 0}}
+
+test assets-integrity {An incorrect fingerprint cannot receive immutable caching or 304} -body {
+    set response [::assets::respond /assets/versioned/css/example.0000000000000000.css \
+        {headers {if-none-match *}} text/css [encoding convertto utf-8 {changed bytes}]]
+    list [dict get $response statusCode] [dict get $response headers Cache-Control]
+} -result {404 no-store}
+
+test assets-bytes {ETags change with exact bytes, even at the same length} -body {
+    set a [binary format H* 00ff0d0a]
+    set b [binary format H* 00fe0d0a]
+    set first [::assets::respond /assets/test.svg {} image/svg+xml $a]
+    set second [::assets::respond /assets/test.svg [dict create headers \
+        [dict create if-none-match [dict get $first headers ETag]]] image/svg+xml $b]
+    list [dict get $second statusCode] [expr {[dict get $first headers ETag] ne [dict get $second headers ETag]}] \
+        [expr {[binary decode base64 [dict get $second body]] eq $b}]
+} -result {200 1 1}
+
+test assets-layouts {Site and package-rendered layouts resolve the manifest} -body {
+    set results {}
+    foreach path {/ /packages /docs /docs/getting-started /blog /request-monitor} {
+        set response [request $path]
+        set html [dict get $response body]
+        lappend results [expr {[string first [::assets::url /css/site.css] $html] >= 0}]
+        lappend results [expr {![regexp {(href|src)="/(css|js)/} $html]}]
+        foreach {match url} [regexp -all -inline {(?:href|src)="(/assets/versioned/[^"]+)"} $html] {
+            lappend results [expr {[dict get [request $url] statusCode] == 200}]
+        }
+    }
+    lappend results [expr {[string first [::assets::url /js/chart.umd.js] \
+        [dict get [request /request-monitor] body]] >= 0}]
+    lsort -unique $results
+} -result 1
+
+test assets-html {Host HTML revalidates and package no-store policies are preserved} -body {
+    list [dict get [request /] headers Cache-Control] [dict get [request /docs] headers cache-control]
+} -result {no-cache no-store}
+
+test assets-manifest {Missing and corrupt build artifacts fail startup} -setup {
+    set fixture [makeDirectory assets-fixture]
+    file mkdir $fixture/public/assets/versioned/css
+    set saved_manifest $::assets::manifest
+} -body {
+    set missing [catch {::assets::load $fixture}]
+    set channel [open $fixture/public/asset-manifest.json w]
+    puts $channel {{"/css/test.css":"/assets/versioned/css/test.0000000000000000.css"}}
+    close $channel
+    set absent [catch {::assets::load $fixture}]
+    set channel [open $fixture/public/assets/versioned/css/test.0000000000000000.css w]
+    puts $channel {corrupted bytes}
+    close $channel
+    list $missing $absent [catch {::assets::load $fixture}]
+} -cleanup {
+    set ::assets::manifest $saved_manifest
+    removeDirectory assets-fixture
+} -result {1 1 1}
+
+test bundles-layout {The homepage loads one combined stylesheet and script} -body {
+    set html [dict get [request /] body]
+    list [regexp -all {<link rel="stylesheet"} $html] [regexp -all {<script } $html] \
+        [expr {[string first [::assets::url /js/site.js] $html] >= 0}]
+} -result {1 1 1}
+
+test compression-assets {gzip preserves exact bytes and uses a distinct, stable ETag} -body {
+    set path [::assets::url /css/site.css]
+    set plain [request $path]
+    set zipped [request $path GET {Accept-Encoding gzip}]
+    set again [request $path GET {accept-encoding gzip}]
+    set bytes [::responses::bytes $zipped]
+    list [dict get $zipped headers Content-Encoding] [dict get $zipped headers Vary] \
+        [expr {[zlib gunzip $bytes] eq [::responses::bytes $plain]}] \
+        [expr {[string length $bytes] < [string length [::responses::bytes $plain]]}] \
+        [expr {[dict get $zipped headers ETag] ne [dict get $plain headers ETag]}] \
+        [expr {$zipped eq $again}]
+} -result {gzip Accept-Encoding 1 1 1 1}
+
+test compression-conditional {Validators select the negotiated representation for GET and HEAD} -body {
+    set path [::assets::url /js/site.js]
+    set get [request $path GET {accept-encoding gzip}]
+    set etag [dict get $get headers ETag]
+    set head [request $path HEAD {accept-encoding gzip}]
+    set headers [dict create accept-encoding gzip if-none-match W/$etag]
+    set unchanged [request $path GET $headers]
+    set unchanged_head [request $path HEAD $headers]
+    list [dict get $head body] [expr {[dict get $head headers] eq [dict get $get headers]}] \
+        [dict get $unchanged statusCode] [dict get $unchanged body] [dict get $unchanged headers Vary] \
+        [dict get $unchanged_head statusCode] [dict get $unchanged_head body] \
+        [dict get [request $path GET [dict create if-none-match $etag]] statusCode]
+} -result {{} 1 304 {} Accept-Encoding 304 {} 200}
+
+test compression-negotiation {Quality values, exclusions, wildcards and identity are respected} -body {
+    set result {}
+    foreach value [list {} br gzip {br, gzip;q=0.5} {gzip;q=0} {*;q=1} \
+            {gzip;q=0, *;q=1} {gzip;q=0.5, identity;q=1} {GZIP; Q=1.000} {gzip;q=invalid} {gzip;q=0.000}] {
+        set response [request /css/site.css GET [dict create Accept-Encoding $value]]
+        lappend result [dict exists $response headers Content-Encoding]
+    }
+    set result
+} -result {0 0 1 1 0 1 0 0 1 0 0}
+
+test compression-html {HTML is compressed after rendering and preserves UTF-8 text} -body {
+    set plain [request /]
+    set zipped [request / GET {accept-encoding gzip}]
+    list [dict get $zipped headers Content-Encoding] [dict get $zipped headers Cache-Control] \
+        [expr {[zlib gunzip [::responses::bytes $zipped]] eq [encoding convertto utf-8 [dict get $plain body]]}]
+} -result {gzip no-cache 1}
+
+test compression-skip {Small, binary, already encoded, partial and no-transform responses stay untouched} -body {
+    set small [::twebserver::build_response 200 text/plain hello]
+    set binary [::twebserver::build_response 200 image/png [string repeat x 2048]]
+    set encoded [::twebserver::build_response 200 text/plain [string repeat x 2048]]
+    dict set encoded headers Content-Encoding br
+    set partial [::twebserver::build_response 206 text/plain [string repeat x 2048]]
+    set no_transform [::twebserver::build_response 200 text/plain [string repeat x 2048]]
+    dict set no_transform headers Cache-Control {public, no-transform}
+    set result {}
+    foreach response [list $small $binary $encoded $partial $no_transform] {
+        set prepared [::responses::prepare {method GET headers {accept-encoding gzip}} $response]
+        lappend result [expr {[dict get $prepared body] eq [dict get $response body]}]
+    }
+    set result
+} -result {1 1 1 1 1}
+
+test compression-vary {Compression preserves existing Vary fields} -body {
+    set response [::twebserver::build_response 200 application/json [string repeat x 2048]]
+    dict set response headers vary Origin
+    set result [::responses::prepare {method GET headers {accept-encoding gzip}} $response]
+    list [dict get $result headers Vary] [dict get $result headers Content-Encoding]
+} -result {{Origin, Accept-Encoding} gzip}
+
+test canonical-host {Other hosts redirect to HTTPS ttrek.sh with path and query intact} -setup {
+    set saved_env [array get ::env ENV]
+    set ::env(ENV) PROD
+} -body {
+    set response [::site::dispatch $::site::router {method GET path /search \
+        queryString {q=web%20server&tag=a&tag=b} headers {Host www.ttrek.sh}}]
+    list [dict get $response statusCode] [::responses::header $response Location] \
+        [dict get $response headers Cache-Control] \
+        [dict get [request / GET {host TTREK.SH x-forwarded-host evil.example}] statusCode]
+} -cleanup {
+    unset ::env(ENV)
+    array set ::env $saved_env
+} -result {302 https://ttrek.sh/search?q=web%20server&tag=a&tag=b no-store 200}
+
+test canonical-host-local {LOCAL keeps localhost available} -setup {
+    set saved_env [array get ::env ENV]
+    set ::env(ENV) LOCAL
+} -body {
+    dict get [request / GET {host localhost:8080}] statusCode
+} -cleanup {
+    unset ::env(ENV)
+    array set ::env $saved_env
+} -result 200
+
 $::site::router destroy
 set failed $::tcltest::numTests(Failed)
 cleanupTests

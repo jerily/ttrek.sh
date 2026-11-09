@@ -1,7 +1,6 @@
 
 {% extends 'master.html.jinja' %}
 {% block body_class %}home-page{% endblock %}
-{% block styles %}<link rel="stylesheet" href="/css/search.css" />{% endblock %}
 {% block content %}
 {% include 'bashline.html.jinja' %}
     <main class="splash-container">
@@ -17,9 +16,4 @@
             </div>
         </div>
     </main>
-{% endblock %}
-{% block scripts %}
-    <script src="/js/clipboard.min.js"></script>
-    <script src="/js/clipboard-init.js" defer></script>
-    <script type="module" src="/js/search.js"></script>
 {% endblock %}
