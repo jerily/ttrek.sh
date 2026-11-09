@@ -17,6 +17,7 @@ ttrek run tclsh9.1 "$PWD/tests/config.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
+ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/installer.tcl"
@@ -104,6 +105,10 @@ removes it afterward. It also checks that PostgreSQL never loads SQLite and
 runs four independent processes to exercise simultaneous cold starts and writes.
 Use only a disposable test database. `tests/telemetry-config.test` verifies ENV
 selection and required TLS without connecting to services.
+
+`tests/registry-metadata.test` uses the same backend selection. It covers existing
+schema upgrades, per-version metadata, imports from multiple registries, repeated
+and concurrent imports, invalid recipes, and preservation of IDs and telemetry.
 
 Run `ttrek run tclsh9.1 tests/telemetry-maintenance.test` for lazy-loading and
 private-event dispatch checks. With `TTREK_TEST_POSTGRES` pointing at a disposable

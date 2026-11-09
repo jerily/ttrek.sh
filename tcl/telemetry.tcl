@@ -35,7 +35,7 @@ namespace eval ::telemetry {
 
 }
 
-proc ::telemetry::init {settings} {
+proc ::telemetry::init {settings {registryDirectories {}}} {
     variable connection
     variable dialect
     variable event_list
@@ -54,6 +54,7 @@ proc ::telemetry::init {settings} {
     set connection $opened
     try {
         transaction {create_schema} true
+        if {[llength $registryDirectories]} {sync_registry_metadata {*}$registryDirectories}
     } on error {message opts} {
         close
         return -options $opts $message
@@ -101,7 +102,9 @@ proc ::telemetry::table_definitions {} {
     dict set definitions package_names [db_define_table package_names [dict create \
         pkg_name_id $id name {type text unique 1 not_null 1}]]
     dict set definitions packages [db_define_table packages [dict create \
-        pkg_id $id pkg_name_id $required version {type text not_null 1}] \
+        pkg_id $id pkg_name_id $required version {type text not_null 1} \
+        description [dict create type text not_null 1 default [db_value {} -type text]] \
+        url [dict create type text not_null 1 default [db_value {} -type text]]] \
         -unique {{pkg_name_id version}} \
         -foreign_keys {{columns pkg_name_id table package_names referenced_columns pkg_name_id}}]
     dict set definitions platforms [db_define_table platforms [dict create \
@@ -133,8 +136,25 @@ proc ::telemetry::table_definitions {} {
 
 proc ::telemetry::create_schema {} {
     variable connection
+    variable dialect
     dict for {table definition} [table_definitions] {
         db_create_table $connection $definition -if_not_exists true
+    }
+    # Upgrade existing databases without replacing package IDs or event rows.
+    # tpersist has no ALTER TABLE helper; only fixed schema identifiers enter SQL.
+    if {$dialect eq "sqlite"} {
+        set columns [lmap row [::tpersist::_raw $connection {PRAGMA table_info(packages)}] {dict get $row name}]
+    } else {
+        set columns [lmap row [::tpersist::_raw $connection {
+            SELECT attname FROM pg_attribute
+            WHERE attrelid = 'packages'::regclass AND attnum > 0 AND NOT attisdropped
+        }] {dict get $row attname}]
+    }
+    foreach column {description url} {
+        if {$column ni $columns} {
+            set guard [expr {$dialect eq "postgresql" ? "IF NOT EXISTS " : ""}]
+            ::tpersist::_raw $connection "ALTER TABLE packages ADD COLUMN ${guard}$column TEXT NOT NULL DEFAULT ''"
+        }
     }
     db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
     db_create_index $connection idx_install_package req_pkg_install_event {pkg_id platform_id} -if_not_exists true
@@ -167,6 +187,70 @@ proc ::telemetry::ensure_row {table key values {extra {}}} {
         if {![llength $found]} {return -options $opts $message}
     }
     return [dict get [lindex $found 0] $key]
+}
+
+# Read and validate every recipe before writing. Registry paths are explicit so
+# private registries can be imported locally without being bundled on the site.
+proc ::telemetry::sync_registry_metadata {args} {
+    variable connection
+    package require tjson
+    set catalog {}
+    foreach directory $args {
+        if {![file isdirectory $directory]} {error "Registry directory does not exist: $directory"}
+        foreach path [lsort -ascii [glob -nocomplain -directory $directory -types f */*/ttrek.json]] {
+            set channel [open $path r]
+            try {
+                fconfigure $channel -encoding utf-8
+                ::tjson::parse [read $channel] spec
+            } finally {::close $channel}
+            if {![::tjson::is_object $spec]} {error "Expected a recipe object in $path"}
+            set metadata {}
+            foreach field {description url} {
+                if {![::tjson::has_object_item $spec $field]} continue
+                set item [::tjson::get_object_item $spec $field]
+                if {![::tjson::is_string $item]} {error "$field must be a string in $path"}
+                dict set metadata $field [::tjson::get_valuestring $item]
+            }
+            set version [file tail [file dirname $path]]
+            set name [file tail [file dirname [file dirname $path]]]
+            set key [list $name $version]
+            if {[dict exists $catalog $key]} {error "Duplicate registry package: $name@$version"}
+            dict set catalog $key $metadata
+        }
+    }
+    transaction {
+        # Avoid rewriting the catalog on every server/Lambda cold start.
+        set existing {}
+        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url}] \
+            package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
+        foreach row [rows $query] {
+            dict set existing [list [dict get $row name] [dict get $row version]] $row
+        }
+        dict for {key metadata} $catalog {
+            lassign $key name version
+            if {[dict exists $existing $key]} {
+                set row [dict get $existing $key]
+                set changes {}
+                dict for {field value} $metadata {
+                    if {[dict get $row $field] ne $value} {
+                        dict set changes $field [db_value $value -type text]
+                    }
+                }
+                if {![dict size $changes]} continue
+                set pkg_id [dict get $row pkg_id]
+            } else {
+                set name_id [ensure_row package_names pkg_name_id [dict create name [db_value $name -type text]]]
+                set pkg_id [ensure_row packages pkg_id [dict create \
+                    pkg_name_id [db_value $name_id -type integer] version [db_value $version -type text]]]
+                set changes {}
+                dict for {field value} $metadata {dict set changes $field [db_value $value -type text]}
+                if {![dict size $changes]} continue
+            }
+            db_execute $connection [db_where [db_values [db_update packages] $changes -expressions] \
+                [db_eq [db_col pkg_id] [db_value $pkg_id -type integer]]]
+        }
+    }
+    return [dict size $catalog]
 }
 
 proc ::telemetry::event {event_type args} {

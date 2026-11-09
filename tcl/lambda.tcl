@@ -31,7 +31,7 @@ proc ::site_lambda::initialize {root} {
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
     set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]
-    ::telemetry::init $maintenanceSettings
+    ::telemetry::init $maintenanceSettings [list [dict get $settings registry_dir]]
     ::site::init_worker $settings
     set router $::site::router
 }
