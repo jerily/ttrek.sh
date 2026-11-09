@@ -5,7 +5,6 @@
     "build-assets": "cd \"$PROJECT_HOME\" && npm ci --ignore-scripts && npm run build",
     "build-search": "exec \"$PROJECT_HOME/bin/build-search.sh\" \"$@\"",
     "start-direct": "exec \"$PROJECT_HOME/run.sh\" \"$@\"",
-    "package": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\"",
     "start-local": "exec \"$PROJECT_HOME/bin/start-local.sh\" \"$@\"",
     "start-lambda": "exec \"$PROJECT_HOME/bin/start-lambda.sh\" \"$@\"",
     "start-proxy": "exec \"$PROJECT_HOME/bin/start-proxy.sh\" \"$@\"",

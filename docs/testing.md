@@ -4,7 +4,7 @@
 
 Run these commands from the website checkout after [setup](install.md).
 The local stack test also needs a package built with
-`ttrek run -script package -- --local-only`. Runtime and browser tests have
+`ttrek run -script package-lambda -- --local-only`. Runtime and browser tests have
 additional requirements described below.
 
 ```bash
@@ -20,6 +20,7 @@ ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/installer.tcl"
+ttrek run tclsh9.1 "$PWD/tests/upload-archives.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-smoke.tcl"
 ttrek run tclsh9.1 "$PWD/tests/local-stack.tcl"
 ```
@@ -42,6 +43,10 @@ over seed hashes and the production section of the manifest.
 The Tcl installer test uses mocked platform/download commands and disposable
 homes to verify all supported targets, endpoints, Rosetta detection and overrides;
 it does not download real distributions or modify the user's installation.
+`tests/upload-archives.test` checks source mirror keys, build variants, duplicate
+downloads, existing objects, partial failures and temporary-file cleanup with
+stubbed AWS/curl commands. It also runs the shell launcher's dry-run mode against
+a fixture registry, without contacting AWS or upstream servers.
 The rendering tests validate all templates and exercise the real request handlers and
 renderer with isolated service fixtures, including empty collections, dependency
 conditions, version ordering and HTML/URL escaping. `tests/static-content.test`
