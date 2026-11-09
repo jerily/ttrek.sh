@@ -72,6 +72,9 @@ proc ::assets::respond {path request type bytes} {
         # A stale/corrupt object must never poison an immutable browser cache.
         if {$hash ne [string range $digest 0 15]} {return [unavailable]}
         set policy {public, max-age=31536000, immutable}
+    } elseif {$path in {/assets/favicon.svg /favicon.ico}} {
+        # Three months (90 days), with ETag revalidation after expiry.
+        set policy {public, max-age=7776000}
     }
     set headers [dict create content-type $type Cache-Control $policy ETag $etag]
     return [dict create statusCode 200 headers $headers isBase64Encoded true \

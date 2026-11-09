@@ -82,6 +82,35 @@ test assets-fixed {Fixed assets carry a byte-based ETag and must revalidate} -bo
         [expr {[dict get $response headers ETag] eq "\"sha256-[::assets::digest $bytes]\""}]
 } -result {200 no-cache text/css 1 1}
 
+test assets-favicon {Both favicon formats serve exact bytes and cache for 90 days} -body {
+    set results {}
+    foreach {path type} {/assets/favicon.svg image/svg+xml /favicon.ico image/vnd.microsoft.icon} {
+        set response [request $path]
+        set bytes [::assets::read_bytes [file join $root public [string trimleft $path /]]]
+        lappend results [list [dict get $response statusCode] [dict get $response headers Cache-Control] \
+            [expr {[dict get $response headers content-type] eq $type}] \
+            [expr {[binary decode base64 [dict get $response body]] eq $bytes}] \
+            [expr {[dict get $response headers ETag] eq "\"sha256-[::assets::digest $bytes]\""}]]
+    }
+    lsort -unique $results
+} -result {{200 {public, max-age=7776000} 1 1 1}}
+
+test assets-favicon-conditional {Favicon HEAD and conditional requests preserve the cache policy} -body {
+    set results {}
+    foreach path {/assets/favicon.svg /favicon.ico} {
+        set get [request $path]
+        set head [request $path HEAD]
+        lappend results [list [dict get $head statusCode] [dict get $head body] \
+            [expr {[dict get $head headers] eq [dict get $get headers]}]]
+        foreach method {GET HEAD} {
+            set conditional [request $path $method [dict create If-None-Match [dict get $get headers ETag]]]
+            lappend results [list [dict get $conditional statusCode] [dict get $conditional body] \
+                [dict get $conditional headers Cache-Control]]
+        }
+    }
+    lsort -unique $results
+} -result {{200 {} 1} {304 {} {public, max-age=7776000}}}
+
 test assets-conditional {Strong, weak, list and wildcard validators return empty 304s} -body {
     set etag [dict get [request /css/styles.css] headers ETag]
     set result {}
@@ -162,6 +191,8 @@ test assets-layouts {Site and package-rendered layouts resolve the manifest} -bo
         set response [request $path]
         set html [dict get $response body]
         lappend results [expr {[string first [::assets::url /css/site.css] $html] >= 0}]
+        lappend results [string match {*rel="icon" href="/assets/favicon.svg"*} $html]
+        lappend results [string match {*rel="icon" href="/favicon.ico"*} $html]
         lappend results [expr {![regexp {(href|src)="/(css|js)/} $html]}]
         foreach {match url} [regexp -all -inline {(?:href|src)="(/assets/versioned/[^"]+)"} $html] {
             lappend results [expr {[dict get [request $url] statusCode] == 200}]
