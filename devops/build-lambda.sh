@@ -24,9 +24,18 @@ ttrek install -y -fail-verbose -registry "$CODEBUILD_SRC_DIR_PrivateRegistry" -r
 export TTREK_SITE_PREFIX="$SITE_ROOT/ttrek-venv/local"
 export LD_LIBRARY_PATH="$TTREK_SITE_PREFIX/lib:$TTREK_SITE_PREFIX/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 TCLSH="$TTREK_SITE_PREFIX/bin/tclsh9.1"
+# Rehydrate previous fingerprints into every clean build, so older pages keep
+# working after deployment. This prefix is covered by the existing lambda/* IAM
+# permissions. Never use --delete on the append-only asset history.
+: "${SAM_ARTIFACT_BUCKET:?CodeBuild must supply the SAM artifact bucket}"
+ASSET_HISTORY="s3://$SAM_ARTIFACT_BUCKET/lambda/ttrek-sh-assets/"
+mkdir -p public/assets/versioned
+aws s3 sync "$ASSET_HISTORY" public/assets/versioned/ --only-show-errors
 ttrek run -script build-assets
+npm test
 ttrek run -script build-search
 "$TCLSH" tests/all.tcl
+"$TCLSH" tests/static-content.test
 "$TCLSH" tests/config.test
 "$TCLSH" tests/lambda-config.test
 "$TCLSH" tests/telemetry-config.test
@@ -40,3 +49,4 @@ ttrek run -script package-lambda -- --local-only
 python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 "$TCLSH" tests/lambda-package.tcl dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
+aws s3 sync public/assets/versioned/ "$ASSET_HISTORY" --only-show-errors

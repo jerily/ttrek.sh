@@ -3,9 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="stylesheet" href="/css/pure/pure-min.css" />
-        <link rel="stylesheet" href="/css/pure/grids-responsive-min.css" />
-        <link rel="stylesheet" href="/css/styles.css" />
+        <link rel="stylesheet" href="{{ asset_urls['/css/site.css'] }}" />
         {% block styles %}{% endblock %}
         <title>{% if pagetitle %}{{ pagetitle }}{% else %}{{ title }} · ttrek{% endif %}</title>
     </head>
@@ -27,8 +25,7 @@
             &#169; <!-- ttrek-current-year --> JERILY LTD · <a href="https://github.com/jerily/ttrek">Source on GitHub</a> · <a href="https://github.com/jerily/ttrek-registry">Registry on GitHub</a> · <a href="/request-monitor">Request Monitor</a>
         </footer>
         {% block scripts %}
-            <script src="/js/clipboard.min.js"></script>
-            <script src="/js/clipboard-init.js" defer></script>
+            <script type="module" src="{{ asset_urls['/js/site.js'] }}"></script>
         {% endblock %}
     </body>
 </html>

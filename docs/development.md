@@ -47,6 +47,52 @@
   authored content and public assets; `registry/`: pinned
   package recipes. `build/`, `dist/`, and `var/` contain generated output or state.
 
+## Browser assets and caching
+
+Run `ttrek run -script build-assets` after editing CSS or browser JavaScript, then
+restart workers (and repackage when using the local Lambda stack). Rollup bundles
+clipboard, its initializer and search into `public/js/site.js`. Its final build
+step combines Pure, responsive grids, shared layout and scoped page styles into
+`public/css/site.css`, copies vendor files, fingerprints CSS/JS bytes with SHA-256,
+and writes `public/asset-manifest.json`. Generated URLs
+look like `/assets/versioned/css/site.0123456789abcdef.css`. The first 16 hex
+characters identify the content. Fixed URLs remain available for existing clients.
+
+Templates reference `asset_urls['/css/site.css']`. The homepage and package pages
+load one stylesheet and one script; documentation/blog omit the unused script,
+and the monitor retains its dedicated chart scripts. The root layouts bind the
+manifest at startup, so inherited blocks work in host, wiki, blog and monitor
+renderers. The monitor also receives its versioned Chart.js URL. Startup and
+packaging fail if a referenced asset is missing or its fingerprint is incorrect.
+Generated files are ignored by Git and included in the Lambda archive and S3 seed.
+
+The shared asset handler reads exact bytes and sends a quoted SHA-256 `ETag`.
+Fixed CSS/JS/SVG URLs use `Cache-Control: no-cache`: clients may store them but
+must revalidate before reuse, so edits are visible immediately. Matching
+`If-None-Match` values (strong, weak, lists or `*`) produce an empty `304` with the
+same ETag and cache policy. GET and HEAD work in direct HTTP and Lambda, including
+the mock-S3 backend. Changed bytes produce a new ETag and a `200` response.
+
+Verified fingerprint URLs use `Cache-Control: public, max-age=31536000, immutable`.
+An asset whose bytes do not match its filename is rejected with `404, no-store`.
+Ordinary host HTML uses `no-cache`; package-owned HTML keeps its stricter
+`no-store` policy. Build output retains previous fingerprints. Deployment builds
+restore and preserve this history as described in [Deployment](deployment.md).
+
+`tcl/responses.tcl` uses Tcl's `zlib gzip` for compressible HTML, CSS, JavaScript,
+JSON, text and SVG responses of at least 1 KiB when gzip is accepted and reduces
+the size. It honors encoding quality values, preserves `Vary` fields, and skips
+already encoded, partial and `no-transform` responses. Gzip and identity assets
+have distinct strong ETags based on their actual bytes. HEAD and conditional
+requests select the representation before removing the body. The direct server's
+own compression is disabled to avoid compressing twice; Lambda returns the gzip
+bytes through its existing base64 response envelope.
+
+Outside `ENV=LOCAL`, a supplied Host other than `ttrek.sh` redirects with `302`
+to `https://ttrek.sh`, preserving the path and query string. Host matching is
+case-insensitive, and forwarded-host headers do not override it. LOCAL keeps the
+localhost development workflow available.
+
 ## Shared runtime and packaging
 
 `tdevops` 0.2.0 owns the shared Lambda runtime, packaging and local service supervision; `etc/tdevops.tcl` supplies

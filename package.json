@@ -2,7 +2,8 @@
   "name": "ttrek-sh-assets",
   "private": true,
   "scripts": {
-    "build": "rollup --config && cp node_modules/chart.js/dist/chart.umd.js public/js/chart.umd.js && cp node_modules/chart.js/LICENSE.md public/js/chart.LICENSE.txt && cp node_modules/@kurkle/color/LICENSE.md public/js/chart-color.LICENSE.txt && cp node_modules/throttle-debounce/LICENSE.md public/js/search.LICENSE.txt"
+    "build": "rollup --config",
+    "test": "node --test tests/assets-build.test.mjs"
   },
   "dependencies": {
     "chart.js": "4.4.4",

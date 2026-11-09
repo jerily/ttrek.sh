@@ -13,7 +13,7 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {templates releases request-validation search handlers} {
+foreach module {assets responses templates releases request-validation search handlers} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -49,7 +49,8 @@ proc ::site::mount {router} {
     ::treqmon::mount $router -prefix /request-monitor \
         -include_active_users [expr {![catch {package present tsession}]}] \
         -config [dict create master_template [dict get $templates $monitor_master] \
-            templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
+            templates [dict create master.html.jinja [dict get $templates master.html.jinja]] \
+            chart_script [::assets::url /js/chart.umd.js]]
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {
         $router add $method $pattern [list ::site::invoke $handler $name] -strict true
     }
@@ -73,6 +74,18 @@ proc ::site::dispatch {router request {context {}}} {
     dict set request httpMethod [dict get $request method]
     set request [dict merge [dict create headers {} queryString {} version HTTP/1.1 \
         url [dict get $request path]] $request]
+    set host [::responses::header $request Host]
+    if {$host ne {} && ![string equal -nocase $host ttrek.sh] &&
+        !([info exists ::env(ENV)] && $::env(ENV) eq "LOCAL")} {
+        set path [dict get $request path]
+        if {![string match /* $path]} {set path /$path}
+        set location https://ttrek.sh$path
+        if {[dict get $request queryString] ne {}} {append location ?[dict get $request queryString]}
+        set location [string map [list \r %0D \n %0A] $location]
+        set response [::twebserver::build_redirect 302 $location]
+        dict set response headers Cache-Control no-store
+        return $response
+    }
     set context [dict merge {addr 127.0.0.1 port 8080} $context]
     if {[dict exists $settings treqmon]} {
         set request [::treqmon::middleware::enter $context $request]
@@ -84,15 +97,29 @@ proc ::site::dispatch {router request {context {}}} {
         }
         set request $result
     }
-    set response [$router dispatch $request $context]
-    if {[dict exists $response headers content-type] &&
-        [string match {text/html*} [dict get $response headers content-type]]} {
+    # Render HEAD as GET so compression and validators select identical headers.
+    set routed_request $request
+    if {[dict get $request method] eq "HEAD"} {
+        dict set routed_request method GET
+        dict set routed_request httpMethod GET
+    }
+    set response [$router dispatch $routed_request $context]
+    set content_type {}
+    set has_policy 0
+    dict for {name value} [dict get $response headers] {
+        if {[string equal -nocase $name Content-Type]} {set content_type $value}
+        if {[string equal -nocase $name Cache-Control]} {set has_policy 1}
+    }
+    if {[string match {text/html*} $content_type]} {
         dict set response body [::views::stamp_year [dict get $response body]]
+        # Keep package-owned no-store policies; ordinary site HTML revalidates
+        # so a deployment promptly switches browsers to the new asset URLs.
+        if {!$has_policy} {dict set response headers Cache-Control no-cache}
     }
     if {[dict exists $settings treqmon]} {
         set response [::treqmon::middleware::leave $context $request $response]
     }
-    return $response
+    return [::responses::prepare $request $response]
 }
 
 proc ::site::process_conn {context request} {
