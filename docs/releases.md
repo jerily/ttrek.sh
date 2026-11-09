@@ -137,6 +137,54 @@ source_prefix = ttrek/sources
 source_url_expiry_seconds = 300
 ```
 
+Populate this mirror from a registry checkout with:
+
+```sh
+# Preview every URL/key mapping without contacting AWS or upstream servers.
+bin/upload-archives-to-s3.sh --dry-run
+
+# Check S3, download missing archives, and upload them; keep a log of failures.
+AWS_PROFILE=ttrek-prod-neo bin/upload-archives-to-s3.sh 2>&1 | tee upload-archives.log
+```
+
+The shell launcher uses `bin/site-env.sh` to select the local `ttrek-venv` Tcl
+runtime and libraries, just like the other site launchers. The implementation is
+`bin/upload-archives-to-s3.tcl`, using `tjson` for specs and Tcllib's `sha256` for
+URL hashes; curl and the AWS CLI handle transfers. `TTREK_SITE_PREFIX` can select
+another installation. It defaults to the sibling `ttrek-registry` checkout;
+pass another checkout as a positional argument.
+It uses the normal AWS credential chain, including `AWS_PROFILE`. The region is
+`AWS_REGION`, then `AWS_DEFAULT_REGION`, then `eu-central-1`; `--region` overrides it.
+Use `--bucket` and `--prefix` to override `jerily-ttrek-app` and `ttrek/sources`.
+The prefix must match the website's `releases.source_prefix`.
+
+The configured fallback location is:
+
+```text
+s3://jerily-ttrek-app/ttrek/sources/<package>-<version>-<url-sha256>.archive
+```
+
+Package and version come from the `<package>/<version>/ttrek.json` directory
+path, as in ttrek's registry resolution. The digest is lowercase hexadecimal
+SHA-256 of the exact download URL, with no trailing newline. URLs must use ASCII
+(percent-encode other characters); the script neither expands variables nor
+hashes the final redirect URL. Download `filename` options do not affect the key.
+
+Every `download` command in every build variant is considered, including
+conditional steps and multiple archives per recipe. Duplicate keys are processed
+once per run. Git checkouts and recipes without download steps need no mirror.
+Existing objects are skipped using `head-object`. Only a missing-object response
+triggers a download; permission or connection errors are logged and skipped.
+Use credentials with permission to check object existence and upload under the
+source prefix, including bucket listing permission so S3 can report missing keys.
+
+Downloads follow redirects and retry transient failures. Failed or empty downloads
+are never uploaded, and temporary files are removed after each attempt. Missing
+upstream archives, malformed specs, and S3 failures are logged as warnings; the
+script continues and prints counts, exiting successfully after a best-effort run.
+Invalid arguments or missing prerequisites fail at startup. Dry runs list all
+candidate keys without checking whether they already exist.
+
 `url_expiry_seconds` continues to control binary releases. Source redirects
 require a signed URL, use `Cache-Control: no-store`, and return 503 if disabled
 or signing fails. The endpoint neither fetches upstream URLs nor populates S3;

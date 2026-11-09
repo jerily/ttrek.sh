@@ -18,7 +18,7 @@ Follow the [setup guide](docs/install.md) first. It covers the required tools
 and access to private development packages. Once setup is complete:
 
 ```sh
-ttrek run -script package -- --local-only
+ttrek run -script package-lambda -- --local-only
 ttrek run -script start-local
 ```
 

@@ -1,0 +1,152 @@
+package require tcltest 2
+namespace import ::tcltest::test
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root bin upload-archives-to-s3.tcl]
+set work [::tcltest::makeDirectory upload-archives-fixture]
+set registry [file join $work {registry with spaces}]
+set savedEnv [array get ::env]
+
+proc write_file {path text} {
+    file mkdir [file dirname $path]
+    set channel [open $path w]
+    try {puts -nonewline $channel $text} finally {close $channel}
+}
+proc read_file {path} {
+    set channel [open $path r]
+    try {read $channel} finally {close $channel}
+}
+proc download {url args} {
+    set step [dict create cmd {S download} url [list S $url]]
+    foreach {key value} $args {dict set step $key [list S $value]}
+    return [list M $step]
+}
+proc spec {package build} {
+    set path [file join $::registry $package 1.0.0 ttrek.json]
+    write_file $path [::tjson::typed_to_json [list M [dict create \
+        name [list S $package] version {S 1.0.0} build [list M $build]]]]
+    return $path
+}
+proc reset_fixture {} {
+    file delete -force $::registry
+    file mkdir $::registry
+    set ::calls {}
+    set ::logs {}
+    set ::uploads {}
+    set ::temporaryFiles {}
+}
+proc argument {command option} {lindex $command [expr {[lsearch -exact $command $option] + 1}]}
+
+# Stub only external commands and log output; exercise real spec parsing,
+# hashing, deduplication, error handling and temporary-file cleanup.
+rename ::archive_mirror::run_command ::archive_mirror::real_run_command
+rename ::archive_mirror::require_commands ::archive_mirror::real_require_commands
+rename ::archive_mirror::log ::archive_mirror::real_log
+proc ::archive_mirror::require_commands {} {}
+proc ::archive_mirror::log {level message} {lappend ::logs [list $level $message]}
+proc ::archive_mirror::run_command {command} {
+    lappend ::calls $command
+    if {"head-object" in $command} {
+        set key [argument $command --key]
+        if {[string match */existing-* $key]} {return {}}
+        if {[string match */forbidden-* $key]} {
+            error {An error occurred (403) when calling the HeadObject operation: Forbidden}
+        }
+        error {An error occurred (404) when calling the HeadObject operation: Not Found}
+    }
+    if {[lindex $command 0] eq "curl"} {
+        set path [argument $command --output]
+        set url [argument $command --url]
+        lappend ::temporaryFiles $path
+        write_file $path [expr {[string match */empty $url] ? {} : "archive from $url"}]
+        if {[string match */missing $url]} {error {curl: (22) HTTP 404}}
+        return {}
+    }
+    if {"cp" in $command} {
+        set index [lsearch -exact $command cp]
+        set path [lindex $command [expr {$index + 1}]]
+        set destination [lindex $command [expr {$index + 2}]]
+        lappend ::uploads [list $destination [read_file $path]]
+        if {[string match */upload-fail-* $destination]} {error {upload denied}}
+        return {}
+    }
+    error "Unexpected command: $command"
+}
+
+test archive-mirror-1 {Skip existing objects and keep processing after every kind of failure} -setup {
+    reset_fixture
+    foreach package {existing forbidden missing empty upload-fail z-success} {
+        spec $package [dict create default [list L [list [download https://example.test/$package]]]]
+    }
+    write_file [spec broken {default {L {}}}] "\{broken"
+    spec malformed {default {S invalid} linux.amd64 {L {{S invalid} {M {cmd {S download}}}}}}
+} -body {
+    ::archive_mirror::main [list $registry]
+    set cleaned 1
+    foreach path $temporaryFiles {if {[file exists $path]} {set cleaned 0}}
+    set warnings [join $logs]
+    list $::archive_mirror::counts [llength $temporaryFiles] [llength $uploads] \
+        [lindex $uploads end 1] $cleaned \
+        [string match {*403*HTTP 404*upload denied*} $warnings]
+} -result {{archives 6 existing 1 uploaded 1 planned 0 duplicates 0 failed 5 invalid 3} 4 2 {archive from https://example.test/z-success} 1 1}
+
+test archive-mirror-2 {Use literal URL hashes and directory identity across platforms and filenames} -setup {
+    reset_fixture
+    set url {https://example.test/src%20name.tar.gz?a=1&b=$VERSION#fragment}
+    set step [download $url filename nested/renamed.tar.gz if +static]
+    set path [spec source [dict create \
+        default [list L [list $step {M {cmd {S git} url {S https://example.test/repo}}}]] \
+        darwin.arm64 [list L [list [download $url filename other.tar.gz] [download https://example.test/other]]]]]
+    write_file $path [string map {source stale 1.0.0 0.0.0} [read_file $path]]
+    spec second [dict create default [list L [list $step]]]
+    spec metapackage {default {L {}}}
+} -body {
+    ::archive_mirror::main [list --bucket test-bucket --prefix /custom/sources/ --region eu-west-1 $registry]
+    # An independent OpenSSL digest guards against newlines and URL expansion.
+    set digest [lindex [exec openssl dgst -sha256 << $url] end]
+    set destinations [lmap upload $uploads {lindex $upload 0}]
+    set regions [lsort -unique [lmap command $calls {
+        if {[lindex $command 0] ne "aws"} {continue}
+        argument $command --region
+    }]]
+    list $::archive_mirror::counts \
+        [expr {"s3://test-bucket/custom/sources/source-1.0.0-$digest.archive" in $destinations}] \
+        [expr {"s3://test-bucket/custom/sources/second-1.0.0-$digest.archive" in $destinations}] \
+        [lindex $uploads 0 1] $regions [string match {*using source-1.0.0*} $logs]
+} -result {{archives 3 existing 0 uploaded 3 planned 0 duplicates 1 failed 0 invalid 0} 1 1 {archive from https://example.test/src%20name.tar.gz?a=1&b=$VERSION#fragment} eu-west-1 1}
+
+test archive-mirror-3 {Dry runs make no external calls} -setup {
+    reset_fixture
+    spec preview [dict create default [list L [list [download https://example.test/source]]]]
+} -body {
+    ::archive_mirror::main [list --dry-run $registry]
+    list $calls [dict get $::archive_mirror::counts planned] \
+        [string match {*s3://jerily-ttrek-app/ttrek/sources/preview-1.0.0-*} $logs]
+} -result {{} 1 1}
+
+test archive-mirror-4 {The shell launcher runs the local Tcl implementation} -body {
+    set output [exec sh [file join $root bin upload-archives-to-s3.sh] --dry-run $registry]
+    string match {*SUMMARY: specs=1 archives=1 existing=0 uploaded=0 planned=1 duplicates=0 failed=0 invalid=0} $output
+} -result 1
+
+test archive-mirror-5 {Missing registry is a startup error} -body {
+    ::archive_mirror::main [list [file join $work missing]]
+} -returnCodes error -match glob -result {Registry directory does not exist:*}
+
+test archive-mirror-6 {Invalid options fail before any transfers} -body {
+    set result {}
+    foreach args {{--bucket} {--prefix ../private} {--prefix /} {--unknown} {one two}} {
+        lappend result [catch {::archive_mirror::main $args}]
+    }
+    set result
+} -result {1 1 1 1 1}
+
+foreach name {run_command require_commands log} {
+    rename ::archive_mirror::$name {}
+    rename ::archive_mirror::real_$name ::archive_mirror::$name
+}
+array unset ::env
+array set ::env $savedEnv
+::tcltest::removeDirectory $work
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+if {$failed} {exit 1}

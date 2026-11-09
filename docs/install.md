@@ -65,7 +65,7 @@ locally; Node and npm are not included in the Lambda runtime.
 ## Start a local preview
 
 ```sh
-ttrek run -script package -- --local-only
+ttrek run -script package-lambda -- --local-only
 ttrek run -script start-local
 ```
 
