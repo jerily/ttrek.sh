@@ -76,8 +76,11 @@ thread::send $telemetry_thread_id [list source [file normalize [file join $dir t
 # Keep credentials out of a failed thread script's error trace.
 thread::send $telemetry_thread_id [list set ::telemetry_settings \
     [::app_config::telemetry $config [file normalize $dir]]]
+thread::send $telemetry_thread_id [list set ::telemetry_registries [list [dict get $config registry directory]]]
 thread::send $telemetry_thread_id {
-    try {::telemetry::init $::telemetry_settings} finally {unset ::telemetry_settings}
+    try {::telemetry::init $::telemetry_settings $::telemetry_registries} finally {
+        unset ::telemetry_settings ::telemetry_registries
+    }
 }
 
 set init_script "source [file normalize [file join $dir tcl init-thread.tcl]]"

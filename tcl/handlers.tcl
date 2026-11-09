@@ -449,6 +449,7 @@ proc get_package_page_handler {ctx req} {
     set registry_dir [get_registry_dir]
     set versions [get_package_versions $registry_dir $package_name]
     set description {}
+    set project_url {}
     set spec_path [file join $registry_dir $package_name [lindex $versions 0] ttrek.json]
     if {[llength $versions] && [file isfile $spec_path]} {
         set channel [open $spec_path r]
@@ -462,6 +463,15 @@ proc get_package_page_handler {ctx req} {
                 set description [string trim [::tjson::get_valuestring $item]]
             }
         }
+        if {[::tjson::has_object_item $spec url]} {
+            set item [::tjson::get_object_item $spec url]
+            if {[::tjson::is_string $item]} {
+                set candidate [string trim [::tjson::get_valuestring $item]]
+                if {[regexp -nocase {^https?://[^/[:space:]?#]+[^[:space:]]*$} $candidate]} {
+                    set project_url $candidate
+                }
+            }
+        }
     }
 
     set stat_platforms [get_package_stats $package_name]
@@ -469,6 +479,7 @@ proc get_package_page_handler {ctx req} {
     set data [dict create \
         package_name [list S $package_name] \
         description [list S $description] \
+        project_url [list S $project_url] \
         versions [::views::strings $versions] \
         stat_platforms [::views::platform_stats $stat_platforms]]
     set html [::views::render package.html.jinja $data]

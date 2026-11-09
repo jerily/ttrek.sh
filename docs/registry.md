@@ -6,6 +6,26 @@ The public package catalog lives in the `registry` Git submodule. See
 [setup](install.md#get-the-source) to clone the website with its registry.
 Commands below run from the website checkout.
 
+Recipes carry a top-level `description` and project `url`. The package overview
+shows the latest version's description and HTTP(S) project link.
+
+At startup, the direct server and Lambda import the configured/bundled registry
+into the telemetry `packages` table, storing `description` and `url` per version.
+Existing SQLite and PostgreSQL schemas are upgraded in place. Repeated imports
+update changed metadata without replacing package IDs or installation history;
+unchanged rows are not rewritten. Missing fields preserve existing values and
+default to empty strings for new packages. Old telemetry backups remain restorable.
+
+After `::telemetry::init $settings`, an explicit import can include multiple local
+registries:
+
+```tcl
+::telemetry::sync_registry_metadata /path/to/ttrek-registry /path/to/private-ttrek-registry
+```
+
+Duplicate name/version pairs are rejected before writing. Private recipes are
+imported only when their directory is explicitly supplied.
+
 ## Update package recipes
 
 Make package changes in `jerily/ttrek-registry` and publish them there first.
