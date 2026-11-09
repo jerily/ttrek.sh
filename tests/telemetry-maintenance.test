@@ -65,6 +65,8 @@ if {$postgres} {
         ::telemetry::event $event {*}$args
     }
     for {set i 0} {$i < 600} {incr i} {::telemetry::event req_logo_get -env $identity}
+    ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
+        [dict create description $description url {https://example.org/project?q='quoted'&lang=en}]]
     ::telemetry::close
     set db [::telemetry_maintenance::connect $settings]
     set dump [file join $work backup.jsonl.gz]
@@ -113,6 +115,30 @@ test maintenance-nonempty {Restoring into a populated database fails without cha
     $target close
     list $failed [dict get [lindex $rows 0] n]
 } -result {1 2}
+
+test maintenance-legacy-metadata {Old version 1 backups restore with empty package metadata} -constraints postgres -body {
+    reset_target
+    set lines {}
+    foreach line [split [string trimright [read_dump $dump] \n] \n] {
+        set record [::tjson::json_to_typed $line]
+        if {[dict exists [lindex $record 1] table] && [dict get [lindex $record 1] table] eq {S packages}} {
+            set fields [lindex [dict get [lindex $record 1] values] 1]
+            dict unset fields description
+            dict unset fields url
+            set data [lindex $record 1]
+            dict set data values [list M $fields]
+            set line [::tjson::typed_to_json [list M $data]]
+        }
+        lappend lines $line
+    }
+    set legacy [file join $work legacy.jsonl.gz]
+    write_dump $legacy "[join $lines \n]\n"
+    set target [::telemetry_maintenance::connect $targetSettings]
+    ::telemetry_maintenance::restore $target $legacy
+    set rows [$target allrows {SELECT description, url FROM packages}]
+    $target close
+    set rows
+} -result {{description {} url {}}}
 
 test maintenance-truncated {Missing footer rolls back every inserted row} -constraints postgres -body {
     reset_target

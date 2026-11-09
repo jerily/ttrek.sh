@@ -161,6 +161,12 @@ proc ::telemetry_maintenance::restore {db path} {
             set table [dict get $record table]
             set columns [dict get $definitions $table columns]
             set row [dict get $record values]
+            # Version 1 backups predating registry metadata omitted these fields.
+            if {$table eq "packages"} {
+                foreach field {description url} {
+                    if {![dict exists $row $field]} {dict set row $field {}}
+                }
+            }
             if {[lsort [dict keys $row]] ne [lsort [dict keys $columns]]} {error "Invalid backup columns"}
             set values {}
             dict for {column spec} $columns {

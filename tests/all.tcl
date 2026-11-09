@@ -309,6 +309,34 @@ test handlers-2 {Version ordering and installation statistics survive JSON seria
     set test_stats {}
 } -result {1 1 1 1}
 
+test handlers-project-url {Overview shows the latest version's project URL with HTML escaping} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+    set channel [open $latest w]
+    puts $channel {{"url":"https://example.org/project?x=\"quoted\"&y=<tag>","description":"Demo project"}}
+    close $channel
+} -body {
+    set html [body [get_package_page_handler {} {pathParameters {package_name demo}}]]
+    list [contains $html {<p>Demo project</p>}] \
+        [contains $html {Project: <a href="https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;">https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;</a>}]
+} -cleanup {
+    writeFile $latest $original
+} -result {1 1}
+
+test handlers-project-url-invalid {Absent, non-string and unsafe URLs do not produce project links} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+} -body {
+    set results {}
+    foreach json {{{}} {{"url":null}} {{"url":42}} {{"url":"javascript:alert(1)"}} {{"url":"//example.org"}} {{"url":"https://"}}} {
+        writeFile $latest $json
+        lappend results [contains [body [get_package_page_handler {} {pathParameters {package_name demo}}]] {Project:}]
+    }
+    lsort -unique $results
+} -cleanup {
+    writeFile $latest $original
+} -result 0
+
 test handlers-3 {Dependency conditions render on version pages} -body {
     set html [body [get_package_version_page_handler {} {pathParameters {package_name demo package_version 1.0.0}}]]
     list [contains $html {demo@1.0.0}] [contains $html {<td>tcl</td>}] \

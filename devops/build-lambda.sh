@@ -40,6 +40,7 @@ ttrek run -script build-search
 "$TCLSH" tests/lambda-config.test
 "$TCLSH" tests/telemetry-config.test
 "$TCLSH" tests/telemetry.test
+"$TCLSH" tests/registry-metadata.test
 "$TCLSH" tests/telemetry-maintenance.test
 "$TCLSH" tests/installer.tcl
 bash devops/generate-prod-config.sh

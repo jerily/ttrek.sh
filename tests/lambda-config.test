@@ -110,7 +110,7 @@ foreach {name script} {
     }
     telemetry {
         namespace eval ::telemetry {}
-        proc ::telemetry::init {settings} {}
+        proc ::telemetry::init {settings registryDirectories} {set ::telemetry::registries $registryDirectories}
     }
     telemetry-maintenance {}
     local-assets {}
@@ -169,6 +169,10 @@ test lambda-releases-2 {Local mock release overrides remain independent of the p
         [dict get $releases endpoint] \
         [expr {[dict get $releases checksums linux-amd64-glibc] eq [string repeat b 64]}]
 } -result {ttrek-local 2.0.0 test/2.0.0 http://127.0.0.1:9999 1}
+
+test lambda-registry-metadata {Lambda imports metadata from its bundled registry} -body {
+    set ::telemetry::registries
+} -result [list [file join $root registry]]
 
 rename ::tconfig::load_config {}
 rename ::tconfig::real_load_config ::tconfig::load_config

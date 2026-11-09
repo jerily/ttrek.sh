@@ -1,0 +1,174 @@
+# Uses a disposable SQLite database, or an isolated PostgreSQL schema selected
+# by the same TTREK_TEST_POSTGRES settings as telemetry.test.
+package require tcltest 2
+package require tjson
+namespace import ::tcltest::test
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl telemetry.tcl]
+namespace import ::tpersist::db_*
+
+if {[llength $argv] && [lindex $argv 0] eq "--worker"} {
+    ::telemetry::init [lindex $argv 1] [lindex $argv 2]
+    ::telemetry::close
+    exit
+}
+
+set work [::tcltest::makeDirectory registry-metadata-fixture]
+set public [file join $work public]
+set private [file join $work private]
+file mkdir $public $private
+set postgres [info exists ::env(TTREK_TEST_POSTGRES)]
+if {$postgres} {
+    package require tdbc::postgres
+    set options {}
+    dict for {key value} $::env(TTREK_TEST_POSTGRES) {lappend options -$key $value}
+    set admin [tdbc::postgres::connection new {*}$options]
+    set schema registry_metadata_[pid]_[clock clicks]
+    $admin allrows "CREATE SCHEMA $schema"
+    set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES) \
+        [dict create options "-c search_path=$schema -c statement_timeout=10000"]]
+} else {
+    set settings [dict create dialect sqlite database [file join $work metadata.sqlite3] timeout 5000]
+}
+
+proc recipe {directory name version metadata} {
+    set path [file join $directory $name $version ttrek.json]
+    file mkdir [file dirname $path]
+    set channel [open $path w]
+    try {
+        fconfigure $channel -encoding utf-8
+        puts $channel [::tjson::typed_to_json [list M $metadata]]
+    } finally {close $channel}
+    return $path
+}
+proc metadata_rows {} {
+    ::telemetry::rows [db_order_by [db_join [db_select packages -expr {
+        name, version, pkg_id, description, url
+    }] package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}] -expr {name, version}]
+}
+
+# Reproduce the old schema, with an installation event that must survive.
+set options {-autobegin false}
+dict for {key value} $settings {lappend options -$key $value}
+set ::telemetry::connection [db_connect {*}$options]
+set ::telemetry::dialect [dict get $settings dialect]
+dict for {table definition} [::telemetry::table_definitions] {
+    if {$table eq "packages"} {
+        dict unset definition columns description
+        dict unset definition columns url
+    }
+    db_create_table $::telemetry::connection $definition
+}
+set identity [string repeat a 64]
+dict for {event parameters} $::telemetry::event_list {
+    dict set ::telemetry::event_list $event [lsort $parameters]
+}
+::telemetry::event register_environment -env $identity -description legacy
+::telemetry::event req_pkg_install_event -env $identity -pkg_name demo -pkg_version 1.0.0 \
+    -os Linux -arch x86_64 -install_outcome 1 -install_is_toplevel 1
+set legacy_id [dict get [lindex [::telemetry::rows [db_select packages]] 0] pkg_id]
+::telemetry::close
+
+set description {Quotes ' " < & Unicode λ 日本語}
+set url {https://example.org/project?q='quoted'&lang=en}
+recipe $public demo 1.0.0 [dict create description [list S $description] url [list S $url]]
+recipe $public demo 2.0.0 {description {S {New version}} url {S https://example.org/v2}}
+recipe $private private-app 1.0.0 {description {S Private} url {S https://github.com/example/private}}
+
+test metadata-migrate {Old databases gain metadata without losing IDs or telemetry} -body {
+    ::telemetry::init $settings [list $public $private]
+    set row [lindex [metadata_rows] 0]
+    list [expr {[dict get $row pkg_id] == $legacy_id}] \
+        [expr {[dict get $row description] eq $description}] [expr {[dict get $row url] eq $url}] \
+        [::telemetry::stats demo] [llength [metadata_rows]]
+} -result {1 1 1 {{{Linux x86_64} 1 1 0}} 3}
+
+test metadata-idempotent {Repeated imports retain every version and identifier} -body {
+    set before [metadata_rows]
+    set count [::telemetry::sync_registry_metadata $public $private]
+    list $count [expr {$before eq [metadata_rows]}]
+} -result {3 1}
+
+test metadata-update {Recipe edits update existing rows, including explicit empty values} -body {
+    recipe $public demo 1.0.0 {description {S Edited} url {S {}}}
+    ::telemetry::sync_registry_metadata $public
+    set row [lindex [metadata_rows] 0]
+    list [dict get $row description] [dict get $row url] [expr {[dict get $row pkg_id] == $legacy_id}]
+} -result {Edited {} 1}
+
+test metadata-optional {Missing fields preserve known metadata and default to empty on new rows} -body {
+    recipe $public demo 1.0.0 {}
+    recipe $public missing 1.0.0 {}
+    ::telemetry::sync_registry_metadata $public
+    set rows [metadata_rows]
+    list [dict get [lindex $rows 0] description] \
+        [dict get [lindex $rows 2] description] [dict get [lindex $rows 2] url]
+} -result {Edited {} {}}
+
+test metadata-validation {Bad metadata is rejected before any catalog changes are written} -body {
+    set before [metadata_rows]
+    set results {}
+    foreach field {description url} {
+        foreach value {42 null {{}} {[]}} {
+            set path [recipe $private z-invalid 1.0.0 {}]
+            set channel [open $path w]
+            puts $channel [format {{"%s":%s}} $field $value]
+            close $channel
+            lappend results [catch {::telemetry::sync_registry_metadata $public $private} message]
+            if {![string match "$field must be a string*" $message]} {error $message}
+        }
+    }
+    list [lsort -unique $results] [expr {$before eq [metadata_rows]}]
+} -cleanup {
+    file delete -force [file join $private z-invalid]
+} -result {1 1}
+
+test metadata-duplicate {Overlapping registries cannot silently overwrite a version} -body {
+    recipe $private demo 1.0.0 {description {S Conflict}}
+    set result [catch {::telemetry::sync_registry_metadata $public $private} message]
+    file delete -force [file join $private demo]
+    list $result $message
+} -result {1 {Duplicate registry package: demo@1.0.0}}
+
+test metadata-events {Telemetry can still record versions absent from the registry} -body {
+    ::telemetry::event req_pkg_version_get -env $identity -pkg_name unknown -pkg_version 001
+    set row [lindex [metadata_rows] end]
+    list [dict get $row version] [dict get $row description] [dict get $row url]
+} -result {001 {} {}}
+
+test metadata-reopen {Startup sync refreshes metadata and retains telemetry-only rows} -body {
+    recipe $public demo 1.0.0 {description {S Restarted} url {S https://example.org/restarted}}
+    ::telemetry::init $settings [list $public $private]
+    list [dict get [lindex [metadata_rows] 0] description] [llength [metadata_rows]] [::telemetry::stats demo]
+} -result {Restarted 5 {{{Linux x86_64} 1 1 0}}}
+
+test metadata-concurrent {Concurrent migrations and imports share package IDs without losing metadata} -body {
+    # Simulate an interrupted rollout where one column already exists.
+    ::tpersist::_raw $::telemetry::connection {ALTER TABLE packages DROP COLUMN url}
+    ::telemetry::close
+    recipe $private simultaneous 1.0.0 {description {S Concurrent} url {S https://example.org/concurrent}}
+    set workers {}
+    for {set i 0} {$i < 4} {incr i} {
+        lappend workers [open [list | [info nameofexecutable] [info script] --worker $settings [list $public $private]] r]
+    }
+    set errors {}
+    foreach worker $workers {
+        read $worker
+        if {[catch {close $worker} message]} {lappend errors $message}
+    }
+    if {[llength $errors]} {error $errors}
+    ::telemetry::init $settings
+    set rows [metadata_rows]
+    list [llength $rows] [dict get [lindex $rows 0] url] [dict get [lindex $rows 4] description] \
+        [::telemetry::stats demo]
+} -result {6 https://example.org/restarted Concurrent {{{Linux x86_64} 1 1 0}}}
+
+::telemetry::close
+if {$postgres} {
+    $admin allrows "DROP SCHEMA $schema CASCADE"
+    $admin close
+}
+::tcltest::removeDirectory $work
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed != 0}]
