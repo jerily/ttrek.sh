@@ -41,13 +41,15 @@ limiter still uses the configured Valkey connection independently of monitoring.
 The private registry
 supplies the local mock tooling; the public registry supplies the static content
 packages. `TTREK_LOCAL_CONFIG` may select a local INI for release settings.
-The `package` and `package-lambda` scripts package both content directories.
+The `package-lambda` script packages both content directories for local testing
+and deployment. It calls `bin/package-lambda.sh`, the same entry point used by
+the infrastructure build scripts.
 Repackage the site after changing Markdown for the local Lambda stack or deployment.
 
 To run the website through all three mocks, without Valkey or AWS:
 
 ```sh
-ttrek run -script package -- --local-only
+ttrek run -script package-lambda -- --local-only
 ttrek run -script start-local
 ```
 
