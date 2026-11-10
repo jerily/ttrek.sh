@@ -68,6 +68,15 @@ Resources:
               - Effect: Allow
                 Action: s3:PutObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
+        - PolicyName: SendTransactionalEmail
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [ses:SendEmail, ses:SendRawEmail, ses:SendTemplatedEmail]
+                Resource:
+                  - !ImportValue Infra-DevOps-TTREK-SES-IdentityArn
+                  - !ImportValue Infra-DevOps-TTREK-SES-ConfigurationSetArn
         - PolicyName: WriteFunctionLogs
           PolicyDocument:
             Version: '2012-10-17'

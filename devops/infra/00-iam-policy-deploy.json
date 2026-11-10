@@ -44,6 +44,69 @@
     },
     {
       "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "arn:aws:route53:::hostedzone/*",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "*._domainkey.ttrek.sh"
+          ]
+        },
+        "ForAllValues:StringEquals": {
+          "route53:ChangeResourceRecordSetsRecordTypes": [
+            "CNAME"
+          ]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "arn:aws:route53:::hostedzone/*",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "bounce.ttrek.sh"
+          ]
+        },
+        "ForAllValues:StringEquals": {
+          "route53:ChangeResourceRecordSetsRecordTypes": [
+            "MX",
+            "TXT"
+          ]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "arn:aws:route53:::hostedzone/*",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "_dmarc.ttrek.sh"
+          ]
+        },
+        "ForAllValues:StringEquals": {
+          "route53:ChangeResourceRecordSetsRecordTypes": [
+            "TXT"
+          ]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ses:GetEmailIdentity",
+        "ses:GetConfigurationSet"
+      ],
+      "Resource": [
+        "arn:aws:ses:__REGION__:__ACCOUNT_ID__:identity/ttrek.sh",
+        "arn:aws:ses:__REGION__:__ACCOUNT_ID__:configuration-set/ttrek-transactional"
+      ]
+    },
+    {
+      "Effect": "Allow",
       "Action": "ssm:GetParameter",
       "Resource": "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/*"
     },
