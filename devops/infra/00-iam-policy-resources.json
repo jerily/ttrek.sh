@@ -169,6 +169,42 @@
         "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/ops.apigateway.amazonaws.com/AWSServiceRoleForAPIGateway",
         "arn:aws:iam::__ACCOUNT_ID__:role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS"
       ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ses:CreateEmailIdentity",
+        "ses:DeleteEmailIdentity",
+        "ses:GetEmailIdentity",
+        "ses:PutEmailIdentityConfigurationSetAttributes",
+        "ses:PutEmailIdentityDkimAttributes",
+        "ses:PutEmailIdentityDkimSigningAttributes",
+        "ses:PutEmailIdentityFeedbackAttributes",
+        "ses:PutEmailIdentityMailFromAttributes",
+        "ses:CreateConfigurationSet",
+        "ses:DeleteConfigurationSet",
+        "ses:GetConfigurationSet",
+        "ses:DescribeConfigurationSet",
+        "ses:PutConfigurationSetTrackingOptions",
+        "ses:PutConfigurationSetDeliveryOptions",
+        "ses:PutConfigurationSetReputationOptions",
+        "ses:PutConfigurationSetSendingOptions",
+        "ses:PutConfigurationSetSuppressionOptions",
+        "ses:PutConfigurationSetVdmOptions",
+        "ses:PutConfigurationSetArchivingOptions",
+        "ses:TagResource",
+        "ses:UntagResource",
+        "ses:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:ses:__REGION__:__ACCOUNT_ID__:identity/ttrek.sh",
+        "arn:aws:ses:__REGION__:__ACCOUNT_ID__:configuration-set/ttrek-transactional"
+      ],
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "aws:CalledVia": "cloudformation.amazonaws.com"
+        }
+      }
     }
   ]
 }
