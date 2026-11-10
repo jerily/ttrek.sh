@@ -65,7 +65,8 @@ For a new deployment:
 4. Set the SSM cache host to the cache stack's `TTrekValkeyClusterEndpointAddress` output.
 5. Follow the [telemetry deployment steps](telemetry.md#deploy): create the PostgreSQL
    SecureString and deploy `38-deploy-infra-rds-postgres.sh` before building the website.
-6. Run `15-deploy-infra-certificate.sh` and complete DNS validation.
+6. Run `15-deploy-infra-certificate.sh` and complete DNS validation, then run
+   `45-deploy-infra-ses.sh` to create the SES exports required by the Lambda role.
 7. Complete the GitHub connection setup below, run `30-deploy-codebuild.sh`, then
    run the build (or use the manual Lambda steps below).
 8. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.
@@ -118,6 +119,87 @@ the same names; these templates do not take over unmanaged resources.
 See [ACM CloudFormation DNS validation](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-certificatemanager-certificate.html)
 and [HTTP API custom domains](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-custom-domain-names.html).
 
+### Transactional email (SES)
+
+`devops/infra/45-infra-ses.yml` manages the `ttrek.sh` sending identity in the
+selected region and its default `ttrek-transactional` configuration set. It
+enables 2048-bit Easy DKIM, reputation metrics, and suppression of addresses
+that bounce or complain. The dedicated MAIL FROM domain is `bounce.ttrek.sh`.
+Route 53 receives three DKIM CNAME records and the MAIL FROM MX/SPF records;
+the apex MX and SPF records are unaffected. This provisions sending, not an inbox.
+
+Update the [deployment IAM policies](#deployment-iam-policy), then deploy this
+stack before deploying the SAM template:
+
+```bash
+devops/infra/45-deploy-infra-ses.sh
+```
+
+The defaults are `AWS_PROFILE=ttrek-prod-neo`, `AWS_REGION=eu-central-1`, and
+stack `Infra-DevOps-TTREK-SES`. The script uses the same hosted-zone resolver as
+the certificate and API scripts. `TTREK_HOSTED_ZONE_ID=''` skips Route 53
+management; publish the stack's `DkimRecordName1`/`DkimRecordValue1` through
+`DkimRecordName3`/`DkimRecordValue3` as CNAMEs, and `MailFromMxValue`/`MailFromSpfValue`
+as MX/TXT records at `MailFromDomain`, at your DNS provider. Keep DKIM records
+unproxied. Direct CloudFormation deployments accept the equivalent parameters.
+
+| Environment variable | Template parameter | Default |
+| --- | --- | --- |
+| `TTREK_DOMAIN_NAME` | `DomainName` | `ttrek.sh` |
+| `TTREK_HOSTED_ZONE_ID` | `HostedZoneId` | Public-zone lookup |
+| `TTREK_SES_MAIL_FROM_SUBDOMAIN` | `MailFromSubdomain` | `bounce` |
+| `TTREK_SES_CONFIGURATION_SET` | `ConfigurationSetName` | `ttrek-transactional` |
+| `TTREK_SES_MANAGE_DMARC` | `ManageDmarcRecord` | `false` |
+| `TTREK_SES_DMARC_POLICY` | `DmarcPolicy` | `none` |
+
+DMARC is opt-in because `_dmarc.ttrek.sh` applies to every sender for the domain.
+If no record exists and this stack should own it, use
+`TTREK_SES_MANAGE_DMARC=true`; the default policy requests no quarantine or
+rejection. For external DNS, this option exposes the DMARC record name/value
+as outputs instead. Keep an existing DMARC policy under its current management.
+Before deploying, reconcile any existing SES identity/configuration set or
+conflicting DNS records; the stack does not take over unmanaged resources.
+Deployment-policy ARNs and DNS restrictions use the defaults above; adjust them
+when selecting another domain, configuration set or MAIL FROM subdomain.
+
+Stack completion does not mean DNS verification has finished. Inspect the
+identity in the same region:
+
+```bash
+aws sesv2 get-email-identity --email-identity ttrek.sh \
+  --region "${AWS_REGION:-${AWS_DEFAULT_REGION:-eu-central-1}}" \
+  --profile "${AWS_PROFILE:-ttrek-prod-neo}" \
+  --query '{Verified:VerifiedForSendingStatus,DKIM:DkimAttributes.Status,MailFrom:MailFromAttributes.MailFromDomainStatus}'
+```
+
+Wait for `Verified=true`, `DKIM=SUCCESS`, and `MailFrom=SUCCESS`. The identity uses
+`REJECT_MESSAGE` on MAIL FROM MX failure, so it will reject sends while that
+verification is pending or failing. SES sandbox/production access is regional
+and is managed separately from this stack. In the sandbox, use verified
+recipients or `success@simulator.amazonses.com`; request production access before
+sending to arbitrary recipients. See [SES domain verification](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-ses-emailidentity.html),
+[custom MAIL FROM](https://docs.aws.amazon.com/ses/latest/dg/mail-from.html), and
+[production access](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html).
+
+The template exports `IdentityArn`, `ConfigurationSetName`, and
+`ConfigurationSetArn` under `Infra-DevOps-TTREK-SES-*`. The new Tcl extension can
+use the verified identity with `region eu-central-1`, a `from` address at
+`ttrek.sh`, and `configuration_set ttrek-transactional`. Install
+`aws-sdk-tcl-ses` and use `package require awsses 1.0.16` in the sending application.
+Feedback forwarding remains enabled; use a monitored From or `return_path`
+mailbox for bounce/complaint notifications. Reputation metrics incur CloudWatch
+charges; application event destinations can be added separately.
+
+`devops/sam-template.yaml` grants the website Lambda execution role
+`ses:SendEmail`, `ses:SendRawEmail`, and `ses:SendTemplatedEmail`, scoped to the
+exported identity and configuration set. Deploy the SES stack before creating
+or updating the SAM stack, which imports those ARNs. The deployment policies
+manage SES resources and read their status; the application role owns sending.
+The current isolated VPC still needs an SES **API** interface endpoint on TCP 443
+with private DNS and security-group access from Lambda, or outbound internet
+access. An SMTP endpoint cannot serve `awsses` API requests. This identity stack
+does not change the VPC. See [SES VPC endpoints](https://docs.aws.amazon.com/ses/latest/dg/send-email-set-up-vpc-endpoints.html).
+
 ### Deployment IAM policy
 
 The existing IAM group `ttrek_prod_admin_group` receives two customer managed
@@ -146,12 +228,16 @@ Other group policies are preserved. `--dry-run` prints the complete rendered
 CloudFormation template without changing AWS. The source JSON contains
 placeholders and must be rendered before it is submitted to IAM.
 
-The policies cover the application infrastructure scripts (Keys through Api): stack change
+The policies cover the application infrastructure scripts (Keys through SES): stack change
 sets, KMS keys and aliases, the S3 bucket, isolated VPC, Valkey, ACM/DNS, CodeBuild
 and its role, and the public API's Lambda invocation permission. Most resource
 operations require CloudFormation's [forward access session](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/fas-requests-and-permission-evaluation.html).
 SSM reads and decryption through SSM are scoped to `/ttrek_sh/*`;
-DNS changes are limited to A/CNAME records at `ttrek.sh` and `_*.ttrek.sh`.
+DNS changes are limited to A/CNAME records at `ttrek.sh` and `_*.ttrek.sh`,
+DKIM CNAMEs at `*._domainkey.ttrek.sh`, MAIL FROM MX/TXT records at
+`bounce.ttrek.sh`, and the optional TXT record at `_dmarc.ttrek.sh`.
+SES management is scoped to the `ttrek.sh` identity and `ttrek-transactional`
+configuration set through CloudFormation, with direct read access for status checks.
 Role passing is scoped to CodeBuild and the telemetry scheduler. Cleanup permissions
 for the removed maintenance Lambda are retained for existing stack upgrades.
 The policies also cover RDS and its service-linked role, maintenance schedules,

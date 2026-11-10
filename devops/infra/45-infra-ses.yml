@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SES domain identity and transactional email configuration for ttrek.sh.
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: ttrek.sh
+    MaxLength: 253
+    AllowedPattern: '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+'
+    Description: Sending domain, in lowercase without a trailing dot.
+  HostedZoneId:
+    Type: String
+    Default: ''
+    AllowedPattern: '(^$|Z[A-Z0-9]+)'
+    Description: Public Route 53 zone ID in this account; leave empty to publish the DNS outputs manually.
+  MailFromSubdomain:
+    Type: String
+    Default: bounce
+    AllowedPattern: '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?'
+    Description: Dedicated subdomain for SES bounce handling, not an inbox or a From address.
+  ConfigurationSetName:
+    Type: String
+    Default: ttrek-transactional
+    AllowedPattern: '[A-Za-z0-9_-]{1,64}'
+  ManageDmarcRecord:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Opt in only if this stack should own the domain's DMARC record and no record already exists.
+  DmarcPolicy:
+    Type: String
+    Default: none
+    AllowedValues: [none, quarantine, reject]
+    Description: Used only when ManageDmarcRecord is true; none starts without requesting quarantine or rejection.
+
+Conditions:
+  UseRoute53: !Not [!Equals [!Ref HostedZoneId, '']]
+  ManageDmarc: !Equals [!Ref ManageDmarcRecord, 'true']
+  CreateDmarcRecord: !And [!Condition UseRoute53, !Condition ManageDmarc]
+
+Resources:
+  TransactionalConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Properties:
+      Name: !Ref ConfigurationSetName
+      ReputationOptions:
+        ReputationMetricsEnabled: true
+      SendingOptions:
+        SendingEnabled: true
+      SuppressionOptions:
+        SuppressedReasons: [BOUNCE, COMPLAINT]
+
+  SendingIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref DomainName
+      ConfigurationSetAttributes:
+        ConfigurationSetName: !Ref TransactionalConfigurationSet
+      DkimAttributes:
+        SigningEnabled: true
+      DkimSigningAttributes:
+        NextSigningKeyLength: RSA_2048_BIT
+      # Keep feedback forwarding until an application event handler is configured.
+      FeedbackAttributes:
+        EmailForwardingEnabled: true
+      MailFromAttributes:
+        MailFromDomain: !Sub ${MailFromSubdomain}.${DomainName}
+        BehaviorOnMxFailure: REJECT_MESSAGE
+
+  # Keep DKIM and MAIL FROM in separate batches to match their IAM restrictions.
+  DkimDns:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: UseRoute53
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !GetAtt SendingIdentity.DkimDNSTokenName1
+          Type: CNAME
+          TTL: '300'
+          ResourceRecords: [!GetAtt SendingIdentity.DkimDNSTokenValue1]
+        - Name: !GetAtt SendingIdentity.DkimDNSTokenName2
+          Type: CNAME
+          TTL: '300'
+          ResourceRecords: [!GetAtt SendingIdentity.DkimDNSTokenValue2]
+        - Name: !GetAtt SendingIdentity.DkimDNSTokenName3
+          Type: CNAME
+          TTL: '300'
+          ResourceRecords: [!GetAtt SendingIdentity.DkimDNSTokenValue3]
+
+  MailFromDns:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: UseRoute53
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !Sub ${MailFromSubdomain}.${DomainName}
+          Type: MX
+          TTL: '300'
+          ResourceRecords: [!Sub '10 feedback-smtp.${AWS::Region}.amazonses.com']
+        - Name: !Sub ${MailFromSubdomain}.${DomainName}
+          Type: TXT
+          TTL: '300'
+          ResourceRecords: ['"v=spf1 include:amazonses.com ~all"']
+
+  DmarcDns:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDmarcRecord
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub _dmarc.${DomainName}
+      Type: TXT
+      TTL: '300'
+      ResourceRecords: [!Sub '"v=DMARC1; p=${DmarcPolicy}; adkim=r; aspf=r"']
+
+Outputs:
+  Region:
+    Value: !Ref AWS::Region
+  Identity:
+    Value: !Ref SendingIdentity
+  IdentityArn:
+    Value: !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${SendingIdentity}
+    Export:
+      Name: !Sub ${AWS::StackName}-IdentityArn
+  ConfigurationSetName:
+    Value: !Ref TransactionalConfigurationSet
+    Export:
+      Name: !Sub ${AWS::StackName}-ConfigurationSetName
+  ConfigurationSetArn:
+    Value: !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${TransactionalConfigurationSet}
+    Export:
+      Name: !Sub ${AWS::StackName}-ConfigurationSetArn
+  DkimRecordName1:
+    Value: !GetAtt SendingIdentity.DkimDNSTokenName1
+  DkimRecordValue1:
+    Value: !GetAtt SendingIdentity.DkimDNSTokenValue1
+  DkimRecordName2:
+    Value: !GetAtt SendingIdentity.DkimDNSTokenName2
+  DkimRecordValue2:
+    Value: !GetAtt SendingIdentity.DkimDNSTokenValue2
+  DkimRecordName3:
+    Value: !GetAtt SendingIdentity.DkimDNSTokenName3
+  DkimRecordValue3:
+    Value: !GetAtt SendingIdentity.DkimDNSTokenValue3
+  MailFromDomain:
+    Value: !Sub ${MailFromSubdomain}.${DomainName}
+  MailFromMxValue:
+    Value: !Sub 10 feedback-smtp.${AWS::Region}.amazonses.com
+  MailFromSpfValue:
+    Value: 'v=spf1 include:amazonses.com ~all'
+  DmarcRecordName:
+    Condition: ManageDmarc
+    Value: !Sub _dmarc.${DomainName}
+  DmarcRecordValue:
+    Condition: ManageDmarc
+    Value: !Sub 'v=DMARC1; p=${DmarcPolicy}; adkim=r; aspf=r'
