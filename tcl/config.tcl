@@ -269,7 +269,7 @@ proc ::app_config::releases_from_ini {path root} {
 
 # Private image storage shared by the documentation and blog snapshots.
 proc ::app_config::content_images {config root} {
-    set settings [dict create bucket {} region {} directory content prefix ttrek/content/images \
+    set settings [dict create bucket {} region {} directory content/docs prefix ttrek/content/images \
         url_expiry_seconds 3600 endpoint {}]
     if {[dict exists $config content_images]} {
         dict for {name value} [dict get $config content_images] {

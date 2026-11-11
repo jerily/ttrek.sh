@@ -11,7 +11,7 @@ test image-config-default {images are opt-in and the directory is relative to th
     set settings [::app_config::content_images {} $root]
     list [dict get $settings bucket] [dict get $settings directory] \
         [::content_images::options $settings]
-} -result [list {} [file join $root content] {}]
+} -result [list {} [file join $root content docs] {}]
 
 test image-config-invalid {reject bad storage configuration} -body {
     set errors {}
