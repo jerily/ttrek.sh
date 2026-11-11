@@ -88,10 +88,9 @@ tjson's private cJSON implementation is not used by jinja2-tcl. The interpreter
 is `build/install/bin/tclsh9.1`; no sibling repository is needed. The build and
 registry use the published tjson 1.0.26 and twebserver 1.47.54 release tags.
 
-`ttrek.json` declares every Tcl extension installed by `build.sh` as a direct
-dependency, including `tink-tcl` 20240704.0.1 and `tsession` 1.0.3. Their native
-libraries remain transitive registry dependencies. Tcl's bundled SQLite package
-comes with the Tcl runtime.
+The site does not create or persist user sessions, so `tsession` and its storage
+adapters are not dependencies. Native libraries remain transitive registry
+dependencies. Tcl's bundled SQLite package comes with the Tcl runtime.
 
 `build.sh` installs public runtime dependencies, including TLS-enabled Valkey and
 `tink-tcl` 20240704.0.1 with Tcl stubs. Tink and RapidJSON patches live in
