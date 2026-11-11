@@ -18,6 +18,7 @@ proc ::site_lambda::initialize {root} {
     }
     set settings [dict merge [dict create rootdir $root registry_dir [file join $root registry] \
         releases [::app_config::releases $config $root] \
+        content_images [::app_config::content_images $config $root] \
         request_monitor [::app_config::request_monitor $config]] [::app_config::lambda_middleware $config]]
     if {[info exists ::env(TTREK_LOCAL_S3_ENDPOINT)]} {
         if {[::app_config::mode] ne "LOCAL"} {error "TTREK_LOCAL_S3_ENDPOINT requires ENV=LOCAL"}
@@ -28,6 +29,11 @@ proc ::site_lambda::initialize {root} {
         dict set release region us-east-1
         dict set release endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
         dict set settings releases [::app_config::releases [dict create releases $release]]
+        set images [dict get $settings content_images]
+        dict set images bucket ttrek-local
+        dict set images region us-east-1
+        dict set images endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
+        dict set settings content_images [::app_config::content_images [dict create content_images $images] $root]
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
     set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]

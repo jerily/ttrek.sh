@@ -21,6 +21,16 @@ Parameters:
     Default: jerily-ttrek-app
     Description: Must match releases.bucket in the packaged production configuration.
 
+  ContentImagesBucket:
+    Type: String
+    Default: jerily-ttrek-app
+    Description: Must match content_images.bucket in the packaged production configuration.
+  ContentImagesPrefix:
+    Type: String
+    Default: ttrek/content/images
+    AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
+    Description: Must match content_images.prefix (without leading or trailing slashes).
+
 Resources:
   SiteLogs:
     Type: AWS::Logs::LogGroup
@@ -61,6 +71,19 @@ Resources:
               - Effect: Allow
                 Action: s3:GetObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::${ReleaseBucket}/ttrek/*
+        - PolicyName: ContentImages
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}
+                Condition:
+                  StringLike:
+                    s3:prefix: !Sub ${ContentImagesPrefix}/*
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/*
         - PolicyName: WriteTelemetryBackups
           PolicyDocument:
             Version: '2012-10-17'

@@ -4,8 +4,8 @@ package require tjson
 package require thread
 package require tratelimit 1.0.1
 package require treqmon 2.1.0
-package require web-static-wiki 0.1.0
-package require web-static-blog 0.1.0
+package require web-static-wiki 0.1.1
+package require web-static-blog 0.1.1
 package require tpathexp 1.1.0
 
 namespace eval ::site {
@@ -13,7 +13,7 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {assets responses templates releases request-validation search handlers} {
+foreach module {assets responses templates releases content-images request-validation search handlers} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -35,9 +35,13 @@ proc ::site::configure {config} {
 # Each worker owns a router and immutable directory snapshots.
 proc ::site::mount {router} {
     set templates $::views::templates
+    set imageOptions {}
+    if {[dict exists [config] content_images]} {
+        set imageOptions [::content_images::options [dict get [config] content_images]]
+    }
     foreach {kind title prefix} {wiki Documentation /docs blog Blog /blog} {
         set directory [expr {$kind eq "wiki" ? "docs" : "blog"}]
-        set store [::web::static::${kind}::create -directory [file join [root] content $directory] -title $title]
+        set store [::web::static::${kind}::create -directory [file join [root] content $directory] -title $title {*}$imageOptions]
         ::web::static::${kind}::mount $router -store $store -prefix $prefix \
             -config [dict create master_template [dict get $templates ${directory}-master.html.jinja] \
                 templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
