@@ -99,7 +99,7 @@ test lambda-config-12 {Invalid monitor history limits fail during configuration}
 # Run the real Lambda initializer with disposable configuration. Only KMS
 # decryption, database connections and router startup are replaced.
 file mkdir [file join $root tcl]
-foreach name {config local-ratelimit} {
+foreach name {config local-ratelimit patch} {
     file copy [file join $sourceRoot tcl $name.tcl] [file join $root tcl $name.tcl]
 }
 foreach {name script} {
@@ -110,7 +110,8 @@ foreach {name script} {
     }
     telemetry {
         namespace eval ::telemetry {}
-        proc ::telemetry::init {settings registryDirectories} {set ::telemetry::registries $registryDirectories}
+        proc ::telemetry::init_local {settings registryDirectories} {set ::telemetry::registries $registryDirectories}
+        proc ::telemetry::connect {settings} {set ::telemetry::connection test; set ::telemetry::registries {}}
     }
     telemetry-maintenance {}
     local-assets {}
@@ -143,6 +144,7 @@ test lambda-releases-1 {Production startup loads releases and resolves the manif
     set ::releases::client [::aws::s3::create {region eu-central-1 aws_access_key_id test aws_secret_access_key test}]
 } -body {
     ::site_lambda::initialize $root
+    if {$::telemetry::registries ne {}} {error "PROD startup must not import registry metadata"}
     set releases [dict get [::site::config] releases]
     set artifact [::releases::artifact aarch64-apple-darwin]
     set url [::releases::signed_url $artifact]

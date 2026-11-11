@@ -17,9 +17,6 @@ if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONF
     set releases [::app_config::releases_from_ini [file join $siteRoot etc config.ini] $siteRoot]
     set images [::app_config::content_images_from_ini [file join $siteRoot etc config.ini] $siteRoot]
     if {[dict get $images bucket] eq {}} {error "Production configuration requires content_images.bucket"}
-    # Check both collections using the packaged image files. Rendering the smoke
-    # requests below stays independent of AWS credentials and URL signing.
-    ::content_images::snapshots $siteRoot $images 0
 }
 source [file join $siteRoot tcl search-build.tcl]
 ::recipe_search::build [file join $siteRoot registry] [file join $siteRoot etc search-index.json]
@@ -27,11 +24,18 @@ file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
     releases $releases]
 set router [::tpathexp::router]
+set savedEnv [array get ::env ENV]
 try {
-    # Smoke requests do not require AWS credentials; image validation ran above.
+    # Packaging smoke checks use the existing local content path. Published
+    # production content is prepared only by the independent patch task.
+    set ::env(ENV) LOCAL
     ::site::mount $router
     foreach path {/ /docs /docs/getting-started /blog /packages} {
         set response [::site::dispatch $router [dict create method GET path $path]]
         if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}
     }
-} finally {$router destroy}
+} finally {
+    $router destroy
+    unset ::env(ENV)
+    array set ::env $savedEnv
+}

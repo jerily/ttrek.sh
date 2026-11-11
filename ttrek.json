@@ -2,14 +2,38 @@
   "name": "ttrek_sh",
   "version": "1.0.0",
   "scripts": {
-    "build-assets": "cd \"$PROJECT_HOME\" && npm ci --ignore-scripts && npm run build",
-    "build-search": "exec \"$PROJECT_HOME/bin/build-search.sh\" \"$@\"",
-    "start-direct": "exec \"$PROJECT_HOME/run.sh\" \"$@\"",
-    "start-local": "exec \"$PROJECT_HOME/bin/start-local.sh\" \"$@\"",
-    "start-lambda": "exec \"$PROJECT_HOME/bin/start-lambda.sh\" \"$@\"",
-    "start-proxy": "exec \"$PROJECT_HOME/bin/start-proxy.sh\" \"$@\"",
-    "start-s3": "exec \"$PROJECT_HOME/bin/start-s3.sh\" \"$@\"",
-    "package-lambda": "exec \"$PROJECT_HOME/bin/package-lambda.sh\" \"$@\""
+    "build-assets": {
+      "file": "bin/build-assets.sh",
+      "args": []
+    },
+    "build-search": {
+      "file": "bin/build-search.sh",
+      "args": []
+    },
+    "start-direct": {
+      "file": "run.sh",
+      "args": []
+    },
+    "start-local": {
+      "file": "bin/start-local.sh",
+      "args": []
+    },
+    "start-lambda": {
+      "file": "bin/start-lambda.sh",
+      "args": []
+    },
+    "start-proxy": {
+      "file": "bin/start-proxy.sh",
+      "args": []
+    },
+    "start-s3": {
+      "file": "bin/start-s3.sh",
+      "args": []
+    },
+    "package-lambda": {
+      "file": "bin/package-lambda.sh",
+      "args": []
+    }
   },
   "dependencies": {
     "libpq": "^16.15.0",
@@ -24,8 +48,8 @@
     "ttrigrams": "=0.2.0",
     "valkey-tcl": "^1.0.3",
     "tdbcpostgres": ">=1.1.8",
-    "web-static-blog": "^0.1.2",
-    "web-static-wiki": "^0.1.3",
+    "web-static-blog": "^0.1.3",
+    "web-static-wiki": "^0.1.4",
     "tratelimit": "^1.0.1",
     "treqmon": "^2.1.0",
     "aws-sdk-tcl-s3": "^1.0.17",

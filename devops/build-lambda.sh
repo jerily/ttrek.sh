@@ -41,6 +41,8 @@ ttrek run -script build-search
 "$TCLSH" tests/config.test
 "$TCLSH" tests/lambda-config.test
 "$TCLSH" tests/telemetry-config.test
+"$TCLSH" tests/telemetry-startup.test
+"$TCLSH" tests/patch.test
 "$TCLSH" tests/telemetry.test
 "$TCLSH" tests/registry-metadata.test
 "$TCLSH" tests/telemetry-maintenance.test

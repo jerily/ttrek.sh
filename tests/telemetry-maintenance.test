@@ -51,7 +51,7 @@ if {$postgres} {
     $admin allrows "CREATE SCHEMA $targetSchema"
     dict set settings options "-c search_path=$sourceSchema"
     set targetSettings [dict replace $settings options "-c search_path=$targetSchema"]
-    ::telemetry::init $settings
+    ::telemetry::init_local $settings
     set identity [string repeat ab 32]
     set description "Quotes \" and newline\nUnicode λ 日本語"
     ::telemetry::event register_environment -env $identity -description $description
@@ -74,7 +74,7 @@ if {$postgres} {
     proc reset_target {} {
         $::admin allrows "DROP SCHEMA $::targetSchema CASCADE"
         $::admin allrows "CREATE SCHEMA $::targetSchema"
-        ::telemetry::init $::targetSettings
+        ::telemetry::init_local $::targetSettings
         ::telemetry::close
     }
     proc read_dump {path} {
@@ -101,7 +101,7 @@ test maintenance-roundtrip {All tables, binary hashes, duplicate rows and text r
 } -result {1 601 1}
 
 test maintenance-sequences {Restored identifiers do not collide with subsequent application inserts} -constraints postgres -body {
-    ::telemetry::init $targetSettings
+    ::telemetry::init_local $targetSettings
     ::telemetry::event register_environment -env [string repeat cd 32] -description another
     set rows [::telemetry::rows [::tpersist::db_select environments -expr {COUNT(*) AS n}]]
     ::telemetry::close
