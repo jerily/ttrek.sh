@@ -54,5 +54,4 @@ ttrek run -script package-lambda -- --local-only
 python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 "$TCLSH" tests/lambda-package.tcl dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
-"$TCLSH" devops/upload-content-images.tcl "$TTREK_PRODUCTION_CONFIG"
 aws s3 sync public/assets/versioned/ "$ASSET_HISTORY" --only-show-errors

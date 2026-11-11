@@ -29,7 +29,7 @@ The execution role can read `ttrek/*` in `ReleaseBucket`, which must match
 `releases.bucket` (both default to `jerily-ttrek-app`). Binary and source requests
 redirect clients to signed S3 URLs; the clients download directly from S3.
 Generating these URLs does not require a Lambda network call to S3, so the
-backup-only S3 gateway endpoint policy does not need additional permissions.
+S3 gateway endpoint policy does not need release-download permissions.
 
 Lambda, Valkey and the Single-AZ RDS instance use the first isolated subnet.
 A second private subnet in another AZ satisfies RDS subnet-group requirements.
@@ -40,9 +40,10 @@ Lambda has no
 runtime SSM access: SSM values are resolved by the build outside the VPC. The
 security groups allow Lambda to reach Valkey on 6379, PostgreSQL on 5432 and KMS
 on 443. The website Lambda also reaches a free S3 gateway endpoint for scheduled
-JSONL backups. One private scheduled event performs backup and vacuum together. Future
-outbound AWS service calls need matching endpoints and policies; calls to public
-third-party services would need internet egress. API Gateway invocation and
+JSONL backups and explicit content-image synchronization. One private scheduled
+event performs backup and vacuum together. Future outbound AWS service calls
+need matching endpoints and policies; calls to public third-party services would
+need internet egress. API Gateway invocation and
 Lambda's normal stdout/stderr logging do not need a NAT gateway.
 
 Lambda, Valkey and the KMS endpoint use the first availability zone returned by
@@ -335,40 +336,37 @@ The build:
    `--local-only`, and sets executable ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,
    dependency resolution, and staged-site checks still run.
-5. Validates the SAM template and packaged image settings/bytes, uploads missing
-   content images, preserves the new asset fingerprints, and deploys
-   `devops/sam-template.yaml` with SAM. Image validation or upload errors stop
-   deployment.
+5. Validates the SAM template and packaged image settings/bytes, preserves the
+   new asset fingerprints, and deploys `devops/sam-template.yaml` with SAM.
+   Content images are uploaded by the explicit `task_sync_website` patch task.
 
 Content images use `[content_images]` in `devops/config.prod.ini`, which is carried
-into the generated production config. `devops/upload-content-images.tcl` reads
-only this public section and uses `aws-sdk-tcl-s3` with the CodeBuild role. Both
-wiki and blog references are validated before uploading. Identical bytes share
-content-hashed keys; existing objects and older images are retained. The build
-does not generate signed URLs: each page response signs fresh URLs at runtime.
-Production workers use `upload_missing false` and make no S3 listing or upload
-calls for images, including during cold starts. Local workers still upload
-missing images to their configured bucket or local S3 mock.
+into the generated production config. After deploying content changes, run the
+[explicit sync patch task](#explicit-website-patch-tasks). It uses the website
+Lambda role to upload missing wiki and blog images before committing their
+database references. Validation or upload errors fail the task and roll back
+its database changes. Identical bytes share content-hashed keys; existing objects
+and older images are retained. Each page response signs fresh URLs at runtime.
+Production startup and HTTP requests make no S3 listing or upload calls for
+images. Local workers still upload missing images to their configured bucket or
+local S3 mock. `task_initdb_website` initializes schemas only.
 
-Build-time image uploads require web-static-blog 0.1.2+ and web-static-wiki
-0.1.3+, supplied by the pinned registry. When first enabling this pipeline:
-
-1. Update the CodeBuild stack once with
-   `bash devops/infra/30-deploy-codebuild.sh`, using the existing
-   `TTREK_GITHUB_CONNECTION_ARN` and deployment AWS profile. The updated role needs
-   `s3:PutObject` on `ttrek/content/images/*`; its image-prefix listing permission
-   is also declared in the template.
-2. Run CodeBuild. Its SAM deployment updates Lambda's
-   image policy to `s3:GetObject` only. No separate VPC template deployment or
-   manual image upload is needed.
+Before relying on patch-task uploads, update the S3 gateway endpoint policy with
+`bash devops/infra/38-deploy-infra-rds-postgres.sh`. It allows `s3:ListBucket` and
+`s3:PutObject` only for the configured image prefix, alongside existing backup
+writes. The SAM Lambda role already grants the corresponding image permissions;
+the [endpoint policy](https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html#edit-vpc-endpoint-policy-s3)
+must also allow these calls.
+Deploying the website does not run the sync task automatically.
 
 The defaults use bucket `jerily-ttrek-app`, region `eu-central-1`, prefix
 `ttrek/content/images`, and directory `content/docs`. If changing the bucket or
-prefix, keep the CodeBuild and SAM `ContentImagesBucket`/`ContentImagesPrefix`
-parameters aligned with the generated production configuration (including any
-SSM overrides). Production image directories must be included under `content/`
-in the Lambda archive. The build checks their paths and bytes against the files
-it will upload. Keep the checkout unchanged until uploads finish.
+prefix, keep the PostgreSQL stack's endpoint and SAM
+`ContentImagesBucket`/`ContentImagesPrefix` parameters aligned with the generated
+production configuration (including any SSM overrides). Production image
+directories must be included under `content/`
+in the Lambda archive. The build checks their paths and bytes against the
+checkout; the patch task uploads images from the deployed archive.
 
 Fingerprint history lives under `s3://$SAM_ARTIFACT_BUCKET/lambda/ttrek-sh-assets/`.
 CodeBuild downloads this directory before building and uploads it after successful

@@ -26,7 +26,7 @@ phases:
   build:
     on-failure: ABORT
     commands:
-      # Validate and package the site, then upload missing content images before deployment.
+      # Validate and package the site; the explicit sync patch task uploads content images.
       - bash devops/build-lambda.sh
       - >-
         sam deploy --template-file devops/sam-template.yaml
