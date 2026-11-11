@@ -161,3 +161,43 @@ documentation, blog and monitor pages.
 
 See [setup](install.md) for dependencies, [testing](testing.md) for validation,
 and [security](security.md) for trust boundaries and current limitations.
+
+## Content images
+
+Both static packages (0.1.1+) accept a private S3 bucket and an image directory
+from the host. Configure direct-server and Lambda startup using:
+
+```ini
+[content_images]
+bucket=jerily-ttrek-app
+region=eu-central-1
+directory=content
+prefix=ttrek/content/images
+url_expiry_seconds=3600
+```
+
+`directory` is relative to the site root (or an absolute trusted directory).
+With the configuration above, put shared images under `content/images/` and use
+`![Architecture](images/architecture.svg)` in either docs or blog Markdown,
+including Markdown in nested folders. Alternatively, set `directory=content/images`
+and use `![Architecture](architecture.svg)`. Image paths always start at this
+configured directory; `..`, absolute/external image URLs, backslashes, encoded
+traversal and symlinks are rejected. The directory must exist.
+
+An empty bucket disables image hosting. Each worker shares one `awss3` client
+between the packages and creates snapshots at startup. Creation uploads only
+missing content-hashed objects with their MIME type. Page rendering signs fresh
+URLs without additional S3 requests. The SDK requires `aws-sdk-tcl-s3` 1.0.17+
+for its optional file-upload MIME type. Image hashes use Tcllib's `sha256`.
+
+The local Lambda stack overrides the bucket to `ttrek-local` and uses its loopback
+S3 mock, with dummy credentials. Direct LOCAL runs may set `endpoint` to a loopback
+HTTP mock explicitly. HTTP endpoints are rejected in PROD. No live AWS upload is
+performed by the tests or by the artifact-packaging smoke check.
+
+For deployment, match the SAM `ContentImagesBucket` and `ContentImagesPrefix`
+parameters to the configuration. The execution role lists only that prefix and
+gets/puts only its objects. Existing images and old content-hashed objects are
+never deleted; manage retention separately. If image files change, recreate the
+snapshots (normally by restarting). Already-open pages may require a reload after
+the signed URLs expire.
