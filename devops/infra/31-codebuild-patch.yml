@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Invoke an explicit maintenance task on the existing ttrek.sh Lambda.
+
+Parameters:
+  WebsiteFunctionName:
+    Type: String
+    Default: prod-Api-TtrekWebsite-Function
+    AllowedPattern: '[A-Za-z0-9_-]{1,54}'
+  TaskName:
+    Type: String
+    Default: task_sync_website
+    AllowedValues: [task_initdb_website, task_sync_website]
+
+Resources:
+  PatchBuildLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/codebuild/Infra-DevOps-TTREK-Patch
+      RetentionInDays: 14
+  PatchBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ttrek-app-PatchCodeBuildRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: codebuild.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeWebsiteTask
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt PatchBuildLogs.Arn
+  PatchBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: Infra-DevOps-TTREK-Patch
+      ServiceRole: !GetAtt PatchBuildRole.Arn
+      ConcurrentBuildLimit: 1
+      TimeoutInMinutes: 10
+      Artifacts: {Type: NO_ARTIFACTS}
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref PatchBuildLogs
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
+        PrivilegedMode: false
+        EnvironmentVariables:
+          - Name: WEBSITE_FUNCTION_NAME
+            Value: !Ref WebsiteFunctionName
+          - Name: PATCH_TASK
+            Value: !Ref TaskName
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          env:
+            shell: bash
+          phases:
+            build:
+              on-failure: ABORT
+              commands:
+                - |
+                  set -euo pipefail
+                  case "$PATCH_TASK" in
+                    task_initdb_website|task_sync_website) ;;
+                    *) echo 'Unknown patch task' >&2; exit 1 ;;
+                  esac
+                  printf '{"source":"ttrek.patch","task":"%s"}' "$PATCH_TASK" > payload.json
+                  aws lambda invoke --function-name "$WEBSITE_FUNCTION_NAME" \
+                    --invocation-type RequestResponse --cli-read-timeout 320 \
+                    --payload fileb://payload.json response.json > invocation.json
+                  python3 - <<'PY'
+                  import json, os
+                  from pathlib import Path
+                  metadata = json.loads(Path('invocation.json').read_text())
+                  if metadata.get('StatusCode') != 200 or metadata.get('FunctionError'):
+                      raise SystemExit('Lambda task failed; inspect the website Lambda logs')
+                  result = json.loads(Path('response.json').read_text())
+                  if result.get('ok') is not True or result.get('task') != os.environ['PATCH_TASK']:
+                      raise SystemExit('Lambda did not confirm task completion')
+                  print(json.dumps(result))
+                  PY
+Outputs:
+  ProjectName:
+    Value: !Ref PatchBuildProject

@@ -172,6 +172,7 @@
       "Resource": [
         "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:function:ttrek-telemetry-maintenance",
         "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:/aws/lambda/ttrek-telemetry-maintenance:*",
+        "arn:aws:logs:__REGION__:__ACCOUNT_ID__:log-group:/aws/codebuild/Infra-DevOps-TTREK-Patch:*",
         "arn:aws:scheduler:__REGION__:__ACCOUNT_ID__:schedule/default/ttrek-telemetry-*",
         "arn:aws:cloudwatch:__REGION__:__ACCOUNT_ID__:alarm:ttrek-telemetry-maintenance-errors",
         "arn:aws:ssm:__REGION__:__ACCOUNT_ID__:parameter/ttrek_sh/prod/postgres/host",

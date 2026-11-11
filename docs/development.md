@@ -14,7 +14,8 @@
   templates fail startup.
 - Documentation and blog content use `web-static-wiki` at `/docs` and
   `web-static-blog` at `/blog`, mounted on the host's `tpathexp` router.
-  Packages read Markdown directories into immutable snapshots per worker.
+  LOCAL reads Markdown directories as before. PROD queries individual content
+  rows through `tpersist`; explicit patch tasks prepare the database content.
   The host supplies trusted layouts. Restart workers to publish source changes.
 - Home, registry, documentation, blog and request-monitor pages share `www/master.html.jinja` and
   `public/css/styles.css` for
@@ -46,6 +47,19 @@
 - `assets/js/`: browser source bundled by Rollup; `content/` and `public/`:
   authored content and public assets; `registry/`: pinned
   package recipes. `build/`, `dist/`, and `var/` contain generated output or state.
+
+## Project commands
+
+`ttrek.json` references executable scripts through `file`, with optional preset
+arguments in `args`. Pass runtime arguments after `--`, for example:
+
+```sh
+ttrek run -script package-lambda -- --local-only --output "build/site review.zip"
+ttrek run -script start-local -- --help
+```
+
+Arguments pass through literally, including spaces. `build-assets` installs the
+locked npm dependencies and forwards runtime arguments to the asset build.
 
 ## Browser assets and caching
 
@@ -107,8 +121,8 @@ application staging, S3 seeds and release configuration. `etc/lambda.json` selec
 keeps its HTTP event mapping, telemetry and release settings; tdevops supplies the
 bootstrap, Runtime API loop, package-path setup and generated local template.
 There is no app-local `lambda/` directory. `devops/prepare-lambda.tcl` builds the
-search snapshot before packaging; telemetry initializes its selected backend at
-runtime. [Telemetry](telemetry.md) uses tpersist with SQLite only in LOCAL and
+search index before packaging. PROD startup opens database connections only;
+LOCAL retains schema initialization and registry synchronization through `init_local`. [Telemetry](telemetry.md) uses tpersist with SQLite only in LOCAL and
 PostgreSQL only in PROD. Backend drivers are loaded only on connection.
 
 ## Request validation
@@ -193,13 +207,12 @@ location. `..`, absolute/external image URLs, backslashes, encoded traversal and
 symlinks are rejected. The directory must exist.
 
 An empty bucket disables image hosting locally; production packaging and uploads
-require a bucket. Each worker shares one `awss3` client between the packages and
-creates snapshots at startup. LOCAL passes `upload_missing true`, uploading only
-missing content-hashed objects with their MIME type. PROD passes
-`upload_missing false`: startup validates local sources and computes keys without
-listing or uploading S3 objects. Page rendering signs fresh URLs. The SDK requires
-`aws-sdk-tcl-s3` 1.0.17+ for its optional file-upload MIME type. Image hashes use
-Tcllib's `sha256`.
+require a bucket. Each worker shares one `awss3` client between the packages.
+LOCAL reads its directories and uploads missing images as before. PROD queries
+one item from PostgreSQL when requested and signs URLs using the stored image
+keys. It does not scan directories, render Markdown, or hash images at startup.
+`task_sync_website` performs those operations through each package's `sync` proc.
+The SDK requires `aws-sdk-tcl-s3` 1.0.17+; maintenance image hashes use `::twebserver::sha256`.
 
 The local Lambda stack overrides the bucket to `ttrek-local` and uses its loopback
 S3 mock, with dummy credentials. Direct LOCAL runs may set `endpoint` to a loopback
@@ -214,8 +227,8 @@ image paths, bytes and settings match what the build will upload.
 
 For deployment, match the CodeBuild and SAM `ContentImagesBucket` and
 `ContentImagesPrefix` parameters to the configuration. CodeBuild lists the image
-prefix and puts missing objects; the Lambda execution role only gets images for
-signed downloads. Existing images and old content-hashed objects are
-never deleted; manage retention separately. If image files change, recreate the
-snapshots (normally by restarting). Already-open pages may require a reload after
+prefix and puts missing objects. The Lambda role can also list/put this prefix
+for the explicit sync task, and get images for signed downloads. Existing images and old content-hashed objects are
+never deleted; manage retention separately. If content or image files change, run `task_sync_website` against the deployed
+website revision. Existing database readers see the changes on their next query. Already-open pages may require a reload after
 the signed URLs expire.

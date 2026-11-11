@@ -64,6 +64,22 @@ try {
         }
     }
     write_file [file join $app etc [expr {$mode eq "LOCAL" ? "config.local.ini" : "config.ini"}]] $config
+    if {$mode eq "PROD"} {
+        # Provision fixtures explicitly, outside the request-serving process.
+        source [file join $app tcl telemetry.tcl]
+        ::telemetry::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+        try {
+            ::telemetry::initdb
+            ::telemetry::sync_registry_metadata [file join $app $registryDir]
+            foreach {kind directory} {wiki docs blog blog} {
+                package require web-static-$kind
+                ::web::static::${kind}::initdb $::telemetry::connection
+                set store [::web::static::${kind}::create -connection $::telemetry::connection -domain ttrek.sh \
+                    -title [expr {$kind eq "wiki" ? "Documentation" : "Blog"}]]
+                ::web::static::${kind}::sync $store [file join $app content $directory]
+            }
+        } finally {::telemetry::close}
+    }
     write_file [file join $app users.acl] "user default off\nuser appuser on >tls-smoke-password ~* +@all\n"
     set valkeyProcess [::test_support::start [list $valkey --bind 127.0.0.1 --port 0 --tls-port $valkeyPort \
         --tls-cert-file [file join $app cert.pem] --tls-key-file [file join $app key.pem] \

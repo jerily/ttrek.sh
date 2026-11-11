@@ -130,7 +130,9 @@
       "Resource": [
         "arn:aws:s3:::jerily-ttrek-app",
         "arn:aws:codebuild:__REGION__:__ACCOUNT_ID__:project/Infra-DevOps-TTREK-Builds",
+        "arn:aws:codebuild:__REGION__:__ACCOUNT_ID__:project/Infra-DevOps-TTREK-Patch",
         "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-app-CodeBuildRole",
+        "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-app-PatchCodeBuildRole",
         "arn:aws:codeconnections:__REGION__:__ACCOUNT_ID__:connection/*",
         "arn:aws:apigateway:__REGION__::/apis",
         "arn:aws:apigateway:__REGION__::/apis/*",
@@ -150,7 +152,10 @@
     {
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-app-CodeBuildRole",
+      "Resource": [
+        "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-app-CodeBuildRole",
+        "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-app-PatchCodeBuildRole"
+      ],
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "codebuild.amazonaws.com"

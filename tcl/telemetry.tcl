@@ -35,7 +35,8 @@ namespace eval ::telemetry {
 
 }
 
-proc ::telemetry::init {settings {registryDirectories {}}} {
+# Runtime startup opens the connection only. Provisioning is explicit.
+proc ::telemetry::connect {settings} {
     variable connection
     variable dialect
     variable event_list
@@ -52,8 +53,13 @@ proc ::telemetry::init {settings {registryDirectories {}}} {
         return -code error -errorcode {TELEMETRY CONNECT} "Could not connect to the telemetry database"
     }
     set connection $opened
+}
+
+# Preserve local startup behavior; production uses connect and explicit tasks.
+proc ::telemetry::init_local {settings {registryDirectories {}}} {
+    connect $settings
     try {
-        transaction {create_schema} true
+        initdb
         if {[llength $registryDirectories]} {sync_registry_metadata {*}$registryDirectories}
     } on error {message opts} {
         close
@@ -134,30 +140,32 @@ proc ::telemetry::table_definitions {} {
     return $definitions
 }
 
-proc ::telemetry::create_schema {} {
+proc ::telemetry::initdb {} {
     variable connection
     variable dialect
-    dict for {table definition} [table_definitions] {
-        db_create_table $connection $definition -if_not_exists true
-    }
-    # Upgrade existing databases without replacing package IDs or event rows.
-    # tpersist has no ALTER TABLE helper; only fixed schema identifiers enter SQL.
-    if {$dialect eq "sqlite"} {
-        set columns [lmap row [::tpersist::_raw $connection {PRAGMA table_info(packages)}] {dict get $row name}]
-    } else {
-        set columns [lmap row [::tpersist::_raw $connection {
-            SELECT attname FROM pg_attribute
-            WHERE attrelid = 'packages'::regclass AND attnum > 0 AND NOT attisdropped
-        }] {dict get $row attname}]
-    }
-    foreach column {description url} {
-        if {$column ni $columns} {
-            set guard [expr {$dialect eq "postgresql" ? "IF NOT EXISTS " : ""}]
-            ::tpersist::_raw $connection "ALTER TABLE packages ADD COLUMN ${guard}$column TEXT NOT NULL DEFAULT ''"
+    transaction {
+        dict for {table definition} [table_definitions] {
+            db_create_table $connection $definition -if_not_exists true
         }
-    }
-    db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
-    db_create_index $connection idx_install_package req_pkg_install_event {pkg_id platform_id} -if_not_exists true
+        # Upgrade existing databases without replacing package IDs or event rows.
+        # tpersist has no ALTER TABLE helper; only fixed schema identifiers enter SQL.
+        if {$dialect eq "sqlite"} {
+            set columns [lmap row [::tpersist::_raw $connection {PRAGMA table_info(packages)}] {dict get $row name}]
+        } else {
+            set columns [lmap row [::tpersist::_raw $connection {
+                SELECT attname FROM pg_attribute
+                WHERE attrelid = 'packages'::regclass AND attnum > 0 AND NOT attisdropped
+            }] {dict get $row attname}]
+        }
+        foreach column {description url} {
+            if {$column ni $columns} {
+                set guard [expr {$dialect eq "postgresql" ? "IF NOT EXISTS " : ""}]
+                ::tpersist::_raw $connection "ALTER TABLE packages ADD COLUMN ${guard}$column TEXT NOT NULL DEFAULT ''"
+            }
+        }
+        db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
+        db_create_index $connection idx_install_package req_pkg_install_event {pkg_id platform_id} -if_not_exists true
+    } true
 }
 
 proc ::telemetry::rows {statement} {
