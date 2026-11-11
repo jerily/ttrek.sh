@@ -1,5 +1,5 @@
 package require tjson
-package require sha256
+package require twebserver
 
 namespace eval ::archive_mirror {
     variable root [file dirname [file dirname [file normalize [info script]]]]
@@ -169,7 +169,7 @@ proc ::archive_mirror::process_spec {settings path seenVar} {
                     error "Download URL must be nonempty ASCII without whitespace; percent-encode other characters"
                 }
                 # Match ttrek's byte-array SHA-256: literal URL, no trailing newline.
-                set digest [string tolower [::sha2::sha256 -hex -- $url]]
+                set digest [string tolower [::twebserver::hex_encode [::twebserver::sha256 $url]]]
                 set key [dict get $settings prefix]/$recipe-$digest.archive
             } message]} {
                 dict incr counts failed

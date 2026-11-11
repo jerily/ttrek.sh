@@ -578,3 +578,44 @@ The deploy policy permits both on `/tags/*`. The resource policy also includes
 an explicit authorization denial for that action on `/apis/.../stages`. Retain
 that permission alongside the documented HTTP-verb permissions. Some IAM linters
 may not recognize the action because it is absent from the published action list.
+
+## Explicit website patch tasks
+
+The existing website Lambda accepts private direct invocations with
+`{"source":"ttrek.patch","task":"task_initdb_website"}` or
+`{"source":"ttrek.patch","task":"task_sync_website"}`. The first initializes the
+installed packages' schemas; the second synchronizes wiki/blog content, images,
+and registry metadata. HTTP request envelopes cannot select either task. IAM
+`lambda:InvokeFunction` authorizes the whole function, including its existing
+backup task; IAM does not restrict individual task names.
+
+`devops/infra/31-codebuild-patch.yml` defines the new, independent
+`Infra-DevOps-TTREK-Patch` CodeBuild project. It needs only Lambda invocation and
+its own log permissions; the Lambda uses its existing VPC/database access.
+The website deployment build does not invoke it. Redeploy the group policies with
+`00-deploy-iam-policy.sh` using an administrator profile to allow management of
+the new project, role and log group. Deploy the patch stack separately with its
+companion script, then select the task when starting a build:
+
+```sh
+bash devops/infra/31-deploy-codebuild-patch.sh
+aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
+  --environment-variables-override name=PATCH_TASK,value=task_initdb_website,type=PLAINTEXT
+aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
+  --environment-variables-override name=PATCH_TASK,value=task_sync_website,type=PLAINTEXT
+```
+
+The script uses the standard AWS profile/region defaults above.
+`TTREK_WEBSITE_FUNCTION_NAME` overrides the target Lambda and `TTREK_PATCH_TASK`
+sets the project's default task (otherwise `task_sync_website`). Deploying the
+stack does not start a build or run a task.
+
+Run initialization before the first sync on a new database. Tasks run the code and
+content currently deployed in the website Lambda. PROD startup does no schema or
+content synchronization; pages/posts query their rows on demand. Existing content
+stays under `ttrek.sh/content`, and there is no separate patch Lambda project.
+Local testing uses the existing `tdevops` website stack and the same invocation
+payloads against its local Lambda endpoint.
+
+The pinned registry supplies `web-static-wiki` 0.1.4 and `web-static-blog` 0.1.3,
+which provide the explicit initialization and synchronization procedures.

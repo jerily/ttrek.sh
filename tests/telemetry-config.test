@@ -27,7 +27,7 @@ test telemetry-config-5 {Connection failures redact driver diagnostics and crede
     proc ::tpersist::db_connect {args} {error "driver diagnostic containing [dict get $args -password]"}
 } -body {
     set marker [string repeat x 40]
-    catch {::telemetry::init [dict create dialect postgresql database test password $marker]} message options
+    catch {::telemetry::init_local [dict create dialect postgresql database test password $marker]} message options
     list $message [dict get $options -errorcode] [expr {[string first $marker [dict get $options -errorinfo]] < 0}]
 } -cleanup {
     rename ::tpersist::db_connect {}

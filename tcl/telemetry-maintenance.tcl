@@ -127,7 +127,7 @@ proc ::telemetry_maintenance::run {settings context} {
     }
 }
 
-# Restore only into an empty telemetry schema, created by telemetry::init.
+# Restore only into an empty telemetry schema, created by telemetry::initdb.
 # All inserts use tpersist compilation and bound TDBC parameters. A missing
 # footer, bad count, invalid row or damaged gzip rolls the entire restore back.
 proc ::telemetry_maintenance::restore {db path} {

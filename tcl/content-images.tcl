@@ -25,8 +25,8 @@ proc ::content_images::options {settings {uploadMissing {}}} {
 
 # Build and runtime use the same directories, image options and navigation rules.
 proc ::content_images::snapshots {root settings {uploadMissing {}}} {
-    package require web-static-wiki 0.1.3
-    package require web-static-blog 0.1.2
+    package require web-static-wiki 0.1.4
+    package require web-static-blog 0.1.3
     set imageOptions [options $settings $uploadMissing]
     set stores {}
     foreach {kind title directory} {wiki Documentation docs blog Blog blog} {
@@ -39,11 +39,36 @@ proc ::content_images::snapshots {root settings {uploadMissing {}}} {
     return $stores
 }
 
+# Lightweight database handles: no source reads, image hashing, schema changes,
+# or content queries until a route requests an item or listing.
+proc ::content_images::database_stores {connection settings} {
+    package require web-static-wiki 0.1.4
+    package require web-static-blog 0.1.3
+    set imageOptions [options $settings 0]
+    set stores {}
+    foreach {kind title} {wiki Documentation blog Blog} {
+        set contentOptions {}
+        if {$kind eq "wiki"} {set contentOptions {-exclude_from_navigation images}}
+        dict set stores $kind [::web::static::${kind}::create -connection $connection \
+            -domain ttrek.sh -title $title {*}$contentOptions {*}$imageOptions]
+    }
+    return $stores
+}
+
+proc ::content_images::connect {settings} {
+    package require tpersist 0.1.2
+    set options {-autobegin false}
+    dict for {key value} $settings {lappend options -$key $value}
+    if {[catch {::tpersist::db_connect {*}$options} connection]} {
+        return -code error -errorcode {CONTENT CONNECT} "Could not connect to the content database"
+    }
+    return $connection
+}
+
 proc ::content_images::upload {root settings} {
     if {[dict get $settings bucket] eq {}} {error "Production image uploads require content_images.bucket"}
-    # Validate both collections before the first upload. The second pass uses the
-    # packages' normal content hashes, MIME types and missing-object checks.
-    snapshots $root $settings 0
-    snapshots $root $settings 1
+    # Validate both collections before uploading from their prepared inventories.
+    set stores [snapshots $root $settings 0]
+    dict for {kind store} $stores {::web::static::${kind}::sync_images $store}
     return
 }

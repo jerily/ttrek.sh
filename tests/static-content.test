@@ -1,4 +1,5 @@
 package require Tcl 9.1
+set ::env(ENV) LOCAL
 package require tcltest 2
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]

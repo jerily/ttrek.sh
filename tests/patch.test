@@ -1,0 +1,92 @@
+package require tcltest 2
+package require tjson
+package require http
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl content-images.tcl]
+source [file join $root tcl telemetry.tcl]
+source [file join $root tcl patch.tcl]
+source [file join $root tcl lambda.tcl]
+set saved [array get ::env]
+set ::env(ENV) LOCAL
+namespace eval ::site {}
+proc ::site::config {} {
+    global root
+    dict create rootdir $root registry_dir [file join $root registry] content_images {}
+}
+set schema {}
+if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
+    ::telemetry::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    set schema patch_[pid]_[clock clicks]
+    ::tpersist::_raw $::telemetry::connection "CREATE SCHEMA $schema"
+    ::tpersist::_raw $::telemetry::connection "SET search_path TO $schema"
+} else {::telemetry::connect {dialect sqlite database :memory:}}
+
+test patch-initdb {direct invocation initializes all installed website schema providers, repeatedly} -body {
+    set payload {{"source":"ttrek.patch","task":"task_initdb_website"}}
+    set connection $::telemetry::connection
+    set first [::tjson::json_to_simple [::site_lambda::handle $payload {}]]
+    set second [::tjson::json_to_simple [::site_lambda::handle $payload {}]]
+    if {$schema ne {}} {
+        set query {SELECT tablename AS name FROM pg_tables WHERE schemaname = current_schema()}
+    } else {set query {SELECT name FROM sqlite_master WHERE type = 'table'}}
+    set tables [lmap row [::tpersist::_raw $connection $query] {dict get $row name}]
+    set required {::telemetry::initdb ::web::static::wiki::initdb ::web::static::blog::initdb}
+    set initialized [dict get $first completed]
+    foreach command $required {if {$command ni $initialized} {error "Missing initializer: $command"}}
+    if {[llength [package versions tsession::sql]] &&
+        ("::tsession::sql::initdb" ni $initialized || "tsession_sessions" ni $tables)} {
+        error "Installed SQL session schema was not initialized"
+    }
+    list [expr {$first eq $second}] \
+        [expr {"packages" in $tables && "web_static_wiki_items" in $tables && "web_static_blog_items" in $tables}] \
+        [expr {$connection eq $::telemetry::connection}]
+} -result {1 1 1}
+
+test patch-sync {sync updates rows through package APIs and preserves the website connection} -body {
+    rename ::telemetry::initdb ::telemetry::real_initdb
+    proc ::telemetry::initdb {} {error "Sync must not create schema"}
+    try {
+        set connection $::telemetry::connection
+        set result [::tjson::json_to_simple [::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_website"}} {}]]
+        set stores [::content_images::database_stores $connection {}]
+        list [dict get $result completed] \
+            [dict get [::web::static::wiki::load [dict get $stores wiki] /getting-started] title] \
+            [expr {[llength [::web::static::blog::posts [dict get $stores blog]]] > 0}] \
+            [expr {$connection eq $::telemetry::connection}]
+    } finally {
+        rename ::telemetry::initdb {}; rename ::telemetry::real_initdb ::telemetry::initdb
+    }
+} -result {{wiki blog registry} {Getting started} 1 1}
+
+test patch-provider-failure {broken installed schema providers fail the task} -setup {
+    package ifneeded web-wiki 99.0 {namespace eval ::web::wiki {}; proc ::web::wiki::initdb {db} {error {schema failure}}; package provide web-wiki 99.0}
+} -body {
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}
+} -cleanup {
+    package forget web-wiki
+    rename ::web::wiki::initdb {}
+} -returnCodes error -result {schema failure}
+
+test patch-reject {task names cannot select arbitrary Tcl commands} -body {
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"exec"}} {}
+} -returnCodes error -result {Unknown patch task}
+
+test patch-http {HTTP envelopes and bodies cannot select private tasks} -body {
+    proc ::site::dispatch {router request context} {dict create statusCode 200 headers {} body http}
+    set ::site_lambda::router unused
+    set result [::tjson::json_to_simple [::site_lambda::handle {
+        {"source":"ttrek.patch","task":"task_initdb_website","httpMethod":"POST","path":"/patch",
+         "body":"{\"source\":\"ttrek.patch\",\"task\":\"task_sync_website\"}"}
+    } {}]]
+    binary decode base64 [dict get $result body]
+} -cleanup {rename ::site::dispatch {}} -result http
+
+if {$schema ne {}} {::tpersist::_raw $::telemetry::connection "DROP SCHEMA $schema CASCADE"}
+::telemetry::close
+array unset ::env
+array set ::env $saved
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

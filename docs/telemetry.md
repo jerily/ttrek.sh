@@ -19,13 +19,16 @@ connection needs them: `tdbc::sqlite3` for `ENV=LOCAL`, `tdbc::postgres` for
   for a test server. Obtain bundle updates from
   [AWS's RDS trust store](https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem).
 
-Tables are created transactionally on first connection. Existing LOCAL telemetry
+Tables are created only by the explicit `::telemetry::initdb` procedure. LOCAL
+startup uses `::telemetry::init_local`; PROD startup only connects.
+The private `task_initdb_website` invocation provisions production schemas. Existing LOCAL telemetry
 remains in place. Environment registrations and package/platform dimensions are
 shared across workers; events commit atomically. Whole transactions retry bounded
 SQLite lock conflicts and PostgreSQL deadlocks/serialization failures. Schema
-initialization also handles simultaneous PostgreSQL cold starts. Descriptions
+initialization also handles concurrent maintenance invocations. Descriptions
 are not indexed, so the registration API's 65,535-character limit does not exceed
-PostgreSQL's index-entry limit. Package statistics group by both OS and architecture.
+PostgreSQL's index-entry limit. Package statistics query the requested package
+and version through `tpersist`, grouped by OS and architecture; they are not preloaded.
 
 Old production Lambda SQLite files were temporary per-environment files. They are
 not imported into PostgreSQL by this change.

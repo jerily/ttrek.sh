@@ -8,7 +8,7 @@ source [file join $root tcl telemetry.tcl]
 namespace import ::tpersist::db_*
 
 if {[llength $argv] && [lindex $argv 0] eq "--worker"} {
-    ::telemetry::init [lindex $argv 1] [lindex $argv 2]
+    ::telemetry::init_local [lindex $argv 1] [lindex $argv 2]
     ::telemetry::close
     exit
 }
@@ -76,7 +76,7 @@ recipe $public demo 2.0.0 {description {S {New version}} url {S https://example.
 recipe $private private-app 1.0.0 {description {S Private} url {S https://github.com/example/private}}
 
 test metadata-migrate {Old databases gain metadata without losing IDs or telemetry} -body {
-    ::telemetry::init $settings [list $public $private]
+    ::telemetry::init_local $settings [list $public $private]
     set row [lindex [metadata_rows] 0]
     list [expr {[dict get $row pkg_id] == $legacy_id}] \
         [expr {[dict get $row description] eq $description}] [expr {[dict get $row url] eq $url}] \
@@ -138,7 +138,7 @@ test metadata-events {Telemetry can still record versions absent from the regist
 
 test metadata-reopen {Startup sync refreshes metadata and retains telemetry-only rows} -body {
     recipe $public demo 1.0.0 {description {S Restarted} url {S https://example.org/restarted}}
-    ::telemetry::init $settings [list $public $private]
+    ::telemetry::init_local $settings [list $public $private]
     list [dict get [lindex [metadata_rows] 0] description] [llength [metadata_rows]] [::telemetry::stats demo]
 } -result {Restarted 5 {{{Linux x86_64} 1 1 0}}}
 
@@ -157,7 +157,7 @@ test metadata-concurrent {Concurrent migrations and imports share package IDs wi
         if {[catch {close $worker} message]} {lappend errors $message}
     }
     if {[llength $errors]} {error $errors}
-    ::telemetry::init $settings
+    ::telemetry::init_local $settings
     set rows [metadata_rows]
     list [llength $rows] [dict get [lindex $rows 0] url] [dict get [lindex $rows 4] description] \
         [::telemetry::stats demo]

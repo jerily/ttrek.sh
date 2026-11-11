@@ -15,7 +15,8 @@ try {
     set ::env(ENV) PROD
     set config [::tconfig::load_config [lindex $argv 1]]
     set settings [::app_config::telemetry $config $root]
-    ::telemetry::init $settings
+    ::telemetry::connect $settings
+    ::telemetry::initdb
     ::telemetry::close
     set db [::telemetry_maintenance::connect $settings]
     set counts [::telemetry_maintenance::restore $db [lindex $argv 0]]

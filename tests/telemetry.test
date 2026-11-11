@@ -7,7 +7,7 @@ source [file join $root tcl telemetry.tcl]
 namespace import ::tpersist::db_*
 
 if {[llength $argv] && [lindex $argv 0] eq "--worker"} {
-    ::telemetry::init [lindex $argv 1]
+    ::telemetry::init_local [lindex $argv 1]
     set identity [string repeat f 64]
     ::telemetry::event register_environment -env $identity -description concurrent
     for {set i 0} {$i < 15} {incr i} {
@@ -36,7 +36,7 @@ if {$postgres} {
     set path [::tcltest::makeFile {} telemetry-test.sqlite3]
     set settings [dict create dialect sqlite database $path timeout 5000]
 }
-::telemetry::init $settings
+::telemetry::init_local $settings
 set identity [string repeat a 64]
 proc count_rows {table} {
     dict get [lindex [::telemetry::rows [::tpersist::db_select $table -expr {COUNT(*) AS n}]] 0] n
@@ -113,7 +113,7 @@ test telemetry-9 {Foreign-key failure rolls back the enclosing transaction} -bod
 
 test telemetry-10 {Committed telemetry survives disconnect and schema reinitialization} -body {
     ::telemetry::close
-    ::telemetry::init $settings
+    ::telemetry::init_local $settings
     ::telemetry::stats tcl 9.1.0
 } -result {{{Linux x86_64} 2 1 1}}
 
@@ -133,7 +133,7 @@ test telemetry-11 {Concurrent cold starts and writers share dimensions without l
         if {[catch {close $worker} message]} {lappend errors $message}
     }
     if {[llength $errors]} {error $errors}
-    ::telemetry::init $settings
+    ::telemetry::init_local $settings
     list [count_rows environments] [count_rows package_names] [count_rows packages] [::telemetry::stats concurrent]
 } -result {1 1 1 {{{Linux x86_64} 60 60 0}}}
 

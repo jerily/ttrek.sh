@@ -4,8 +4,8 @@ package require tjson
 package require thread
 package require tratelimit 1.0.1
 package require treqmon 2.1.0
-package require web-static-wiki 0.1.3
-package require web-static-blog 0.1.2
+package require web-static-wiki 0.1.4
+package require web-static-blog 0.1.3
 package require tpathexp 1.1.0
 
 namespace eval ::site {
@@ -32,14 +32,22 @@ proc ::site::configure {config} {
     }
 }
 
-# Each worker owns a router and immutable directory snapshots.
+# Each worker owns a router. PROD content is queried per request.
 proc ::site::mount {router} {
     set templates $::views::templates
     set imageSettings {}
     if {[dict exists [config] content_images]} {
         set imageSettings [dict get [config] content_images]
     }
-    set stores [::content_images::snapshots [root] $imageSettings]
+    if {[::app_config::mode] eq "LOCAL"} {
+        set stores [::content_images::snapshots [root] $imageSettings]
+    } else {
+        variable settings
+        if {![dict exists $settings content_connection]} {
+            dict set settings content_connection [::content_images::connect [dict get $settings content_database]]
+        }
+        set stores [::content_images::database_stores [dict get $settings content_connection] $imageSettings]
+    }
     foreach {kind directory prefix} {wiki docs /docs blog blog /blog} {
         set store [dict get $stores $kind]
         ::web::static::${kind}::mount $router -store $store -prefix $prefix \

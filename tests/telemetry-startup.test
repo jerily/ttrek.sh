@@ -1,0 +1,34 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl telemetry.tcl]
+set directory [makeDirectory telemetry-startup]
+set settings [dict create dialect sqlite database [file join $directory telemetry.sqlite3]]
+
+test telemetry-connect {connecting leaves schema creation to the explicit initdb procedure} -body {
+    ::telemetry::connect $settings
+    set before [::tpersist::_raw $::telemetry::connection {SELECT name FROM sqlite_master WHERE type = 'table'}]
+    ::telemetry::initdb
+    ::telemetry::initdb
+    list $before [::telemetry::stats missing]
+} -cleanup {::telemetry::close} -result {{} {}}
+
+test telemetry-prepared {runtime startup and requests never call initdb or registry sync} -body {
+    rename ::telemetry::initdb ::telemetry::real_initdb
+    rename ::telemetry::sync_registry_metadata ::telemetry::real_sync_registry_metadata
+    proc ::telemetry::initdb {} {error "Runtime schema work forbidden"}
+    proc ::telemetry::sync_registry_metadata {args} {error "Runtime registry sync forbidden"}
+    try {
+        ::telemetry::connect $settings
+        list [expr {$::telemetry::connection ne {}}] [::telemetry::stats missing]
+    } finally {
+        rename ::telemetry::initdb {}; rename ::telemetry::real_initdb ::telemetry::initdb
+        rename ::telemetry::sync_registry_metadata {}; rename ::telemetry::real_sync_registry_metadata ::telemetry::sync_registry_metadata
+        ::telemetry::close
+    }
+} -result {1 {}}
+
+removeDirectory telemetry-startup
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

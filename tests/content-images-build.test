@@ -55,18 +55,27 @@ test build-images-upload {build deduplicates both collections and repeats withou
         [lsearch -index 0 $build_images::calls put] [lindex [lindex [dict values $build_images::objects] 0] 1]
 } -cleanup ::build_images::cleanup -result {1 1 -1 image/png}
 
-test build-images-runtime {production snapshots and signed rendering never list or upload} -setup ::build_images::setup -body {
-    ::content_images::upload $build_images::root $build_images::settings
-    set build_images::calls {}
-    set stores [::content_images::snapshots $build_images::root $build_images::settings]
-    set matches {}
-    foreach {kind path} {wiki /guide blog /2026-11-11-guide} {
-        set store [dict get $stores $kind]
-        set html [::web::static::${kind}::render_markdown $store [::web::static::${kind}::load $store $path]]
-        set key [lindex [dict keys $build_images::objects] 0]
-        lappend matches [string match "*<img src=\"https://images.example/$key?*" $html]
-    }
-    list $build_images::calls $matches
+test build-images-runtime {database stores query content without scans, hashes or S3 operations} -setup ::build_images::setup -body {
+    package require tpersist 0.1.2
+    set db [::tpersist::db_connect -database :memory: -autobegin 0]
+    try {
+        set stores [::content_images::database_stores $db $build_images::settings]
+        foreach {kind directory} {wiki docs blog blog} {
+            ::web::static::${kind}::initdb $db
+            ::web::static::${kind}::sync [dict get $stores $kind] [file join $build_images::root content $directory]
+        }
+        file delete -force [file join $build_images::root content]
+        set build_images::calls {}
+        set stores [::content_images::database_stores $db $build_images::settings]
+        set matches {}
+        foreach {kind path} {wiki /guide blog /2026-11-11-guide} {
+            set store [dict get $stores $kind]
+            set html [::web::static::${kind}::render_markdown $store [::web::static::${kind}::load $store $path]]
+            set key [lindex [dict keys $build_images::objects] 0]
+            lappend matches [string match "*<img src=\"https://images.example/$key?*" $html]
+        }
+        list $build_images::calls $matches
+    } finally {::tpersist::db_disconnect $db}
 } -cleanup ::build_images::cleanup -result {{} {1 1}}
 
 test build-images-invalid {invalid blog references prevent uploads for both collections} -setup ::build_images::setup -body {

@@ -8,6 +8,7 @@ proc ::site_lambda::initialize {root} {
     source [file join $root tcl config.tcl]
     source [file join $root tcl telemetry.tcl]
     source [file join $root tcl telemetry-maintenance.tcl]
+    source [file join $root tcl patch.tcl]
     if {[::app_config::mode] eq "LOCAL"} {
         source [file join $root tcl local-ratelimit.tcl]
     }
@@ -37,7 +38,12 @@ proc ::site_lambda::initialize {root} {
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
     set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]
-    ::telemetry::init $maintenanceSettings [list [dict get $settings registry_dir]]
+    if {[::app_config::mode] eq "PROD"} {
+        ::telemetry::connect $maintenanceSettings
+        dict set settings content_connection $::telemetry::connection
+    } else {
+        ::telemetry::init_local $maintenanceSettings [list [dict get $settings registry_dir]]
+    }
     ::site::init_worker $settings
     set router $::site::router
 }
@@ -54,6 +60,9 @@ proc ::site_lambda::handle {payload context} {
         set typed {}
         dict for {key value} $result {dict set typed $key [list S $value]}
         return [::tjson::typed_to_json [list M $typed]]
+    }
+    if {[lsort [dict keys $event]] eq {source task} && [dict get $event source] eq "ttrek.patch"} {
+        return [::site_patch::run [dict get $event task] $context]
     }
     if {[dict exists $event version] && [dict get $event version] eq "2.0"} {
         dict set event method [dict get $event requestContext http method]
