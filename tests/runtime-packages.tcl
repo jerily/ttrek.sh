@@ -4,8 +4,8 @@ set packages $argv
 if {![llength $packages]} {
     set packages {
         twebserver topenapi thread sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
-        awss3 awskms awsssm awsdynamodb tconfig::decrypt tconfig::encrypt
-        tratelimit treqmon tsession tsession-dynamodb
+        awss3 awskms awsssm tconfig::decrypt tconfig::encrypt
+        tratelimit treqmon
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3 tdbc::postgres
         mock-proxy-app mock-lambda-app mock-s3-app trequests
     }
@@ -26,7 +26,9 @@ foreach name $packages {
             trequests {package require trequests 1.1.0}
             treqmon {package require treqmon 2.1.0}
             tratelimit {package require tratelimit 1.0.1}
-            awss3 - awskms - awsssm - awsdynamodb {package require $name 1.0.12}
+            awss3 {package require awss3 1.0.17}
+            awskms - awsssm {package require $name 1.0.12}
+            web-static-wiki - web-static-blog {package require $name 0.1.1}
             default {package require $name}
         }
     } result]} {
