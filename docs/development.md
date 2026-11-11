@@ -171,18 +171,23 @@ from the host. Configure direct-server and Lambda startup using:
 [content_images]
 bucket=jerily-ttrek-app
 region=eu-central-1
-directory=content
+directory=content/docs
 prefix=ttrek/content/images
 url_expiry_seconds=3600
 ```
 
 `directory` is relative to the site root (or an absolute trusted directory).
-With the configuration above, put shared images under `content/images/` and use
-`![Architecture](images/architecture.svg)` in either docs or blog Markdown,
-including Markdown in nested folders. Alternatively, set `directory=content/images`
-and use `![Architecture](architecture.svg)`. Image paths always start at this
-configured directory; `..`, absolute/external image URLs, backslashes, encoded
-traversal and symlinks are rejected. The directory must exist.
+With the configuration above, put images under `content/docs/images/` and use
+`![Architecture](images/architecture.svg)` in Markdown files directly under
+`content/docs/`. These paths work in local Markdown previews as well as on the
+website. The website's blog mount also uses this configured image directory.
+The docs mount uses `-exclude_from_navigation {images}` (web-static-wiki 0.1.2+)
+to keep the screenshot folders out of directory listings while retaining image
+discovery and rendering.
+Image paths on the website always start at the configured directory, including
+for Markdown in nested folders; they are not resolved from each document's
+location. `..`, absolute/external image URLs, backslashes, encoded traversal and
+symlinks are rejected. The directory must exist.
 
 An empty bucket disables image hosting. Each worker shares one `awss3` client
 between the packages and creates snapshots at startup. Creation uploads only
