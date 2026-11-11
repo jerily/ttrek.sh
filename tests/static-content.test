@@ -330,16 +330,16 @@ proc ::site_image_test::client {method bucket key args} {
     if {$method eq "ls"} {return [dict keys $::site_image_test::objects $key]}
     dict set ::site_image_test::objects $key 1
 }
-test static-images-config {both mounted packages receive the bucket and shared image directory} -setup {
+test static-images-config {doc image folders are hidden while both mounts render their images} -setup {
     set imageRoot [makeDirectory static-image-site]
     foreach name {www public etc tcl} {file link -symbolic [file join $imageRoot $name] [file join $root $name]}
-    file mkdir [file join $imageRoot content docs] [file join $imageRoot content blog] [file join $imageRoot images]
+    file mkdir [file join $imageRoot content docs images] [file join $imageRoot content blog]
     foreach name {docs/guide.md blog/2026-11-11-guide.md} {
         set channel [open [file join $imageRoot content $name] w]
-        puts $channel "# Guide\n\n!\[Image\](pixel.png)"
+        puts $channel "# Guide\n\n!\[Image\](images/pixel.png)"
         close $channel
     }
-    set channel [open [file join $imageRoot images pixel.png] wb]
+    set channel [open [file join $imageRoot content docs images pixel.png] wb]
     puts -nonewline $channel [binary format H* 89504e470d0a00ff]
     close $channel
     set savedClients $::content_images::clients
@@ -353,7 +353,7 @@ test static-images-config {both mounted packages receive the bucket and shared i
     set imageRouter [::tpathexp::router]
 } -body {
     set imageSettings [::app_config::content_images {content_images {bucket configured-images \
-        region eu-central-1 directory images prefix configured-prefix}} $imageRoot]
+        region eu-central-1 directory content/docs prefix configured-prefix}} $imageRoot]
     ::site::configure [dict replace $settings rootdir $imageRoot content_images $imageSettings]
     ::site::mount $imageRouter
     set result {}
@@ -363,7 +363,8 @@ test static-images-config {both mounted packages receive the bucket and shared i
             [string match {*<img src="https://configured-images.example/configured-prefix/*} [dict get $response body]]
     }
     lappend result [dict size $::site_image_test::objects] \
-        [llength [lsearch -all -index 0 $::site_image_test::calls put]]
+        [llength [lsearch -all -index 0 $::site_image_test::calls put]] \
+        [string match {*href="/docs/images"*} [dict get [$imageRouter dispatch {method GET path /docs}] body]]
     set result
 } -cleanup {
     $imageRouter destroy
@@ -372,7 +373,7 @@ test static-images-config {both mounted packages receive the bucket and shared i
     set ::content_images::clients $savedClients
     ::site::configure $settings
     removeDirectory static-image-site
-} -result {200 1 200 1 1 1}
+} -result {200 1 200 1 1 1 0}
 
 $::site::router destroy
 set failed $::tcltest::numTests(Failed)

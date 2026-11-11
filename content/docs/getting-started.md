@@ -54,3 +54,6 @@ puts [package present tjson]
 Use `ttrek install -y` to install a project's declared dependencies. See
 [Managing packages](/docs/managing-packages) and
 [Registries](/docs/registries) for version selection and private packages.
+
+For a complete project to try, follow [Build websites with ttrek](/docs/build-websites-with-ttrek)
+to run a personal site and a community site with accounts.

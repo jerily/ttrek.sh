@@ -4,7 +4,7 @@ package require tjson
 package require thread
 package require tratelimit 1.0.1
 package require treqmon 2.1.0
-package require web-static-wiki 0.1.1
+package require web-static-wiki 0.1.2
 package require web-static-blog 0.1.1
 package require tpathexp 1.1.0
 
@@ -41,7 +41,10 @@ proc ::site::mount {router} {
     }
     foreach {kind title prefix} {wiki Documentation /docs blog Blog /blog} {
         set directory [expr {$kind eq "wiki" ? "docs" : "blog"}]
-        set store [::web::static::${kind}::create -directory [file join [root] content $directory] -title $title {*}$imageOptions]
+        set contentOptions {}
+        if {$kind eq "wiki"} {set contentOptions {-exclude_from_navigation images}}
+        set store [::web::static::${kind}::create -directory [file join [root] content $directory] \
+            -title $title {*}$contentOptions {*}$imageOptions]
         ::web::static::${kind}::mount $router -store $store -prefix $prefix \
             -config [dict create master_template [dict get $templates ${directory}-master.html.jinja] \
                 templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]

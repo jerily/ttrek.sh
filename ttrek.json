@@ -25,7 +25,7 @@
     "valkey-tcl": "^1.0.3",
     "tdbcpostgres": ">=1.1.8",
     "web-static-blog": "^0.1.1",
-    "web-static-wiki": "^0.1.1",
+    "web-static-wiki": "^0.1.2",
     "tratelimit": "^1.0.1",
     "treqmon": "^2.1.0",
     "aws-sdk-tcl-s3": "^1.0.17",
