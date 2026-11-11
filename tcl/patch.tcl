@@ -8,6 +8,8 @@ proc ::site_patch::run {task context} {
     ::tjson::typed_to_json [list M [dict create ok {BOOL 1} task [list S $task] completed [list L $completed]]]
 }
 
+# Schema providers must preserve existing tables and rows on every invocation.
+# Importing or replacing website content belongs only to task_sync_website.
 proc ::site_patch::task_initdb_website {context} {
     set initialized {}
     ::tpersist::db_transaction $::telemetry::connection {

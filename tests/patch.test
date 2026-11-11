@@ -60,6 +60,37 @@ test patch-sync {sync updates rows through package APIs and preserves the websit
     }
 } -result {{wiki blog registry} {Getting started} 1 1}
 
+test patch-initdb-preserves-content {repeated initialization preserves populated content, registry IDs and telemetry} -setup {
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_website"}} {}
+    set identity [string repeat a 64]
+    ::telemetry::event register_environment -env $identity -description existing-site
+    ::telemetry::event req_pkg_install_event -env $identity -pkg_name initdb-test -pkg_version 1.0.0 \
+        -os Linux -arch x86_64 -install_outcome 1 -install_is_toplevel 1
+    # A database-only edit also detects an accidental reimport during initdb.
+    ::tpersist::_raw $::telemetry::connection {
+        UPDATE web_static_wiki_items SET title = 'Stored title'
+        WHERE domain = 'ttrek.sh' AND path = '/getting-started'
+    }
+} -body {
+    set tables [concat {web_static_wiki_items web_static_blog_items} [dict keys [::telemetry::table_definitions]]]
+    set before {}
+    foreach table $tables {
+        dict set before $table [lsort [::tpersist::_raw $::telemetry::connection "SELECT * FROM $table"]]
+    }
+    for {set i 0} {$i < 2} {incr i} {
+        ::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}
+        foreach table $tables {
+            set after [lsort [::tpersist::_raw $::telemetry::connection "SELECT * FROM $table"]]
+            if {$after ne [dict get $before $table]} {error "Initialization changed rows in $table"}
+        }
+    }
+    set stores [::content_images::database_stores $::telemetry::connection {}]
+    list [dict get [::web::static::wiki::load [dict get $stores wiki] /getting-started] title] \
+        [expr {[llength [::web::static::blog::posts [dict get $stores blog]]] > 0}] \
+        [::telemetry::stats initdb-test]
+} -result {{Stored title} 1 {{{Linux x86_64} 1 1 0}}}
+
 test patch-provider-failure {broken installed schema providers fail the task} -setup {
     package ifneeded web-wiki 99.0 {namespace eval ::web::wiki {}; proc ::web::wiki::initdb {db} {error {schema failure}}; package provide web-wiki 99.0}
 } -body {

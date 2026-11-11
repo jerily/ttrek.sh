@@ -608,8 +608,18 @@ The script uses the standard AWS profile/region defaults above.
 sets the project's default task (otherwise `task_sync_website`). Deploying the
 stack does not start a build or run a task.
 
-Run initialization before the first sync on a new database. Tasks run the code and
-content currently deployed in the website Lambda. PROD startup does no schema or
+Run initialization before the first sync on a new database. Initialization creates
+missing tables/indexes and applies additive schema upgrades; repeated runs preserve
+existing content, registry IDs, and telemetry. It does not drop or clear tables or
+import content.
+
+When upgrading an existing site from Markdown snapshots to database-backed content,
+run both tasks in order once: `task_initdb_website`, then `task_sync_website`.
+The new content tables start empty even though the Markdown files already exist.
+After that first import, rerunning initialization does not require another sync;
+sync again when publishing content, images, or registry metadata changes.
+
+Tasks run the code and content currently deployed in the website Lambda. PROD startup does no schema or
 content synchronization; pages/posts query their rows on demand. Existing content
 stays under `ttrek.sh/content`, and there is no separate patch Lambda project.
 Local testing uses the existing `tdevops` website stack and the same invocation

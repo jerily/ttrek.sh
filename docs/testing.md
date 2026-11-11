@@ -18,6 +18,7 @@ ttrek run tclsh9.1 "$PWD/tests/lambda-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
 ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
+ttrek run tclsh9.1 "$PWD/tests/patch.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/content-images.test"
@@ -115,6 +116,10 @@ selection and required TLS without connecting to services.
 `tests/registry-metadata.test` uses the same backend selection. It covers existing
 schema upgrades, per-version metadata, imports from multiple registries, repeated
 and concurrent imports, invalid recipes, and preservation of IDs and telemetry.
+
+`tests/patch.test` also uses that backend selection. It verifies that repeated
+`task_initdb_website` calls preserve populated wiki/blog content, registry IDs,
+and telemetry without needing another sync, as well as private task dispatch.
 
 Run `ttrek run tclsh9.1 tests/telemetry-maintenance.test` for lazy-loading and
 private-event dispatch checks. With `TTREK_TEST_POSTGRES` pointing at a disposable
