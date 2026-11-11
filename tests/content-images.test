@@ -1,0 +1,52 @@
+package require Tcl 9.1
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl content-images.tcl]
+set savedEnv [array get ::env ENV]
+set ::env(ENV) PROD
+
+test image-config-default {images are opt-in and the directory is relative to the application} -body {
+    set settings [::app_config::content_images {} $root]
+    list [dict get $settings bucket] [dict get $settings directory] \
+        [::content_images::options $settings]
+} -result [list {} [file join $root content] {}]
+
+test image-config-invalid {reject bad storage configuration} -body {
+    set errors {}
+    foreach config {{bucket invalid/name region eu-central-1} {bucket valid-bucket} \
+            {url_expiry_seconds 0} {url_expiry_seconds 604801} {prefix ../secret} \
+            {directory {}} {typo x} {endpoint http://127.0.0.1:9000}} {
+        lappend errors [catch {::app_config::content_images [dict create content_images $config] $root}]
+    }
+    set errors
+} -result {1 1 1 1 1 1 1 1}
+
+test image-config-endpoint {LOCAL accepts only loopback mock endpoints} -setup {
+    set ::env(ENV) LOCAL
+} -body {
+    list [dict get [::app_config::content_images {content_images {endpoint http://127.0.0.1:9000}} $root] endpoint] \
+        [catch {::app_config::content_images {content_images {endpoint http://example.com:9000}} $root}]
+} -cleanup {set ::env(ENV) PROD} -result {http://127.0.0.1:9000 1}
+
+package provide awss3 1.0.17
+namespace eval ::aws::s3 {}
+proc ::aws::s3::create {settings} {lappend ::createdClients $settings; return test_image_client}
+set createdClients {}
+test image-config-pass {bucket, directory and signing settings reach both packages using one client} -body {
+    set config [::app_config::content_images {content_images {bucket private-images region eu-central-1 \
+        directory content/images prefix private/images url_expiry_seconds 120}} $root]
+    set wiki [::content_images::options $config]
+    set blog [::content_images::options $config]
+    list [expr {$wiki eq $blog}] [llength $createdClients] [dict get $wiki -images-directory] \
+        [dict get $wiki -s3] $createdClients
+} -result [list 1 1 [file join $root content images] \
+    {client test_image_client bucket private-images prefix private/images url_expiry_seconds 120 http_endpoint {}} \
+    {{region eu-central-1}}]
+
+unset ::env(ENV)
+array set ::env $savedEnv
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

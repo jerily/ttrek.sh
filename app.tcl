@@ -61,6 +61,7 @@ set config_dict [dict create \
     rootdir [file dirname [info script]] \
     registry_dir [dict get $config registry directory] \
     releases $releases_config \
+    content_images [::app_config::content_images $config [file normalize $dir]] \
     request_monitor [::app_config::request_monitor $config] \
     gzip off \
     conn_timeout_millis 10000 \

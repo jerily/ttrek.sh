@@ -266,3 +266,39 @@ proc ::app_config::releases_from_ini {path root} {
     }
     return [releases [dict create releases $settings]]
 }
+
+# Private image storage shared by the documentation and blog snapshots.
+proc ::app_config::content_images {config root} {
+    set settings [dict create bucket {} region {} directory content prefix ttrek/content/images \
+        url_expiry_seconds 3600 endpoint {}]
+    if {[dict exists $config content_images]} {
+        dict for {name value} [dict get $config content_images] {
+            if {![dict exists $settings $name]} {error "unknown content_images setting: $name"}
+            dict set settings $name $value
+        }
+    }
+    set bucket [dict get $settings bucket]
+    if {$bucket ne {} && (![regexp {^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$} $bucket] ||
+            ![regexp {^[a-z0-9-]+$} [dict get $settings region]])} {
+        error "content_images requires a valid bucket and region"
+    }
+    set endpoint [dict get $settings endpoint]
+    if {$endpoint ne {} && ([mode] ne "LOCAL" ||
+            ![regexp {^http://(127\.0\.0\.1|localhost):[0-9]+$} $endpoint])} {
+        error "content_images.endpoint is only supported for a loopback mock in LOCAL mode"
+    }
+    set expiry [dict get $settings url_expiry_seconds]
+    if {![string is integer -strict $expiry] || $expiry < 1 || $expiry > 604800} {
+        error "content_images.url_expiry_seconds must be between 1 and 604800"
+    }
+    set prefix [string trim [dict get $settings prefix] /]
+    if {$prefix eq {} || ![regexp {^[a-zA-Z0-9_./-]+$} $prefix] ||
+            "." in [split $prefix /] || ".." in [split $prefix /]} {
+        error "content_images.prefix must be an S3 key prefix without dot segments"
+    }
+    dict set settings prefix $prefix
+    if {[dict get $settings directory] eq {}} {error "content_images.directory must not be empty"}
+    # Leave symlinks visible for the packages' image-directory validation.
+    dict set settings directory [file join $root [dict get $settings directory]]
+    return $settings
+}
