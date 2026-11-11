@@ -28,7 +28,8 @@ foreach name $packages {
             tratelimit {package require tratelimit 1.0.1}
             awss3 {package require awss3 1.0.17}
             awskms - awsssm {package require $name 1.0.12}
-            web-static-wiki - web-static-blog {package require $name 0.1.1}
+            web-static-wiki {package require $name 0.1.2}
+            web-static-blog {package require $name 0.1.1}
             default {package require $name}
         }
     } result]} {
