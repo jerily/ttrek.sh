@@ -330,7 +330,7 @@ proc ::site_image_test::client {method bucket key args} {
     if {$method eq "ls"} {return [dict keys $::site_image_test::objects $key]}
     dict set ::site_image_test::objects $key 1
 }
-test static-images-config {doc image folders are hidden while both mounts render their images} -setup {
+test static-images-config {the default image directory serves both mounts and stays hidden in doc navigation} -setup {
     set imageRoot [makeDirectory static-image-site]
     foreach name {www public etc tcl} {file link -symbolic [file join $imageRoot $name] [file join $root $name]}
     file mkdir [file join $imageRoot content docs images] [file join $imageRoot content blog]
@@ -353,7 +353,7 @@ test static-images-config {doc image folders are hidden while both mounts render
     set imageRouter [::tpathexp::router]
 } -body {
     set imageSettings [::app_config::content_images {content_images {bucket configured-images \
-        region eu-central-1 directory content/docs prefix configured-prefix}} $imageRoot]
+        region eu-central-1 prefix configured-prefix}} $imageRoot]
     ::site::configure [dict replace $settings rootdir $imageRoot content_images $imageSettings]
     ::site::mount $imageRouter
     set result {}
