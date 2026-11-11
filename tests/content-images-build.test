@@ -1,0 +1,91 @@
+package require Tcl 9.1
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl content-images.tcl]
+package provide awss3 1.0.17
+namespace eval ::aws::s3 {}
+proc ::aws::s3::create {settings} {return ::build_images::client}
+proc ::aws::s3::generate_presigned_url {args} {
+    return "https://images.example/[lindex $args end]?X-Amz-Signature=[string repeat a 64]"
+}
+namespace eval ::build_images {}
+proc ::build_images::write {path data} {
+    file mkdir [file dirname $path]
+    set channel [open $path wb]
+    try {puts -nonewline $channel $data} finally {close $channel}
+}
+proc ::build_images::setup {} {
+    variable root [makeDirectory build-images-fixture]
+    variable calls {}; variable objects {}; variable failure {}
+    variable savedEnv [array get ::env ENV]
+    set ::env(ENV) PROD
+    write [file join $root content docs guide.md] "# Guide\n\n!\[Image\](images/pixel.png)"
+    write [file join $root content blog 2026-11-11-guide.md] "# Guide\n\n!\[Image\](images/pixel.png)"
+    write [file join $root content docs images pixel.png] [binary format H* 89504e470d0a00ff]
+    variable settings [::app_config::content_images {content_images {bucket test-images region eu-central-1}} $root]
+}
+proc ::build_images::client {method bucket key args} {
+    variable calls; variable objects; variable failure
+    lappend calls [list $method $bucket $key {*}$args]
+    if {$method eq $failure} {error "S3 $method failed"}
+    switch -- $method {
+        ls {return [dict keys $objects $key]}
+        put {
+            lassign $args path type
+            set channel [open $path rb]
+            try {dict set objects $key [list [read $channel] $type]} finally {close $channel}
+        }
+        default {error "Unexpected S3 method: $method"}
+    }
+}
+proc ::build_images::cleanup {} {
+    unset ::env(ENV)
+    array set ::env $::build_images::savedEnv
+    removeDirectory build-images-fixture
+}
+
+test build-images-upload {build deduplicates both collections and repeats without writes} -setup ::build_images::setup -body {
+    ::content_images::upload $build_images::root $build_images::settings
+    set count [llength [lsearch -all -index 0 $build_images::calls put]]
+    set build_images::calls {}
+    ::content_images::upload $build_images::root $build_images::settings
+    list $count [dict size $build_images::objects] \
+        [lsearch -index 0 $build_images::calls put] [lindex [lindex [dict values $build_images::objects] 0] 1]
+} -cleanup ::build_images::cleanup -result {1 1 -1 image/png}
+
+test build-images-runtime {production snapshots and signed rendering never list or upload} -setup ::build_images::setup -body {
+    ::content_images::upload $build_images::root $build_images::settings
+    set build_images::calls {}
+    set stores [::content_images::snapshots $build_images::root $build_images::settings]
+    set matches {}
+    foreach {kind path} {wiki /guide blog /2026-11-11-guide} {
+        set store [dict get $stores $kind]
+        set html [::web::static::${kind}::render_markdown $store [::web::static::${kind}::load $store $path]]
+        set key [lindex [dict keys $build_images::objects] 0]
+        lappend matches [string match "*<img src=\"https://images.example/$key?*" $html]
+    }
+    list $build_images::calls $matches
+} -cleanup ::build_images::cleanup -result {{} {1 1}}
+
+test build-images-invalid {invalid blog references prevent uploads for both collections} -setup ::build_images::setup -body {
+    ::build_images::write [file join $build_images::root content blog 2026-11-11-guide.md] \
+        "# Guide\n\n!\[Image\](../secret.png)"
+    list [catch {::content_images::upload $build_images::root $build_images::settings}] $build_images::calls
+} -cleanup ::build_images::cleanup -result {1 {}}
+
+foreach method {ls put} {
+    test build-images-error-$method {S3 failures fail the build} -setup ::build_images::setup -body {
+        set build_images::failure $method
+        ::content_images::upload $build_images::root $build_images::settings
+    } -cleanup ::build_images::cleanup -returnCodes error -result "S3 $method failed"
+}
+
+test build-images-bucket {an absent production bucket fails before any uploads} -setup ::build_images::setup -body {
+    ::content_images::upload $build_images::root [dict replace $build_images::settings bucket {}]
+} -cleanup ::build_images::cleanup -returnCodes error -result {Production image uploads require content_images.bucket}
+
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

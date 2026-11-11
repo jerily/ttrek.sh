@@ -4,16 +4,51 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 if {[llength $argv] != 1} {error "Usage: lambda-package.tcl ARCHIVE"}
 set archive [file normalize [lindex $argv 0]]
 set ::env(ENV) PROD
+package require web-static-wiki 0.1.3
 
 proc read_bytes {path} {
     set channel [open $path rb]
     try {read $channel} finally {close $channel}
 }
 
+proc image_objects {directory {relative {}}} {
+    set objects {}
+    foreach path [lsort [glob -nocomplain -directory $directory *]] {
+        set source [file join $relative [file tail $path]]
+        if {[file isdirectory $path]} {
+            set objects [dict merge $objects [image_objects $path $source]]
+        } elseif {[::web::static::wiki::image_type $path] ne {}} {
+            # Read synchronously: Tcllib's event-driven file hashing cannot read
+            # ZIP-backed channels. Exact bytes also detect packaging changes.
+            dict set objects $source [read_bytes $path]
+        }
+    }
+    return $objects
+}
+
 set mount [zipfs mount $archive /ttrek-lambda-package-test]
 try {
     source [file join $mount tcl config.tcl]
     set releases [::app_config::releases_from_ini [file join $mount etc config.ini] $mount]
+    set images [::app_config::content_images_from_ini [file join $mount etc config.ini] $mount]
+    if {[dict get $images bucket] eq {}} {error "Packaged content_images.bucket must not be empty"}
+    set buildConfig [file join $root devops config.prod.ini]
+    if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONFIG) ne {}} {
+        set buildConfig $::env(TTREK_PRODUCTION_CONFIG)
+    }
+    set buildImages [::app_config::content_images_from_ini $buildConfig $root]
+    foreach key {bucket region prefix url_expiry_seconds endpoint} {
+        if {[dict get $images $key] ne [dict get $buildImages $key]} {
+            error "Packaged content_images.$key differs from the upload configuration"
+        }
+    }
+    set directory [dict get $images directory]
+    if {![string match "$mount/content/*" "$directory/"] || ![file isdirectory $directory]} {
+        error "Production content_images.directory must be bundled under content/"
+    }
+    if {[image_objects [dict get $images directory]] ne [image_objects [dict get $buildImages directory]]} {
+        error "Packaged image paths or bytes differ from the files to upload"
+    }
     set manifest [file join $mount etc releases.json]
     if {[dict get $releases checksums_file] ne $manifest} {
         error "Packaged release settings must use the bundled etc/releases.json"
@@ -29,7 +64,7 @@ try {
     foreach forbidden {etc/config.local.ini etc/config.enc} {
         if {[file exists [file join $mount $forbidden]]} {error "Unexpected host configuration in ZIP: $forbidden"}
     }
-    puts "PASS packaged release configuration and manifest ([dict size $checksums] production targets)"
+    puts "PASS packaged release configuration and manifest ([dict size $checksums] production targets), image settings and bytes"
 } finally {
     zipfs unmount $mount
 }

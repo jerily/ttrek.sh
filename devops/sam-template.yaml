@@ -76,13 +76,7 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: s3:ListBucket
-                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}
-                Condition:
-                  StringLike:
-                    s3:prefix: !Sub ${ContentImagesPrefix}/*
-              - Effect: Allow
-                Action: [s3:GetObject, s3:PutObject]
+                Action: s3:GetObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/*
         - PolicyName: WriteTelemetryBackups
           PolicyDocument:

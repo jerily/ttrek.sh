@@ -164,8 +164,10 @@ and [security](security.md) for trust boundaries and current limitations.
 
 ## Content images
 
-Both static packages (0.1.1+) accept a private S3 bucket and an image directory
-from the host. Configure direct-server and Lambda startup using:
+The static packages accept a private S3 bucket and an image directory from the
+host. Use web-static-blog 0.1.2+ and web-static-wiki 0.1.3+ for separate build and
+runtime upload modes. Configure `devops/config.prod.ini` for the production build,
+`etc/config.local.ini` for local development, or `etc/config.ini` for direct PROD:
 
 ```ini
 [content_images]
@@ -176,7 +178,8 @@ prefix=ttrek/content/images
 url_expiry_seconds=3600
 ```
 
-`directory` is relative to the site root (or an absolute trusted directory).
+`directory` is relative to the site root (or an absolute trusted directory for
+direct-server use). Production Lambda images must be bundled under `content/`.
 With the configuration above, put images under `content/docs/images/` and use
 `![Architecture](images/architecture.svg)` in Markdown files directly under
 `content/docs/`. These paths work in local Markdown previews as well as on the
@@ -189,20 +192,30 @@ for Markdown in nested folders; they are not resolved from each document's
 location. `..`, absolute/external image URLs, backslashes, encoded traversal and
 symlinks are rejected. The directory must exist.
 
-An empty bucket disables image hosting. Each worker shares one `awss3` client
-between the packages and creates snapshots at startup. Creation uploads only
-missing content-hashed objects with their MIME type. Page rendering signs fresh
-URLs without additional S3 requests. The SDK requires `aws-sdk-tcl-s3` 1.0.17+
-for its optional file-upload MIME type. Image hashes use Tcllib's `sha256`.
+An empty bucket disables image hosting locally; production packaging and uploads
+require a bucket. Each worker shares one `awss3` client between the packages and
+creates snapshots at startup. LOCAL passes `upload_missing true`, uploading only
+missing content-hashed objects with their MIME type. PROD passes
+`upload_missing false`: startup validates local sources and computes keys without
+listing or uploading S3 objects. Page rendering signs fresh URLs. The SDK requires
+`aws-sdk-tcl-s3` 1.0.17+ for its optional file-upload MIME type. Image hashes use
+Tcllib's `sha256`.
 
 The local Lambda stack overrides the bucket to `ttrek-local` and uses its loopback
 S3 mock, with dummy credentials. Direct LOCAL runs may set `endpoint` to a loopback
 HTTP mock explicitly. HTTP endpoints are rejected in PROD. No live AWS upload is
 performed by the tests or by the artifact-packaging smoke check.
 
-For deployment, match the SAM `ContentImagesBucket` and `ContentImagesPrefix`
-parameters to the configuration. The execution role lists only that prefix and
-gets/puts only its objects. Existing images and old content-hashed objects are
+CodeBuild runs `devops/upload-content-images.tcl` after artifact validation and
+before `sam deploy`, reading the generated production image settings without
+decrypting application secrets. Both content collections are validated before
+uploading; S3 failures fail the build. The ZIP check verifies that the packaged
+image paths, bytes and settings match what the build will upload.
+
+For deployment, match the CodeBuild and SAM `ContentImagesBucket` and
+`ContentImagesPrefix` parameters to the configuration. CodeBuild lists the image
+prefix and puts missing objects; the Lambda execution role only gets images for
+signed downloads. Existing images and old content-hashed objects are
 never deleted; manage retention separately. If image files change, recreate the
 snapshots (normally by restarting). Already-open pages may require a reload after
 the signed URLs expire.

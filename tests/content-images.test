@@ -42,8 +42,25 @@ test image-config-pass {bucket, directory and signing settings reach both packag
     list [expr {$wiki eq $blog}] [llength $createdClients] [dict get $wiki -images-directory] \
         [dict get $wiki -s3] $createdClients
 } -result [list 1 1 [file join $root content images] \
-    {client test_image_client bucket private-images prefix private/images url_expiry_seconds 120 http_endpoint {}} \
+    {client test_image_client bucket private-images prefix private/images url_expiry_seconds 120 http_endpoint {} upload_missing 0} \
     {{region eu-central-1}}]
+
+test image-config-upload-mode {production never uploads at startup; local and explicit build calls do} -body {
+    set config [::app_config::content_images {content_images {bucket private-images region eu-central-1}} $root]
+    set ::env(ENV) PROD
+    set prod [dict get [::content_images::options $config] -s3 upload_missing]
+    set build [dict get [::content_images::options $config 1] -s3 upload_missing]
+    set ::env(ENV) LOCAL
+    set local [dict get [::content_images::options $config] -s3 upload_missing]
+    set package [dict get [::content_images::options $config 0] -s3 upload_missing]
+    list $prod $build $local $package
+} -cleanup {set ::env(ENV) PROD} -result {0 1 1 0}
+
+test image-config-production {production template supplies image settings without decrypting secrets} -body {
+    set settings [::app_config::content_images_from_ini [file join $root devops config.prod.ini] $root]
+    list [dict get $settings bucket] [dict get $settings region] [dict get $settings prefix] \
+        [dict get $settings directory]
+} -result [list jerily-ttrek-app eu-central-1 ttrek/content/images [file join $root content docs]]
 
 unset ::env(ENV)
 array set ::env $savedEnv

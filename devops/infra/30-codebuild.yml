@@ -14,6 +14,15 @@ Parameters:
   PrivateRegistryRef:
     Type: String
     Default: main
+  ContentImagesBucket:
+    Type: String
+    Default: jerily-ttrek-app
+    Description: Must match content_images.bucket in the production configuration.
+  ContentImagesPrefix:
+    Type: String
+    Default: ttrek/content/images
+    AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
+    Description: Must match content_images.prefix in the production configuration.
   GitHubConnectionArn:
     Type: String
     Default: ''
@@ -73,6 +82,15 @@ Resources:
               - Effect: Allow
                 Action: s3:GetObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::jerily-ttrek-app/ttrek/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}
+                Condition:
+                  StringLike:
+                    s3:prefix: !Sub ${ContentImagesPrefix}/*
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/*
               - Effect: Allow
                 Action: cloudformation:CreateChangeSet
                 Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
