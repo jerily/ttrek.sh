@@ -21,6 +21,7 @@ ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/content-images.test"
+ttrek run tclsh9.1 "$PWD/tests/content-images-build.test"
 ttrek run tclsh9.1 "$PWD/tests/installer.tcl"
 ttrek run tclsh9.1 "$PWD/tests/upload-archives.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-smoke.tcl"
@@ -29,9 +30,13 @@ ttrek run tclsh9.1 "$PWD/tests/local-stack.tcl"
 
 `tests/runtime-packages.tcl` loads runtime and development packages without starting services.
 `ttrek run tclsh9.1 tests/lambda-package.tcl dist/ttrek-sh.zip` checks a production
-ZIP's release settings, bundled checksum manifest and exclusion of host config.
+ZIP's release settings, bundled checksum manifest, image settings and bytes, and
+exclusion of host config.
 CodeBuild runs this after packaging and finalization, before deployment; it needs
 neither decrypted credentials nor running services.
+`tests/content-images-build.test` uses a fake S3 client to verify upload
+deduplication across both collections, validation before uploads, build failure
+on S3 errors, and production rendering without S3 listing or upload calls.
 `tests/local-stack.tcl` runs the packaged site through all three installed mock
 services on temporary ports. It checks documentation, HEAD/error behavior,
 S3-backed asset changes, binary objects, signed release downloads and checksums,

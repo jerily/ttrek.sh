@@ -247,8 +247,8 @@ proc ::app_config::release_checksums {path version} {
     return $selected
 }
 
-# Read only the public release settings for the local mock stack.
-proc ::app_config::releases_from_ini {path root} {
+# Read public settings without loading encrypted secrets or contacting KMS/SSM.
+proc ::app_config::ini_section {path section} {
     package require inifile
     set comment [::ini::commentchar]
     set ini {}
@@ -256,15 +256,25 @@ proc ::app_config::releases_from_ini {path root} {
         ::ini::commentchar #
         set ini [::ini::open $path r]
         set settings {}
-        if {"releases" in [::ini::sections $ini]} {set settings [::ini::get $ini releases]}
+        if {$section in [::ini::sections $ini]} {set settings [::ini::get $ini $section]}
     } finally {
         if {$ini ne {}} {::ini::close $ini}
         ::ini::commentchar $comment
     }
+    return $settings
+}
+
+# Read only the public release settings for the local mock stack.
+proc ::app_config::releases_from_ini {path root} {
+    set settings [ini_section $path releases]
     if {[dict exists $settings checksums_file] && [dict get $settings checksums_file] ne {}} {
         dict set settings checksums_file [file normalize [file join $root [dict get $settings checksums_file]]]
     }
     return [releases [dict create releases $settings]]
+}
+
+proc ::app_config::content_images_from_ini {path root} {
+    return [content_images [dict create content_images [ini_section $path content_images]] $root]
 }
 
 # Private image storage shared by the documentation and blog snapshots.

@@ -331,6 +331,8 @@ proc ::site_image_test::client {method bucket key args} {
     dict set ::site_image_test::objects $key 1
 }
 test static-images-config {the default image directory serves both mounts and stays hidden in doc navigation} -setup {
+    set savedImageEnv [array get ::env ENV]
+    set ::env(ENV) LOCAL
     set imageRoot [makeDirectory static-image-site]
     foreach name {www public etc tcl} {file link -symbolic [file join $imageRoot $name] [file join $root $name]}
     file mkdir [file join $imageRoot content docs images] [file join $imageRoot content blog]
@@ -372,6 +374,8 @@ test static-images-config {the default image directory serves both mounts and st
     rename ::site_image_test::real_sign ::aws::s3::generate_presigned_url
     set ::content_images::clients $savedClients
     ::site::configure $settings
+    unset ::env(ENV)
+    array set ::env $savedImageEnv
     removeDirectory static-image-site
 } -result {200 1 200 1 1 1 0}
 

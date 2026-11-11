@@ -335,8 +335,40 @@ The build:
    `--local-only`, and sets executable ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,
    dependency resolution, and staged-site checks still run.
-5. Validates the SAM template, preserves the new asset fingerprints, and deploys
-   `devops/sam-template.yaml` with SAM.
+5. Validates the SAM template and packaged image settings/bytes, uploads missing
+   content images, preserves the new asset fingerprints, and deploys
+   `devops/sam-template.yaml` with SAM. Image validation or upload errors stop
+   deployment.
+
+Content images use `[content_images]` in `devops/config.prod.ini`, which is carried
+into the generated production config. `devops/upload-content-images.tcl` reads
+only this public section and uses `aws-sdk-tcl-s3` with the CodeBuild role. Both
+wiki and blog references are validated before uploading. Identical bytes share
+content-hashed keys; existing objects and older images are retained. The build
+does not generate signed URLs: each page response signs fresh URLs at runtime.
+Production workers use `upload_missing false` and make no S3 listing or upload
+calls for images, including during cold starts. Local workers still upload
+missing images to their configured bucket or local S3 mock.
+
+Build-time image uploads require web-static-blog 0.1.2+ and web-static-wiki
+0.1.3+, supplied by the pinned registry. When first enabling this pipeline:
+
+1. Update the CodeBuild stack once with
+   `bash devops/infra/30-deploy-codebuild.sh`, using the existing
+   `TTREK_GITHUB_CONNECTION_ARN` and deployment AWS profile. The updated role needs
+   `s3:PutObject` on `ttrek/content/images/*`; its image-prefix listing permission
+   is also declared in the template.
+2. Run CodeBuild. Its SAM deployment updates Lambda's
+   image policy to `s3:GetObject` only. No separate VPC template deployment or
+   manual image upload is needed.
+
+The defaults use bucket `jerily-ttrek-app`, region `eu-central-1`, prefix
+`ttrek/content/images`, and directory `content/docs`. If changing the bucket or
+prefix, keep the CodeBuild and SAM `ContentImagesBucket`/`ContentImagesPrefix`
+parameters aligned with the generated production configuration (including any
+SSM overrides). Production image directories must be included under `content/`
+in the Lambda archive. The build checks their paths and bytes against the files
+it will upload. Keep the checkout unchanged until uploads finish.
 
 Fingerprint history lives under `s3://$SAM_ARTIFACT_BUCKET/lambda/ttrek-sh-assets/`.
 CodeBuild downloads this directory before building and uploads it after successful
