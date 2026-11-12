@@ -19,13 +19,8 @@
       "macos-x86_64": "e9c6a0842d57d2bc6fed77d98b2e771a0c964173f97025b3e75eae103978092b"
     },
     "1.2.0": {
-      "linux-amd64-glibc": "bb4775c61b81bddbe47cf790e9ce525f3367f499a3874f364465ac16f2d25e0c",
-      "linux-amd64-musl": "2da2cce9d82ae8f1f0fc5580d3a330db17e45964b54e52728f008fc91369e282",
-      "linux-arm64-glibc": "571c69b24d45abca3ecd795e8d4fb3aaa2e7687b6c574ddd4f0f2d375c2ea8ac",
-      "linux-arm64-musl": "c2155e92dba1066fa3c57e7a6044e49418bfee6b0e4b1af6f8382de6289bde84",
-      "macos-arm64": "db5c8dfd0eaa17bdee5116df94b81fa08d2dfe9946245ba8ba2b0bfc7e1b70fa",
-      "macos-universal2": "850ad4f505cca62d86bfea40e7a8ef363b678cea44d9ac486da458f65dd84fff",
-      "macos-x86_64": "bbc83a2c95232f82f963fd01d70c21c4ff8122407b31af95721049b7730b8e39"
+      "linux-amd64-glibc": "554aee0d5aaeaf88a7cd40b5f02188ede9c50619f25e915d5da24b49ba96a943",
+      "linux-amd64-musl": "120b5c19a58330a6782dbe3031482ed92fc8fd98705c99ccb369d20de1b26a97"
     }
   }
 }
