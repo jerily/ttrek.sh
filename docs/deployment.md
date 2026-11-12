@@ -68,6 +68,7 @@ For a new deployment:
    SecureString and deploy `38-deploy-infra-rds-postgres.sh` before building the website.
 6. Run `15-deploy-infra-certificate.sh` and complete DNS validation, then run
    `45-deploy-infra-ses.sh` to create the SES exports required by the Lambda role.
+   Run `16-deploy-cloudfront-cdn.sh` before the SAM application, which imports its URL.
 7. Complete the GitHub connection setup below, run `30-deploy-codebuild.sh`, then
    run the build (or use the manual Lambda steps below).
 8. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.
@@ -231,7 +232,9 @@ placeholders and must be rendered before it is submitted to IAM.
 
 The policies cover the application infrastructure scripts (Keys through SES): stack change
 sets, KMS keys and aliases, the S3 bucket, isolated VPC, Valkey, ACM/DNS, CodeBuild
-and its role, and the public API's Lambda invocation permission. Most resource
+and its role, CloudFront distribution/cache/OAC resources, and the public API's
+Lambda invocation permission. CloudFront permissions are split between the two
+managed policies to keep both within IAM's size limit. Most resource
 operations require CloudFormation's [forward access session](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/fas-requests-and-permission-evaluation.html).
 SSM reads and decryption through SSM are scoped to `/ttrek_sh/*`;
 DNS changes are limited to A/CNAME records at `ttrek.sh` and `_*.ttrek.sh`,
@@ -340,21 +343,24 @@ The build:
    dependency resolution, and staged-site checks still run.
 5. Validates the SAM template and packaged image settings/bytes, preserves the
    new asset fingerprints, and deploys `devops/sam-template.yaml` with SAM.
+   When CDN delivery is enabled, browser assets are uploaded before SAM deployment.
    Content images are uploaded by the explicit `task_sync_website` patch task.
 
 Content images use `[content_images]` in `devops/config.prod.ini`, which is carried
 into the generated production config. After deploying content changes, run the
 [explicit sync patch task](#explicit-website-patch-tasks). It uses the website
-Lambda role to upload missing wiki and blog images before committing their
+Lambda role to upload missing or changed wiki and blog images before committing their
 database references. Validation or upload errors fail the task and roll back
-its database changes. Identical bytes share content-hashed keys; existing objects
-and older images are retained. Each page response signs fresh URLs at runtime.
+its database changes. Keys preserve paths under `<prefix>/docs/` and
+`<prefix>/blog/`. SHA-256 comparisons skip unchanged bytes; changes replace the
+same key. S3 replacements are independent of the SQL transaction. Each response
+uses signed S3 URLs or CloudFront paths according to the production setting.
 Production startup and HTTP requests make no S3 listing or upload calls for
 images. Local workers still upload missing images to their configured bucket or
 local S3 mock. `task_initdb_website` initializes schemas only.
 
 Before relying on patch-task uploads, update the S3 gateway endpoint policy with
-`bash devops/infra/38-deploy-infra-rds-postgres.sh`. It allows `s3:ListBucket` and
+`bash devops/infra/38-deploy-infra-rds-postgres.sh`. It allows `s3:ListBucket`, `s3:GetObject` and
 `s3:PutObject` only for the configured image prefix, alongside existing backup
 writes. The SAM Lambda role already grants the corresponding image permissions;
 the [endpoint policy](https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html#edit-vpc-endpoint-policy-s3)
@@ -362,13 +368,85 @@ must also allow these calls.
 Deploying the website does not run the sync task automatically.
 
 The defaults use bucket `jerily-ttrek-app`, region `eu-central-1`, prefix
-`ttrek/content/images`, and directory `content/docs`. If changing the bucket or
+`ttrek/content/images`, `docs_directory=content/docs`, and `blog_directory=content/blog`. If changing the bucket or
 prefix, keep the PostgreSQL stack's endpoint and SAM
 `ContentImagesBucket`/`ContentImagesPrefix` parameters aligned with the generated
 production configuration (including any SSM overrides). Production image
 directories must be included under `content/`
 in the Lambda archive. The build checks their paths and bytes against the
 checkout; the patch task uploads images from the deployed archive.
+
+### Content image CDN
+
+Deploy `devops/infra/16-infra-cloudfront-cdn.yml` with
+`bash devops/infra/16-deploy-cloudfront-cdn.sh` after updating the deployment IAM
+policies. This creates `Infra-DevOps-TTREK-CloudFrontCDN` using the existing image
+bucket. `CONTENT_IMAGES_BUCKET`, `CONTENT_IMAGES_PREFIX`, and
+`BROWSER_ASSETS_PREFIX` (default `cdn`) override the defaults in the CDN and
+CodeBuild deploy scripts; keep them aligned with `content_images.bucket`,
+`content_images.prefix`, and `content_images.assets_prefix` in the configuration.
+The stack owns the bucket policy; merge any separately managed statements before
+adopting it for a bucket with an existing policy.
+
+The distribution uses the default HTTPS CloudFront hostname and an
+[origin access control](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html).
+Its bucket policy grants this distribution only `GetObject` for
+`<prefix>/blog/*`, `<prefix>/docs/*`, and `<assets_prefix>/*` (default `cdn/*`).
+It cannot serve release archives, backups or other bucket objects. Viewers can read
+these files through CloudFront; S3 remains private.
+The full S3 key is also the URL path, for example:
+`https://<distribution>.cloudfront.net/ttrek/content/images/blog/images/example.png`.
+
+`CdnBaseUrl` exports `${AWS::StackName}-BaseUrl`. SAM's `CloudFrontStackName`
+parameter selects that export (default `Infra-DevOps-TTREK-CloudFrontCDN`) and
+injects it as `CONTENT_IMAGES_CLOUDFRONT_URL`. Deploy the CDN stack before the SAM
+stack, including when CDN delivery is disabled. Delivery is enabled in
+`devops/config.prod.ini` with:
+
+```ini
+[content_images]
+cloudfront_enabled=true
+assets_prefix=cdn
+```
+
+Set it to `false` for signed S3 image URLs and the existing local CSS/JS/favicon
+URLs. LOCAL always retains that behavior. Changing
+this setting requires a configuration deployment but no content resync; both URL
+modes use the same stored paths. Direct PROD servers must supply the same environment
+variable when enabled. Upload and packaging helpers do not need a distribution URL.
+
+`devops/upload-browser-assets.tcl` reads the exact generated production config and
+uploads CSS/JS from the versioned asset tree, adjacent license notices, both
+favicon formats, and the installed `treqmon` chart script. CodeBuild runs it after
+artifact validation and before SAM deployment. It skips uploads when the flag is
+false and fails the build on missing assets or S3 errors. Unchanged fingerprinted
+objects are reused; fixed paths are refreshed. Removed and older versioned assets
+are retained. Manual builds can run:
+
+```bash
+ttrek run tclsh9.1 devops/upload-browser-assets.tcl build/prod/config.ini
+```
+
+Redeploy `30-deploy-codebuild.sh` to grant uploads under `cdn/*` (or the configured
+browser prefix), and redeploy the CDN stack to grant read access. No runtime S3
+uploads are needed for browser assets. The application adds only the imported CDN
+origin to the script/style/image CSP directives on package-rendered HTML.
+
+Browser cache behaviors use [CloudFront response-header policies](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/modifying-response-headers.html)
+with CORS for JavaScript modules and `nosniff`. Stable paths revalidate in the
+browser; fingerprinted CSS/JS keep one-year immutable caching. The stack exports
+`${AWS::StackName}-BrowserAssetResponseHeadersPolicyId` and
+`${AWS::StackName}-VersionedAssetResponseHeadersPolicyId` for other stacks to
+import and attach to their own cache behaviors. These are policy IDs; Lambda's
+page CSP uses the exported base URL instead.
+
+Images, favicons, license files and the monitor script use a five-minute maximum edge TTL by default (`ImageCacheTTL`, or
+`CONTENT_IMAGES_CACHE_TTL` in the deploy script), with browser revalidation.
+Changed images can remain cached at the edge until that TTL expires. For immediate
+refresh, invalidate the changed CloudFront paths using an authorized operator.
+Sync does not add content hashes to image URLs or automatically invalidate the CDN.
+Run `task_sync_website` after deploying the path-based image packages to publish
+the new locations and stored references; there is no legacy-key fallback.
 
 Fingerprint history lives under `s3://$SAM_ARTIFACT_BUCKET/lambda/ttrek-sh-assets/`.
 CodeBuild downloads this directory before building and uploads it after successful
@@ -377,7 +455,9 @@ the retained files, allowing older open pages to request their assets after a
 deployment. Neither sync uses `--delete`. Do not apply a lifecycle expiration to
 this prefix without an explicit retention policy; old pages can outlive the HTML
 cache. History increases archive size over time, so monitor Lambda package limits.
-This S3 prefix is build storage; production assets still come from Lambda.
+This S3 prefix remains build storage. When CDN delivery is enabled, the validated
+files are also published under `cdn/` in the image bucket. Otherwise production
+assets continue to come from Lambda.
 
 The rebuilt binary targets glibc 2.28 with static third-party dependencies;
 [AL2023 provides glibc 2.34](https://docs.aws.amazon.com/linux/al2023/ug/core-glibc.html).

@@ -219,6 +219,31 @@
         "apigateway:POST"
       ],
       "Resource": "arn:aws:apigateway:__REGION__::/tags/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateDistribution",
+        "cloudfront:CreateDistributionWithTags",
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:ListTagsForResource",
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:GetCachePolicy",
+        "cloudfront:GetCachePolicyConfig",
+        "cloudfront:GetResponseHeadersPolicy",
+        "cloudfront:GetResponseHeadersPolicyConfig"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "aws:CalledVia": "cloudformation.amazonaws.com"
+        }
+      }
     }
   ]
 }

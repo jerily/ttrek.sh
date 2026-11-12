@@ -37,6 +37,7 @@ npm test
 "$TCLSH" tests/static-content.test
 "$TCLSH" tests/content-images.test
 "$TCLSH" tests/content-images-build.test
+"$TCLSH" tests/browser-assets.test
 "$TCLSH" tests/config.test
 "$TCLSH" tests/lambda-config.test
 "$TCLSH" tests/telemetry-config.test
@@ -56,3 +57,4 @@ python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 "$TCLSH" tests/lambda-package.tcl dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
 aws s3 sync public/assets/versioned/ "$ASSET_HISTORY" --only-show-errors
+"$TCLSH" devops/upload-browser-assets.tcl "$TTREK_PRODUCTION_CONFIG"

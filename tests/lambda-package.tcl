@@ -4,7 +4,7 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 if {[llength $argv] != 1} {error "Usage: lambda-package.tcl ARCHIVE"}
 set archive [file normalize [lindex $argv 0]]
 set ::env(ENV) PROD
-package require web-static-wiki 0.1.3
+package require web-static-wiki 0.1.5
 
 proc read_bytes {path} {
     set channel [open $path rb]
@@ -37,17 +37,30 @@ try {
         set buildConfig $::env(TTREK_PRODUCTION_CONFIG)
     }
     set buildImages [::app_config::content_images_from_ini $buildConfig $root]
-    foreach key {bucket region prefix url_expiry_seconds endpoint} {
+    foreach key {bucket region prefix url_expiry_seconds endpoint cloudfront_enabled assets_prefix} {
         if {[dict get $images $key] ne [dict get $buildImages $key]} {
             error "Packaged content_images.$key differs from the upload configuration"
         }
     }
-    set directory [dict get $images directory]
-    if {![string match "$mount/content/*" "$directory/"] || ![file isdirectory $directory]} {
-        error "Production content_images.directory must be bundled under content/"
+    foreach key {docs_directory blog_directory} {
+        set directory [dict get $images $key]
+        if {![string match "$mount/content/*" "$directory/"] || ![file isdirectory $directory]} {
+            error "Production content_images.$key must be bundled under content/"
+        }
+        if {[image_objects $directory] ne [image_objects [dict get $buildImages $key]]} {
+            error "Packaged $key image paths or bytes differ from the files to upload"
+        }
     }
-    if {[image_objects [dict get $images directory]] ne [image_objects [dict get $buildImages directory]]} {
-        error "Packaged image paths or bytes differ from the files to upload"
+    set assetManifest [read_bytes [file join $mount public asset-manifest.json]]
+    if {$assetManifest ne [read_bytes [file join $root public asset-manifest.json]]} {
+        error "Packaged browser asset manifest differs from the upload sources"
+    }
+    set assetPaths [dict values [::tjson::json_to_simple [encoding convertfrom utf-8 $assetManifest]]]
+    foreach path [concat $assetPaths {/favicon.ico /assets/favicon.svg}] {
+        set relative [string trimleft $path /]
+        if {[read_bytes [file join $mount public $relative]] ne [read_bytes [file join $root public $relative]]} {
+            error "Packaged browser asset differs from the file to upload: $path"
+        }
     }
     set manifest [file join $mount etc releases.json]
     if {[dict get $releases checksums_file] ne $manifest} {

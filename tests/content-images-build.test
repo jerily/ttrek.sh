@@ -24,6 +24,7 @@ proc ::build_images::setup {} {
     write [file join $root content docs guide.md] "# Guide\n\n!\[Image\](images/pixel.png)"
     write [file join $root content blog 2026-11-11-guide.md] "# Guide\n\n!\[Image\](images/pixel.png)"
     write [file join $root content docs images pixel.png] [binary format H* 89504e470d0a00ff]
+    write [file join $root content blog images pixel.png] blog-image
     variable settings [::app_config::content_images {content_images {bucket test-images region eu-central-1}} $root]
 }
 proc ::build_images::client {method bucket key args} {
@@ -32,6 +33,7 @@ proc ::build_images::client {method bucket key args} {
     if {$method eq $failure} {error "S3 $method failed"}
     switch -- $method {
         ls {return [dict keys $objects $key]}
+        get {write [lindex $args 0] [lindex [dict get $objects $key] 0]}
         put {
             lassign $args path type
             set channel [open $path rb]
@@ -46,14 +48,14 @@ proc ::build_images::cleanup {} {
     removeDirectory build-images-fixture
 }
 
-test build-images-upload {build deduplicates both collections and repeats without writes} -setup ::build_images::setup -body {
+test build-images-upload {build separates both collections and repeats without writes} -setup ::build_images::setup -body {
     ::content_images::upload $build_images::root $build_images::settings
     set count [llength [lsearch -all -index 0 $build_images::calls put]]
     set build_images::calls {}
     ::content_images::upload $build_images::root $build_images::settings
     list $count [dict size $build_images::objects] \
         [lsearch -index 0 $build_images::calls put] [lindex [lindex [dict values $build_images::objects] 0] 1]
-} -cleanup ::build_images::cleanup -result {1 1 -1 image/png}
+} -cleanup ::build_images::cleanup -result {2 2 -1 image/png}
 
 test build-images-runtime {database stores query content without scans, hashes or S3 operations} -setup ::build_images::setup -body {
     package require tpersist 0.1.2
@@ -68,15 +70,60 @@ test build-images-runtime {database stores query content without scans, hashes o
         set build_images::calls {}
         set stores [::content_images::database_stores $db $build_images::settings]
         set matches {}
-        foreach {kind path} {wiki /guide blog /2026-11-11-guide} {
+        foreach {kind directory path} {wiki docs /guide blog blog /2026-11-11-guide} {
             set store [dict get $stores $kind]
             set html [::web::static::${kind}::render_markdown $store [::web::static::${kind}::load $store $path]]
-            set key [lindex [dict keys $build_images::objects] 0]
+            set key ttrek/content/images/$directory/images/pixel.png
             lappend matches [string match "*<img src=\"https://images.example/$key?*" $html]
         }
         list $build_images::calls $matches
     } finally {::tpersist::db_disconnect $db}
 } -cleanup ::build_images::cleanup -result {{} {1 1}}
+
+test build-images-delivery {stored paths switch between signing and CDN without another sync} -setup ::build_images::setup -body {
+    package require tpersist 0.1.2
+    set savedCdn [array get ::env CONTENT_IMAGES_CLOUDFRONT_URL]
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
+    set db [::tpersist::db_connect -database :memory: -autobegin 0]
+    try {
+        set stores [::content_images::database_stores $db $build_images::settings]
+        foreach {kind directory} {wiki docs blog blog} {
+            ::web::static::${kind}::initdb $db
+            ::web::static::${kind}::sync [dict get $stores $kind] [file join $build_images::root content $directory]
+        }
+        file delete -force [file join $build_images::root content]
+        set build_images::calls {}
+        set stores [::content_images::database_stores $db [dict replace $build_images::settings cloudfront_enabled true]]
+        set result {}
+        foreach {kind directory path} {wiki docs /guide blog blog /2026-11-11-guide} {
+            set store [dict get $stores $kind]
+            set html [::web::static::${kind}::render_markdown $store [::web::static::${kind}::load $store $path]]
+            lappend result [string match "*<img src=\"https://cdn.example/ttrek/content/images/$directory/images/pixel.png\"*" $html] \
+                [string match {*X-Amz-Signature*} $html]
+        }
+        list $result $build_images::calls
+    } finally {
+        ::tpersist::db_disconnect $db
+        unset ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+        array set ::env $savedCdn
+    }
+} -cleanup ::build_images::cleanup -result {{1 0 1 0} {}}
+
+test build-images-paths {identical relative names have independent docs and blog objects} -setup ::build_images::setup -body {
+    ::content_images::upload $build_images::root $build_images::settings
+    list [lsort [dict keys $build_images::objects]] \
+        [lindex [dict get $build_images::objects ttrek/content/images/blog/images/pixel.png] 0]
+} -cleanup ::build_images::cleanup -result {{ttrek/content/images/blog/images/pixel.png ttrek/content/images/docs/images/pixel.png} blog-image}
+
+test build-images-blog-root {a missing blog image cannot be satisfied from docs} -setup ::build_images::setup -body {
+    file delete [file join $build_images::root content blog images pixel.png]
+    list [catch {::content_images::upload $build_images::root $build_images::settings}] $build_images::calls
+} -cleanup ::build_images::cleanup -result {1 {}}
+
+test build-images-cloudfront {uploads do not need a distribution URL even when PROD delivery enables CDN} -setup ::build_images::setup -body {
+    ::content_images::upload $build_images::root [dict replace $build_images::settings cloudfront_enabled true]
+    dict size $build_images::objects
+} -cleanup ::build_images::cleanup -result 2
 
 test build-images-invalid {invalid blog references prevent uploads for both collections} -setup ::build_images::setup -body {
     ::build_images::write [file join $build_images::root content blog 2026-11-11-guide.md] \

@@ -13,8 +13,8 @@ proc ::site_patch::run {task context} {
 proc ::site_patch::task_initdb_website {context} {
     set initialized {}
     ::tpersist::db_transaction $::telemetry::connection {
-        package require web-static-wiki 0.1.4
-        package require web-static-blog 0.1.3
+        package require web-static-wiki 0.1.5
+        package require web-static-blog 0.1.4
         ::telemetry::initdb
         lappend initialized ::telemetry::initdb
         set dialect [::tpersist::db_dialect $::telemetry::connection]
@@ -48,8 +48,8 @@ proc ::site_patch::task_sync_website {context} {
     set settings [::site::config]
     set root [dict get $settings rootdir]
     set stores [::content_images::database_stores $::telemetry::connection [dict get $settings content_images]]
-    # Both collections and registry metadata commit together. Immutable image
-    # objects uploaded before a rollback are safe to reuse on retry.
+    # Both collections and registry metadata commit together. Image replacements
+    # in S3 are independent of this transaction and are not rolled back with SQL.
     ::telemetry::transaction {
         ::telemetry::lock_search_snapshot
         foreach {kind directory} {wiki docs blog blog} {

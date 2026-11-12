@@ -30,6 +30,10 @@ Parameters:
     Default: ttrek/content/images
     AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
     Description: Must match content_images.prefix (without leading or trailing slashes).
+  CloudFrontStackName:
+    Type: String
+    Default: Infra-DevOps-TTREK-CloudFrontCDN
+    Description: CDN stack exporting BaseUrl; deploy it before this application stack.
 
 Resources:
   SiteLogs:
@@ -131,6 +135,8 @@ Resources:
       Environment:
         Variables:
           ENV: PROD
+          CONTENT_IMAGES_CLOUDFRONT_URL:
+            Fn::ImportValue: !Sub ${CloudFrontStackName}-BaseUrl
           TELEMETRY_BACKUP_BUCKET: !Ref BackupBucket
 
 Outputs:

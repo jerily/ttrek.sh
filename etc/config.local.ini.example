@@ -20,8 +20,13 @@ checksums_file=etc/releases.json
 
 [content_images]
 # Sources are relative to this directory; paths cannot escape it.
-directory=content/docs
+docs_directory=content/docs
+blog_directory=content/blog
 bucket=
 region=us-east-1
 prefix=ttrek/content/images
+# Browser assets (favicon, CSS and JS) use a separate S3 prefix.
+assets_prefix=cdn
 url_expiry_seconds=3600
+# PROD only; SAM imports the CDN base URL from the CloudFront stack.
+cloudfront_enabled=false

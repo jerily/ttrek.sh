@@ -23,6 +23,11 @@ Parameters:
     Default: ttrek/content/images
     AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
     Description: Must match content_images.prefix in the production configuration.
+  BrowserAssetsPrefix:
+    Type: String
+    Default: cdn
+    AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
+    Description: Must match content_images.assets_prefix and the CloudFront stack.
   GitHubConnectionArn:
     Type: String
     Default: ''
@@ -87,10 +92,14 @@ Resources:
                 Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}
                 Condition:
                   StringLike:
-                    s3:prefix: !Sub ${ContentImagesPrefix}/*
+                    s3:prefix:
+                      - !Sub ${ContentImagesPrefix}/*
+                      - !Sub ${BrowserAssetsPrefix}/*
               - Effect: Allow
-                Action: s3:PutObject
-                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/*
+                Action: [s3:GetObject, s3:PutObject]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/*
+                  - !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${BrowserAssetsPrefix}/*
               - Effect: Allow
                 Action: cloudformation:CreateChangeSet
                 Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
