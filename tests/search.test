@@ -32,10 +32,7 @@ search_recipe $search_fixture split-tags 1.0.0 {} {relational storage}
 search_recipe $search_fixture one-tag 1.0.0 {} {{relational storage}}
 file mkdir [file join $search_fixture tclz 1.0.0]
 ::telemetry::sync_registry_metadata $search_fixture
-rename ::recipe_search::index ::recipe_search::original_index
-rename ::recipe_search::descriptions ::recipe_search::original_descriptions
-set saved_entries $::recipe_search::entries
-set saved_documents $::recipe_search::documents
+::telemetry::publish_search_snapshot
 ::recipe_search::build $search_fixture $search_snapshot
 ::recipe_search::load $search_snapshot
 proc search_names {query} {
@@ -191,8 +188,7 @@ test search-snapshot-2 {Invalid loads preserve both active indexes and clean up 
     ::tjson::parse $json snapshot
     set fields [lindex [::tjson::to_typed $snapshot] 1]
     set rejected {}
-    foreach {field invalid} {format {N 99} entries {L {}} documents {L {{L {{S missing} {S text}}}}} \
-            documents {L {}} names {S invalid!} descriptions {S invalid!}} {
+    foreach {field invalid} {format {N 99} mapping {L {}} mapping {M {}} names {S invalid!} descriptions {S invalid!}} {
         set broken [dict replace $fields $field $invalid]
         set channel [open [file join $search_artifacts broken.json] w]
         puts $channel [::tjson::typed_to_json [list M $broken]]
@@ -235,11 +231,4 @@ test search-snapshot-3 {Missing snapshot fails loading without rebuilding} -body
 } -returnCodes error -result {Search snapshot is missing; run the build-search script}
 
 ::tcltest::removeDirectory search-artifacts
-::recipe_search::index destroy
-::recipe_search::descriptions destroy
-rename ::recipe_search::original_index ::recipe_search::index
-rename ::recipe_search::original_descriptions ::recipe_search::descriptions
-set ::recipe_search::entries $saved_entries
-set ::recipe_search::documents $saved_documents
-
-unset -nocomplain ::recipe_search::catalog_rows
+::recipe_search::reset

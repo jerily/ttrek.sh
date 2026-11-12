@@ -13,8 +13,8 @@ Run the commands in this guide from the website checkout unless stated otherwise
   `tdevops` and the private mock-tool source repositories. The commands below
   expect the private registry checkout at `../private-ttrek-registry`.
 
-The local preview runs without AWS or Valkey. Running the direct server has
-additional [configuration requirements](local-development.md#direct-server).
+The local preview runs without AWS or Valkey. See [local development](local-development.md)
+for the explicit initialization and synchronization workflow.
 
 ## Get the source
 
@@ -69,8 +69,18 @@ ttrek run -script package-lambda -- --local-only
 ttrek run -script start-local
 ```
 
+With the services running, use another terminal to initialize and publish the local data:
+
+```sh
+ttrek run -script initdb-local
+ttrek run -script sync-local
+```
+
+Startup only opens database connections. Repeat these tasks after starting a new
+disposable local stack; use `sync-local` to publish the packaged content and registry.
+
 Open <http://127.0.0.1:8080/>. Press Ctrl-C to stop the services.
-Packaging builds the search index automatically. See [local development](local-development.md)
+The explicit sync task builds and publishes the search indexes. See [local development](local-development.md)
 for content edits, custom ports and running the direct server.
 
 ## Public dependency bootstrap

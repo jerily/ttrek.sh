@@ -137,6 +137,8 @@ proc ::telemetry_maintenance::restore {db path} {
     fconfigure $channel -encoding utf-8 -translation lf
     try {
         $db begintransaction
+        # Serialize with publishers; invalidation commits only with a valid restore.
+        $db allrows {SELECT id FROM registry_search_snapshot WHERE id = 1 FOR UPDATE}
         set header [::tjson::json_to_simple [gets $channel]]
         if {[dict get $header format] ne "ttrek-telemetry" || [dict get $header version] ne "1" ||
             [dict get $header tables] ne [dict keys $definitions]} {error "Unsupported telemetry backup"}
@@ -198,6 +200,7 @@ proc ::telemetry_maintenance::restore {db path} {
                 }
             }
         }
+        $db allrows {UPDATE registry_search_snapshot SET revision = '', fingerprint = '' WHERE id = 1}
         $db commit
         return $counts
     } on error {message options} {

@@ -233,6 +233,7 @@ file copy -force [file join $root registry tink-cc 2.1.1 rapidjson-1.1.0.diff] \
 set test_root $fixture
 set test_registry $registry_fixture
 ::telemetry::sync_registry_metadata $registry_fixture
+::telemetry::publish_search_snapshot
 
 proc body {response} {dict get $response body}
 proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
@@ -319,6 +320,7 @@ test handlers-project-url {Overview shows the latest version's project URL with 
     puts $channel {{"url":"https://example.org/project?x=\"quoted\"&y=<tag>","description":"Demo project"}}
     close $channel
     ::telemetry::sync_registry_metadata $registry_fixture
+    ::telemetry::publish_search_snapshot
 } -body {
     set html [body [get_package_page_handler {} {pathParameters {package_name demo}}]]
     list [contains $html {<p>Demo project</p>}] \
@@ -326,6 +328,7 @@ test handlers-project-url {Overview shows the latest version's project URL with 
 } -cleanup {
     writeFile $latest $original
     ::telemetry::sync_registry_metadata $registry_fixture
+    ::telemetry::publish_search_snapshot
 } -result {1 1}
 
 test handlers-project-url-invalid {Absent and unsafe database URLs do not produce project links} -body {
@@ -337,6 +340,7 @@ test handlers-project-url-invalid {Absent and unsafe database URLs do not produc
     lsort -unique $results
 } -cleanup {
     ::telemetry::sync_registry_metadata $registry_fixture
+    ::telemetry::publish_search_snapshot
 } -result 0
 
 test handlers-tags {Overview and listing show escaped tag links} -setup {
@@ -345,6 +349,7 @@ test handlers-tags {Overview and listing show escaped tag links} -setup {
     set tags {json {xml&"<x>}}
     writeFile $latest [::tjson::typed_to_json [list M [dict create tags [::views::strings $tags]]]]
     ::telemetry::sync_registry_metadata $registry_fixture
+    ::telemetry::publish_search_snapshot
 } -body {
     set results {}
     foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
@@ -357,6 +362,7 @@ test handlers-tags {Overview and listing show escaped tag links} -setup {
 } -cleanup {
     writeFile $latest $original
     ::telemetry::sync_registry_metadata $registry_fixture
+    ::telemetry::publish_search_snapshot
 } -result {200 1 1 0 200 1 1 0}
 
 test handlers-tags-optional {Missing and empty tags keep overview and listing usable} -setup {
@@ -367,6 +373,7 @@ test handlers-tags-optional {Missing and empty tags keep overview and listing us
     foreach json {{{}} {{"tags":[]}}} {
         writeFile $latest $json
         ::telemetry::sync_registry_metadata $registry_fixture
+        ::telemetry::publish_search_snapshot
         foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
                 [get_packages_page_handler {} {}]] {
             lappend results [dict get $response status] [contains [body $response] {class="package-tags"}]
@@ -376,13 +383,15 @@ test handlers-tags-optional {Missing and empty tags keep overview and listing us
 } -cleanup {
     writeFile $latest $original
     ::telemetry::sync_registry_metadata $registry_fixture
+    ::telemetry::publish_search_snapshot
 } -result {200 0 200 0 200 0 200 0}
 
 test handlers-database-catalog {Overview, listing, and search use stored metadata without recipe files} -setup {
     ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
         [dict create description {Stored overview} tags {["json"]} url https://example.org/stored]]
     file rename $registry_fixture ${registry_fixture}.hidden
-    unset -nocomplain ::recipe_search::catalog_rows
+    ::telemetry::publish_search_snapshot
+    ::recipe_search::reset
 } -body {
     set overview [get_package_page_handler {} {pathParameters {package_name demo}}]
     set listing [get_packages_page_handler {} {}]
@@ -395,6 +404,7 @@ test handlers-database-catalog {Overview, listing, and search use stored metadat
 } -cleanup {
     file rename ${registry_fixture}.hidden $registry_fixture
     ::telemetry::sync_registry_metadata $registry_fixture
+    ::telemetry::publish_search_snapshot
 } -result {200 1 1 200 1 200 demo json}
 
 test handlers-catalog-cache {Unchanged database metadata reuses worker indexes} -body {
@@ -412,6 +422,20 @@ test handlers-catalog-cache {Unchanged database metadata reuses worker indexes} 
         }
     }
 } -result 200
+
+test handlers-unpublished-search {Missing indexes return 503 for search while listings and overviews remain available} -setup {
+    ::tpersist::_raw $::telemetry::connection {UPDATE registry_search_snapshot SET revision = '', fingerprint = ''}
+    ::recipe_search::reset
+} -body {
+    set results {}
+    foreach handler {get_search_handler get_autocomplete_handler get_search_page_handler} {
+        set response [$handler {} {queryStringParameters {q demo}}]
+        lappend results [dict get $response status] [dict get $response headers Cache-Control]
+    }
+    lappend results [dict get [get_packages_page_handler {} {}] status] \
+        [dict get [get_package_page_handler {} {pathParameters {package_name demo}}] status] \
+        [info exists ::recipe_search::revision] [info commands ::recipe_search::index]
+} -cleanup {::telemetry::publish_search_snapshot} -result {503 no-store 503 no-store 503 no-store 200 200 0 {}}
 
 test handlers-3 {Dependency conditions render on version pages} -body {
     set html [body [get_package_version_page_handler {} {pathParameters {package_name demo package_version 1.0.0}}]]

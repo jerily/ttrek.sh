@@ -10,9 +10,13 @@
       "file": "bin/build-search.sh",
       "args": []
     },
-    "start-direct": {
-      "file": "run.sh",
-      "args": []
+    "initdb-local": {
+      "file": "bin/invoke-patch-local.sh",
+      "args": ["task_initdb_website"]
+    },
+    "sync-local": {
+      "file": "bin/invoke-patch-local.sh",
+      "args": ["task_sync_website"]
     },
     "start-local": {
       "file": "bin/start-local.sh",

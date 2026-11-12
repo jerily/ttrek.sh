@@ -13,7 +13,9 @@ Usage: start-local.sh [options]
   --help              Show this help
 
 Run the package script before starting. These services execute trusted local
-code. Content is served from the directories in the archive. Runtime state
+code. In another terminal, run `ttrek run -script initdb-local`, then
+`ttrek run -script sync-local` to import the packaged content and registry.
+Pass `-- --lambda-port PORT` to these scripts when using a custom port. Runtime state
 and uploaded mock objects are disposable. Stop with Ctrl-C; the supervisor stops all three services.
 
 TTREK_SITE_PREFIX selects installed dependencies. TTREK_SITE_ZIP,
