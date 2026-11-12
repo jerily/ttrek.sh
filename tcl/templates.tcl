@@ -41,7 +41,6 @@ proc ::views::init {directory} {
 # Each field has a tjson type tag; never infer arrays/objects from Tcl strings.
 proc ::views::render {name fields} {
     variable templates
-    dict set fields pagetitle {S {ttrek: registry, website, and command-line interface}}
     return [stamp_year [::jinja2::render [dict get $templates $name] \
         [::tjson::typed_to_json [list M $fields]] -templates $templates -path $name]]
 }
