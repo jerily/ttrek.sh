@@ -67,11 +67,13 @@ Static Tcl extensions are intended for embedding, not `package require` loading.
 
 ## Recipe search
 
-`GET /registry/search?q=web` returns JSON objects with `name`, `description`, and
-`match`. Ranking: exact name, prefix, substring, literal description, name typo,
-description typo. Ties prefer fewer edits, greater query-trigram coverage, less
+`GET /registry/search?q=web` returns JSON objects with `name`, `description`, `tags`, and
+`match`. Ranking: exact name, prefix, substring, literal description, literal tag,
+name typo, description typo, tag typo. Ties prefer fewer edits, greater query-trigram coverage, less
 unmatched name text, then name. `distance` is omitted for prefix/substring name
 matches; `coverage` is shared/total unique query trigrams for description hits.
+Tag hits use `field: "tags"` with the existing `description` or `description-fuzzy`
+match value so older CLI clients can still consume the results.
 
 `GET /registry/autocomplete?q=web` returns up to eight `{name, description}`
 objects with the same ranking and validation. Both endpoints use the loaded build
@@ -84,16 +86,18 @@ JavaScript, including when suggestions are unavailable.
 Matching ignores ASCII case. Queries accept 1–255 ASCII letters, digits, spaces,
 `.`, `_`, `+` and `-`, excluding empty queries, `.` and `..`. Encode literal `+`
 as `%2B`. Invalid queries return 400; no matches returns `[]`. Queries of at most
-three characters allow one edit, longer queries two. Description suggestions
+three characters allow one edit, longer queries two. Description and tag suggestions
 require a shared trigram and a verified substring distance; below three
-characters descriptions match literally.
+characters descriptions and tags match literally. Tags are searched individually.
 
 `ttrek.sh` builds and serializes both indexes **at build time**, using ttrie and
 ttrigrams 0.2.0. Workers call `::recipe_search::load` to restore the trie nodes
 and sorted trigram postings directly; they never scan recipes or construct an
-index. All version descriptions are indexed, with one result per package.
-Description hits display the matched text; name hits use the first nonempty
-description in alphabetical order. Missing descriptions are allowed.
+index. All version descriptions and tags are indexed, with one result per package.
+Description hits display the matched text; name and tag hits use the first nonempty
+description in alphabetical order. Missing descriptions and tags are allowed.
+Tags are optional arrays of nonempty, single-line strings of at most 255 UTF-8 bytes.
+Package overviews and result cards omit the tag list when no tags are present.
 
 For direct serving, build after installing dependencies and whenever recipes change:
 

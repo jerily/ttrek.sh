@@ -337,6 +337,47 @@ test handlers-project-url-invalid {Absent, non-string and unsafe URLs do not pro
     writeFile $latest $original
 } -result 0
 
+test handlers-tags {Overview and listing show escaped tag links} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+    set saved_entries $::recipe_search::entries
+    set tags {json {xml&"<x>}}
+    writeFile $latest [::tjson::typed_to_json [list M [dict create tags [::views::strings $tags]]]]
+    dict set ::recipe_search::entries demo tags $tags
+} -body {
+    set results {}
+    foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
+            [get_packages_page_handler {} {}]] {
+        set html [body $response]
+        lappend results [dict get $response status] [contains $html {href="/search?q=json"}] \
+            [contains $html {xml&amp;&quot;&lt;x&gt;}] [contains $html {xml&"<x>}]
+    }
+    set results
+} -cleanup {
+    writeFile $latest $original
+    set ::recipe_search::entries $saved_entries
+} -result {200 1 1 0 200 1 1 0}
+
+test handlers-tags-optional {Missing and empty tags keep overview and listing usable} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+    set saved_entries $::recipe_search::entries
+    set ::recipe_search::entries {}
+} -body {
+    set results {}
+    foreach json {{{}} {{"tags":[]}}} {
+        writeFile $latest $json
+        foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
+                [get_packages_page_handler {} {}]] {
+            lappend results [dict get $response status] [contains [body $response] {class="package-tags"}]
+        }
+    }
+    set results
+} -cleanup {
+    writeFile $latest $original
+    set ::recipe_search::entries $saved_entries
+} -result {200 0 200 0 200 0 200 0}
+
 test handlers-3 {Dependency conditions render on version pages} -body {
     set html [body [get_package_version_page_handler {} {pathParameters {package_name demo package_version 1.0.0}}]]
     list [contains $html {demo@1.0.0}] [contains $html {<td>tcl</td>}] \

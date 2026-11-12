@@ -200,10 +200,14 @@ proc get_packages_page_handler {ctx req} {
     set packages {}
     foreach name [lsort $package_names] {
         set description {}
+        set tags {}
         if {[dict exists $::recipe_search::entries $name description]} {
             set description [dict get $::recipe_search::entries $name description]
         }
-        lappend packages [dict create name $name description $description]
+        if {[dict exists $::recipe_search::entries $name tags]} {
+            set tags [dict get $::recipe_search::entries $name tags]
+        }
+        lappend packages [dict create name $name description $description tags $tags]
     }
     set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
         result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}}]
@@ -474,6 +478,7 @@ proc get_package_page_handler {ctx req} {
     set registry_dir [get_registry_dir]
     set versions [get_package_versions $registry_dir $package_name]
     set description {}
+    set tags {}
     set project_url {}
     set spec_path [file join $registry_dir $package_name [lindex $versions 0] ttrek.json]
     if {[llength $versions] && [file isfile $spec_path]} {
@@ -487,6 +492,9 @@ proc get_package_page_handler {ctx req} {
             if {[::tjson::is_string $item]} {
                 set description [string trim [::tjson::get_valuestring $item]]
             }
+        }
+        if {[::tjson::has_object_item $spec tags]} {
+            set tags [::recipe_search::tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $spec_path]
         }
         if {[::tjson::has_object_item $spec url]} {
             set item [::tjson::get_object_item $spec url]
@@ -505,6 +513,7 @@ proc get_package_page_handler {ctx req} {
         title [list S "Package Overview: $package_name"] \
         package_name [list S $package_name] \
         description [list S $description] \
+        tags [::views::strings $tags] \
         project_url [list S $project_url] \
         versions [::views::strings $versions] \
         stat_platforms [::views::platform_stats $stat_platforms]]
