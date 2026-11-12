@@ -30,7 +30,6 @@ the project environment. Individual package recipes may need additional tools.
 mkdir my-app
 cd my-app
 ttrek init -y
-ttrek sync
 ttrek install -y tcl tjson
 ```
 

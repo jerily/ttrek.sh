@@ -3,7 +3,6 @@
 ## Find and install packages
 
 ```sh
-ttrek sync
 ttrek search tcl
 ttrek search 'web server'
 ttrek install -y tjson
