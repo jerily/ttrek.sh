@@ -8,7 +8,12 @@ source [file join $root tcl config.tcl]
 source [file join $root tcl telemetry.tcl]
 ::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root registry]]
 set settings [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}] \
-    treqmon {store {tsvstore {history_max_events 100}}}]
+    content_connection $::telemetry::connection content_images {} treqmon {store {tsvstore {history_max_events 100}}}]
+foreach {kind directory} {wiki docs blog blog} {
+    ::web::static::${kind}::initdb $::telemetry::connection
+    set store [dict get [::content_images::database_stores $::telemetry::connection {}] $kind]
+    ::web::static::${kind}::sync $store [file join $root content $directory]
+}
 ::site::init_worker $settings
 proc request {path {method GET} {headers {}}} {
     ::site::dispatch $::site::router [dict create method $method path $path headers $headers]
@@ -360,6 +365,10 @@ test static-images-config {the default image directory serves both mounts and st
     set imageSettings [::app_config::content_images {content_images {bucket configured-images \
         region eu-central-1 prefix configured-prefix}} $imageRoot]
     ::site::configure [dict replace $settings rootdir $imageRoot content_images $imageSettings]
+    foreach {kind directory} {wiki docs blog blog} {
+        set store [dict get [::content_images::database_stores $::telemetry::connection $imageSettings] $kind]
+        ::web::static::${kind}::sync $store [file join $imageRoot content $directory]
+    }
     ::site::mount $imageRouter
     set result {}
     foreach path {/docs/guide /blog/2026-11-11-guide} {

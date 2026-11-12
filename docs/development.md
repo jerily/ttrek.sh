@@ -14,9 +14,9 @@
   templates fail startup.
 - Documentation and blog content use `web-static-wiki` at `/docs` and
   `web-static-blog` at `/blog`, mounted on the host's `tpathexp` router.
-  LOCAL reads Markdown directories as before. PROD queries individual content
-  rows through `tpersist`; explicit patch tasks prepare the database content.
-  The host supplies trusted layouts. Restart workers to publish source changes.
+  Both LOCAL and PROD query content rows through `tpersist`; explicit patch tasks
+  prepare the database content. The host supplies trusted layouts. Repackage and
+  restart local workers after source edits, then run `initdb-local` and `sync-local`.
 - Home, registry, documentation, blog and request-monitor pages share `www/master.html.jinja` and
   `public/css/styles.css` for
   typography, navigation, content width and footer layout. The wiki/blog host
@@ -119,9 +119,9 @@ application staging, S3 seeds and release configuration. `etc/lambda.json` selec
 `prod-Api-TtrekWebsite-Function`, `tcl/lambda.tcl`, its initializer and request handler. The application
 keeps its HTTP event mapping, telemetry and release settings; tdevops supplies the
 bootstrap, Runtime API loop, package-path setup and generated local template.
-There is no app-local `lambda/` directory. Search indexes are cached per worker
-from the database catalog. PROD startup opens database connections only;
-LOCAL retains schema initialization and registry synchronization through `init_local`. [Telemetry](telemetry.md) uses tpersist with SQLite only in LOCAL and
+There is no app-local `lambda/` directory. Search indexes are published by sync
+and loaded lazily per worker. Both PROD and LOCAL startup open database connections
+only; initialization and synchronization use explicit patch tasks. [Telemetry](telemetry.md) uses tpersist with SQLite only in LOCAL and
 PostgreSQL only in PROD. Backend drivers are loaded only on connection.
 
 ## Request validation
@@ -207,9 +207,8 @@ symlinks are rejected. The directory must exist.
 
 An empty bucket disables image hosting locally; production packaging and uploads
 require a bucket. Each worker shares one `awss3` client between the packages.
-LOCAL reads its directories and uploads missing images as before. PROD queries
-one item from PostgreSQL when requested and signs URLs using the stored image
-keys. It does not scan directories, render Markdown, or hash images at startup.
+Both modes query stored content when requested and sign URLs using the stored image
+keys. LOCAL uses SQLite and PROD uses PostgreSQL. It does not scan directories, render Markdown, or hash images at startup.
 `task_sync_website` performs those operations through each package's `sync` proc.
 The SDK requires `aws-sdk-tcl-s3` 1.0.17+; maintenance image hashes use `::twebserver::sha256`.
 

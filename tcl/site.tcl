@@ -25,7 +25,7 @@ proc ::site::configure {config} {
     ::views::init [file join [root] www]
     # Defer database reads until a catalog request, so provisioning tasks can
     # initialize a new deployment before its first public request.
-    ::recipe_search::load_rows {}
+    ::recipe_search::reset
     if {[dict exists $settings tratelimit]} {
         ::tratelimit::init_middleware [dict get $settings tratelimit]
     }
@@ -34,22 +34,18 @@ proc ::site::configure {config} {
     }
 }
 
-# Each worker owns a router. PROD content is queried per request.
+# Each worker owns a router. Content is queried per request in both modes.
 proc ::site::mount {router} {
     set templates $::views::templates
     set imageSettings {}
     if {[dict exists [config] content_images]} {
         set imageSettings [dict get [config] content_images]
     }
-    if {[::app_config::mode] eq "LOCAL"} {
-        set stores [::content_images::snapshots [root] $imageSettings]
-    } else {
-        variable settings
-        if {![dict exists $settings content_connection]} {
-            dict set settings content_connection [::content_images::connect [dict get $settings content_database]]
-        }
-        set stores [::content_images::database_stores [dict get $settings content_connection] $imageSettings]
+    variable settings
+    if {![dict exists $settings content_connection]} {
+        dict set settings content_connection [::content_images::connect [dict get $settings content_database]]
     }
+    set stores [::content_images::database_stores [dict get $settings content_connection] $imageSettings]
     foreach {kind directory prefix} {wiki docs /docs blog blog /blog} {
         set store [dict get $stores $kind]
         ::web::static::${kind}::mount $router -store $store -prefix $prefix \

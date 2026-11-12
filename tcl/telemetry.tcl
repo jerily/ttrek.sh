@@ -56,12 +56,16 @@ proc ::telemetry::connect {settings} {
     set connection $opened
 }
 
-# Preserve local startup behavior; production uses connect and explicit tasks.
+# Explicit fixture/provisioning helper. Runtime startup always uses connect.
 proc ::telemetry::init_local {settings {registryDirectories {}}} {
     connect $settings
     try {
         initdb
-        if {[llength $registryDirectories]} {sync_registry_metadata {*}$registryDirectories}
+        transaction {
+            lock_search_snapshot
+            if {[llength $registryDirectories]} {sync_registry_metadata {*}$registryDirectories}
+            publish_search_snapshot
+        }
     } on error {message opts} {
         close
         return -options $opts $message
@@ -151,6 +155,8 @@ proc ::telemetry::initdb {} {
             db_create_table $connection $definition -if_not_exists true
         }
         # Upgrade existing databases without replacing package IDs or event rows.
+        # Adding listed defaults legacy rows to 0 until the first registry sync
+        # identifies published recipes. Existing listed flags are never reset.
         # tpersist has no ALTER TABLE helper; only fixed schema identifiers enter SQL.
         if {$dialect eq "sqlite"} {
             set columns [lmap row [::tpersist::_raw $connection {PRAGMA table_info(packages)}] {dict get $row name}]
@@ -173,6 +179,7 @@ proc ::telemetry::initdb {} {
         }
         db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
         db_create_index $connection idx_install_package req_pkg_install_event {pkg_id platform_id} -if_not_exists true
+        init_search_snapshot
     } true
 }
 
@@ -239,7 +246,8 @@ proc ::telemetry::sync_registry_metadata {args} {
         }
     }
     transaction {
-        # Avoid rewriting the catalog on every server/Lambda cold start.
+        # Avoid rewriting unchanged catalog rows during repeated syncs.
+        lock_search_snapshot
         set existing {}
         set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, tags, listed}] \
             package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
@@ -283,11 +291,17 @@ proc ::telemetry::sync_registry_metadata {args} {
 
 # The website reads this catalog, never recipe metadata or a build-time file.
 # Telemetry-only package names and withdrawn versions remain outside discovery.
-proc ::telemetry::registry_catalog {} {
+proc ::telemetry::registry_catalog {args} {
     package require tjson
+    if {[llength $args] > 1} {error "Expected an optional list of package names"}
     set query [db_join [db_select packages -expr {name, version, description, url, tags}] \
         package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
-    set query [db_order_by [db_where $query [db_eq [db_col listed] [db_value 1 -type integer]]] -expr {name, version}]
+    set predicate [db_eq [db_col listed] [db_value 1 -type integer]]
+    if {[llength $args]} {
+        set names [lindex $args 0]
+        set predicate [db_and $predicate [db_in [db_col name] [lmap name $names {db_value $name -type text}]]]
+    }
+    set query [db_order_by [db_where $query $predicate] -expr {name, version}]
     set result {}
     foreach row [rows $query] {
         dict set row tags [::registry_metadata::tags [::tjson::json_to_typed [dict get $row tags]] database]
@@ -376,3 +390,5 @@ proc ::telemetry::stats {package_name {package_version {}}} {
             [dict get $row success] [dict get $row failure]
     }
 }
+
+source [file join [file dirname [info script]] search-store.tcl]

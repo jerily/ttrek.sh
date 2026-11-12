@@ -19,9 +19,9 @@ connection needs them: `tdbc::sqlite3` for `ENV=LOCAL`, `tdbc::postgres` for
   for a test server. Obtain bundle updates from
   [AWS's RDS trust store](https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem).
 
-Tables are created only by the explicit `::telemetry::initdb` procedure. LOCAL
-startup uses `::telemetry::init_local`; PROD startup only connects.
-The private `task_initdb_website` invocation provisions production schemas. Existing LOCAL telemetry
+Tables are created only by explicit initialization. Both LOCAL and PROD startup
+only connect. The private `task_initdb_website` invocation provisions schemas;
+locally, run `ttrek run -script initdb-local`. Existing LOCAL telemetry
 remains in place. Environment registrations and package/platform dimensions are
 shared across workers; events commit atomically. Whole transactions retry bounded
 SQLite lock conflicts and PostgreSQL deadlocks/serialization failures. Schema
@@ -158,7 +158,13 @@ The target configuration is mandatory, so the website's configuration is never
 selected implicitly. Restore creates the telemetry schema if missing and refuses
 to insert into nonempty tables. It validates format, table names, columns and
 row counts, then restores all rows in one transaction and advances ID sequences.
-An invalid or incomplete backup rolls back the imported rows. Treat backups as
+The derived search snapshot is excluded from the backup table list, so existing
+version 1 backups remain compatible. A successful restore invalidates its revision
+in the restore transaction; the restore CLI then rebuilds it from the restored
+package tables. If publication fails, the CLI reports that data was restored and
+asks for `task_publish_search`. Older backups without listing flags need a registry
+sync to repopulate the published catalog.
+An invalid or incomplete backup rolls back the imported rows and invalidation. Treat backups as
 private data and restore only trusted files.
 
 Tail the shared function's logs:

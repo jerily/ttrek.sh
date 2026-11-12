@@ -7,23 +7,14 @@ Complete [setup](install.md) first. Run these commands from the website checkout
 ## Edit website content
 
 Documentation lives in `content/docs/`; dated blog posts live in `content/blog/`.
-The public packages `web-static-wiki` and `web-static-blog` serve these directories
-without a content database or browser write routes. Blog filenames use
-`YYYY-MM-DD-title.md`. The first announcement is
-`content/blog/2026-11-07-ttrek-1-0-0-is-now-public.md`.
+The public packages `web-static-wiki` and `web-static-blog` serve database content
+without browser write routes. Blog filenames use `YYYY-MM-DD-title.md`.
 
-Edit Markdown files locally and restart the direct server to publish changes:
-
-```sh
-ENV=LOCAL ttrek run -script start-direct
-```
-
-The **Documentation** and **Blog** links open `/docs` and `/blog`. Each worker owns
-its router and directory snapshots. Mounts receive `-store`, `-prefix`, and
-`-config` with `master_template` (the docs/blog bridge) and `templates` (the shared
-host master). The packages retain their index, card, article and Markdown rendering;
-the host master owns site navigation, so content layouts do not repeat it.
-Direct serving uses the configured Valkey service and TLS settings below.
+Edit Markdown, repackage, and restart the local services. Run `initdb-local`, then
+`sync-local`, against the running local Lambda to publish the packaged files.
+Neither startup nor HTTP requests import Markdown, upload content images, create
+schemas, or build search indexes. Each worker owns its router and loads search
+indexes lazily from the published database snapshot.
 
 The footer's **Request Monitor** link opens `/request-monitor`. Its shared site
 layout is selected by `[request_monitor] master_template` in the INI configuration,
@@ -53,6 +44,19 @@ ttrek run -script package-lambda -- --local-only
 ttrek run -script start-local
 ```
 
+In another terminal, initialize the database and synchronize the website:
+
+```sh
+ttrek run -script initdb-local
+ttrek run -script sync-local
+```
+
+These call the private `task_initdb_website` and `task_sync_website` tasks through
+the mock Lambda Invoke API. Sync imports docs, blog posts and registry metadata,
+uploads missing content images, and publishes the search indexes. Initialization
+preserves existing rows. Search returns 503 until a snapshot has been published.
+
+
 Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor starts:
 
 | Service | Default port | Responsibility |
@@ -76,13 +80,14 @@ it excludes host configuration, TLS keys, Git metadata and working databases.
 The release bucket contains this host's `ttrek` executable, not a published release.
 `--local-only` selects the host ABI; no archive is uploaded or deployed.
 
-The Lambda runtime uses directory snapshots, a SQLite telemetry database shared
-within the local runtime data directory, and per-process request-monitor history and rate limits in memory. Copy
+The Lambda runtime uses a SQLite database for content, catalog metadata, search
+snapshots and telemetry, shared within the local runtime data directory, and per-process request-monitor history and rate limits in memory. Copy
 `etc/config.local.ini.example` to ignored `etc/config.local.ini` to adjust limits;
 `TTREK_LOCAL_CONFIG` selects an alternative host file. Local files are never
 packaged, and local mocks do not load the production config or call AWS.
 Mock object uploads and runtime state are disposable. Repackage after source
-changes and restart the services to load the new snapshots.
+changes and restart the services, then run `initdb-local` and `sync-local` again.
+The stopped stack removes its disposable database.
 
 All services bind to loopback. Custom ports and paths can be passed together:
 
@@ -90,6 +95,19 @@ All services bind to loopback. Custom ports and paths can be passed together:
 ttrek run -script start-local -- --port 8081 --lambda-port 3002 --s3-port 3016 \
     --zip /path/to/ttrek-sh.zip --s3-dir /path/to/s3 --state-dir /tmp/ttrek-local
 ```
+
+Use the matching Lambda port for the patch scripts:
+
+```sh
+ttrek run -script initdb-local -- --lambda-port 3002
+ttrek run -script sync-local -- --lambda-port 3002
+```
+
+Both also honor `TTREK_LAMBDA_PORT` (default 3001). The shared helper always
+connects to `127.0.0.1`, reads the function name from `etc/lambda.json`, and fails
+on HTTP errors, Lambda function errors, or unconfirmed task completion.
+To republish search indexes after editing database metadata without importing
+recipes, run `bin/invoke-patch-local.sh task_publish_search`.
 
 `start-lambda`, `start-proxy` and `start-s3` also run individually with the same
 options. `TTREK_SITE_PREFIX` selects installed dependencies, defaulting to
@@ -99,35 +117,3 @@ services and their workers; generated service directories are removed.
 CodeBuild uses the same ttrek packaging workflow for the SAM Lambda deployment
 described in [Deployment](deployment.md). The older `build.sh` remains a
 [public dependency bootstrap](install.md#public-dependency-bootstrap).
-
-## Direct server
-
-Configure Valkey and TLS as described below. LOCAL startup imports the registry
-metadata into SQLite; [search](registry.md#recipe-search) reads that catalog.
-
-After building the dependencies and browser assets, run `ttrek.sh` locally.
-`run.sh` sets the library search path automatically. `ENV=PROD` (the default)
-loads `etc/config.enc`, or `etc/config.ini` if no encrypted file exists.
-`ENV=LOCAL` loads only `etc/config.local.ini` and forces the Valkey host to
-`localhost`. Copy `etc/config.ini` to that ignored local file and set the local
-port, username, password, CA file, and HTTPS certificate/key. Production requires
-authenticated TLS; LOCAL mode accepts `ssl = false` for the loopback system service:
-```bash
-ENV=LOCAL ./run.sh
-# or
-ENV=PROD ./run.sh
-```
-
-LOCAL mode also registers the `localhost` TLS hostname for
-`https://localhost:4433/`. Use a local certificate with a `DNS:localhost` subject
-alternative name. To use the system `valkey-server` service on its usual port,
-set `[redis]` to `host = localhost`, `port = 6379`, and `ssl = false`. Omit
-`username` and `password` when the local service does not require authentication.
-LOCAL mode always forces the connection host to localhost. Production still
-forces TLS and requires credentials even if the configuration says `ssl = false`.
-
-`ssl_ca_file` may be relative to the project root, for example
-`local/dev-runtime/cert.pem`; the loader resolves it independently of the launch
-working directory. TLS certificate options are omitted for plain TCP. Keep local
-certificates and keys under ignored `local/`, and keep the machine-specific
-configuration in ignored `etc/config.local.ini`.

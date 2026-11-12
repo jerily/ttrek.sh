@@ -24,13 +24,19 @@ file mkdir [file join $siteRoot data]
 set router [::tpathexp::router]
 set savedEnv [array get ::env ENV]
 try {
-    # Packaging smoke checks use the existing local content path. Published
-    # production content is prepared only by the independent patch task.
+    # Provision only a disposable in-memory fixture for packaging smoke checks.
+    # Runtime startup never initializes or imports a database in either mode.
     set ::env(ENV) LOCAL
     # Catalog pages now read the database; validate them against a disposable
     # import of the staged recipes without contacting the production database.
     source [file join $siteRoot tcl telemetry.tcl]
     ::telemetry::init_local {dialect sqlite database :memory:} [list [file join $siteRoot registry]]
+    dict set ::site::settings content_connection $::telemetry::connection
+    foreach {kind directory} {wiki docs blog blog} {
+        ::web::static::${kind}::initdb $::telemetry::connection
+        set store [dict get [::content_images::database_stores $::telemetry::connection {}] $kind]
+        ::web::static::${kind}::sync $store [file join $siteRoot content $directory]
+    }
     ::site::mount $router
     foreach path {/ /docs /docs/getting-started /blog /packages} {
         set response [::site::dispatch $router [dict create method GET path $path]]

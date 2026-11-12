@@ -69,9 +69,7 @@ set config_dict [dict create \
     tratelimit $tratelimit_config \
     treqmon $treqmon_config]
 
-if {[::app_config::mode] eq "PROD"} {
-    dict set config_dict content_database [::app_config::telemetry $config [file normalize $dir]]
-}
+dict set config_dict content_database [::app_config::telemetry $config [file normalize $dir]]
 
 # create the server
 set dir [file dirname [info script]]
@@ -81,14 +79,11 @@ thread::send $telemetry_thread_id [list source [file normalize [file join $dir t
 # Keep credentials out of a failed thread script's error trace.
 thread::send $telemetry_thread_id [list set ::telemetry_settings \
     [::app_config::telemetry $config [file normalize $dir]]]
-thread::send $telemetry_thread_id [list set ::telemetry_registries [list [dict get $config registry directory]]]
 thread::send $telemetry_thread_id {
     try {
-        if {[dict get $::telemetry_settings dialect] eq "postgresql"} {
-            ::telemetry::connect $::telemetry_settings
-        } else {::telemetry::init_local $::telemetry_settings $::telemetry_registries}
+        ::telemetry::connect $::telemetry_settings
     } finally {
-        unset ::telemetry_settings ::telemetry_registries
+        unset ::telemetry_settings
     }
 }
 

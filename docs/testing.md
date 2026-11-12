@@ -18,6 +18,8 @@ ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
 ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
 ttrek run tclsh9.1 "$PWD/tests/patch.test"
+ttrek run tclsh9.1 "$PWD/tests/invoke-patch-local.test"
+ttrek run tclsh9.1 "$PWD/tests/search-store.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/content-images.test"
@@ -68,6 +70,9 @@ empty GET/HEAD `304` responses, missing/corrupt assets, cache policies, gzip
 negotiation and canonical-host redirects.
 The local stack checks these policies through the packaged Lambda and mock S3,
 including changed objects and both API Gateway payload versions.
+It first verifies that search is unavailable in a fresh local runtime, then
+explicitly invokes initialization and synchronization through the shared local
+patch helper. Local startup performs neither task automatically.
 
 Integration tests use Tcl 9.1 and the development dependency `trequests` 1.1.0
 for HTTP, binary bodies and verified TLS. They need Linux `setsid` and OpenSSL
@@ -119,6 +124,40 @@ and concurrent imports, invalid recipes, and preservation of IDs and telemetry.
 `tests/patch.test` also uses that backend selection. It verifies that repeated
 `task_initdb_website` calls preserve populated wiki/blog content, registry IDs,
 and telemetry without needing another sync, as well as private task dispatch.
+It also reproduces the pre-tags schema upgrade: rows survive initialization,
+the new `listed = 0` default hides them until the first sync, and subsequent
+initialization preserves the published catalog.
+
+`tests/search-store.test` runs on SQLite or the same disposable PostgreSQL setup.
+It checks binary round trips, a fresh worker with constructors disabled, warm
+revision checks and result-only metadata reads, unchanged and URL-only syncs,
+publication/metadata races, corrupt snapshots, transaction rollback, and competing
+publishers. Search HTTP and rendering compatibility remain covered by `all.tcl`.
+`tests/invoke-patch-local.test` checks local invocation validation, function errors,
+transport errors and task confirmation. PostgreSQL maintenance tests cover derived
+snapshot invalidation and rebuilding after restore without changing backup tables.
+
+Run `ttrek run tclsh9.1 "$PWD/tests/benchmark-search.tcl"` for a reproducible
+in-memory benchmark using the checkout's registry. It reports the two blob sizes,
+mapping size, native construction/loading times and complete validated build/load
+times. It does not connect to production or write persistent application data.
+
+On 2026-11-12, an x86_64 local run with Tcl 9.1, ttrie/ttrigrams 0.2.0 and the
+bundled registry (101 packages, 215 versions, 599 documents) averaged the following
+over 50 iterations:
+
+| Measurement | Result |
+| --- | ---: |
+| Name index | 1,749 bytes |
+| Trigram index | 64,552 bytes |
+| JSON document mapping | 20,980 bytes |
+| Native construction of both indexes | 1.15 ms |
+| Native loading of both indexes | 0.14 ms |
+| Complete publication build, including input preparation and validation | 8.39 ms |
+| Worker load, including checksum and mapping validation | 2.91 ms |
+
+These exclude network/database transfer time and do not measure complete Lambda
+request latency. Warm requests reuse indexes and fetch only matched metadata.
 
 Run `ttrek run tclsh9.1 tests/telemetry-maintenance.test` for lazy-loading and
 private-event dispatch checks. With `TTREK_TEST_POSTGRES` pointing at a disposable
