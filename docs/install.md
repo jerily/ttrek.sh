@@ -13,7 +13,8 @@ Run the commands in this guide from the website checkout unless stated otherwise
   `tdevops` and the private mock-tool source repositories. The commands below
   expect the private registry checkout at `../private-ttrek-registry`.
 
-The local preview runs without AWS or Valkey. See [local development](local-development.md)
+The local preview requires a running loopback Valkey service configured in the
+local INI's `[redis]` section. The preview runs without AWS. See [local development](local-development.md)
 for the explicit initialization and synchronization workflow.
 
 ## Get the source

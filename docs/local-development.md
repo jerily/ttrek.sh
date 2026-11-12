@@ -20,10 +20,10 @@ The footer's **Request Monitor** link opens `/request-monitor`. Its shared site
 layout is selected by `[request_monitor] master_template` in the INI configuration,
 defaulting to `request-monitor-master.html.jinja` in `www/`. Custom monitor masters
 provide a `body` block and load the chart assets, as the default bridge does.
-The `treqmon` package mounts the page and serves its chart script. Set
-`[request_monitor] store=memory` for local history without a monitoring database,
-or `store=valkey` to use the `[redis]` host, port, credentials and TLS options.
-Omitting `store` selects memory in LOCAL mode and Valkey in PROD mode.
+The `treqmon` package mounts the page and serves its chart script. Monitoring
+always uses Valkey with the `[redis]` port, credentials and TLS options.
+`[request_monitor] store` may be omitted or set to `valkey`; remove any old
+`store=memory` setting. LOCAL mode restricts the connection to localhost.
 `history_max_events` sets the retained event limit. The direct server's rate
 limiter still uses the configured Valkey connection independently of monitoring.
 
@@ -37,7 +37,9 @@ and deployment. It calls `bin/package-lambda.sh`, the same entry point used by
 the infrastructure build scripts.
 Repackage the site after changing Markdown for the local Lambda stack or deployment.
 
-To run the website through all three mocks, without Valkey or AWS:
+Start your local Valkey service and configure its connection in the required
+`[redis]` section of your local INI, then run the website through all three mocks
+without AWS:
 
 ```sh
 ttrek run -script package-lambda -- --local-only
@@ -65,6 +67,10 @@ Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor st
 | mock-lambda-app | 3001 | Runs the packaged custom runtime and HTTP event adapter |
 | mock-s3-app | 3015 | Serves public assets and the locally built release executable |
 
+`start-local` and `start-lambda` fail before starting services if the selected
+local INI has no `[redis]` section. They use your configured Valkey service and
+never start or stop it, generate connection settings, or delete its data.
+
 `etc/routes.json` maps `/` and `/{proxy+}` to the function. The Lambda adapter supports
 payloads 1.0 and 2.0, preserves query/body data and returns base64-encoded response
 bytes. Static website assets are fetched from S3 through Lambda, retaining the
@@ -81,7 +87,9 @@ The release bucket contains this host's `ttrek` executable, not a published rele
 `--local-only` selects the host ABI; no archive is uploaded or deployed.
 
 The Lambda runtime uses a SQLite database for content, catalog metadata, search
-snapshots and telemetry, shared within the local runtime data directory, and per-process request-monitor history and rate limits in memory. Copy
+snapshots and telemetry, shared within the local runtime data directory. Monitor
+history is shared through Valkey; local Lambda rate limits remain in memory per
+process. Copy
 `etc/config.local.ini.example` to ignored `etc/config.local.ini` to adjust limits;
 `TTREK_LOCAL_CONFIG` selects an alternative host file. Local files are never
 packaged, and local mocks do not load the production config or call AWS.

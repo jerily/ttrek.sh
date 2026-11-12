@@ -286,7 +286,7 @@ the cache endpoint is missing. No plaintext secret is committed or printed.
 | `/ttrek_sh/prod/ratelimit/limit` | String | Optional; default `1000` |
 | `/ttrek_sh/prod/request_monitor/history_max_events` | String | Optional; default `100000` |
 | `/ttrek_sh/prod/request_monitor/master_template` | String | Optional; default `request-monitor-master.html.jinja` from `www/` |
-| `/ttrek_sh/prod/request_monitor/store` | String | Optional; default `valkey`; `memory` keeps history within each process |
+| `/ttrek_sh/prod/request_monitor/store` | String | Optional; only `valkey` is supported |
 
 The Valkey user group contains only the password-authenticated `appuser`.
 Valkey requires password or IAM authentication for each user and disables the
@@ -309,8 +309,10 @@ output through Python, avoiding that failure while preserving command exit codes
 
 For local Lambda mocks, copy `etc/config.local.ini.example` to the ignored
 `etc/config.local.ini`. `TTREK_LOCAL_CONFIG` can select another local file.
-The mocks read it directly from the host; it is never packaged. Both local
-request monitoring and rate limiting use memory, independent for each worker.
+The mocks read it from the host; it is never packaged. Local request monitoring
+uses Valkey shared across workers; local Lambda rate limiting remains in memory
+per worker. The local INI must supply `[redis]` settings for a running service;
+the launcher fails if the section is missing.
 Local mode ignores any packaged production configuration and makes no SSM/KMS
 calls. Direct server development still uses its existing Valkey configuration.
 

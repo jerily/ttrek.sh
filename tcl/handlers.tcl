@@ -5,21 +5,24 @@ proc get_debug_handler {ctx req} {
 }
 
 proc telemetry_event { event_type args } {
-    set config [::site::config]
-    if {[dict exists $config telemetry_thread_id]} {
-        thread::send -async [dict get $config telemetry_thread_id] \
-            [list ::telemetry::event $event_type {*}$args]
-    } else {::telemetry::event $event_type {*}$args}
+    try {
+        ::telemetry::event $event_type {*}$args
+    } on error {message options} {
+        # Direct-server telemetry was asynchronous and never failed the request.
+        # Retain that policy while recording events in the request worker.
+        set config [::site::config]
+        if {[dict exists $config telemetry_best_effort] && [dict get $config telemetry_best_effort]} {
+            puts stderr "Could not record telemetry event: $event_type"
+            return
+        }
+        return -options $options $message
+    }
 }
 
 proc telemetry_stats {package_name {package_version {}}} {
     # Statistics must not break package pages when the database is unavailable.
     if {[catch {
-        set config [::site::config]
-        set command [list ::telemetry::stats $package_name $package_version]
-        if {[dict exists $config telemetry_thread_id]} {
-            thread::send [dict get $config telemetry_thread_id] $command
-        } else {{*}$command}
+        ::telemetry::stats $package_name $package_version
     } result]} {
         puts "Error while accessing telemetry db: $result"
         return {}

@@ -42,6 +42,10 @@ test config-5 {Production TLS cannot be disabled through configuration} -body {
     list [dict get $settings ssl] [dict get $settings username]
 } -result {true appuser}
 
+test config-missing-redis {Missing redis configuration fails explicitly} -body {
+    ::app_config::valkey {}
+} -returnCodes error -result {Application configuration requires a [redis] section}
+
 test config-6 {Missing credentials fail before connecting} -body {
     set ::env(ENV) PROD
     ::app_config::valkey {redis {host localhost port 6379}}
