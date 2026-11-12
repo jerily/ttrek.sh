@@ -315,9 +315,20 @@ proc resolve_recipe_scripts {scripts_typed directory} {
             lappend result $name $script
             continue
         }
-        if {$type ne "M" || [dict size $value] != 1 || ![dict exists $value file] ||
+        if {$type ne "M" || ![dict exists $value file] ||
+            [dict size $value] != 1 + [dict exists $value args] ||
             [lindex [dict get $value file] 0] ne "S"} {
-            error "recipe scripts must have string bodies or a single file reference"
+            error "recipe scripts must have string bodies or a file reference with optional args"
+        }
+        set presets {}
+        if {[dict exists $value args]} {
+            lassign [dict get $value args] args_type args
+            if {$args_type ne "L"} {error "recipe script args must be an array of strings"}
+            foreach arg $args {
+                lassign $arg arg_type arg_value
+                if {$arg_type ne "S"} {error "recipe script args must be an array of strings"}
+                append presets " '" [string map [list ' {'"'"'}] $arg_value] "'"
+            }
         }
         set filename [lindex [dict get $value file] 1]
         if {![regexp {^[A-Za-z0-9._+-]+$} $filename] || $filename in {. ..}} {
@@ -334,6 +345,18 @@ proc resolve_recipe_scripts {scripts_typed directory} {
             close $fp
         }
         if {[string first \u0000 $body] >= 0} {error "Recipe script must not contain NUL bytes"}
+        if {$presets ne {}} {
+            # Return a self-contained shell body with literal presets before runtime arguments.
+            set position 0
+            if {[string range $body 0 1] eq "#!"} {
+                set position [string first \n $body]
+                if {$position < 0} {
+                    append body \n
+                    set position [string length $body]
+                } else {incr position}
+            }
+            set body "[string range $body 0 $position-1]set --$presets \"\$@\"\n[string range $body $position end]"
+        }
         lappend result $name [list S $body]
     }
     return [list M $result]

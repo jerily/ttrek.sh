@@ -519,6 +519,58 @@ test registry-script-files-3 {Reject symbolic links, directories and NUL bytes} 
     set errors
 } -result {1 1 1}
 
+test registry-script-args-1 {API resolves literal presets before runtime arguments} -setup {
+    set script_body {#!/bin/sh
+for arg do printf '%s\n' "$arg"; done
+}
+    writeFile [file join $recipe_dir args.sh] $script_body
+    set presets [list {} {two words} {café 世界} "one\ntwo" {'quoted'} {"double"} \
+        {$(touch preset-injected)} {`touch preset-injected`} {; touch preset-injected} {*} --]
+    set reference [list M [list file {S args.sh} args [list L [lmap arg $presets {list S $arg}]]]]
+    writeFile [file join $recipe_dir ttrek.json] [::tjson::typed_to_json \
+        [list M [list dependencies {M {}} scripts [list M [list demo $reference]] build {M {default {L {}}}}]]]
+} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name file-demo package_version 1.0.0 os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    set resolved [dict get $spec scripts demo]
+    set runtime [list runtime {} {two words}]
+    set previous [pwd]
+    try {
+        cd $recipe_dir
+        set output [exec -keepnewline sh -c $resolved -- {*}$runtime]
+    } finally {cd $previous}
+    list [dict get $response status] [string match "#!/bin/sh\n*" $resolved] \
+        [expr {$output eq "[join [concat $presets $runtime] \n]\n"}] \
+        [file exists [file join $recipe_dir preset-injected]]
+} -result {200 1 1 0}
+
+test registry-script-args-2 {Empty presets preserve bytes and scripts can omit a shebang or final newline} -body {
+    set reference {M {file {S args.sh} args {L {}}}}
+    lassign [resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir] type scripts
+    set results [list [expr {[lindex [dict get $scripts demo] 1] eq $script_body}]]
+    foreach content [list {printf '%s\n' "$@"} {#!/bin/sh}] {
+        writeFile [file join $recipe_dir plain.sh] $content
+        set reference {M {file {S plain.sh} args {L {{S plain}}}}}
+        lassign [resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir] type scripts
+        lappend results [exec sh -c [lindex [dict get $scripts demo] 1] -- tail]
+    }
+    set results
+} -result [list 1 "plain\ntail" {}]
+
+test registry-script-args-3 {Reject malformed preset arrays and unknown reference fields} -body {
+    set errors {}
+    foreach reference {
+        {M {file {S args.sh} args {S bad}}}
+        {M {file {S args.sh} args {NULL {}}}}
+        {M {file {S args.sh} args {L {{N 1}}}}}
+        {M {file {S args.sh} args {L {}} extra {B true}}}
+    } {
+        lappend errors [catch {resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir}]
+    }
+    set errors
+} -result {1 1 1 1}
+
 test registry-scripts-3 {Pinned OpenACS recipe exposes the installed-package entry points} -setup {
     set test_registry [file join $root registry]
 } -body {
