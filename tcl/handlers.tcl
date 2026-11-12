@@ -180,7 +180,9 @@ proc get_index_page_handler {ctx req} {
     if {[info exists ::env(ENV)] && $::env(ENV) eq "LOCAL"} {
         set install_command {curl -fsS http://localhost:8080/init | ENV=LOCAL sh}
     }
-    set data [dict create title {S {Install ttrek}} install_command [list S $install_command]]
+    set data [dict create title {S {Install ttrek}} \
+        pagetitle {S {ttrek: registry, website, and command-line interface}} \
+        install_command [list S $install_command]]
     set html [::views::render index.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
@@ -477,6 +479,7 @@ proc get_package_page_handler {ctx req} {
     set stat_platforms [get_package_stats $package_name]
 
     set data [dict create \
+        title [list S "Package Overview: $package_name"] \
         package_name [list S $package_name] \
         description [list S $description] \
         project_url [list S $project_url] \
@@ -529,6 +532,7 @@ proc get_package_version_page_handler {ctx req} {
     set stat_platforms [get_package_version_stats $package_name $package_version]
 
     set data [dict create \
+        title [list S "Package Version: $package_name@$package_version"] \
         package_name [list S $package_name] \
         package_version [list S $package_version] \
         deps [list L $deps] \
