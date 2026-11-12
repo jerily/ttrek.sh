@@ -325,12 +325,12 @@ and SAM with pip, then checks the CMake and compiler versions. These tools are
 needed to build the site's dependencies even though ttrek itself is downloaded.
 The build:
 
-1. Downloads the ttrek 1.1.0 Linux AMD64 glibc binary from
-   `s3://jerily-ttrek-app/ttrek/1.1.0/linux-amd64-glibc/ttrek`, makes it executable,
+1. Downloads the ttrek 1.2.0 Linux AMD64 glibc binary from
+   `s3://jerily-ttrek-app/ttrek/1.2.0/linux-amd64-glibc/ttrek`, makes it executable,
    and checks that it starts with `ttrek self-update -version`.
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).
-3. Restores retained browser assets, runs the asset and search builds, then the
+3. Restores retained browser assets, builds browser assets, then the
    application and asset checks.
 4. Generates encrypted production config from SSM, packages with tdevops using
    `--local-only`, and sets executable ZIP attributes. This skips the numeric

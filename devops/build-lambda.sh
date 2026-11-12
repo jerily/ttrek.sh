@@ -8,7 +8,7 @@ cd "$SITE_ROOT"
 # The rebuilt glibc release targets glibc 2.28, compatible with AL2023's 2.34.
 TTREK_BIN_DIR="$SITE_ROOT/build/ttrek"
 mkdir -p "$TTREK_BIN_DIR"
-aws s3 cp s3://jerily-ttrek-app/ttrek/1.1.0/linux-amd64-glibc/ttrek \
+aws s3 cp s3://jerily-ttrek-app/ttrek/1.2.0/linux-amd64-glibc/ttrek \
   "$TTREK_BIN_DIR/ttrek" --only-show-errors
 chmod 0755 "$TTREK_BIN_DIR/ttrek"
 "$TTREK_BIN_DIR/ttrek" self-update -version
@@ -33,7 +33,6 @@ mkdir -p public/assets/versioned
 aws s3 sync "$ASSET_HISTORY" public/assets/versioned/ --only-show-errors
 ttrek run -script build-assets
 npm test
-ttrek run -script build-search
 "$TCLSH" tests/all.tcl
 "$TCLSH" tests/static-content.test
 "$TCLSH" tests/content-images.test

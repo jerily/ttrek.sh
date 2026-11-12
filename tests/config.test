@@ -161,7 +161,7 @@ test releases-config-4 {Mock S3 endpoint is restricted to loopback in LOCAL mode
 set checksums_fixture [file join [file dirname [info script]] fixtures release-checksums.json]
 test releases-config-5 {Checksums are selected by environment and version without falling back} -body {
     set result {}
-    foreach {mode version} {LOCAL 1.0.0 PROD 1.0.0 PROD 1.1.0 PROD 9.0.0 LOCAL 1.1.0} {
+    foreach {mode version} {LOCAL 1.0.0 PROD 1.0.0 PROD 1.2.0 PROD 9.0.0 LOCAL 1.2.0} {
         set ::env(ENV) $mode
         set settings [::app_config::releases [dict create releases [dict create checksums_file $checksums_fixture version $version]]]
         lappend result [dict get $settings checksums]
@@ -189,7 +189,7 @@ test releases-config-6 {Missing and malformed checksum manifests fail startup} -
 test releases-config-7 {Checksum paths resolve from the application root in both config modes} -setup {
     file copy -force $checksums_fixture [file join $root etc releases.json]
     rename ::tconfig::read_config ::tconfig::saved_read_config
-    proc ::tconfig::read_config {path} {dict create redis {host localhost} releases {checksums_file etc/releases.json}}
+    proc ::tconfig::read_config {path} {dict create redis {host localhost} releases {version 1.0.0 checksums_file etc/releases.json}}
     set saved_cwd [pwd]
     cd /tmp
 } -body {
@@ -222,7 +222,7 @@ test releases-config-9 {Unrelated local configuration keeps default release sett
     puts $channel "\[registry\]\ndirectory=registry"
     close $channel
     dict get [::app_config::releases_from_ini $path $root] version
-} -result 1.0.0
+} -result 1.2.0
 
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env

@@ -18,8 +18,6 @@ if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONF
     set images [::app_config::content_images_from_ini [file join $siteRoot etc config.ini] $siteRoot]
     if {[dict get $images bucket] eq {}} {error "Production configuration requires content_images.bucket"}
 }
-source [file join $siteRoot tcl search-build.tcl]
-::recipe_search::build [file join $siteRoot registry] [file join $siteRoot etc search-index.json]
 file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
     releases $releases]
@@ -29,12 +27,17 @@ try {
     # Packaging smoke checks use the existing local content path. Published
     # production content is prepared only by the independent patch task.
     set ::env(ENV) LOCAL
+    # Catalog pages now read the database; validate them against a disposable
+    # import of the staged recipes without contacting the production database.
+    source [file join $siteRoot tcl telemetry.tcl]
+    ::telemetry::init_local {dialect sqlite database :memory:} [list [file join $siteRoot registry]]
     ::site::mount $router
     foreach path {/ /docs /docs/getting-started /blog /packages} {
         set response [::site::dispatch $router [dict create method GET path $path]]
         if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}
     }
 } finally {
+    if {[llength [info commands ::telemetry::close]]} {::telemetry::close}
     $router destroy
     unset ::env(ENV)
     array set ::env $savedEnv

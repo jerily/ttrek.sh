@@ -4,6 +4,7 @@
 
 # Drivers are loaded by tpersist only when the selected backend connects.
 package require tpersist
+source [file join [file dirname [info script]] registry-metadata.tcl]
 
 namespace eval ::telemetry {
     namespace import ::tpersist::db_*
@@ -110,7 +111,9 @@ proc ::telemetry::table_definitions {} {
     dict set definitions packages [db_define_table packages [dict create \
         pkg_id $id pkg_name_id $required version {type text not_null 1} \
         description [dict create type text not_null 1 default [db_value {} -type text]] \
-        url [dict create type text not_null 1 default [db_value {} -type text]]] \
+        url [dict create type text not_null 1 default [db_value {} -type text]] \
+        tags [dict create type text not_null 1 default [db_value {[]} -type text]] \
+        listed [dict create type integer not_null 1 default [db_value 0 -type integer]]] \
         -unique {{pkg_name_id version}} \
         -foreign_keys {{columns pkg_name_id table package_names referenced_columns pkg_name_id}}]
     dict set definitions platforms [db_define_table platforms [dict create \
@@ -157,10 +160,15 @@ proc ::telemetry::initdb {} {
                 WHERE attrelid = 'packages'::regclass AND attnum > 0 AND NOT attisdropped
             }] {dict get $row attname}]
         }
-        foreach column {description url} {
+        foreach {column definition} {
+            description {TEXT NOT NULL DEFAULT ''}
+            url {TEXT NOT NULL DEFAULT ''}
+            tags {TEXT NOT NULL DEFAULT '[]'}
+            listed {INTEGER NOT NULL DEFAULT 0}
+        } {
             if {$column ni $columns} {
                 set guard [expr {$dialect eq "postgresql" ? "IF NOT EXISTS " : ""}]
-                ::tpersist::_raw $connection "ALTER TABLE packages ADD COLUMN ${guard}$column TEXT NOT NULL DEFAULT ''"
+                ::tpersist::_raw $connection "ALTER TABLE packages ADD COLUMN ${guard}$column $definition"
             }
         }
         db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
@@ -212,7 +220,11 @@ proc ::telemetry::sync_registry_metadata {args} {
                 ::tjson::parse [read $channel] spec
             } finally {::close $channel}
             if {![::tjson::is_object $spec]} {error "Expected a recipe object in $path"}
-            set metadata {}
+            set tags {}
+            if {[::tjson::has_object_item $spec tags]} {
+                set tags [::registry_metadata::tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $path]
+            }
+            set metadata [dict create tags [::tjson::typed_to_json [list L [lmap tag $tags {list S $tag}]]]]
             foreach field {description url} {
                 if {![::tjson::has_object_item $spec $field]} continue
                 set item [::tjson::get_object_item $spec $field]
@@ -229,7 +241,7 @@ proc ::telemetry::sync_registry_metadata {args} {
     transaction {
         # Avoid rewriting the catalog on every server/Lambda cold start.
         set existing {}
-        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url}] \
+        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, tags, listed}] \
             package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
         foreach row [rows $query] {
             dict set existing [list [dict get $row name] [dict get $row version]] $row
@@ -239,6 +251,7 @@ proc ::telemetry::sync_registry_metadata {args} {
             if {[dict exists $existing $key]} {
                 set row [dict get $existing $key]
                 set changes {}
+                if {![dict get $row listed]} {dict set changes listed [db_value 1 -type integer]}
                 dict for {field value} $metadata {
                     if {[dict get $row $field] ne $value} {
                         dict set changes $field [db_value $value -type text]
@@ -250,15 +263,37 @@ proc ::telemetry::sync_registry_metadata {args} {
                 set name_id [ensure_row package_names pkg_name_id [dict create name [db_value $name -type text]]]
                 set pkg_id [ensure_row packages pkg_id [dict create \
                     pkg_name_id [db_value $name_id -type integer] version [db_value $version -type text]]]
-                set changes {}
+                set changes [dict create listed [db_value 1 -type integer]]
                 dict for {field value} $metadata {dict set changes $field [db_value $value -type text]}
                 if {![dict size $changes]} continue
             }
             db_execute $connection [db_where [db_values [db_update packages] $changes -expressions] \
                 [db_eq [db_col pkg_id] [db_value $pkg_id -type integer]]]
         }
+        # Keep telemetry history while removing withdrawn versions from discovery.
+        dict for {key row} $existing {
+            if {[dict get $row listed] && ![dict exists $catalog $key]} {
+                db_execute $connection [db_where [db_values [db_update packages] {listed 0}] \
+                    [db_eq [db_col pkg_id] [db_value [dict get $row pkg_id] -type integer]]]
+            }
+        }
     }
     return [dict size $catalog]
+}
+
+# The website reads this catalog, never recipe metadata or a build-time file.
+# Telemetry-only package names and withdrawn versions remain outside discovery.
+proc ::telemetry::registry_catalog {} {
+    package require tjson
+    set query [db_join [db_select packages -expr {name, version, description, url, tags}] \
+        package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
+    set query [db_order_by [db_where $query [db_eq [db_col listed] [db_value 1 -type integer]]] -expr {name, version}]
+    set result {}
+    foreach row [rows $query] {
+        dict set row tags [::registry_metadata::tags [::tjson::json_to_typed [dict get $row tags]] database]
+        lappend result $row
+    }
+    return $result
 }
 
 proc ::telemetry::event {event_type args} {
