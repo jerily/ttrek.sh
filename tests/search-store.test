@@ -1,0 +1,305 @@
+# Real SQLite / PostgreSQL coverage for publication, worker caching and two-step search.
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl telemetry.tcl]
+source [file join $root tcl search.tcl]
+source [file join $root tcl patch.tcl]
+namespace eval ::site {proc config {} {return {}}}
+
+if {[llength $argv] && [lindex $argv 0] in {--worker --reader}} {
+    ::telemetry::connect [lindex $argv 1]
+    if {[lindex $argv 0] eq "--reader"} {
+        puts [::recipe_search::results [lindex $argv 2]]
+        ::telemetry::close
+        exit
+    }
+    ::telemetry::transaction {
+        ::telemetry::lock_search_snapshot
+        ::telemetry::sync_registry_metadata [lindex $argv 2]
+        ::telemetry::publish_search_snapshot
+    }
+    ::telemetry::close
+    exit
+}
+
+set work [makeDirectory search-store-fixture]
+set schema {}
+if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
+    set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    ::telemetry::connect $settings
+    set schema search_store_[pid]_[clock clicks]
+    ::tpersist::_raw $::telemetry::connection "CREATE SCHEMA $schema"
+    dict set settings options "-c search_path=$schema -c statement_timeout=10000"
+    ::telemetry::connect $settings
+} else {
+    set settings [dict create dialect sqlite database [file join $work test.sqlite3] timeout 5000]
+    ::telemetry::connect $settings
+}
+proc recipe {directory name version description {tags {}}} {
+    set path [file join $directory $name $version ttrek.json]
+    file mkdir [file dirname $path]
+    set ch [open $path w]
+    puts $ch [::tjson::typed_to_json [list M [dict create description [list S $description] \
+        tags [list L [lmap tag $tags {list S $tag}]] url {S https://example.org/original}]]]
+    close $ch
+}
+proc publish {directory} {
+    ::telemetry::transaction {
+        ::telemetry::lock_search_snapshot
+        ::telemetry::sync_registry_metadata $directory
+        ::telemetry::publish_search_snapshot
+    }
+}
+proc replace_snapshot {snapshot} {
+    set values {}
+    dict for {field value} [dict remove $snapshot id] {
+        set type [expr {$field in {names descriptions} ? "binary" : ($field eq "format" ? "integer" : "text")}]
+        dict set values $field [::tpersist::db_value $value -type $type]
+    }
+    ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values \
+        [::tpersist::db_update registry_search_snapshot] $values -expressions]
+}
+proc no_build {} {
+    foreach name {ttrie ttrigrams} {
+        rename ::${name}::create ::${name}::real_create
+        proc ::${name}::create {args} {error "Index construction in a request"}
+    }
+}
+proc allow_build {} {
+    foreach name {ttrie ttrigrams} {
+        rename ::${name}::create {}
+        rename ::${name}::real_create ::${name}::create
+    }
+}
+set public [file join $work public]
+recipe $public demo 1.0.0 {A Web toolkit.} {json xml}
+recipe $public demo 2.0.0 {Compression utilities.} {sqlite}
+recipe $public __all__ 1.0.0 {Literal sentinel name.}
+for {set i 0} {$i < 12} {incr i} {recipe $public web-$i 1.0.0 {Web server.}}
+
+test snapshot-startup {Worker initialization does not touch an unprovisioned database or construct indexes} -body {
+    no_build
+    try {
+        ::recipe_search::reset
+        list [info exists ::recipe_search::revision] [info commands ::recipe_search::index]
+    } finally {allow_build}
+} -result {0 {}}
+
+test snapshot-init {Schema creation does not publish and derived tables are excluded from backups} -body {
+    ::telemetry::initdb
+    list [::telemetry::search_snapshot_revision] [dict exists [::telemetry::table_definitions] registry_search_snapshot] \
+        [catch {::recipe_search::results web}]
+} -result {{} 0 1}
+
+test snapshot-publish {Both indexes round-trip as binary with only the compact mapping alongside them} -body {
+    set revision [publish $public]
+    set snapshot [::telemetry::search_snapshot]
+    ::recipe_search::load_snapshot $snapshot
+    set mapping [::tjson::json_to_simple [dict get $snapshot mapping]]
+    list [expr {$revision eq [dict get $snapshot revision]}] \
+        [expr {[::recipe_search::index serialize] eq [dict get $snapshot names]}] \
+        [expr {[::recipe_search::descriptions serialize] eq [dict get $snapshot descriptions]}] \
+        [dict keys $mapping] [expr {[string first {https://} [dict get $snapshot mapping]] < 0}] \
+        [dict get [lindex [::recipe_search::results compression] 0] description]
+} -result {1 1 1 {builder names documents} 1 {Compression utilities.}}
+
+test snapshot-binary {The database driver preserves NUL and high-bit bytes} -body {
+    set snapshot [::telemetry::search_snapshot]
+    set bytes [binary format H* 00ff8001fe007f]
+    try {
+        replace_snapshot [dict replace $snapshot names $bytes]
+        binary encode hex [dict get [::telemetry::search_snapshot] names]
+    } finally {replace_snapshot $snapshot}
+} -result 00ff8001fe007f
+
+test snapshot-fresh-worker {A fresh interpreter loads native blobs without building or scanning the catalog} -body {
+    interp create worker
+    try {
+        worker eval [list set auto_path $auto_path]
+        worker eval [list source [file join $root tcl search.tcl]]
+        worker eval {
+            namespace eval ::site {proc config {} {return {}}}
+            namespace eval ::telemetry {}
+            foreach name {ttrie ttrigrams} {
+                rename ::${name}::create {}
+                proc ::${name}::create {args} {error "Unexpected build"}
+            }
+            ::recipe_search::reset
+        }
+        foreach method {search_snapshot search_snapshot_revision search_result_metadata} {
+            interp alias worker ::telemetry::$method {} ::telemetry::$method
+        }
+        worker eval {dict get [lindex [::recipe_search::results sqlite] 0] name}
+    } finally {interp delete worker}
+} -result demo
+
+test snapshot-warm {Warm requests read revisions and matched metadata, never blobs or the full catalog} -setup {
+    ::recipe_search::results web
+    rename ::telemetry::search_snapshot ::telemetry::real_search_snapshot
+    proc ::telemetry::search_snapshot {} {error "Unexpected payload fetch"}
+    rename ::telemetry::registry_catalog ::telemetry::real_registry_catalog
+    proc ::telemetry::registry_catalog {args} {
+        if {![llength $args]} {error "Unexpected full catalog read"}
+        set ::requested_names [lindex $args 0]
+        ::telemetry::real_registry_catalog {*}$args
+    }
+    no_build
+} -body {
+    set matches [::recipe_search::results web 8]
+    list [llength $matches] [expr {$requested_names eq [lmap row $matches {dict get $row name}]}] \
+        [dict get [lindex [::recipe_search::results compression] 0] name] $requested_names
+} -cleanup {
+    allow_build
+    rename ::telemetry::search_snapshot {}; rename ::telemetry::real_search_snapshot ::telemetry::search_snapshot
+    rename ::telemetry::registry_catalog {}; rename ::telemetry::real_registry_catalog ::telemetry::registry_catalog
+} -result {8 1 demo demo}
+
+test snapshot-unchanged {Unchanged syncs and URL-only updates skip construction and publication} -body {
+    set before [::telemetry::search_snapshot]
+    no_build
+    try {
+        publish $public
+        set unchanged [expr {$before eq [::telemetry::search_snapshot]}]
+        ::tpersist::_raw $::telemetry::connection {UPDATE packages SET url = 'https://example.org/edited'}
+        ::telemetry::publish_search_snapshot
+        list $unchanged [expr {$before eq [::telemetry::search_snapshot]}] \
+            [dict get [lindex [::telemetry::registry_catalog {demo}] 0] url] \
+            [llength [::telemetry::registry_catalog {__all__}]]
+    } finally {allow_build}
+} -result {1 1 https://example.org/edited 1}
+
+test snapshot-refresh {Published search changes replace the indexes on the next request} -body {
+    set old $::recipe_search::revision
+    recipe $public demo 2.0.0 {Brandnew description.} {postgres}
+    publish $public
+    set match [lindex [::recipe_search::results brandnew] 0]
+    list [dict get $match name] [dict get $match description] [expr {$old ne $::recipe_search::revision}] \
+        [::recipe_search::results compression]
+} -result {demo {Brandnew description.} 1 {}}
+
+test snapshot-publication-race {The fetched payload's actual revision wins over the earlier revision check} -setup {
+    recipe $public demo 2.0.0 {Intermediate description.}
+    publish $public
+    rename ::telemetry::search_snapshot_revision ::telemetry::real_search_snapshot_revision
+    proc ::telemetry::search_snapshot_revision {} {
+        set revision [::telemetry::real_search_snapshot_revision]
+        recipe $::public demo 2.0.0 {Final description.}
+        publish $::public
+        return $revision
+    }
+} -body {
+    set match [lindex [::recipe_search::results final] 0]
+    list [dict get $match description] [expr {$::recipe_search::revision eq [::telemetry::real_search_snapshot_revision]}]
+} -cleanup {
+    rename ::telemetry::search_snapshot_revision {}
+    rename ::telemetry::real_search_snapshot_revision ::telemetry::search_snapshot_revision
+} -result {{Final description.} 1}
+
+test snapshot-metadata-race {A publication after ranking retries the search before retrieving metadata} -setup {
+    rename ::telemetry::search_result_metadata ::telemetry::real_search_result_metadata
+    set metadata_calls 0
+    proc ::telemetry::search_result_metadata {revision names} {
+        if {[incr ::metadata_calls] == 1} {
+            recipe $::public added 1.0.0 {Final addition.}
+            publish $::public
+        }
+        ::telemetry::real_search_result_metadata $revision $names
+    }
+} -body {
+    list [lmap row [::recipe_search::results final] {dict get $row name}] $metadata_calls
+} -cleanup {
+    rename ::telemetry::search_result_metadata {}
+    rename ::telemetry::real_search_result_metadata ::telemetry::search_result_metadata
+} -result {{added demo} 2}
+
+test snapshot-corrupt {Corrupt refreshes preserve both old indexes but never mix their results with a new catalog revision} -body {
+    set before [::telemetry::search_snapshot]
+    set old $::recipe_search::revision
+    set ranked [::recipe_search::search final]
+    try {
+        replace_snapshot [dict replace $before revision [string repeat f 64] descriptions [binary format H* 00ff]]
+        set retained [::recipe_search::refresh]
+        set unchanged [expr {$::recipe_search::revision eq $old && [::recipe_search::search final] eq $ranked}]
+        set failed [catch {::recipe_search::results final}]
+        ::recipe_search::reset
+        set cold [catch {::recipe_search::results final}]
+        list $retained $unchanged $failed $cold [info commands ::recipe_search::next_*]
+    } finally {replace_snapshot $before; ::recipe_search::refresh}
+} -result {1 1 1 1 {}}
+
+test snapshot-repair {Explicit republishing repairs corrupted blobs even when the input fingerprint is unchanged} -body {
+    set before [::telemetry::search_snapshot]
+    replace_snapshot [dict replace $before names [binary format H* 00ff]]
+    set result [::tjson::json_to_simple [::site_patch::run task_publish_search {}]]
+    set repaired [::telemetry::search_snapshot]
+    list [dict get $result completed] [expr {[dict get $repaired names] eq [dict get $before names]}] \
+        [expr {[dict get $repaired revision] eq [dict get $before revision]}]
+} -result {search 1 1}
+
+test snapshot-validation {Checksums, native formats and document mappings are validated before activation} -body {
+    set before [::telemetry::search_snapshot]
+    set results {}
+    foreach {key value} {format 99 mapping {[]} names garbage descriptions garbage} {
+        set broken [dict replace $before $key $value]
+        dict set broken revision [::recipe_search::snapshot_revision $broken]
+        lappend results [catch {::recipe_search::load_snapshot $broken}]
+    }
+    list [lsort -unique $results] [expr {$::recipe_search::revision eq [dict get $before revision]}] \
+        [info commands ::recipe_search::next_*]
+} -result {1 1 {}}
+
+test snapshot-rollback {A failed build rolls back catalog changes and leaves the published generation intact} -setup {
+    set before [::telemetry::search_snapshot]
+    set rows [::telemetry::registry_catalog]
+    recipe $public failed-build 1.0.0 {Should roll back.}
+    no_build
+} -body {
+    list [catch {publish $public}] [expr {$before eq [::telemetry::search_snapshot]}] \
+        [expr {$rows eq [::telemetry::registry_catalog]}]
+} -cleanup {allow_build; file delete -force [file join $public failed-build]} -result {1 1 1}
+
+test snapshot-reader-during-sync {Readers serve the committed generation without waiting for a publisher} -body {
+    set expected [::recipe_search::results final]
+    ::tpersist::db_begin $::telemetry::connection
+    try {
+        ::telemetry::lock_search_snapshot
+        ::tpersist::_raw $::telemetry::connection {UPDATE packages SET description = 'Uncommitted description'}
+        ::telemetry::publish_search_snapshot
+        set worker [open [list | [info nameofexecutable] [info script] --reader $settings final] r]
+        set actual [string trim [read $worker]]
+        close $worker
+        expr {$actual eq $expected}
+    } finally {::tpersist::db_rollback $::telemetry::connection}
+} -result 1
+
+test snapshot-concurrent {Competing publishers commit complete matching catalogs and snapshots} -body {
+    set other [file join $work other]
+    recipe $other alternative 1.0.0 {Alternative registry.}
+    set workers {}
+    for {set i 0} {$i < 4} {incr i} {
+        set registry [expr {$i % 2 ? $other : $public}]
+        lappend workers [open [list | [info nameofexecutable] [info script] --worker $settings $registry] r]
+    }
+    set errors {}
+    foreach worker $workers {read $worker; if {[catch {close $worker} message]} {lappend errors $message}}
+    if {[llength $errors]} {error $errors}
+    set snapshot [::telemetry::search_snapshot]
+    set expected [::recipe_search::build_snapshot [::recipe_search::snapshot_inputs [::telemetry::registry_catalog]]]
+    set equal 1
+    dict for {field value} $expected {
+        if {[dict get $snapshot $field] ne $value} {set equal 0}
+    }
+    set equal
+} -result 1
+
+::telemetry::close
+if {$schema ne {}} {
+    ::telemetry::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    ::tpersist::_raw $::telemetry::connection "DROP SCHEMA $schema CASCADE"
+    ::telemetry::close
+}
+removeDirectory $work
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

@@ -42,8 +42,10 @@ npm test
 "$TCLSH" tests/telemetry-config.test
 "$TCLSH" tests/telemetry-startup.test
 "$TCLSH" tests/patch.test
+"$TCLSH" tests/invoke-patch-local.test
 "$TCLSH" tests/telemetry.test
 "$TCLSH" tests/registry-metadata.test
+"$TCLSH" tests/search-store.test
 "$TCLSH" tests/telemetry-maintenance.test
 "$TCLSH" tests/installer.tcl
 bash devops/generate-prod-config.sh

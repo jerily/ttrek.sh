@@ -60,6 +60,13 @@ try {
     assert {[string first {Sign Up} $homepage] < 0}
     set year "&#169; [clock format [clock seconds] -format %Y] JERILY LTD"
     assert {[string first $year $homepage] >= 0}
+    # A new local runtime has no schema or imported catalog until explicitly patched.
+    request /registry/search?q=web 503
+    foreach {script task} {initdb-local task_initdb_website sync-local task_sync_website} {
+        set result [::tjson::json_to_simple [exec {*}[auto_execok ttrek] run -script $script -- --lambda-port $lambdaPort]]
+        assert {[dict get $result ok] && [dict get $result task] eq $task}
+    }
+    puts {PASS explicit local initialization and synchronization through Lambda}
     foreach path {/docs /docs/getting-started /blog} {
         assert {[::test_support::contains [request $path] $year]} $path
     }

@@ -193,12 +193,10 @@ proc get_registry_dir {} {
 }
 
 proc get_packages_page_handler {ctx req} {
-    ::recipe_search::refresh
-    set packages {}
-    foreach name [lsort -ascii [dict keys $::recipe_search::entries]] {
-        set entry [dict get $::recipe_search::entries $name]
-        lappend packages [dict create name $name description [dict get $entry description] tags [dict get $entry tags]]
+    if {[catch {::recipe_search::catalog_entries [::recipe_search::database registry_catalog]} catalog]} {
+        return [::recipe_search::unavailable]
     }
+    set packages [dict values $catalog]
     set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
         result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}}]
     set html [::views::render packages.html.jinja $data]
@@ -465,11 +463,13 @@ proc compare_versions {a b} {
 proc get_package_page_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_pkg_get -pkg_name $package_name
-    ::recipe_search::refresh
-    if {![dict exists $::recipe_search::entries $package_name]} {
+    if {[catch {::recipe_search::catalog_entries [::recipe_search::database registry_catalog [list $package_name]]} catalog]} {
+        return [::recipe_search::unavailable]
+    }
+    if {![dict exists $catalog $package_name]} {
         return [::twebserver::build_response 404 text/plain "Package not found"]
     }
-    set metadata [dict get $::recipe_search::entries $package_name versions]
+    set metadata [dict get $catalog $package_name versions]
     set versions [lsort -command compare_versions -decreasing [dict keys $metadata]]
     set latest [dict get $metadata [lindex $versions 0]]
     set description [string trim [dict get $latest description]]

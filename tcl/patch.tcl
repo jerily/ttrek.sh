@@ -2,7 +2,7 @@
 # requests retain their HTTP envelope and cannot select this dispatch path.
 namespace eval ::site_patch {}
 proc ::site_patch::run {task context} {
-    if {$task ni {task_initdb_website task_sync_website}} {error "Unknown patch task"}
+    if {$task ni {task_initdb_website task_sync_website task_publish_search}} {error "Unknown patch task"}
     set completed {}
     foreach name [::site_patch::$task $context] {lappend completed [list S $name]}
     ::tjson::typed_to_json [list M [dict create ok {BOOL 1} task [list S $task] completed [list L $completed]]]
@@ -50,11 +50,19 @@ proc ::site_patch::task_sync_website {context} {
     set stores [::content_images::database_stores $::telemetry::connection [dict get $settings content_images]]
     # Both collections and registry metadata commit together. Immutable image
     # objects uploaded before a rollback are safe to reuse on retry.
-    ::tpersist::db_transaction $::telemetry::connection {
+    ::telemetry::transaction {
+        ::telemetry::lock_search_snapshot
         foreach {kind directory} {wiki docs blog blog} {
             ::web::static::${kind}::sync [dict get $stores $kind] [file join $root content $directory]
         }
         ::telemetry::sync_registry_metadata [dict get $settings registry_dir]
+        ::telemetry::publish_search_snapshot
     }
     return {wiki blog registry}
+}
+
+# Publish database edits or restored metadata without reimporting recipe files.
+proc ::site_patch::task_publish_search {context} {
+    ::telemetry::publish_search_snapshot true
+    return {search}
 }

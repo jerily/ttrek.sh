@@ -73,7 +73,7 @@ test patch-initdb-preserves-content {repeated initialization preserves populated
         WHERE domain = 'ttrek.sh' AND path = '/getting-started'
     }
 } -body {
-    set tables [concat {web_static_wiki_items web_static_blog_items} [dict keys [::telemetry::table_definitions]]]
+    set tables [concat {registry_search_snapshot web_static_wiki_items web_static_blog_items} [dict keys [::telemetry::table_definitions]]]
     set before {}
     foreach table $tables {
         dict set before $table [lsort [::tpersist::_raw $::telemetry::connection "SELECT * FROM $table"]]
@@ -90,6 +90,43 @@ test patch-initdb-preserves-content {repeated initialization preserves populated
         [expr {[llength [::web::static::blog::posts [dict get $stores blog]]] > 0}] \
         [::telemetry::stats initdb-test]
 } -result {{Stored title} 1 {{{Linux x86_64} 1 1 0}}}
+
+test patch-initdb-migrates-listing {The pre-tags schema keeps its rows but needs one sync to publish the catalog} -setup {
+    set catalog [::telemetry::registry_catalog]
+    if {![llength $catalog]} {error "Migration fixture must contain published packages"}
+    set before {}
+    foreach table [concat {web_static_wiki_items web_static_blog_items} [dict keys [::telemetry::table_definitions]]] {
+        set rows [::tpersist::_raw $::telemetry::connection "SELECT * FROM $table"]
+        if {$table eq "packages"} {
+            set rows [lmap row $rows {dict remove $row tags listed}]
+        }
+        dict set before $table [lsort $rows]
+    }
+    # Reproduce the production schema immediately before the tags/listed release.
+    ::tpersist::_raw $::telemetry::connection {ALTER TABLE packages DROP COLUMN tags}
+    ::tpersist::_raw $::telemetry::connection {ALTER TABLE packages DROP COLUMN listed}
+} -body {
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}
+    dict for {table expected} $before {
+        set rows [::tpersist::_raw $::telemetry::connection "SELECT * FROM $table"]
+        if {$table eq "packages"} {
+            foreach row $rows {
+                if {[dict get $row tags] ne {[]} || [dict get $row listed] != 0} {
+                    error "Unexpected migration defaults"
+                }
+            }
+            set rows [lmap row $rows {dict remove $row tags listed}]
+        }
+        if {[lsort $rows] ne $expected} {error "Migration changed existing data in $table"}
+    }
+    set unpublished [::telemetry::registry_catalog]
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_website"}} {}
+    set published [::telemetry::registry_catalog]
+    # Once synchronized, initialization must never clear the listed flags.
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}
+    list $unpublished [expr {$published eq $catalog}] \
+        [expr {[::telemetry::registry_catalog] eq $published}] [::telemetry::stats initdb-test]
+} -result {{} 1 1 {{{Linux x86_64} 1 1 0}}}
 
 test patch-provider-failure {broken installed schema providers fail the task} -setup {
     package ifneeded web-wiki 99.0 {namespace eval ::web::wiki {}; proc ::web::wiki::initdb {db} {error {schema failure}}; package provide web-wiki 99.0}

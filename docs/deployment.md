@@ -583,7 +583,10 @@ The existing website Lambda accepts private direct invocations with
 `{"source":"ttrek.patch","task":"task_initdb_website"}` or
 `{"source":"ttrek.patch","task":"task_sync_website"}`. The first initializes the
 installed packages' schemas; the second synchronizes wiki/blog content, images,
-and registry metadata. HTTP request envelopes cannot select either task. IAM
+and registry metadata, then publishes both search indexes in the same transaction.
+`{"source":"ttrek.patch","task":"task_publish_search"}` republishes search from
+the stored package tables without importing recipes or content. HTTP request
+envelopes cannot select these tasks. IAM
 `lambda:InvokeFunction` authorizes the whole function, including its existing
 backup task; IAM does not restrict individual task names.
 
@@ -601,6 +604,9 @@ aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
   --environment-variables-override name=PATCH_TASK,value=task_initdb_website,type=PLAINTEXT
 aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
   --environment-variables-override name=PATCH_TASK,value=task_sync_website,type=PLAINTEXT
+# Republish directly edited/restored database metadata without importing recipes:
+aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
+  --environment-variables-override name=PATCH_TASK,value=task_publish_search,type=PLAINTEXT
 ```
 
 The script uses the standard AWS profile/region defaults above.
@@ -619,11 +625,29 @@ The new content tables start empty even though the Markdown files already exist.
 After that first import, rerunning initialization does not require another sync;
 sync again when publishing content, images, or registry metadata changes.
 
-Tasks run the code and content currently deployed in the website Lambda. PROD startup does no schema or
+The tags/database-catalog upgrade also requires both tasks once. It adds `tags`
+and `listed` to existing package rows; `listed` starts at `0`, and the website
+only displays rows with `listed = 1`. Between initialization and the first sync,
+the catalog therefore appears empty even though package IDs, metadata, and
+telemetry remain intact. Sync marks current registry recipes as listed. Later
+initialization calls preserve those flags and do not hide packages again.
+
+For the search-snapshot upgrade, initialize the new derived table and publish its
+first generation before routing traffic to the new reader. Stage the new code in
+a separate Lambda version/function connected to the same database, invoke
+`task_initdb_website`, then `task_sync_website` (or `task_publish_search` to retain
+database-only metadata edits), and only then switch traffic. The old reader can
+continue using the package tables during this preparation. If deploying in place,
+search returns 503 until these tasks complete; package listings and overviews still
+read the package tables. Repeated initialization preserves an existing snapshot.
+
+Tasks run the code and content currently deployed in the website Lambda. Both LOCAL and PROD startup do no schema or
 content synchronization; pages/posts query their rows on demand. Existing content
 stays under `ttrek.sh/content`, and there is no separate patch Lambda project.
 Local testing uses the existing `tdevops` website stack and the same invocation
-payloads against its local Lambda endpoint.
+payloads against its local Lambda endpoint. With `start-local` running, invoke
+`ttrek run -script initdb-local` and `ttrek run -script sync-local` from another
+terminal. The local stack is disposable, so repeat these after restarting it.
 
 The pinned registry supplies `web-static-wiki` 0.1.4 and `web-static-blog` 0.1.3,
 which provide the explicit initialization and synchronization procedures.

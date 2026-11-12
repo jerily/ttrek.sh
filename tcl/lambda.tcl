@@ -38,12 +38,8 @@ proc ::site_lambda::initialize {root} {
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
     set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]
-    if {[::app_config::mode] eq "PROD"} {
-        ::telemetry::connect $maintenanceSettings
-        dict set settings content_connection $::telemetry::connection
-    } else {
-        ::telemetry::init_local $maintenanceSettings [list [dict get $settings registry_dir]]
-    }
+    ::telemetry::connect $maintenanceSettings
+    dict set settings content_connection $::telemetry::connection
     ::site::init_worker $settings
     set router $::site::router
 }

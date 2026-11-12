@@ -1,160 +1,103 @@
-package require tjson
-source [file join [file dirname [info script]] registry-metadata.tcl]
-package require ttrie 0.2.0
-package require ttrigrams 0.2.0
-
-namespace eval ::recipe_search {
-    variable entries
-    variable documents
-}
-
-proc ::recipe_search::fold {text} {
-    string map {A a B b C c D d E e F f G g H h I i J j K k L l M m N n O o P p Q q R r S s T t U u V v W w X x Y y Z z} $text
-}
-
-proc ::recipe_search::valid_name {name} {
-    expr {[string length $name] >= 1 && [string length $name] <= 255 &&
-          $name ni {. ..} && [regexp {^[A-Za-z0-9._+-]+$} $name]}
-}
+source [file join [file dirname [info script]] search-snapshot.tcl]
 
 proc ::recipe_search::query {text} {
-    if {[string length $text] > 255 || ![regexp {^[A-Za-z0-9._+ -]+$} $text]} {
-        error "Invalid search query"
-    }
+    if {[string length $text] > 255 || ![regexp {^[A-Za-z0-9._+ -]+$} $text]} {error "Invalid search query"}
     set text [fold [string trim $text " "]]
     if {$text in {{} . ..}} {error "Invalid search query"}
     return $text
 }
 
-# Snapshot metadata uses typed JSON so malformed shapes cannot become Tcl data.
-proc ::recipe_search::snapshot_value {value type} {
-    if {[llength $value] != 2 || [lindex $value 0] ne $type} {error "Invalid search snapshot metadata"}
-    return [lindex $value 1]
+proc ::recipe_search::reset {} {
+    foreach command {index descriptions} {
+        if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
+    }
+    discard_staged
+    variable entries {}
+    variable documents {}
+    unset -nocomplain ::recipe_search::revision
 }
 
-proc ::recipe_search::load {path} {
-    variable entries
-    variable documents
-    if {![file isfile $path]} {error "Search snapshot is missing; run the build-search script"}
-    set channel [open $path r]
-    try {
-        fconfigure $channel -encoding utf-8
-        ::tjson::parse [read $channel] snapshot
-    } finally {close $channel}
-    set fields [snapshot_value [::tjson::to_typed $snapshot] M]
-    if {[snapshot_value [dict get $fields format] N] ni {1 2}} {error "Unsupported search snapshot format"}
-    set catalog {}
-    dict for {name value} [snapshot_value [dict get $fields entries] M] {
-        set data [snapshot_value $value M]
-        set normalized [snapshot_value [dict get $data normalized] S]
-        set description [snapshot_value [dict get $data description] S]
-        if {![valid_name $name] || $normalized ne [fold $name]} {error "Invalid search snapshot package"}
-        set tags {}
-        if {[dict exists $data tags]} {set tags [::registry_metadata::tags [dict get $data tags] $path]}
-        dict set catalog $name [dict create normalized $normalized description $description tags $tags]
+proc ::recipe_search::database {command args} {
+    set script [list ::telemetry::$command {*}$args]
+    set config [::site::config]
+    if {[dict exists $config telemetry_thread_id]} {
+        return [thread::send [dict get $config telemetry_thread_id] $script]
     }
-    set docs {}
-    foreach value [snapshot_value [dict get $fields documents] L] {
-        set pair [snapshot_value $value L]
-        if {[llength $pair] ni {2 3}} {error "Invalid search snapshot document"}
-        set name [snapshot_value [lindex $pair 0] S]
-        set description [snapshot_value [lindex $pair 1] S]
-        if {![dict exists $catalog $name]} {error "Unknown search snapshot package"}
-        set field description
-        if {[llength $pair] == 3} {
-            set field [snapshot_value [lindex $pair 2] S]
-            if {$field ne "tags"} {error "Invalid search snapshot field"}
-        }
-        lappend docs [list $name $description $field]
-    }
-    # Publish both loaded indexes and their metadata together, after validation.
-    try {
-        ::ttrie::load ::recipe_search::next_names \
-            [binary decode base64 -strict [snapshot_value [dict get $fields names] S]]
-        ::ttrigrams::load ::recipe_search::next_descriptions \
-            [binary decode base64 -strict [snapshot_value [dict get $fields descriptions] S]]
-        if {[next_descriptions count] != [llength $docs]} {error "Search snapshot document count mismatch"}
-        dict for {name data} $catalog {
-            if {![next_names contains [dict get $data normalized]]} {error "Search snapshot package is not indexed"}
-        }
-        foreach command {index descriptions} {
-            if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
-        }
-        rename ::recipe_search::next_names ::recipe_search::index
-        rename ::recipe_search::next_descriptions ::recipe_search::descriptions
-        set entries $catalog
-        set documents $docs
-    } finally {
-        foreach command {next_names next_descriptions} {
-            if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
-        }
-    }
-}
-
-# Build once per catalog change, keeping native indexes in each worker.
-# Database rows are ordered and contain only versions published by registry sync.
-proc ::recipe_search::load_rows {rows} {
-    variable entries
-    variable documents
-    variable catalog_rows
-    set versions {}
-    foreach row $rows {
-        set name [dict get $row name]
-        set version [dict get $row version]
-        if {![valid_name $name] || ![valid_name $version]} {continue}
-        dict set versions $name $version $row
-    }
-    set catalog {}
-    set docs {}
-    set texts {}
-    set names {}
-    foreach name [lsort -ascii [dict keys $versions]] {
-        set descriptions {}
-        set tags {}
-        dict for {version row} [dict get $versions $name] {
-            set description [dict get $row description]
-            if {$description ne {}} {lappend descriptions $description}
-            lappend tags {*}[dict get $row tags]
-        }
-        set descriptions [lsort -ascii -unique $descriptions]
-        set tags [lsort -ascii -unique $tags]
-        lappend names [fold $name]
-        dict set catalog $name [dict create normalized [fold $name] \
-            description [lindex $descriptions 0] tags $tags versions [dict get $versions $name]]
-        foreach text $descriptions {
-            lappend docs [list $name $text description]
-            lappend texts [fold $text]
-        }
-        foreach tag $tags {
-            lappend docs [list $name $tag tags]
-            lappend texts [fold $tag]
-        }
-    }
-    try {
-        ::ttrie::create ::recipe_search::next_names $names
-        ::ttrigrams::create ::recipe_search::next_descriptions $texts
-        foreach command {index descriptions} {
-            if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
-        }
-        rename ::recipe_search::next_names ::recipe_search::index
-        rename ::recipe_search::next_descriptions ::recipe_search::descriptions
-        set entries $catalog
-        set documents $docs
-        set catalog_rows $rows
-    } finally {
-        foreach command {next_names next_descriptions} {
-            if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
-        }
-    }
+    {*}$script
 }
 
 proc ::recipe_search::refresh {} {
-    variable catalog_rows
-    set config [::site::config]
-    if {[dict exists $config telemetry_thread_id]} {
-        set rows [thread::send [dict get $config telemetry_thread_id] {::telemetry::registry_catalog}]
-    } else {set rows [::telemetry::registry_catalog]}
-    if {![info exists catalog_rows] || $rows ne $catalog_rows} {load_rows $rows}
+    variable revision
+    try {
+        if {[info exists revision] && [database search_snapshot_revision] eq $revision} {return 1}
+        # Use the payload's own revision: publication may occur after the check.
+        load_snapshot [database search_snapshot]
+        return 1
+    } on error {message options} {
+        puts stderr "Search snapshot refresh failed; keeping the last validated indexes if available."
+        return [info exists revision]
+    }
+}
+
+proc ::recipe_search::unavailable {} {
+    set response [::twebserver::build_response 503 text/plain {Package search is temporarily unavailable.}]
+    dict set response headers Retry-After 30
+    dict set response headers Cache-Control no-store
+    return $response
+}
+
+# Display data is fetched after ranking, only for the matching package names.
+proc ::recipe_search::catalog_entries {rows} {
+    set grouped {}
+    foreach row $rows {
+        set name [dict get $row name]
+        set version [dict get $row version]
+        if {![valid_name $name] || ![valid_name $version]} continue
+        dict set grouped $name $version $row
+    }
+    set catalog {}
+    foreach name [lsort -ascii [dict keys $grouped]] {
+        set texts {}
+        set tags {}
+        dict for {version row} [dict get $grouped $name] {
+            if {[dict get $row description] ne {}} {lappend texts [dict get $row description]}
+            lappend tags {*}[dict get $row tags]
+        }
+        dict set catalog $name [dict create name $name description [lindex [lsort -ascii -unique $texts] 0] \
+            tags [lsort -ascii -unique $tags] versions [dict get $grouped $name]]
+    }
+    return $catalog
+}
+
+proc ::recipe_search::results {text {limit 0}} {
+    variable revision
+    for {set attempt 0} {$attempt < 3} {incr attempt} {
+        if {![refresh]} {error "Search snapshot is unavailable"}
+        set matches [search $text]
+        if {$limit > 0} {set matches [lrange $matches 0 [expr {$limit - 1}]]}
+        set names [lmap match $matches {dict get $match name}]
+        try {
+            set rows [database search_result_metadata $revision $names]
+        } on error {message options} {
+            if {[dict get $options -errorcode] eq {SEARCH REVISION}} {continue}
+            return -options $options $message
+        }
+        set metadata [catalog_entries $rows]
+        set results {}
+        foreach match $matches {
+            set name [dict get $match name]
+            set data [dict get $metadata $name]
+            set description [dict get $data description]
+            if {[dict get $match tier] in {3 6}} {
+                set description [dict get $data versions [dict get $match version] description]
+            }
+            dict set match description $description
+            dict set match tags [dict get $data tags]
+            lappend results [dict remove $match version]
+        }
+        return $results
+    }
+    error "Search catalog changed repeatedly during the request"
 }
 
 proc ::recipe_search::compare {a b} {
@@ -188,17 +131,16 @@ proc ::recipe_search::search {text} {
             set distance [dict get $fuzzy $normalized]
         }
         if {$tier in {1 2}} {set unmatched [expr {[string length $name] - [string length $text]}]}
-        dict set found $name [dict create name $name description [dict get $data description] tags [dict get $data tags] \
+        dict set found $name [dict create name $name version {} \
             tier $tier distance $distance negative_coverage 0 unmatched $unmatched query_trigrams 0 shared_trigrams 0]
     }
     foreach match [descriptions search $text $limit] {
-        lassign [lindex $documents [dict get $match document]] name description field
+        lassign [lindex $documents [dict get $match document]] name version field
         set distance [dict get $match distance]
         set shared [dict get $match shared_trigrams]
         set total [dict get $match query_trigrams]
         set tier [expr {($distance == 0 ? 3 : 6) + ($field eq "tags")}]
-        if {$field eq "tags"} {set description [dict get $entries $name description]}
-        set candidate [dict create name $name description $description tags [dict get $entries $name tags] tier $tier distance $distance \
+        set candidate [dict create name $name version $version tier $tier distance $distance \
             negative_coverage [expr {-$shared}] unmatched 0 query_trigrams $total shared_trigrams $shared]
         if {[compare $candidate [dict get $found $name]] < 0} {dict set found $name $candidate}
     }
@@ -242,8 +184,8 @@ proc get_search_handler {ctx req} {
             "q must contain 1 to 255 ASCII letters, digits, spaces, '.', '_', '+' or '-'"]
     }
     set matches {}
-    ::recipe_search::refresh
-    foreach match [::recipe_search::search $query] {
+    if {[catch {::recipe_search::results $query} results]} {return [::recipe_search::unavailable]}
+    foreach match $results {
         set tier [dict get $match tier]
         set kind [lindex {exact prefix substring description description fuzzy description-fuzzy description-fuzzy} $tier]
         set total [dict get $match query_trigrams]
@@ -265,9 +207,9 @@ proc get_autocomplete_handler {ctx req} {
     if {[catch {::recipe_search::request_query $req} query]} {
         return [::twebserver::build_response 400 text/plain "Invalid search query"]
     }
-    ::recipe_search::refresh
+    if {[catch {::recipe_search::results $query 8} results]} {return [::recipe_search::unavailable]}
     set suggestions {}
-    foreach match [lrange [::recipe_search::search $query] 0 7] {
+    foreach match $results {
         lappend suggestions [list M [dict create name [list S [dict get $match name]] \
             description [list S [dict get $match description]]]]
     }
@@ -302,8 +244,7 @@ proc get_search_page_handler {ctx req} {
         set query {}
         set message {Use 1–255 letters, numbers, spaces, dots, underscores, plus signs or hyphens.}
     } else {
-        ::recipe_search::refresh
-        set matches [::recipe_search::search $query]
+        if {[catch {::recipe_search::results $query} matches]} {return [::recipe_search::unavailable]}
     }
     set data [dict create title {S {Search packages}} query [list S $query] \
         is_search {BOOL 1} error [list S $message] result_count [list N [llength $matches]] \

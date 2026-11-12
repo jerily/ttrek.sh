@@ -24,7 +24,8 @@ proc request {path args} {
     ::test_support::request $path {*}$args
 }
 proc rank {match query} {
-    set tier [lsearch -exact {exact prefix substring description fuzzy description-fuzzy} [dict get $match match]]
+    set tier [dict get {exact 0 prefix 1 substring 2 description 3 fuzzy 5 description-fuzzy 6} [dict get $match match]]
+    if {[dict exists $match field] && [dict get $match field] eq "tags"} {incr tier}
     set distance [expr {[dict exists $match distance] ? [dict get $match distance] : 0}]
     set coverage [expr {[dict exists $match coverage] ? -[dict get $match coverage] : 0}]
     set unmatched [expr {$tier in {1 2} ? [string length [dict get $match name]] - [string length $query] : 0}]
@@ -63,22 +64,27 @@ try {
         }
     }
     write_file [file join $app etc [expr {$mode eq "LOCAL" ? "config.local.ini" : "config.ini"}]] $config
+    # Provision fixtures explicitly, outside the request-serving process.
+    source [file join $app tcl telemetry.tcl]
     if {$mode eq "PROD"} {
-        # Provision fixtures explicitly, outside the request-serving process.
-        source [file join $app tcl telemetry.tcl]
-        ::telemetry::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
-        try {
-            ::telemetry::initdb
-            ::telemetry::sync_registry_metadata [file join $app $registryDir]
-            foreach {kind directory} {wiki docs blog blog} {
-                package require web-static-$kind
-                ::web::static::${kind}::initdb $::telemetry::connection
-                set store [::web::static::${kind}::create -connection $::telemetry::connection -domain ttrek.sh \
-                    -title [expr {$kind eq "wiki" ? "Documentation" : "Blog"}]]
-                ::web::static::${kind}::sync $store [file join $app content $directory]
-            }
-        } finally {::telemetry::close}
+        set databaseSettings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    } else {
+        file mkdir [file join $app data]
+        set databaseSettings [dict create dialect sqlite database [file join $app data telemetry.sqlite3] timeout 5000]
     }
+    ::telemetry::connect $databaseSettings
+    try {
+        ::telemetry::initdb
+        ::telemetry::sync_registry_metadata [file join $app $registryDir]
+        ::telemetry::publish_search_snapshot
+        foreach {kind directory} {wiki docs blog blog} {
+            package require web-static-$kind
+            ::web::static::${kind}::initdb $::telemetry::connection
+            set store [::web::static::${kind}::create -connection $::telemetry::connection -domain ttrek.sh \
+                -title [expr {$kind eq "wiki" ? "Documentation" : "Blog"}]]
+            ::web::static::${kind}::sync $store [file join $app content $directory]
+        }
+    } finally {::telemetry::close}
     write_file [file join $app users.acl] "user default off\nuser appuser on >tls-smoke-password ~* +@all\n"
     set valkeyProcess [::test_support::start [list $valkey --bind 127.0.0.1 --port 0 --tls-port $valkeyPort \
         --tls-cert-file [file join $app cert.pem] --tls-key-file [file join $app key.pem] \

@@ -1,0 +1,66 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root bin invoke-patch-local.tcl]
+rename ::trequests::request ::trequests::real_request
+proc ::trequests::request {method url args} {
+    set ::invocation [list $method $url $args]
+    return ::patch_response
+}
+proc ::patch_response {method} {
+    switch $method {
+        status_code {return $::http_status}
+        headers {return $::response_headers}
+        content {return $::response_body}
+        error {return {connection refused}}
+        destroy {incr ::destroyed}
+    }
+}
+proc reset_response {} {
+    set ::http_status 200
+    set ::response_headers {}
+    set ::response_body {{"ok":true,"task":"task_initdb_website","completed":[]}}
+    set ::destroyed 0
+    unset -nocomplain ::invocation
+}
+
+test local-patch-invoke {Direct loopback invocation uses the private payload and validates completion} -setup reset_response -body {
+    set result [::local_patch::main $root {task_initdb_website --lambda-port 3101}]
+    lassign $invocation method url options
+    list $method $url [::tjson::json_to_simple [dict get $options -data_binary]] \
+        [dict get [::tjson::json_to_simple $result] ok] $destroyed
+} -result {POST http://127.0.0.1:3101/2015-03-31/functions/prod-Api-TtrekWebsite-Function/invocations {source ttrek.patch task task_initdb_website} 1 1}
+
+test local-patch-function-error {HTTP 200 with a Lambda function error fails the script} -setup reset_response -body {
+    set response_headers {X-Amz-Function-Error Unhandled}
+    set failed [catch {::local_patch::invoke task_initdb_website 3001 test} message]
+    list $failed [string match {Local Lambda task failed:*} $message] $destroyed
+} -result {1 1 1}
+
+test local-patch-http-error {HTTP and transport failures cannot look like completed tasks} -setup reset_response -body {
+    set http_status 0
+    set failed [catch {::local_patch::invoke task_initdb_website 3001 test} message]
+    list $failed [string match {*connection refused*} $message] $destroyed
+} -result {1 1 1}
+
+test local-patch-confirmation {Missing, mismatched and malformed confirmations fail and release responses} -setup reset_response -body {
+    set results {}
+    foreach response_body [list {{"ok":false,"task":"task_initdb_website"}} \
+        {{"ok":true,"task":"task_sync_website"}} {{"statusCode":200}} invalid] {
+        lappend results [catch {::local_patch::invoke task_initdb_website 3001 test}]
+    }
+    list $results $destroyed
+} -result {{1 1 1 1} 4}
+
+test local-patch-validation {Invalid tasks, ports and options fail before making a request} -setup reset_response -body {
+    list [catch {::local_patch::main $root {exec}}] \
+        [catch {::local_patch::main $root {task_sync_website --lambda-port 0}}] \
+        [catch {::local_patch::main $root {task_sync_website --endpoint https://example.org}}] \
+        [info exists invocation]
+} -result {1 1 1 0}
+
+rename ::trequests::request {}
+rename ::trequests::real_request ::trequests::request
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

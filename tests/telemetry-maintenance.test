@@ -100,6 +100,19 @@ test maintenance-roundtrip {All tables, binary hashes, duplicate rows and text r
     list [lsort -unique $matches] [dict get $counts req_logo_get] [dict get $counts req_pkg_install_event]
 } -result {1 601 1}
 
+test maintenance-search-snapshot {Restore invalidates derived indexes without changing the backup table list} -constraints postgres -body {
+    reset_target
+    set target [::telemetry_maintenance::connect $targetSettings]
+    set before [dict get [lindex [$target allrows {SELECT revision FROM registry_search_snapshot}] 0] revision]
+    ::telemetry_maintenance::restore $target $dump
+    set invalidated [dict get [lindex [$target allrows {SELECT revision FROM registry_search_snapshot}] 0] revision]
+    $target close
+    ::telemetry::connect $targetSettings
+    try {set rebuilt [::telemetry::publish_search_snapshot]} finally {::telemetry::close}
+    list [expr {$before ne {}}] $invalidated [expr {$rebuilt ne {}}] \
+        [dict exists [::telemetry::table_definitions] registry_search_snapshot]
+} -result {1 {} 1 0}
+
 test maintenance-sequences {Restored identifiers do not collide with subsequent application inserts} -constraints postgres -body {
     ::telemetry::init_local $targetSettings
     ::telemetry::event register_environment -env [string repeat cd 32] -description another
