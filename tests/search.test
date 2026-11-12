@@ -2,11 +2,13 @@ source [file join $root tcl search-build.tcl]
 set search_fixture [::tcltest::makeDirectory search-registry]
 set search_artifacts [::tcltest::makeDirectory search-artifacts]
 set search_snapshot [file join $search_artifacts search.json]
-proc search_recipe {root name version {description {}}} {
+proc search_recipe {root name version {description {}} {tags {}}} {
     set directory [file join $root $name $version]
     file mkdir $directory
     set channel [open [file join $directory ttrek.json] w]
-    puts $channel [::tjson::typed_to_json [list M [dict create description [list S $description]]]]
+    set fields [dict create description [list S $description]]
+    if {[llength $tags]} {dict set fields tags [list L [lmap tag $tags {list S $tag}]]}
+    puts $channel [::tjson::typed_to_json [list M $fields]]
     close $channel
 }
 foreach name {tcl tclx tk tcl-tk a-c a_c a.c a+c abc web webserver atweb zzwebzzz b wec encryption} {
@@ -20,7 +22,16 @@ foreach {name description} {
     literal-typo {Literal encrytion phrase.}
 } {search_recipe $search_fixture $name 1.0.0 $description}
 search_recipe $search_fixture twebserver 2.0.0 {Compression utilities.}
+foreach name {json json-tools zzjsonzz jsox} {search_recipe $search_fixture $name 1.0.0}
+search_recipe $search_fixture described 1.0.0 {JSON data formats.}
+search_recipe $search_fixture tdom 1.0.0 {DOM processing.} {JSON xml JSON}
+search_recipe $search_fixture tdom 2.0.0 {} {sqlite}
+search_recipe $search_fixture desc-suggestion 1.0.0 {A jsom parser.}
+search_recipe $search_fixture tag-suggestion 1.0.0 {} {jsom}
+search_recipe $search_fixture split-tags 1.0.0 {} {relational storage}
+search_recipe $search_fixture one-tag 1.0.0 {} {{relational storage}}
 file mkdir [file join $search_fixture tclz 1.0.0]
+::telemetry::sync_registry_metadata $search_fixture
 rename ::recipe_search::index ::recipe_search::original_index
 rename ::recipe_search::descriptions ::recipe_search::original_descriptions
 set saved_entries $::recipe_search::entries
@@ -52,7 +63,7 @@ test search-5 {Index every version and display the matching description} -body {
     set response [get_search_handler {} {queryStringParameters {q compression}}]
     set matches [::tjson::json_to_simple [dict get $response body]]
     list [dict get $response status] [dict get $response type] $matches
-} -result {200 application/json {{name twebserver description {Compression utilities.} match description distance 0 coverage 1}}}
+} -result {200 application/json {{name twebserver description {Compression utilities.} match description tags {} distance 0 coverage 1}}}
 
 test search-6 {Phrase queries and description display for a name substring} -body {
     set response [get_search_handler {} {queryStringParameters {q web}}]
@@ -91,6 +102,33 @@ test search-8 {Bad descriptions preserve the artifact and working indexes} -body
     list [lsort -unique $rejected] [expr {$before eq $after}] [lindex [search_names web] 0]
 } -result {1 1 web}
 
+test search-tags-1 {Tags follow names and descriptions, with literal matches before typo suggestions} -body {
+    list [search_names json] [expr {[search_names { JSON }] eq [search_names json]}] \
+        [lindex [search_names sqlite] 0] [search_names {relational storage}] [expr {"tdom" in [search_names sq]}]
+} -result {{json json-tools zzjsonzz described tdom jsox desc-suggestion tag-suggestion} 1 tdom one-tag 1}
+
+test search-tags-2 {API returns tag metadata without breaking the existing match vocabulary} -body {
+    set response [get_search_handler {} {queryStringParameters {q xml}}]
+    set match [lindex [::tjson::json_to_simple [dict get $response body]] 0]
+    list [dict get $match name] [dict get $match description] [dict get $match match] \
+        [dict get $match field] [dict get $match tags]
+} -result {tdom {DOM processing.} description tags {JSON sqlite xml}}
+
+test search-tags-3 {Malformed tags preserve the artifact and active indexes} -body {
+    set before [readFile $search_snapshot]
+    set invalid [file join $search_fixture bad 1.0.0]
+    file mkdir $invalid
+    set rejected {}
+    foreach value [list null {"json"} {{}} {[42]} {[""]} {["bad\nline"]} \
+            [format {["%s"]} [string repeat x 256]]] {
+        writeFile [file join $invalid ttrek.json] [format {{"tags":%s}} $value]
+        lappend rejected [catch {::recipe_search::build $search_fixture $search_snapshot} message]
+        if {![string match {*tags must*} $message]} {error $message}
+    }
+    file delete -force [file join $search_fixture bad]
+    list [lsort -unique $rejected] [expr {$before eq [readFile $search_snapshot]}] [search_names xml]
+} -result {1 1 tdom}
+
 test autocomplete-1 {Suggestions preserve search ranking and return at most eight names and descriptions} -body {
     set response [get_autocomplete_handler {} {queryStringParameters {q e}}]
     set matches [::tjson::json_to_simple [dict get $response body]]
@@ -123,6 +161,18 @@ test search-page-2 {Empty results and invalid requests have useful HTML response
         [dict get $invalid status] [expr {[string first {<script>} [dict get $invalid body]] < 0}]
 } -result {200 1 400 1}
 
+test search-page-tags {Tag hits display searchable tags and retain the package description} -body {
+    set html [dict get [get_search_page_handler {} {queryStringParameters {q xml}}] body]
+    list [expr {[string first {href="/search?q=xml"} $html] >= 0}] \
+        [expr {[string first {DOM processing.} $html] >= 0}] \
+        [expr {[string first {Tag match} $html] >= 0}]
+} -result {1 1 1}
+
+test search-page-no-tags {Missing tags do not add empty tag lists to search results} -body {
+    set response [get_search_page_handler {} {queryStringParameters {q compression}}]
+    list [dict get $response status] [expr {[string first {class="package-tags"} [dict get $response body]] < 0}]
+} -result {200 1}
+
 test search-snapshot-1 {Builds are deterministic and do not change the active index} -body {
     set channel [open $search_snapshot rb]
     set before [read $channel]
@@ -141,7 +191,7 @@ test search-snapshot-2 {Invalid loads preserve both active indexes and clean up 
     ::tjson::parse $json snapshot
     set fields [lindex [::tjson::to_typed $snapshot] 1]
     set rejected {}
-    foreach {field invalid} {format {N 2} entries {L {}} documents {L {{L {{S missing} {S text}}}}} \
+    foreach {field invalid} {format {N 99} entries {L {}} documents {L {{L {{S missing} {S text}}}}} \
             documents {L {}} names {S invalid!} descriptions {S invalid!}} {
         set broken [dict replace $fields $field $invalid]
         set channel [open [file join $search_artifacts broken.json] w]
@@ -154,7 +204,7 @@ test search-snapshot-2 {Invalid loads preserve both active indexes and clean up 
 } -result {1 web twebserver {}}
 
 test search-9 {Fresh workers load without registry files or index construction} -body {
-    set expected [lmap query {web TCL a_c encrytion compression {web server} unknown} {
+    set expected [lmap query {web TCL a_c encrytion compression {web server} json sqlite xml unknown} {
         ::recipe_search::search $query
     }]
     file delete -force $search_fixture
@@ -170,7 +220,7 @@ test search-9 {Fresh workers load without registry files or index construction} 
         }
         worker eval [list ::recipe_search::load $search_snapshot]
         set actual [worker eval {
-            lmap query {web TCL a_c encrytion compression {web server} unknown} {::recipe_search::search $query}
+            lmap query {web TCL a_c encrytion compression {web server} json sqlite xml unknown} {::recipe_search::search $query}
         }]
     } finally {interp delete worker}
     expr {$expected eq $actual}
@@ -191,3 +241,5 @@ rename ::recipe_search::original_index ::recipe_search::index
 rename ::recipe_search::original_descriptions ::recipe_search::descriptions
 set ::recipe_search::entries $saved_entries
 set ::recipe_search::documents $saved_documents
+
+unset -nocomplain ::recipe_search::catalog_rows

@@ -56,6 +56,8 @@ dict for {table definition} [::telemetry::table_definitions] {
     if {$table eq "packages"} {
         dict unset definition columns description
         dict unset definition columns url
+        dict unset definition columns tags
+        dict unset definition columns listed
     }
     db_create_table $::telemetry::connection $definition
 }
@@ -162,6 +164,50 @@ test metadata-concurrent {Concurrent migrations and imports share package IDs wi
     list [llength $rows] [dict get [lindex $rows 0] url] [dict get [lindex $rows 4] description] \
         [::telemetry::stats demo]
 } -result {6 https://example.org/restarted Concurrent {{{Linux x86_64} 1 1 0}}}
+
+test metadata-tags {Tags persist as JSON, deduplicate, and default to an empty list when omitted} -body {
+    set values [list json xml {quote"&} {日本語} json]
+    recipe $public demo 1.0.0 [dict create tags [list L [lmap tag $values {list S $tag}]]]
+    ::telemetry::sync_registry_metadata $public $private
+    set found {}
+    foreach row [::telemetry::registry_catalog] {
+        if {[dict get $row name] eq "demo" && [dict get $row version] eq "1.0.0"} {set found $row}
+    }
+    set stored [dict get $found tags]
+    recipe $public demo 1.0.0 {}
+    ::telemetry::sync_registry_metadata $public $private
+    set cleared {}
+    foreach row [::telemetry::registry_catalog] {
+        if {[dict get $row name] eq "demo" && [dict get $row version] eq "1.0.0"} {
+            set cleared [expr {[dict get $row tags] eq {}}]
+        }
+    }
+    list [expr {$stored eq [lsort -ascii -unique $values]}] $cleared
+} -result {1 1}
+
+test metadata-tags-invalid {Invalid tags roll back the import without changing persisted discovery data} -body {
+    set before [::telemetry::registry_catalog]
+    set rejected {}
+    foreach tags {{"json"} null {[1]} {[""]}} {
+        set path [recipe $private invalid-tags 1.0.0 {}]
+        set channel [open $path w]
+        puts $channel [format {{"tags":%s}} $tags]
+        close $channel
+        lappend rejected [catch {::telemetry::sync_registry_metadata $public $private} message]
+        if {![string match {tags must*} $message]} {error $message}
+    }
+    list [lsort -unique $rejected] [expr {$before eq [::telemetry::registry_catalog]}]
+} -cleanup {
+    file delete -force [file join $private invalid-tags]
+} -result {1 1}
+
+test metadata-listed {Removed recipes and telemetry-only names stay out of discovery without losing history} -body {
+    file delete -force [file join $public demo]
+    ::telemetry::sync_registry_metadata $public $private
+    set names [lmap row [::telemetry::registry_catalog] {dict get $row name}]
+    list [expr {"demo" ni $names && "unknown" ni $names}] [::telemetry::stats demo] \
+        [expr {[dict get [lindex [metadata_rows] 0] pkg_id] == $legacy_id}]
+} -result {1 {{{Linux x86_64} 1 1 0}} 1}
 
 ::telemetry::close
 if {$postgres} {

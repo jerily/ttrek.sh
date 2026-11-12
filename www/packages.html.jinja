@@ -23,6 +23,9 @@
                 <div class="package-icon" aria-hidden="true">{ }</div>
                 <h2><a href="/package/{{ package.name|urlencode }}">{{ package.name }}</a></h2>
                 <p>{{ package.description if package.description else 'Explore available versions and installation details.' }}</p>
+                {% if package.tags %}<ul class="package-tags" aria-label="Tags">
+                    {% for tag in package.tags %}<li><a href="/search?q={{ tag|urlencode }}">{{ tag }}</a></li>{% endfor %}
+                </ul>{% endif %}
                 {% if package.match_label %}<span class="match-label">{{ package.match_label }}</span>{% endif %}
             </article>
         {% endfor %}

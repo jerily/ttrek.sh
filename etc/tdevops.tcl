@@ -32,8 +32,8 @@ proc ::project_devops::local {options work} {
     set releases [::app_config::releases {}]
     if {[file isfile $configPath]} {set releases [::app_config::releases_from_ini $configPath $root]}
     # Seed binaries are only a fallback for targets without uploaded metadata.
-    if {[dict get $releases version] eq "1.0.0" && [dict get $releases prefix] eq "ttrek/1.0.0"} {
-        foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.0.0/*/ttrek] {
+    if {[dict get $releases version] eq "1.2.0" && [dict get $releases prefix] eq "ttrek/1.2.0"} {
+        foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.2.0/*/ttrek] {
             set target [file tail [file dirname $binary]]
             if {![dict exists $releases checksums $target]} {
                 dict set releases checksums $target [lindex [exec sha256sum $binary] 0]
@@ -55,7 +55,7 @@ proc ::project_devops::seed_s3 {options architecture} {
     set cli [auto_execok ttrek]
     if {$cli eq {}} {error "ttrek is required to seed the local release download"}
     set target linux-[expr {$architecture eq "x86_64" ? "amd64" : "arm64"}]-glibc
-    set release [file join $seed ttrek-local ttrek 1.0.0 $target]
+    set release [file join $seed ttrek-local ttrek 1.2.0 $target]
     file mkdir $release
     # Preserve binaries written by the release upload script across packaging.
     if {![file exists [file join $release ttrek]]} {

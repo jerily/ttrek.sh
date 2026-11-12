@@ -47,7 +47,6 @@ try {
     file copy [file join $root registry] [file join $app $registryDir]
     file delete -force [file join $app $registryDir .git]
     write_file [file join $app $registryDir tclx 1.0.0 ttrek.json] {{}}
-    exec {*}$envCommand $tclsh [file join $app bin build-search.tcl] [file join $app $registryDir] >@stdout 2>@stderr
     file mkdir [file join $app build] [file join $app etc]
     file link -symbolic [file join $app build install] $prefix
     exec {*}$envCommand [file join $prefix bin openssl] req -x509 -newkey rsa:2048 -config /dev/null \

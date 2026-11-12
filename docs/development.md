@@ -39,8 +39,7 @@
   CodeDeploy hooks in `codedeploy-scripts/`, and CloudFormation templates and
   launchers in `infra/`.
 - `etc/`: application configuration, proxy/API Gateway routes, release checksums,
-  and the generated, ignored `search-index.json`. Search workers load this file;
-  direct builds and Lambda packaging generate it before startup.
+  and optional offline search snapshots. Website search reads database metadata.
 - `bin/`: local command launchers. `tdevops` supplies the shared Lambda runtime;
   `etc/lambda.json` declares the function and `tcl/lambda.tcl` owns app callbacks.
 - `tcl/`: application modules; `www/`: Jinja templates; `schemas/`: request schemas.
@@ -120,8 +119,8 @@ application staging, S3 seeds and release configuration. `etc/lambda.json` selec
 `prod-Api-TtrekWebsite-Function`, `tcl/lambda.tcl`, its initializer and request handler. The application
 keeps its HTTP event mapping, telemetry and release settings; tdevops supplies the
 bootstrap, Runtime API loop, package-path setup and generated local template.
-There is no app-local `lambda/` directory. `devops/prepare-lambda.tcl` builds the
-search index before packaging. PROD startup opens database connections only;
+There is no app-local `lambda/` directory. Search indexes are cached per worker
+from the database catalog. PROD startup opens database connections only;
 LOCAL retains schema initialization and registry synchronization through `init_local`. [Telemetry](telemetry.md) uses tpersist with SQLite only in LOCAL and
 PostgreSQL only in PROD. Backend drivers are loaded only on connection.
 

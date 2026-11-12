@@ -34,6 +34,10 @@
 .package-card a:hover { text-decoration: underline; }
 .package-card p { margin: 0 0 1.3rem; font-size: .9rem; overflow-wrap: anywhere; }
 .match-label { margin-top: auto; font-size: .72rem; color: #5e7187; }
+.package-tags { display: flex; flex-wrap: wrap; gap: .35rem; list-style: none; padding: 0; margin: 0 0 1rem; }
+.package-tags a { display: inline-block; padding: .15rem .55rem; border-radius: 1rem; background: #edf3f9; color: #224f7e; font-size: .75rem; line-height: 1.5; text-decoration: none; overflow-wrap: anywhere; }
+.package-tags a:hover { background: #e0eaf5; text-decoration: underline; }
+.package-tags a:focus-visible { outline: 3px solid #58aafa; outline-offset: 3px; }
 .empty-results { text-align: center; border: 1px dashed #c8d4e3; border-radius: 12px; padding: 3rem 1.5rem; background: white; }
 .empty-results h2 { font-size: 1.3rem; }
 .empty-results a, .browse-link a { color: #225d98; }

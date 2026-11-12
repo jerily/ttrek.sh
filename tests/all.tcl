@@ -43,6 +43,8 @@ source [file join $root tcl site.tcl]
 proc ::site::config {} {
     dict merge [dict create rootdir $::test_root] [::twebserver::get_config_dict]
 }
+source [file join $root tcl telemetry.tcl]
+::telemetry::init_local {dialect sqlite database :memory:}
 ::site::configure [::site::config]
 proc telemetry_event_common {args} {}
 proc telemetry_stats {args} {lmap {a b c d} $::test_stats {list $a $b $c $d}}
@@ -136,7 +138,7 @@ test releases-5 {Metadata contains the configured version, target, checksum and 
     set saved_release_env [array get ::env ENV]
     set ::env(ENV) PROD
     set test_releases [::app_config::releases [dict create releases [dict create \
-        bucket public-releases region us-east-1 version 1.1.0 prefix ttrek/1.1.0 \
+        bucket public-releases region us-east-1 version 1.2.0 prefix ttrek/1.2.0 \
         checksums_file [file join $root tests fixtures release-checksums.json]]]]
     set s3_url "https://public-releases.s3.amazonaws.com/ttrek?X-Amz-Signature=[string repeat a 64]"
 } -body {
@@ -149,7 +151,7 @@ test releases-5 {Metadata contains the configured version, target, checksum and 
 } -cleanup {
     unset -nocomplain ::env(ENV)
     array set ::env $saved_release_env
-} -result {200 1.1.0 macos-arm64 1 1 no-store ttrek/1.1.0/macos-arm64/ttrek}
+} -result {200 1.2.0 macos-arm64 1 1 no-store ttrek/1.2.0/macos-arm64/ttrek}
 
 test releases-6 {Metadata requires a published checksum and supported target} -body {
     list [dict get [get_release_handler {} {pathParameters {target linux-amd64-glibc}}] status] \
@@ -211,7 +213,7 @@ test releases-7 {The real SDK generates a signed URL without an AWS request} -se
     set ::releases::client [::aws::s3::create {region eu-west-1 aws_access_key_id test aws_secret_access_key test}]
 } -body {
     set url [::releases::signed_url linux-amd64-glibc]
-    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.0.0/linux-amd64-glibc/ttrek?*} $url] \
+    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.2.0/linux-amd64-glibc/ttrek?*} $url] \
         [regexp {[?&]X-Amz-Expires=300(&|$)} $url] \
         [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
 } -cleanup {
@@ -230,6 +232,7 @@ file copy -force [file join $root registry tink-cc 2.1.1 rapidjson-1.1.0.diff] \
     [file join $registry_fixture demo 2.0.0 rapidjson-1.1.0.diff]
 set test_root $fixture
 set test_registry $registry_fixture
+::telemetry::sync_registry_metadata $registry_fixture
 
 proc body {response} {dict get $response body}
 proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
@@ -294,7 +297,7 @@ test templates-year {Copyright follows the clock for each render, including a wa
     unset test_year
 } -result {1 1}
 
-test handlers-1 {Package listing comes from the registry} -body {
+test handlers-1 {Package listing comes from the database catalog} -body {
     contains [body [get_packages_page_handler {} {}]] {href="/package/demo">demo</a>}
 } -result 1
 
@@ -315,27 +318,100 @@ test handlers-project-url {Overview shows the latest version's project URL with 
     set channel [open $latest w]
     puts $channel {{"url":"https://example.org/project?x=\"quoted\"&y=<tag>","description":"Demo project"}}
     close $channel
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set html [body [get_package_page_handler {} {pathParameters {package_name demo}}]]
     list [contains $html {<p>Demo project</p>}] \
         [contains $html {Project: <a href="https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;">https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;</a>}]
 } -cleanup {
     writeFile $latest $original
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result {1 1}
 
-test handlers-project-url-invalid {Absent, non-string and unsafe URLs do not produce project links} -setup {
-    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
-    set original [readFile $latest]
-} -body {
+test handlers-project-url-invalid {Absent and unsafe database URLs do not produce project links} -body {
     set results {}
-    foreach json {{{}} {{"url":null}} {{"url":42}} {{"url":"javascript:alert(1)"}} {{"url":"//example.org"}} {{"url":"https://"}}} {
-        writeFile $latest $json
+    foreach url {{} 42 javascript:alert(1) //example.org https://} {
+        ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] [dict create url $url]]
         lappend results [contains [body [get_package_page_handler {} {pathParameters {package_name demo}}]] {Project:}]
     }
     lsort -unique $results
 } -cleanup {
-    writeFile $latest $original
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result 0
+
+test handlers-tags {Overview and listing show escaped tag links} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+    set tags {json {xml&"<x>}}
+    writeFile $latest [::tjson::typed_to_json [list M [dict create tags [::views::strings $tags]]]]
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -body {
+    set results {}
+    foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
+            [get_packages_page_handler {} {}]] {
+        set html [body $response]
+        lappend results [dict get $response status] [contains $html {href="/search?q=json"}] \
+            [contains $html {xml&amp;&quot;&lt;x&gt;}] [contains $html {xml&"<x>}]
+    }
+    set results
+} -cleanup {
+    writeFile $latest $original
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {200 1 1 0 200 1 1 0}
+
+test handlers-tags-optional {Missing and empty tags keep overview and listing usable} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+} -body {
+    set results {}
+    foreach json {{{}} {{"tags":[]}}} {
+        writeFile $latest $json
+        ::telemetry::sync_registry_metadata $registry_fixture
+        foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
+                [get_packages_page_handler {} {}]] {
+            lappend results [dict get $response status] [contains [body $response] {class="package-tags"}]
+        }
+    }
+    set results
+} -cleanup {
+    writeFile $latest $original
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {200 0 200 0 200 0 200 0}
+
+test handlers-database-catalog {Overview, listing, and search use stored metadata without recipe files} -setup {
+    ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
+        [dict create description {Stored overview} tags {["json"]} url https://example.org/stored]]
+    file rename $registry_fixture ${registry_fixture}.hidden
+    unset -nocomplain ::recipe_search::catalog_rows
+} -body {
+    set overview [get_package_page_handler {} {pathParameters {package_name demo}}]
+    set listing [get_packages_page_handler {} {}]
+    set search [get_search_page_handler {} {queryStringParameters {q json}}]
+    set api [::tjson::json_to_simple [body [get_search_handler {} {queryStringParameters {q json}}]]]
+    list [dict get $overview status] [contains [body $overview] {Stored overview}] \
+        [contains [body $overview] {https://example.org/stored}] \
+        [dict get $listing status] [contains [body $listing] {href="/search?q=json"}] \
+        [dict get $search status] [dict get [lindex $api 0] name] [dict get [lindex $api 0] tags]
+} -cleanup {
+    file rename ${registry_fixture}.hidden $registry_fixture
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {200 1 1 200 1 200 demo json}
+
+test handlers-catalog-cache {Unchanged database metadata reuses worker indexes} -body {
+    get_packages_page_handler {} {}
+    foreach name {ttrie ttrigrams} {
+        rename ::${name}::create ::${name}::saved_create
+        proc ::${name}::create {args} {error "Unexpected index rebuild"}
+    }
+    try {
+        dict get [get_search_page_handler {} {queryStringParameters {q demo}}] status
+    } finally {
+        foreach name {ttrie ttrigrams} {
+            rename ::${name}::create {}
+            rename ::${name}::saved_create ::${name}::create
+        }
+    }
+} -result 200
 
 test handlers-3 {Dependency conditions render on version pages} -body {
     set html [body [get_package_version_page_handler {} {pathParameters {package_name demo package_version 1.0.0}}]]
@@ -519,6 +595,58 @@ test registry-script-files-3 {Reject symbolic links, directories and NUL bytes} 
     set errors
 } -result {1 1 1}
 
+test registry-script-args-1 {API resolves literal presets before runtime arguments} -setup {
+    set script_body {#!/bin/sh
+for arg do printf '%s\n' "$arg"; done
+}
+    writeFile [file join $recipe_dir args.sh] $script_body
+    set presets [list {} {two words} {café 世界} "one\ntwo" {'quoted'} {"double"} \
+        {$(touch preset-injected)} {`touch preset-injected`} {; touch preset-injected} {*} --]
+    set reference [list M [list file {S args.sh} args [list L [lmap arg $presets {list S $arg}]]]]
+    writeFile [file join $recipe_dir ttrek.json] [::tjson::typed_to_json \
+        [list M [list dependencies {M {}} scripts [list M [list demo $reference]] build {M {default {L {}}}}]]]
+} -body {
+    set response [get_package_spec_handler {} [dict create pathParameters \
+        {package_name file-demo package_version 1.0.0 os Linux machine x86_64}]]
+    set spec [::tjson::json_to_simple [body $response]]
+    set resolved [dict get $spec scripts demo]
+    set runtime [list runtime {} {two words}]
+    set previous [pwd]
+    try {
+        cd $recipe_dir
+        set output [exec -keepnewline sh -c $resolved -- {*}$runtime]
+    } finally {cd $previous}
+    list [dict get $response status] [string match "#!/bin/sh\n*" $resolved] \
+        [expr {$output eq "[join [concat $presets $runtime] \n]\n"}] \
+        [file exists [file join $recipe_dir preset-injected]]
+} -result {200 1 1 0}
+
+test registry-script-args-2 {Empty presets preserve bytes and scripts can omit a shebang or final newline} -body {
+    set reference {M {file {S args.sh} args {L {}}}}
+    lassign [resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir] type scripts
+    set results [list [expr {[lindex [dict get $scripts demo] 1] eq $script_body}]]
+    foreach content [list {printf '%s\n' "$@"} {#!/bin/sh}] {
+        writeFile [file join $recipe_dir plain.sh] $content
+        set reference {M {file {S plain.sh} args {L {{S plain}}}}}
+        lassign [resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir] type scripts
+        lappend results [exec sh -c [lindex [dict get $scripts demo] 1] -- tail]
+    }
+    set results
+} -result [list 1 "plain\ntail" {}]
+
+test registry-script-args-3 {Reject malformed preset arrays and unknown reference fields} -body {
+    set errors {}
+    foreach reference {
+        {M {file {S args.sh} args {S bad}}}
+        {M {file {S args.sh} args {NULL {}}}}
+        {M {file {S args.sh} args {L {{N 1}}}}}
+        {M {file {S args.sh} args {L {}} extra {B true}}}
+    } {
+        lappend errors [catch {resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir}]
+    }
+    set errors
+} -result {1 1 1 1}
+
 test registry-scripts-3 {Pinned OpenACS recipe exposes the installed-package entry points} -setup {
     set test_registry [file join $root registry]
 } -body {
@@ -548,6 +676,7 @@ test templates-5 {Template data cannot execute Tcl or inject HTML} -body {
         [contains $html {<script>"&}]
 } -result {0 1 0}
 
+::telemetry::close
 ::tcltest::removeDirectory registry-fixture
 ::tcltest::removeDirectory {custom registry [data]}
 set failed $::tcltest::numTests(Failed)

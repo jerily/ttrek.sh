@@ -5,6 +5,8 @@ namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl site.tcl]
 source [file join $root tcl config.tcl]
+source [file join $root tcl telemetry.tcl]
+::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root registry]]
 set settings [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}] \
     treqmon {store {tsvstore {history_max_events 100}}}]
 ::site::init_worker $settings

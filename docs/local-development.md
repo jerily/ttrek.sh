@@ -102,8 +102,8 @@ described in [Deployment](deployment.md). The older `build.sh` remains a
 
 ## Direct server
 
-Before starting the direct server, build the [search index](registry.md#recipe-search)
-with `ttrek run -script build-search` and configure Valkey and TLS as described below.
+Configure Valkey and TLS as described below. LOCAL startup imports the registry
+metadata into SQLite; [search](registry.md#recipe-search) reads that catalog.
 
 After building the dependencies and browser assets, run `ttrek.sh` locally.
 `run.sh` sets the library search path automatically. `ENV=PROD` (the default)

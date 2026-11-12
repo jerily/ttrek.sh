@@ -286,7 +286,6 @@ install_tcl_package tsession-dynamodb-main tsession-dynamodb1.0.0 https://github
 
 "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl"
 
-"$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/bin/build-search.tcl"
 
 if [ ! -e "$SELF_DIR/certs/cert.pem" ]; then
     echo "Generate certificates ..."

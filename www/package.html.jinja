@@ -8,6 +8,9 @@
         <div class="content">
             <h2 class="content-head is-center text-normal">{{ package_name }}</h2>
             {% if description %}<p>{{ description }}</p>{% endif %}
+            {% if tags %}<ul class="package-tags" aria-label="Tags">
+                {% for tag in tags %}<li><a href="/search?q={{ tag|urlencode }}">{{ tag }}</a></li>{% endfor %}
+            </ul>{% endif %}
             {% if project_url %}<p>Project: <a href="{{ project_url }}">{{ project_url }}</a></p>{% endif %}
             <p class="content-subhead">Install:</p>
             {{ bashline("ttrek install " ~ package_name) }}

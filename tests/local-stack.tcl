@@ -35,15 +35,15 @@ try {
     set extraTarget macos-universal2
     set extraBinary [binary format a*c* {uploaded release bytes} {0 255}]
     set extraChecksum [sha256 $extraBinary]
-    write_file [file join $seed ttrek-local ttrek 1.0.0 $extraTarget ttrek] {old seed bytes}
+    write_file [file join $seed ttrek-local ttrek 1.2.0 $extraTarget ttrek] {old seed bytes}
     set manifest [file join $temporary releases.json]
     set data {}
     foreach {mode checksum} [list local $extraChecksum prod [string repeat a 64]] {
-        dict set data $mode [list M [dict create 1.0.0 [list M [dict create $extraTarget [list S $checksum]]]]]
+        dict set data $mode [list M [dict create 1.2.0 [list M [dict create $extraTarget [list S $checksum]]]]]
     }
     write_file $manifest [::tjson::typed_to_json [list M $data]]
     set config [file join $temporary config.ini]
-    write_file $config "\[releases\]\nversion=1.0.0\nchecksums_file=$manifest\n"
+    write_file $config "\[releases\]\nversion=1.2.0\nchecksums_file=$manifest\n"
     set log [file join $temporary services.log]
     set process [::test_support::start [list [file join $root bin start-local.sh] --zip $archive \
         --port $port --lambda-port $lambdaPort --s3-port $s3Port --state-dir $state \
@@ -157,7 +157,7 @@ try {
     assert {[dict get [request $s3/ttrek-local/binary.bin] body] eq $binary}
     puts {PASS S3-backed website assets and binary object storage}
 
-    set release [lindex [glob -directory [file join $seedSource ttrek-local ttrek 1.0.0] */ttrek] 0]
+    set release [lindex [glob -directory [file join $seedSource ttrek-local ttrek 1.2.0] */ttrek] 0]
     set target [file tail [file dirname $release]]
     set download [dict get [request /dist/$target/ttrek] body]
     assert {[sha256 $download] eq [sha256 [read_file $release]]}
@@ -165,11 +165,11 @@ try {
     assert {[dict get $metadata sha256] eq [sha256 $download]}
     assert {[string first $s3/ttrek-local/ [dict get $metadata url]] == 0}
     puts {PASS signed release redirect, exact executable bytes and checksum metadata}
-    request $s3/ttrek-local/ttrek/1.0.0/$extraTarget/ttrek 200 PUT $extraBinary
+    request $s3/ttrek-local/ttrek/1.2.0/$extraTarget/ttrek 200 PUT $extraBinary
     set download [dict get [request /dist/$extraTarget/ttrek] body]
     set metadata [json [request /releases/latest/$extraTarget]]
     assert {$download eq $extraBinary && [dict get $metadata sha256] eq $extraChecksum}
-    assert {[dict get $metadata version] eq "1.0.0"}
+    assert {[dict get $metadata version] eq "1.2.0"}
     puts {PASS configured local checksum manifest takes precedence over seed and production hashes}
 
     ::test_support::stop $process

@@ -23,7 +23,9 @@ proc ::site::root {} {dict get [config] rootdir}
 proc ::site::configure {config} {
     variable settings $config
     ::views::init [file join [root] www]
-    ::recipe_search::load [file join [root] etc search-index.json]
+    # Defer database reads until a catalog request, so provisioning tasks can
+    # initialize a new deployment before its first public request.
+    ::recipe_search::load_rows {}
     if {[dict exists $settings tratelimit]} {
         ::tratelimit::init_middleware [dict get $settings tratelimit]
     }

@@ -2,13 +2,13 @@
     <label for="package-query">Search packages</label>
     <div class="search-field">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
-        <input id="package-query" name="q" type="search" value="{{ query }}" placeholder="Search by name or description…" required maxlength="255" autocomplete="off" spellcheck="false" aria-describedby="search-hint" />
+        <input id="package-query" name="q" type="search" value="{{ query }}" placeholder="Search by name, description or tag…" required maxlength="255" autocomplete="off" spellcheck="false" aria-describedby="search-hint" />
         <button type="submit">Search <span aria-hidden="true">→</span></button>
     </div>
     <div class="suggestions" hidden>
         <ul id="package-suggestions" role="listbox" aria-label="Package suggestions"></ul>
         <p class="suggestions-hint">↑ ↓ to explore · Enter to open · Esc to close</p>
     </div>
-    <p id="search-hint" class="visually-hidden">Search package names and descriptions. Suggestions appear as you type.</p>
+    <p id="search-hint" class="visually-hidden">Search package names, descriptions and tags. Suggestions appear as you type.</p>
     <span class="visually-hidden" role="status" aria-live="polite" data-search-status></span>
 </form>
