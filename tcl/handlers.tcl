@@ -486,6 +486,7 @@ proc get_package_page_handler {ctx req} {
         description [list S $description] \
         tags [::views::strings $tags] \
         project_url [list S $project_url] \
+        license [list S [string trim [dict get $latest license]]] \
         versions [::views::strings $versions] \
         stat_platforms [::views::platform_stats $stat_platforms]]
     set html [::views::render package.html.jinja $data]

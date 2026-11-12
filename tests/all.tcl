@@ -343,6 +343,46 @@ test handlers-project-url-invalid {Absent and unsafe database URLs do not produc
     ::telemetry::publish_search_snapshot
 } -result 0
 
+test handlers-license {Overview shows the latest version's license with HTML escaping} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+} -body {
+    set results {}
+    foreach {license expected} {
+        MIT {<p>License: MIT</p>}
+        {MIT OR Apache-2.0} {<p>License: MIT OR Apache-2.0</p>}
+        {<script>"&} {<p>License: &lt;script&gt;&quot;&amp;</p>}
+    } {
+        writeFile $latest [::tjson::typed_to_json [list M [dict create license [list S $license]]]]
+        ::telemetry::sync_registry_metadata $registry_fixture
+        set response [get_package_page_handler {} {pathParameters {package_name demo}}]
+        lappend results [dict get $response status] [contains [body $response] $expected]
+    }
+    set results
+} -cleanup {
+    writeFile $latest $original
+    ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] {license {}}]
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {200 1 200 1 200 1}
+
+test handlers-license-optional {Absent and empty licenses omit the license line} -setup {
+    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $latest]
+} -body {
+    set results {}
+    foreach json {{{}} {{"license":""}} {{"license":"  "}}} {
+        writeFile $latest $json
+        ::telemetry::sync_registry_metadata $registry_fixture
+        set response [get_package_page_handler {} {pathParameters {package_name demo}}]
+        lappend results [dict get $response status] [contains [body $response] {License:}]
+    }
+    set results
+} -cleanup {
+    writeFile $latest $original
+    ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] {license {}}]
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {200 0 200 0 200 0}
+
 test handlers-tags {Overview and listing show escaped tag links} -setup {
     set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
     set original [readFile $latest]
@@ -388,7 +428,7 @@ test handlers-tags-optional {Missing and empty tags keep overview and listing us
 
 test handlers-database-catalog {Overview, listing, and search use stored metadata without recipe files} -setup {
     ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
-        [dict create description {Stored overview} tags {["json"]} url https://example.org/stored]]
+        [dict create description {Stored overview} tags {["json"]} url https://example.org/stored license MIT]]
     file rename $registry_fixture ${registry_fixture}.hidden
     ::telemetry::publish_search_snapshot
     ::recipe_search::reset
@@ -399,13 +439,14 @@ test handlers-database-catalog {Overview, listing, and search use stored metadat
     set api [::tjson::json_to_simple [body [get_search_handler {} {queryStringParameters {q json}}]]]
     list [dict get $overview status] [contains [body $overview] {Stored overview}] \
         [contains [body $overview] {https://example.org/stored}] \
+        [contains [body $overview] {<p>License: MIT</p>}] \
         [dict get $listing status] [contains [body $listing] {href="/search?q=json"}] \
         [dict get $search status] [dict get [lindex $api 0] name] [dict get [lindex $api 0] tags]
 } -cleanup {
     file rename ${registry_fixture}.hidden $registry_fixture
     ::telemetry::sync_registry_metadata $registry_fixture
     ::telemetry::publish_search_snapshot
-} -result {200 1 1 200 1 200 demo json}
+} -result {200 1 1 1 200 1 200 demo json}
 
 test handlers-catalog-cache {Unchanged database metadata reuses worker indexes} -body {
     get_packages_page_handler {} {}
