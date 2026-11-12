@@ -1,0 +1,104 @@
+package require Tcl 9.1
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root devops upload-browser-assets.tcl]
+package provide awss3 1.0.17
+namespace eval ::aws::s3 {}
+proc ::aws::s3::create {settings} {return ::browser_fixture::client}
+namespace eval ::browser_fixture {}
+proc ::browser_fixture::write {path bytes} {
+    file mkdir [file dirname $path]
+    set channel [open $path wb]
+    try {puts -nonewline $channel $bytes} finally {close $channel}
+}
+proc ::browser_fixture::setup {} {
+    variable root [makeDirectory browser-assets-fixture]
+    variable objects {}; variable calls {}; variable failure {}
+    variable savedEnv [array get ::env ENV]
+    set ::env(ENV) PROD
+    write [file join $root public asset-manifest.json] {
+        {"/css/site.css":"/assets/versioned/css/site.0123456789abcdef.css",
+         "/js/site.js":"/assets/versioned/js/site.fedcba9876543210.js"}
+    }
+    foreach {path bytes} {
+        assets/versioned/css/site.0123456789abcdef.css {body {color: red;}}
+        assets/versioned/js/site.fedcba9876543210.js {console.log('current');}
+        assets/versioned/js/site.0000000000000000.js {console.log('previous');}
+        assets/versioned/js/chart.LICENSE.txt {MIT license}
+        assets/versioned/js/secret.json {not a browser asset}
+        assets/favicon.svg {<svg xmlns="http://www.w3.org/2000/svg"/>}
+    } {write [file join $root public $path] $bytes}
+    write [file join $root public favicon.ico] [binary format H* 00000100ff80]
+    variable settings [::app_config::content_images {content_images {
+        bucket test-assets region eu-central-1 cloudfront_enabled true assets_prefix cdn
+    }} $root]
+}
+proc ::browser_fixture::client {method bucket key args} {
+    variable calls; variable objects; variable failure
+    lappend calls [list $method $bucket $key]
+    if {$method eq $failure} {error "S3 $method failed"}
+    switch -- $method {
+        ls {return [dict keys $objects $key]}
+        put {dict set objects $key [list [::assets::read_bytes [lindex $args 0]] [lindex $args 1]]}
+        default {error "Unexpected S3 method: $method"}
+    }
+}
+proc ::browser_fixture::cleanup {} {
+    unset ::env(ENV)
+    array set ::env $::browser_fixture::savedEnv
+    removeDirectory browser-assets-fixture
+}
+
+test browser-assets-upload {only browser files reach the configured prefix with exact bytes and MIME types} -setup browser_fixture::setup -body {
+    set count [::browser_assets::upload $browser_fixture::root $browser_fixture::settings]
+    list $count [lsort [dict keys $browser_fixture::objects]] \
+        [binary encode hex [lindex [dict get $browser_fixture::objects cdn/favicon.ico] 0]] \
+        [lindex [dict get $browser_fixture::objects cdn/assets/favicon.svg] 1] \
+        [lindex [dict get $browser_fixture::objects cdn/assets/versioned/css/site.0123456789abcdef.css] 1] \
+        [lindex [dict get $browser_fixture::objects cdn/request-monitor/_assets/charts.js] 1] \
+        [expr {[lindex [dict get $browser_fixture::objects cdn/request-monitor/_assets/charts.js] 0] eq \
+            [::assets::read_bytes [file join $::treqmon::view::asset_dir charts.js]]}]
+} -cleanup browser_fixture::cleanup -result {7 {cdn/assets/favicon.svg cdn/assets/versioned/css/site.0123456789abcdef.css cdn/assets/versioned/js/chart.LICENSE.txt cdn/assets/versioned/js/site.0000000000000000.js cdn/assets/versioned/js/site.fedcba9876543210.js cdn/favicon.ico cdn/request-monitor/_assets/charts.js} 00000100ff80 image/svg+xml text/css application/javascript 1}
+
+test browser-assets-repeat {immutable files are reused while stable paths refresh and old builds survive} -setup browser_fixture::setup -body {
+    ::browser_assets::upload $browser_fixture::root $browser_fixture::settings
+    browser_fixture::write [file join $browser_fixture::root public favicon.ico] changed
+    set browser_fixture::calls {}
+    list [::browser_assets::upload $browser_fixture::root $browser_fixture::settings] \
+        [llength [lsearch -all -index 0 $browser_fixture::calls put]] \
+        [lindex [dict get $browser_fixture::objects cdn/favicon.ico] 0] \
+        [dict exists $browser_fixture::objects cdn/assets/versioned/js/site.0000000000000000.js]
+} -cleanup browser_fixture::cleanup -result {4 4 changed 1}
+
+test browser-assets-prefix {a configured nested prefix controls every upload} -setup browser_fixture::setup -body {
+    ::browser_assets::upload $browser_fixture::root [dict replace $browser_fixture::settings assets_prefix custom/cdn]
+    lsort -unique [lmap key [dict keys $browser_fixture::objects] {string match custom/cdn/* $key}]
+} -cleanup browser_fixture::cleanup -result 1
+
+test browser-assets-disabled {disabled delivery needs no files or S3 operations} -setup browser_fixture::setup -body {
+    file delete -force [file join $browser_fixture::root public]
+    list [::browser_assets::upload $browser_fixture::root [dict replace $browser_fixture::settings cloudfront_enabled false]] \
+        $browser_fixture::calls
+} -cleanup browser_fixture::cleanup -result {0 {}}
+
+test browser-assets-missing {missing manifest targets fail before any upload} -setup browser_fixture::setup -body {
+    file delete [file join $browser_fixture::root public assets versioned css site.0123456789abcdef.css]
+    list [catch {::browser_assets::upload $browser_fixture::root $browser_fixture::settings}] $browser_fixture::calls
+} -cleanup browser_fixture::cleanup -result {1 {}}
+
+test browser-assets-favicon {a missing favicon fails before any upload} -setup browser_fixture::setup -body {
+    file delete [file join $browser_fixture::root public favicon.ico]
+    list [catch {::browser_assets::upload $browser_fixture::root $browser_fixture::settings}] $browser_fixture::calls
+} -cleanup browser_fixture::cleanup -result {1 {}}
+
+foreach method {ls put} {
+    test browser-assets-error-$method {S3 failures stop deployment} -setup browser_fixture::setup -body {
+        set browser_fixture::failure $method
+        ::browser_assets::upload $browser_fixture::root $browser_fixture::settings
+    } -cleanup browser_fixture::cleanup -returnCodes error -result "S3 $method failed"
+}
+
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

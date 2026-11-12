@@ -3,8 +3,8 @@ package require twebserver
 package require tjson
 package require tratelimit 1.0.1
 package require treqmon 2.1.0
-package require web-static-wiki 0.1.4
-package require web-static-blog 0.1.3
+package require web-static-wiki 0.1.5
+package require web-static-blog 0.1.4
 package require tpathexp 1.1.0
 
 namespace eval ::site {
@@ -21,6 +21,9 @@ proc ::site::root {} {dict get [config] rootdir}
 
 proc ::site::configure {config} {
     variable settings $config
+    set imageSettings {}
+    if {[dict exists $config content_images]} {set imageSettings [dict get $config content_images]}
+    ::assets::configure $imageSettings
     ::views::init [file join [root] www]
     # Defer database reads until a catalog request, so provisioning tasks can
     # initialize a new deployment before its first public request.
@@ -120,6 +123,7 @@ proc ::site::dispatch {router request {context {}}} {
         if {[string equal -nocase $name Cache-Control]} {set has_policy 1}
     }
     if {[string match {text/html*} $content_type]} {
+        set response [::assets::allow_cdn $response]
         dict set response body [::views::stamp_year [dict get $response body]]
         # Keep package-owned no-store policies; ordinary site HTML revalidates
         # so a deployment promptly switches browsers to the new asset URLs.

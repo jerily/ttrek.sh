@@ -1,5 +1,13 @@
 namespace eval ::assets {
     variable manifest {}
+    variable cdn_origin {}
+    variable cdn_prefix {}
+}
+
+proc ::assets::configure {settings} {
+    variable cdn_origin [::content_images::cdn_url $settings]
+    variable cdn_prefix {}
+    if {$cdn_origin ne {}} {set cdn_prefix [dict get $settings assets_prefix]}
 }
 
 proc ::assets::read_bytes {path} {
@@ -26,8 +34,35 @@ proc ::assets::load {root} {
 
 proc ::assets::url {path} {
     variable manifest
-    if {![dict exists $manifest $path]} {error "Asset missing from manifest: $path"}
-    dict get $manifest $path
+    variable cdn_origin
+    variable cdn_prefix
+    if {[dict exists $manifest $path]} {
+        set path [dict get $manifest $path]
+    } elseif {$path ni {/favicon.ico /assets/favicon.svg /request-monitor/_assets/charts.js}} {
+        error "Asset missing from manifest: $path"
+    }
+    if {$cdn_origin ne {}} {return $cdn_origin/$cdn_prefix$path}
+    return $path
+}
+
+# Package layouts carry their own CSP. Add only the configured CDN origin to
+# the directives needed by external scripts, stylesheets and favicon images.
+proc ::assets::allow_cdn {response} {
+    variable cdn_origin
+    if {$cdn_origin eq {}} {return $response}
+    set policy [::responses::header $response Content-Security-Policy]
+    if {$policy eq {}} {return $response}
+    set directives {}
+    foreach directive [split $policy {;}] {
+        set directive [string trim $directive]
+        if {$directive eq {}} {continue}
+        if {[lindex $directive 0] in {script-src style-src img-src} && $cdn_origin ni $directive} {
+            append directive " $cdn_origin"
+        }
+        lappend directives $directive
+    }
+    ::responses::set_header response Content-Security-Policy [join $directives {; }]
+    return $response
 }
 
 # GET/HEAD use weak comparison, including a list of validators and '*'. Parse

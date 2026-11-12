@@ -11,7 +11,9 @@ proc ::views::init {directory} {
     variable templates
     ::assets::load [file dirname $directory]
     set fields {}
-    dict for {path url} $::assets::manifest {dict set fields $path [list S $url]}
+    foreach path [concat [dict keys $::assets::manifest] {/favicon.ico /assets/favicon.svg /request-monitor/_assets/charts.js}] {
+        dict set fields $path [list S [::assets::url $path]]
+    }
     set asset_urls [::tjson::typed_to_json [list M $fields]]
     set templates {}
     foreach path [glob -directory $directory *.html.jinja] {

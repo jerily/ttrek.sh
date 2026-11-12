@@ -1,0 +1,238 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFront delivery for ttrek browser assets and blog/documentation images in private S3.
+
+Parameters:
+  ContentImagesBucket:
+    Type: String
+    Default: jerily-ttrek-app
+    Description: Existing private bucket; must match content_images.bucket.
+  ContentImagesPrefix:
+    Type: String
+    Default: ttrek/content/images
+    AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
+    Description: Must match content_images.prefix; only its blog/ and docs/ subtrees are readable.
+  BrowserAssetsPrefix:
+    Type: String
+    Default: cdn
+    AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
+    Description: Must match content_images.assets_prefix; contains CSS, JavaScript and favicons.
+  ImageCacheTTL:
+    Type: Number
+    Default: 300
+    MinValue: 1
+    MaxValue: 86400
+    Description: Maximum edge cache lifetime in seconds for images replaced at stable paths.
+
+Resources:
+  ImageCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub ${AWS::StackName}-Images
+        DefaultTTL: !Ref ImageCacheTTL
+        MaxTTL: !Ref ImageCacheTTL
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+
+  ImageResponseHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub ${AWS::StackName}-ImageHeaders
+        # Browser reloads revalidate; the edge policy controls shared caching.
+        CustomHeadersConfig:
+          Items:
+            - Header: Cache-Control
+              Value: public, max-age=0, must-revalidate
+              Override: true
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+
+  BrowserAssetCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub ${AWS::StackName}-VersionedAssets
+        DefaultTTL: 31536000
+        MaxTTL: 31536000
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+          EnableAcceptEncodingBrotli: true
+          EnableAcceptEncodingGzip: true
+
+  BrowserAssetResponseHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub ${AWS::StackName}-BrowserAssets
+        CustomHeadersConfig:
+          Items:
+            - Header: Cache-Control
+              Value: public, max-age=0, must-revalidate
+              Override: true
+        # Cross-origin module scripts require CORS even without credentials.
+        CorsConfig:
+          AccessControlAllowCredentials: false
+          AccessControlAllowHeaders:
+            Items: ['*']
+          AccessControlAllowMethods:
+            Items: [GET, HEAD]
+          AccessControlAllowOrigins:
+            Items: ['*']
+          OriginOverride: true
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+
+  VersionedAssetResponseHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub ${AWS::StackName}-VersionedAssets
+        CustomHeadersConfig:
+          Items:
+            - Header: Cache-Control
+              Value: public, max-age=31536000, immutable
+              Override: true
+        CorsConfig:
+          AccessControlAllowCredentials: false
+          AccessControlAllowHeaders:
+            Items: ['*']
+          AccessControlAllowMethods:
+            Items: [GET, HEAD]
+          AccessControlAllowOrigins:
+            Items: ['*']
+          OriginOverride: true
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-OAC
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CdnDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: ttrek browser assets and blog/docs images
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: Images
+            DomainName: !Sub ${ContentImagesBucket}.s3.${AWS::Region}.${AWS::URLSuffix}
+            OriginAccessControlId: !Ref OriginAccessControl
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: Images
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: !Ref ImageCachePolicy
+          ResponseHeadersPolicyId: !Ref ImageResponseHeaders
+          Compress: true
+        CacheBehaviors:
+          # Versioned CSS/JS keep the existing long-lived cache policy.
+          - PathPattern: !Sub ${BrowserAssetsPrefix}/assets/versioned/css/*.css
+            TargetOriginId: Images
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: !Ref BrowserAssetCachePolicy
+            ResponseHeadersPolicyId: !Ref VersionedAssetResponseHeaders
+            Compress: true
+          - PathPattern: !Sub ${BrowserAssetsPrefix}/assets/versioned/js/*.js
+            TargetOriginId: Images
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: !Ref BrowserAssetCachePolicy
+            ResponseHeadersPolicyId: !Ref VersionedAssetResponseHeaders
+            Compress: true
+          # Favicons and the package-owned monitor script have stable paths.
+          - PathPattern: !Sub ${BrowserAssetsPrefix}/*
+            TargetOriginId: Images
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: !Ref ImageCachePolicy
+            ResponseHeadersPolicyId: !Ref BrowserAssetResponseHeaders
+            Compress: true
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ErrorCachingMinTTL: 0
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: none
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  ImageBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ContentImagesBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontBlogDocsAndBrowserAssets
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/blog/*
+              - !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/docs/*
+              - !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${BrowserAssetsPrefix}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CdnDistribution}
+
+Outputs:
+  BrowserAssetResponseHeadersPolicyId:
+    Description: Reusable CORS, nosniff and browser-revalidation policy for stable asset paths.
+    Value: !Ref BrowserAssetResponseHeaders
+    Export:
+      Name: !Sub ${AWS::StackName}-BrowserAssetResponseHeadersPolicyId
+  VersionedAssetResponseHeadersPolicyId:
+    Description: Reusable CORS, nosniff and immutable-cache policy for versioned CSS/JS.
+    Value: !Ref VersionedAssetResponseHeaders
+    Export:
+      Name: !Sub ${AWS::StackName}-VersionedAssetResponseHeadersPolicyId
+  CdnDistributionId:
+    Value: !Ref CdnDistribution
+    Export:
+      Name: !Sub ${AWS::StackName}-DistributionId
+  CdnDomainName:
+    Value: !GetAtt CdnDistribution.DomainName
+    Export:
+      Name: !Sub ${AWS::StackName}-DomainName
+  CdnBaseUrl:
+    Description: HTTPS origin imported by the SAM application; append the full S3 key.
+    Value: !Sub https://${CdnDistribution.DomainName}
+    Export:
+      Name: !Sub ${AWS::StackName}-BaseUrl

@@ -33,6 +33,9 @@ aws cloudformation deploy \
   --stack-name Infra-DevOps-TTREK-Builds \
   --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
   --parameter-overrides "GitHubConnectionArn=${TTREK_GITHUB_CONNECTION_ARN}" \
+    "ContentImagesBucket=${CONTENT_IMAGES_BUCKET:-jerily-ttrek-app}" \
+    "ContentImagesPrefix=${CONTENT_IMAGES_PREFIX:-ttrek/content/images}" \
+    "BrowserAssetsPrefix=${BROWSER_ASSETS_PREFIX:-cdn}" \
   --profile "${AWS_PROFILE:-ttrek-prod-neo}" \
   --region "${AWS_REGION:-${AWS_DEFAULT_REGION:-eu-central-1}}" \
   --no-fail-on-empty-changeset

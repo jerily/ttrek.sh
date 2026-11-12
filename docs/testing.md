@@ -25,6 +25,7 @@ ttrek run tclsh9.1 "$PWD/tests/lambda-valkey.tcl"
 ttrek run tclsh9.1 "$PWD/tests/static-content.test"
 ttrek run tclsh9.1 "$PWD/tests/content-images.test"
 ttrek run tclsh9.1 "$PWD/tests/content-images-build.test"
+ttrek run tclsh9.1 "$PWD/tests/browser-assets.test"
 ttrek run tclsh9.1 "$PWD/tests/installer.tcl"
 ttrek run tclsh9.1 "$PWD/tests/upload-archives.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-smoke.tcl"
@@ -38,8 +39,14 @@ exclusion of host config.
 CodeBuild runs this after packaging and finalization, before deployment; it needs
 neither decrypted credentials nor running services.
 `tests/content-images-build.test` uses a fake S3 client to verify upload
-deduplication across both collections, validation before uploads, build failure
-on S3 errors, and production rendering without S3 listing or upload calls.
+separate docs/blog paths, repeat-sync change detection, validation before uploads, build failure
+on S3 errors, and production rendering without S3 calls. Config and image tests
+cover the PROD-only CloudFront toggle, imported URL validation, path encoding,
+and signed URLs when CDN delivery is disabled. `tests/browser-assets.test` checks
+binary favicon/MIME preservation, the monitor script, configurable prefixes,
+retained asset versions, disabled uploads, and build failure on missing files or
+S3 errors. `tests/static-content.test` verifies CDN and local URLs across all site,
+docs, blog and monitor layouts, including their CSP directives.
 `tests/local-stack.tcl` runs the packaged site through all three installed mock
 services on temporary ports. The test supplies an isolated Valkey fixture through
 an explicit `[redis]` section and verifies the launcher leaves it running on shutdown.
