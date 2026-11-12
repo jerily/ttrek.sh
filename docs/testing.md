@@ -16,6 +16,7 @@ ttrek run tclsh9.1 "$PWD/tests/config.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
+ttrek run tclsh9.1 "$PWD/tests/telemetry-dispatch.test"
 ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
 ttrek run tclsh9.1 "$PWD/tests/patch.test"
 ttrek run tclsh9.1 "$PWD/tests/invoke-patch-local.test"
@@ -40,7 +41,9 @@ neither decrypted credentials nor running services.
 deduplication across both collections, validation before uploads, build failure
 on S3 errors, and production rendering without S3 listing or upload calls.
 `tests/local-stack.tcl` runs the packaged site through all three installed mock
-services on temporary ports. It checks documentation, HEAD/error behavior,
+services on temporary ports. The test supplies an isolated Valkey fixture through
+an explicit `[redis]` section and verifies the launcher leaves it running on shutdown.
+It checks documentation, HEAD/error behavior,
 S3-backed asset changes, binary objects, signed release downloads and checksums,
 Lambda payload 1.0 query/body handling, an unchanged archive, and shutdown cleanup.
 Package before running this test. `TTREK_TEST_SITE_ZIP` and
@@ -100,7 +103,8 @@ connection settings for a disposable PostgreSQL database and `PGSSLROOTCERT`
 pointing to its CA. PROD always verifies TLS.
 
 `tests/lambda-config.test` checks production rejection of plaintext secrets, local
-configuration isolation, local counter expiry, and release configuration during
+configuration isolation, launcher failure before starting services when `[redis]`
+is missing, local counter expiry, and release configuration during
 Lambda startup, including manifest paths and signed download URLs. `tests/lambda-valkey.tcl` needs
 `valkey-server` with TLS and runs two independent Lambda adapters against a disposable
 cache, checking shared history, cross-process rate limiting, and trusted source-IP
@@ -116,6 +120,10 @@ removes it afterward. It also checks that PostgreSQL never loads SQLite and
 runs four independent processes to exercise simultaneous cold starts and writes.
 Use only a disposable test database. `tests/telemetry-config.test` verifies ENV
 selection and required TLS without connecting to services.
+
+`tests/telemetry-dispatch.test` checks synchronous commits and the direct-server
+and Lambda error policies. It, the rendering checks, direct-server smoke test
+and Lambda Valkey workers reject attempts to load the Thread package.
 
 `tests/registry-metadata.test` uses the same backend selection. It covers existing
 schema upgrades, per-version metadata, imports from multiple registries, repeated

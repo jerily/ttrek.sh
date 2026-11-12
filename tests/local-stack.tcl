@@ -6,7 +6,7 @@ interp alias {} read_file {} ::test_support::read_file
 interp alias {} write_file {} ::test_support::write_file
 interp alias {} sha256 {} ::test_support::sha256
 interp alias {} json {} ::test_support::json
-lassign [::test_support::ports 3] port lambdaPort s3Port
+lassign [::test_support::ports 4] port lambdaPort s3Port cachePort
 set base http://127.0.0.1:$port
 set s3 http://127.0.0.1:$s3Port
 proc request {path args} {
@@ -30,6 +30,7 @@ set temporary [::test_support::temporary [file join $root build] {local stack-}]
 set state [file join $temporary state]
 set seed [file join $temporary s3]
 set process {}
+set cacheProcess {}
 try {
     file copy $seedSource $seed
     set extraTarget macos-universal2
@@ -43,7 +44,12 @@ try {
     }
     write_file $manifest [::tjson::typed_to_json [list M $data]]
     set config [file join $temporary config.ini]
-    write_file $config "\[releases\]\nversion=1.2.0\nchecksums_file=$manifest\n"
+    write_file $config "\[releases\]\nversion=1.2.0\nchecksums_file=$manifest\n\n\[redis\]\nport=$cachePort\nssl=false\n"
+    # The test owns the cache; application launchers only use its explicit INI settings.
+    set server [expr {[info exists ::env(VALKEY_SERVER)] ? $::env(VALKEY_SERVER) : "valkey-server"}]
+    set cacheProcess [::test_support::start [list $server --bind 127.0.0.1 --port $cachePort \
+        --save {} --appendonly no --dir $temporary] [file join $temporary valkey.log]]
+    ::test_support::wait_port $cachePort $cacheProcess
     set log [file join $temporary services.log]
     set process [::test_support::start [list [file join $root bin start-local.sh] --zip $archive \
         --port $port --lambda-port $lambdaPort --s3-port $s3Port --state-dir $state \
@@ -56,6 +62,12 @@ try {
         ::test_support::pause 200
     }
     assert {[string first {href="/docs"} $homepage] >= 0}
+    package require valkey
+    set cache [valkey -host localhost -port $cachePort]
+    try {
+        assert {[$cache PING] eq "PONG"}
+        assert {[$cache LLEN history_events] > 0} {local requests must use Valkey monitoring}
+    } finally {$cache destroy}
     assert {[string first {href="/blog"} $homepage] >= 0}
     assert {[string first {Sign Up} $homepage] < 0}
     set year "&#169; [clock format [clock seconds] -format %Y] JERILY LTD"
@@ -188,10 +200,14 @@ try {
     assert {![llength [glob -nocomplain -directory $state *]]} {temporary service directories were not cleaned}
     assert {[sha256 [read_file $archive]] eq $before} {archive changed during the test}
     foreach selected [list $port $lambdaPort $s3Port] {assert {![::test_support::port_open $selected]} {service left running}}
+    assert {[::test_support::running $cacheProcess] && [::test_support::port_open $cachePort]} \
+        {the launcher must leave the configured Valkey service running}
     puts {PASS clean shutdown and unchanged archive}
 } on error {message options} {
     if {[info exists log] && [file exists $log]} {puts stderr [read_file $log]}
     return -options $options $message
 } finally {
-    try {::test_support::stop $process} finally {file delete -force $temporary}
+    try {::test_support::stop $process} finally {
+        try {::test_support::stop $cacheProcess} finally {file delete -force $temporary}
+    }
 }

@@ -1,0 +1,38 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tests fixtures deny-thread.tcl]
+source [file join $root tcl telemetry.tcl]
+source [file join $root tcl handlers.tcl]
+namespace eval ::site {
+    variable settings {}
+    proc config {} {variable settings; return $settings}
+}
+::telemetry::init_local {dialect sqlite database :memory:}
+set identity [string repeat a 64]
+
+test telemetry-dispatch-commit {Handlers commit registration and events before returning} -body {
+    telemetry_event register_environment -env $identity -description test
+    telemetry_event req_pkg_install_event -env $identity -pkg_name demo -pkg_version 1.0 \
+        -os Linux -arch x86_64 -install_outcome 1 -install_is_toplevel 1
+    telemetry_stats demo 1.0
+} -result {{{Linux x86_64} 1 1 0}}
+
+test telemetry-dispatch-direct-error {Direct-server telemetry errors preserve successful HTTP responses} -setup {
+    set ::site::settings {telemetry_best_effort true}
+} -body {
+    telemetry_event register_environment -env invalid -description test
+} -cleanup {set ::site::settings {}} -result {}
+
+test telemetry-dispatch-lambda-error {Lambda retains its existing synchronous error propagation} -body {
+    telemetry_event register_environment -env invalid -description test
+} -returnCodes error -result {invalid telemetry environment ID}
+
+test telemetry-dispatch-stats-error {Statistics retain their fallback when the connection is unavailable} -body {
+    ::telemetry::close
+    telemetry_stats demo
+} -result {}
+
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

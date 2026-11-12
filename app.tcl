@@ -6,7 +6,6 @@ if {$argv ne {}} {error "Usage: app.tcl"}
 
 package require Tcl 9.1
 package require twebserver
-package require thread
 package require tconfig::decrypt
 
 set dir [file dirname [info script]]
@@ -51,11 +50,6 @@ dict set tratelimit_config store valkeystore $valkey_config
 
 set treqmon_config [dict create store [::app_config::monitor_store $config]]
 
-
-
-# Create telemetry thread
-set telemetry_thread_id [thread::create thread::wait]
-
 # Compression is shared with Lambda in ::responses::prepare.
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
@@ -65,7 +59,7 @@ set config_dict [dict create \
     request_monitor [::app_config::request_monitor $config] \
     gzip off \
     conn_timeout_millis 10000 \
-    telemetry_thread_id $telemetry_thread_id \
+    telemetry_best_effort true \
     tratelimit $tratelimit_config \
     treqmon $treqmon_config]
 
@@ -73,19 +67,6 @@ dict set config_dict content_database [::app_config::telemetry $config [file nor
 
 # create the server
 set dir [file dirname [info script]]
-
-# Initialize one database connection owned by the telemetry thread.
-thread::send $telemetry_thread_id [list source [file normalize [file join $dir tcl telemetry.tcl]]]
-# Keep credentials out of a failed thread script's error trace.
-thread::send $telemetry_thread_id [list set ::telemetry_settings \
-    [::app_config::telemetry $config [file normalize $dir]]]
-thread::send $telemetry_thread_id {
-    try {
-        ::telemetry::connect $::telemetry_settings
-    } finally {
-        unset ::telemetry_settings
-    }
-}
 
 set init_script "source [file normalize [file join $dir tcl init-thread.tcl]]"
 set server_handle [::twebserver::create_server $config_dict process_conn $init_script]

@@ -4,6 +4,7 @@ source [file join $root tests support.tcl]
 foreach helper {assert read_file write_file} {interp alias {} $helper {} ::test_support::$helper}
 
 if {[llength $argv] == 3 && [lindex $argv 0] eq "--worker"} {
+    source [file join $root tests fixtures deny-thread.tcl]
     lassign $argv ignored configPath phase
     set ::env(ENV) PROD
     package require tconfig::decrypt
