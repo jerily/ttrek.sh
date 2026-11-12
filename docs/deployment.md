@@ -330,7 +330,7 @@ The build:
    and checks that it starts with `ttrek self-update -version`.
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).
-3. Restores retained browser assets, runs the asset and search builds, then the
+3. Restores retained browser assets, builds browser assets, then the
    application and asset checks.
 4. Generates encrypted production config from SSM, packages with tdevops using
    `--local-only`, and sets executable ZIP attributes. This skips the numeric

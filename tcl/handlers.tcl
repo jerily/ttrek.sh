@@ -193,21 +193,11 @@ proc get_registry_dir {} {
 }
 
 proc get_packages_page_handler {ctx req} {
-    set package_names [list]
-    foreach path [glob -nocomplain -type d -directory [get_registry_dir] *] {
-        lappend package_names [file tail $path]
-    }
+    ::recipe_search::refresh
     set packages {}
-    foreach name [lsort $package_names] {
-        set description {}
-        set tags {}
-        if {[dict exists $::recipe_search::entries $name description]} {
-            set description [dict get $::recipe_search::entries $name description]
-        }
-        if {[dict exists $::recipe_search::entries $name tags]} {
-            set tags [dict get $::recipe_search::entries $name tags]
-        }
-        lappend packages [dict create name $name description $description tags $tags]
+    foreach name [lsort -ascii [dict keys $::recipe_search::entries]] {
+        set entry [dict get $::recipe_search::entries $name]
+        lappend packages [dict create name $name description [dict get $entry description] tags [dict get $entry tags]]
     }
     set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
         result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}}]
@@ -475,37 +465,18 @@ proc compare_versions {a b} {
 proc get_package_page_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_pkg_get -pkg_name $package_name
-    set registry_dir [get_registry_dir]
-    set versions [get_package_versions $registry_dir $package_name]
-    set description {}
-    set tags {}
-    set project_url {}
-    set spec_path [file join $registry_dir $package_name [lindex $versions 0] ttrek.json]
-    if {[llength $versions] && [file isfile $spec_path]} {
-        set channel [open $spec_path r]
-        try {
-            chan configure $channel -encoding utf-8
-            ::tjson::parse [read $channel] spec
-        } finally {close $channel}
-        if {[::tjson::has_object_item $spec description]} {
-            set item [::tjson::get_object_item $spec description]
-            if {[::tjson::is_string $item]} {
-                set description [string trim [::tjson::get_valuestring $item]]
-            }
-        }
-        if {[::tjson::has_object_item $spec tags]} {
-            set tags [::recipe_search::tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $spec_path]
-        }
-        if {[::tjson::has_object_item $spec url]} {
-            set item [::tjson::get_object_item $spec url]
-            if {[::tjson::is_string $item]} {
-                set candidate [string trim [::tjson::get_valuestring $item]]
-                if {[regexp -nocase {^https?://[^/[:space:]?#]+[^[:space:]]*$} $candidate]} {
-                    set project_url $candidate
-                }
-            }
-        }
+    ::recipe_search::refresh
+    if {![dict exists $::recipe_search::entries $package_name]} {
+        return [::twebserver::build_response 404 text/plain "Package not found"]
     }
+    set metadata [dict get $::recipe_search::entries $package_name versions]
+    set versions [lsort -command compare_versions -decreasing [dict keys $metadata]]
+    set latest [dict get $metadata [lindex $versions 0]]
+    set description [string trim [dict get $latest description]]
+    set tags [dict get $latest tags]
+    set project_url {}
+    set candidate [string trim [dict get $latest url]]
+    if {[regexp -nocase {^https?://[^/[:space:]?#]+[^[:space:]]*$} $candidate]} {set project_url $candidate}
 
     set stat_platforms [get_package_stats $package_name]
 

@@ -43,6 +43,8 @@ source [file join $root tcl site.tcl]
 proc ::site::config {} {
     dict merge [dict create rootdir $::test_root] [::twebserver::get_config_dict]
 }
+source [file join $root tcl telemetry.tcl]
+::telemetry::init_local {dialect sqlite database :memory:}
 ::site::configure [::site::config]
 proc telemetry_event_common {args} {}
 proc telemetry_stats {args} {lmap {a b c d} $::test_stats {list $a $b $c $d}}
@@ -230,6 +232,7 @@ file copy -force [file join $root registry tink-cc 2.1.1 rapidjson-1.1.0.diff] \
     [file join $registry_fixture demo 2.0.0 rapidjson-1.1.0.diff]
 set test_root $fixture
 set test_registry $registry_fixture
+::telemetry::sync_registry_metadata $registry_fixture
 
 proc body {response} {dict get $response body}
 proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
@@ -294,7 +297,7 @@ test templates-year {Copyright follows the clock for each render, including a wa
     unset test_year
 } -result {1 1}
 
-test handlers-1 {Package listing comes from the registry} -body {
+test handlers-1 {Package listing comes from the database catalog} -body {
     contains [body [get_packages_page_handler {} {}]] {href="/package/demo">demo</a>}
 } -result 1
 
@@ -315,35 +318,33 @@ test handlers-project-url {Overview shows the latest version's project URL with 
     set channel [open $latest w]
     puts $channel {{"url":"https://example.org/project?x=\"quoted\"&y=<tag>","description":"Demo project"}}
     close $channel
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set html [body [get_package_page_handler {} {pathParameters {package_name demo}}]]
     list [contains $html {<p>Demo project</p>}] \
         [contains $html {Project: <a href="https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;">https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;</a>}]
 } -cleanup {
     writeFile $latest $original
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result {1 1}
 
-test handlers-project-url-invalid {Absent, non-string and unsafe URLs do not produce project links} -setup {
-    set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
-    set original [readFile $latest]
-} -body {
+test handlers-project-url-invalid {Absent and unsafe database URLs do not produce project links} -body {
     set results {}
-    foreach json {{{}} {{"url":null}} {{"url":42}} {{"url":"javascript:alert(1)"}} {{"url":"//example.org"}} {{"url":"https://"}}} {
-        writeFile $latest $json
+    foreach url {{} 42 javascript:alert(1) //example.org https://} {
+        ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] [dict create url $url]]
         lappend results [contains [body [get_package_page_handler {} {pathParameters {package_name demo}}]] {Project:}]
     }
     lsort -unique $results
 } -cleanup {
-    writeFile $latest $original
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result 0
 
 test handlers-tags {Overview and listing show escaped tag links} -setup {
     set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
     set original [readFile $latest]
-    set saved_entries $::recipe_search::entries
     set tags {json {xml&"<x>}}
     writeFile $latest [::tjson::typed_to_json [list M [dict create tags [::views::strings $tags]]]]
-    dict set ::recipe_search::entries demo tags $tags
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set results {}
     foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
@@ -355,18 +356,17 @@ test handlers-tags {Overview and listing show escaped tag links} -setup {
     set results
 } -cleanup {
     writeFile $latest $original
-    set ::recipe_search::entries $saved_entries
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result {200 1 1 0 200 1 1 0}
 
 test handlers-tags-optional {Missing and empty tags keep overview and listing usable} -setup {
     set latest [file join $registry_fixture demo 2.0.0 ttrek.json]
     set original [readFile $latest]
-    set saved_entries $::recipe_search::entries
-    set ::recipe_search::entries {}
 } -body {
     set results {}
     foreach json {{{}} {{"tags":[]}}} {
         writeFile $latest $json
+        ::telemetry::sync_registry_metadata $registry_fixture
         foreach response [list [get_package_page_handler {} {pathParameters {package_name demo}}] \
                 [get_packages_page_handler {} {}]] {
             lappend results [dict get $response status] [contains [body $response] {class="package-tags"}]
@@ -375,8 +375,43 @@ test handlers-tags-optional {Missing and empty tags keep overview and listing us
     set results
 } -cleanup {
     writeFile $latest $original
-    set ::recipe_search::entries $saved_entries
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result {200 0 200 0 200 0 200 0}
+
+test handlers-database-catalog {Overview, listing, and search use stored metadata without recipe files} -setup {
+    ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
+        [dict create description {Stored overview} tags {["json"]} url https://example.org/stored]]
+    file rename $registry_fixture ${registry_fixture}.hidden
+    unset -nocomplain ::recipe_search::catalog_rows
+} -body {
+    set overview [get_package_page_handler {} {pathParameters {package_name demo}}]
+    set listing [get_packages_page_handler {} {}]
+    set search [get_search_page_handler {} {queryStringParameters {q json}}]
+    set api [::tjson::json_to_simple [body [get_search_handler {} {queryStringParameters {q json}}]]]
+    list [dict get $overview status] [contains [body $overview] {Stored overview}] \
+        [contains [body $overview] {https://example.org/stored}] \
+        [dict get $listing status] [contains [body $listing] {href="/search?q=json"}] \
+        [dict get $search status] [dict get [lindex $api 0] name] [dict get [lindex $api 0] tags]
+} -cleanup {
+    file rename ${registry_fixture}.hidden $registry_fixture
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {200 1 1 200 1 200 demo json}
+
+test handlers-catalog-cache {Unchanged database metadata reuses worker indexes} -body {
+    get_packages_page_handler {} {}
+    foreach name {ttrie ttrigrams} {
+        rename ::${name}::create ::${name}::saved_create
+        proc ::${name}::create {args} {error "Unexpected index rebuild"}
+    }
+    try {
+        dict get [get_search_page_handler {} {queryStringParameters {q demo}}] status
+    } finally {
+        foreach name {ttrie ttrigrams} {
+            rename ::${name}::create {}
+            rename ::${name}::saved_create ::${name}::create
+        }
+    }
+} -result 200
 
 test handlers-3 {Dependency conditions render on version pages} -body {
     set html [body [get_package_version_page_handler {} {pathParameters {package_name demo package_version 1.0.0}}]]
@@ -641,6 +676,7 @@ test templates-5 {Template data cannot execute Tcl or inject HTML} -body {
         [contains $html {<script>"&}]
 } -result {0 1 0}
 
+::telemetry::close
 ::tcltest::removeDirectory registry-fixture
 ::tcltest::removeDirectory {custom registry [data]}
 set failed $::tcltest::numTests(Failed)

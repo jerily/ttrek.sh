@@ -10,7 +10,6 @@ additional requirements described below.
 ```bash
 ttrek run -script build-assets
 npm test
-ttrek run -script build-search
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"

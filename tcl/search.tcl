@@ -1,4 +1,5 @@
 package require tjson
+source [file join [file dirname [info script]] registry-metadata.tcl]
 package require ttrie 0.2.0
 package require ttrigrams 0.2.0
 
@@ -31,22 +32,6 @@ proc ::recipe_search::snapshot_value {value type} {
     return [lindex $value 1]
 }
 
-# Tags are optional metadata; callers use an empty list when the field is absent.
-proc ::recipe_search::tags {typed {path recipe}} {
-    if {[lindex $typed 0] ne "L"} {error "tags must be an array of strings in $path"}
-    set result {}
-    foreach item [lindex $typed 1] {
-        lassign $item type text
-        if {$type ne "S"} {error "tags must be an array of strings in $path"}
-        if {$text eq {} || [string length [encoding convertto utf-8 $text]] > 255 ||
-            [regexp {[\x00-\x1f\x7f]} $text]} {
-            error "tags must contain nonempty single-line strings of at most 255 bytes in $path"
-        }
-        lappend result $text
-    }
-    return [lsort -ascii -unique $result]
-}
-
 proc ::recipe_search::load {path} {
     variable entries
     variable documents
@@ -65,7 +50,7 @@ proc ::recipe_search::load {path} {
         set description [snapshot_value [dict get $data description] S]
         if {![valid_name $name] || $normalized ne [fold $name]} {error "Invalid search snapshot package"}
         set tags {}
-        if {[dict exists $data tags]} {set tags [tags [dict get $data tags] $path]}
+        if {[dict exists $data tags]} {set tags [::registry_metadata::tags [dict get $data tags] $path]}
         dict set catalog $name [dict create normalized $normalized description $description tags $tags]
     }
     set docs {}
@@ -104,6 +89,72 @@ proc ::recipe_search::load {path} {
             if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
         }
     }
+}
+
+# Build once per catalog change, keeping native indexes in each worker.
+# Database rows are ordered and contain only versions published by registry sync.
+proc ::recipe_search::load_rows {rows} {
+    variable entries
+    variable documents
+    variable catalog_rows
+    set versions {}
+    foreach row $rows {
+        set name [dict get $row name]
+        set version [dict get $row version]
+        if {![valid_name $name] || ![valid_name $version]} {continue}
+        dict set versions $name $version $row
+    }
+    set catalog {}
+    set docs {}
+    set texts {}
+    set names {}
+    foreach name [lsort -ascii [dict keys $versions]] {
+        set descriptions {}
+        set tags {}
+        dict for {version row} [dict get $versions $name] {
+            set description [dict get $row description]
+            if {$description ne {}} {lappend descriptions $description}
+            lappend tags {*}[dict get $row tags]
+        }
+        set descriptions [lsort -ascii -unique $descriptions]
+        set tags [lsort -ascii -unique $tags]
+        lappend names [fold $name]
+        dict set catalog $name [dict create normalized [fold $name] \
+            description [lindex $descriptions 0] tags $tags versions [dict get $versions $name]]
+        foreach text $descriptions {
+            lappend docs [list $name $text description]
+            lappend texts [fold $text]
+        }
+        foreach tag $tags {
+            lappend docs [list $name $tag tags]
+            lappend texts [fold $tag]
+        }
+    }
+    try {
+        ::ttrie::create ::recipe_search::next_names $names
+        ::ttrigrams::create ::recipe_search::next_descriptions $texts
+        foreach command {index descriptions} {
+            if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
+        }
+        rename ::recipe_search::next_names ::recipe_search::index
+        rename ::recipe_search::next_descriptions ::recipe_search::descriptions
+        set entries $catalog
+        set documents $docs
+        set catalog_rows $rows
+    } finally {
+        foreach command {next_names next_descriptions} {
+            if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
+        }
+    }
+}
+
+proc ::recipe_search::refresh {} {
+    variable catalog_rows
+    set config [::site::config]
+    if {[dict exists $config telemetry_thread_id]} {
+        set rows [thread::send [dict get $config telemetry_thread_id] {::telemetry::registry_catalog}]
+    } else {set rows [::telemetry::registry_catalog]}
+    if {![info exists catalog_rows] || $rows ne $catalog_rows} {load_rows $rows}
 }
 
 proc ::recipe_search::compare {a b} {
@@ -191,6 +242,7 @@ proc get_search_handler {ctx req} {
             "q must contain 1 to 255 ASCII letters, digits, spaces, '.', '_', '+' or '-'"]
     }
     set matches {}
+    ::recipe_search::refresh
     foreach match [::recipe_search::search $query] {
         set tier [dict get $match tier]
         set kind [lindex {exact prefix substring description description fuzzy description-fuzzy description-fuzzy} $tier]
@@ -208,11 +260,12 @@ proc get_search_handler {ctx req} {
         [::tjson::typed_to_json [list L $matches]]]
 }
 
-# Both the JSON suggestions and HTML results read the loaded build snapshot.
+# JSON suggestions and HTML results share the current database catalog.
 proc get_autocomplete_handler {ctx req} {
     if {[catch {::recipe_search::request_query $req} query]} {
         return [::twebserver::build_response 400 text/plain "Invalid search query"]
     }
+    ::recipe_search::refresh
     set suggestions {}
     foreach match [lrange [::recipe_search::search $query] 0 7] {
         lappend suggestions [list M [dict create name [list S [dict get $match name]] \
@@ -249,6 +302,7 @@ proc get_search_page_handler {ctx req} {
         set query {}
         set message {Use 1–255 letters, numbers, spaces, dots, underscores, plus signs or hyphens.}
     } else {
+        ::recipe_search::refresh
         set matches [::recipe_search::search $query]
     }
     set data [dict create title {S {Search packages}} query [list S $query] \

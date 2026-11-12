@@ -18,8 +18,6 @@ if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONF
     set images [::app_config::content_images_from_ini [file join $siteRoot etc config.ini] $siteRoot]
     if {[dict get $images bucket] eq {}} {error "Production configuration requires content_images.bucket"}
 }
-source [file join $siteRoot tcl search-build.tcl]
-::recipe_search::build [file join $siteRoot registry] [file join $siteRoot etc search-index.json]
 file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
     releases $releases]

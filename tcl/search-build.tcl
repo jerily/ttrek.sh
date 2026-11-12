@@ -19,7 +19,7 @@ proc ::recipe_search::metadata {path} {
     }
     set tags {}
     if {[::tjson::has_object_item $spec tags]} {
-        set tags [tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $path]
+        set tags [::registry_metadata::tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $path]
     }
     return [dict create description $text tags $tags]
 }

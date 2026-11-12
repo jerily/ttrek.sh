@@ -33,7 +33,6 @@ mkdir -p public/assets/versioned
 aws s3 sync "$ASSET_HISTORY" public/assets/versioned/ --only-show-errors
 ttrek run -script build-assets
 npm test
-ttrek run -script build-search
 "$TCLSH" tests/all.tcl
 "$TCLSH" tests/static-content.test
 "$TCLSH" tests/content-images.test

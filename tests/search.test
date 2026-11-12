@@ -31,6 +31,7 @@ search_recipe $search_fixture tag-suggestion 1.0.0 {} {jsom}
 search_recipe $search_fixture split-tags 1.0.0 {} {relational storage}
 search_recipe $search_fixture one-tag 1.0.0 {} {{relational storage}}
 file mkdir [file join $search_fixture tclz 1.0.0]
+::telemetry::sync_registry_metadata $search_fixture
 rename ::recipe_search::index ::recipe_search::original_index
 rename ::recipe_search::descriptions ::recipe_search::original_descriptions
 set saved_entries $::recipe_search::entries
@@ -240,3 +241,5 @@ rename ::recipe_search::original_index ::recipe_search::index
 rename ::recipe_search::original_descriptions ::recipe_search::descriptions
 set ::recipe_search::entries $saved_entries
 set ::recipe_search::documents $saved_documents
+
+unset -nocomplain ::recipe_search::catalog_rows
