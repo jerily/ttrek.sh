@@ -183,25 +183,32 @@ and [security](security.md) for trust boundaries and current limitations.
 ## Content images
 
 The static packages accept a private S3 bucket and an image directory from the
-host. Use web-static-blog 0.1.2+ and web-static-wiki 0.1.3+ for separate build and
-runtime upload modes. Configure `devops/config.prod.ini` for the production build,
+host. Use web-static-blog 0.1.4+ and web-static-wiki 0.1.5+ for path-based image keys
+and optional CloudFront delivery. Configure `devops/config.prod.ini` for the production build,
 `etc/config.local.ini` for local development, or `etc/config.ini` for direct PROD:
 
 ```ini
 [content_images]
 bucket=jerily-ttrek-app
 region=eu-central-1
-directory=content/docs
+docs_directory=content/docs
+blog_directory=content/blog
 prefix=ttrek/content/images
+assets_prefix=cdn
 url_expiry_seconds=3600
+cloudfront_enabled=false
 ```
 
-`directory` is relative to the site root (or an absolute trusted directory for
-direct-server use). Production Lambda images must be bundled under `content/`.
+`docs_directory` and `blog_directory` are relative to the site root (or absolute
+trusted directories for direct-server use). Production Lambda images must be
+bundled under `content/`.
 With the configuration above, put images under `content/docs/images/` and use
 `![Architecture](images/architecture.svg)` in Markdown files directly under
 `content/docs/`. These paths work in local Markdown previews as well as on the
-website. The website's blog mount also uses this configured image directory.
+website. Blog images belong in `content/blog/images/`; blog Markdown also uses
+`images/...`, resolved against `blog_directory`, never against the docs directory.
+S3 keys are `<prefix>/docs/images/...` and `<prefix>/blog/images/...`, keeping the
+collections separate even when image filenames are identical.
 The docs mount uses `-exclude_from_navigation {images}` (web-static-wiki 0.1.2+)
 to keep the screenshot folders out of directory listings while retaining image
 discovery and rendering.
@@ -212,8 +219,8 @@ symlinks are rejected. The directory must exist.
 
 An empty bucket disables image hosting locally; production packaging and uploads
 require a bucket. Each worker shares one `awss3` client between the packages.
-Both modes query stored content when requested and sign URLs using the stored image
-keys. LOCAL uses SQLite and PROD uses PostgreSQL. It does not scan directories, render Markdown, or hash images at startup.
+Both modes query stored content when requested and generate URLs using the stored image
+paths. LOCAL uses SQLite and PROD uses PostgreSQL. It does not scan directories, render Markdown, or hash images at startup.
 `task_sync_website` performs those operations through each package's `sync` proc.
 The SDK requires `aws-sdk-tcl-s3` 1.0.17+; maintenance image hashes use `::twebserver::sha256`.
 
@@ -222,16 +229,29 @@ S3 mock, with dummy credentials. Direct LOCAL runs may set `endpoint` to a loopb
 HTTP mock explicitly. HTTP endpoints are rejected in PROD. No live AWS upload is
 performed by the tests or by the artifact-packaging smoke check.
 
-CodeBuild runs `devops/upload-content-images.tcl` after artifact validation and
-before `sam deploy`, reading the generated production image settings without
-decrypting application secrets. Both content collections are validated before
-uploading; S3 failures fail the build. The ZIP check verifies that the packaged
-image paths, bytes and settings match what the build will upload.
+The explicit `task_sync_website` task uploads images before committing database
+references. It compares SHA-256 hashes of local and existing S3 bytes, skipping
+unchanged images and replacing changed images at the same path. Hashing and S3
+reads/writes happen only during synchronization. The standalone
+`devops/upload-content-images.tcl` helper validates both collections before uploads.
+The ZIP check verifies that both collections' image paths, bytes and settings match.
 
-For deployment, match the CodeBuild and SAM `ContentImagesBucket` and
-`ContentImagesPrefix` parameters to the configuration. CodeBuild lists the image
-prefix and puts missing objects. The Lambda role can also list/put this prefix
-for the explicit sync task, and get images for signed downloads. Existing images and old content-hashed objects are
-never deleted; manage retention separately. If content or image files change, run `task_sync_website` against the deployed
-website revision. Existing database readers see the changes on their next query. Already-open pages may require a reload after
-the signed URLs expire.
+Match the CodeBuild, CloudFront and SAM `ContentImagesBucket` and
+`ContentImagesPrefix` parameters to the configuration. Sync needs List/Get/Put
+access under the image prefix. SQL rollback does not undo image replacements.
+Removed images are not automatically deleted. After deploying these changes,
+run `task_sync_website` to save the new path references and upload the images.
+There is no lookup or migration of hash-named objects.
+
+Set `[content_images] cloudfront_enabled=true` to serve production images, CSS,
+JavaScript and favicons through CloudFront (enabled in `devops/config.prod.ini`). SAM imports the CDN stack's `BaseUrl` export into
+`CONTENT_IMAGES_CLOUDFRONT_URL`; the host appends the full stored S3 key. With the
+flag disabled, image URLs are freshly signed S3 URLs and browser assets retain
+their current local URLs. LOCAL always uses the existing local asset delivery.
+`assets_prefix=cdn` keeps browser files separate from content images. For example,
+`/assets/versioned/css/site.<fingerprint>.css` becomes
+`https://<distribution>.cloudfront.net/cdn/assets/versioned/css/site.<fingerprint>.css`.
+The favicon formats use `cdn/favicon.ico` and `cdn/assets/favicon.svg`.
+The monitor's package-owned script uses `cdn/request-monitor/_assets/charts.js`;
+the host layout and response CSP handle the switch without modifying `treqmon`.
+See [deployment](deployment.md#content-image-cdn) for the stack and cache settings.

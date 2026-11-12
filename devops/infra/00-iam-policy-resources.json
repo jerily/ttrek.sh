@@ -210,6 +210,39 @@
           "aws:CalledVia": "cloudformation.amazonaws.com"
         }
       }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:CreateCachePolicy",
+        "cloudfront:UpdateCachePolicy",
+        "cloudfront:DeleteCachePolicy",
+        "cloudfront:CreateResponseHeadersPolicy",
+        "cloudfront:UpdateResponseHeadersPolicy",
+        "cloudfront:DeleteResponseHeadersPolicy"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "aws:CalledVia": "cloudformation.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy"
+      ],
+      "Resource": "arn:aws:s3:::jerily-ttrek-app",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "aws:CalledVia": "cloudformation.amazonaws.com"
+        }
+      }
     }
   ]
 }

@@ -9,19 +9,19 @@ set ::env(ENV) PROD
 
 test image-config-default {images are opt-in and the directory is relative to the application} -body {
     set settings [::app_config::content_images {} $root]
-    list [dict get $settings bucket] [dict get $settings directory] \
-        [::content_images::options $settings]
+    list [dict get $settings bucket] [dict get $settings docs_directory] \
+        [::content_images::options $settings wiki]
 } -result [list {} [file join $root content docs] {}]
 
 test image-config-invalid {reject bad storage configuration} -body {
     set errors {}
     foreach config {{bucket invalid/name region eu-central-1} {bucket valid-bucket} \
             {url_expiry_seconds 0} {url_expiry_seconds 604801} {prefix ../secret} \
-            {directory {}} {typo x} {endpoint http://127.0.0.1:9000}} {
+            {directory content/docs} {docs_directory {}} {blog_directory {}} {assets_prefix ../private} {cloudfront_enabled invalid} {typo x} {endpoint http://127.0.0.1:9000}} {
         lappend errors [catch {::app_config::content_images [dict create content_images $config] $root}]
     }
     set errors
-} -result {1 1 1 1 1 1 1 1}
+} -result {1 1 1 1 1 1 1 1 1 1 1 1}
 
 test image-config-endpoint {LOCAL accepts only loopback mock endpoints} -setup {
     set ::env(ENV) LOCAL
@@ -36,31 +36,65 @@ proc ::aws::s3::create {settings} {lappend ::createdClients $settings; return te
 set createdClients {}
 test image-config-pass {bucket, directory and signing settings reach both packages using one client} -body {
     set config [::app_config::content_images {content_images {bucket private-images region eu-central-1 \
-        directory content/images prefix private/images url_expiry_seconds 120}} $root]
-    set wiki [::content_images::options $config]
-    set blog [::content_images::options $config]
+        docs_directory content/images prefix private/images url_expiry_seconds 120}} $root]
+    set wiki [::content_images::options $config wiki]
+    set blog [::content_images::options $config blog]
     list [expr {$wiki eq $blog}] [llength $createdClients] [dict get $wiki -images-directory] \
-        [dict get $wiki -s3] $createdClients
-} -result [list 1 1 [file join $root content images] \
-    {client test_image_client bucket private-images prefix private/images url_expiry_seconds 120 http_endpoint {} upload_missing 0} \
-    {{region eu-central-1}}]
+        [dict get $wiki -s3] [dict get $blog -images-directory] [dict get $blog -s3 prefix] $createdClients
+} -result [list 0 1 [file join $root content images] \
+    {client test_image_client bucket private-images prefix private/images/docs url_expiry_seconds 120 http_endpoint {} upload_missing 0} \
+    [file join $root content blog] private/images/blog {{region eu-central-1}}]
 
 test image-config-upload-mode {production never uploads at startup; local and explicit build calls do} -body {
     set config [::app_config::content_images {content_images {bucket private-images region eu-central-1}} $root]
     set ::env(ENV) PROD
-    set prod [dict get [::content_images::options $config] -s3 upload_missing]
-    set build [dict get [::content_images::options $config 1] -s3 upload_missing]
+    set prod [dict get [::content_images::options $config wiki] -s3 upload_missing]
+    set build [dict get [::content_images::options $config wiki 1] -s3 upload_missing]
     set ::env(ENV) LOCAL
-    set local [dict get [::content_images::options $config] -s3 upload_missing]
-    set package [dict get [::content_images::options $config 0] -s3 upload_missing]
+    set local [dict get [::content_images::options $config wiki] -s3 upload_missing]
+    set package [dict get [::content_images::options $config wiki 0] -s3 upload_missing]
     list $prod $build $local $package
 } -cleanup {set ::env(ENV) PROD} -result {0 1 1 0}
 
 test image-config-production {production template supplies image settings without decrypting secrets} -body {
     set settings [::app_config::content_images_from_ini [file join $root devops config.prod.ini] $root]
     list [dict get $settings bucket] [dict get $settings region] [dict get $settings prefix] \
-        [dict get $settings directory]
+        [dict get $settings docs_directory]
 } -result [list jerily-ttrek-app eu-central-1 ttrek/content/images [file join $root content docs]]
+
+test image-cloudfront-mode {only enabled PROD uses the URL imported by SAM} -setup {
+    set savedCdn [array get ::env CONTENT_IMAGES_CLOUDFRONT_URL]
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example/
+} -body {
+    set config [::app_config::content_images {content_images {bucket private-images region eu-central-1 cloudfront_enabled true}} $root]
+    set prod [::content_images::options $config blog]
+    set ::env(ENV) LOCAL
+    set local [::content_images::options $config blog]
+    set ::env(ENV) PROD
+    set disabled [::content_images::options [dict replace $config cloudfront_enabled false] wiki]
+    list [dict get $prod -s3 cdn_url] [dict exists $local -s3 cdn_url] [dict exists $disabled -s3 cdn_url]
+} -cleanup {
+    unset ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    array set ::env $savedCdn
+    set ::env(ENV) PROD
+} -result {https://cdn.example 0 0}
+
+test image-cloudfront-invalid {enabled PROD requires a valid imported HTTPS origin} -setup {
+    set savedCdn [array get ::env CONTENT_IMAGES_CLOUDFRONT_URL]
+} -body {
+    set config [::app_config::content_images {content_images {bucket private-images region eu-central-1 cloudfront_enabled true}} $root]
+    set results {}
+    unset -nocomplain ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    lappend results [catch {::content_images::options $config wiki}]
+    foreach url {{} http://cdn.example https://cdn.example/path https://user@cdn.example https://cdn.example?query=1} {
+        set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) $url
+        lappend results [catch {::content_images::options $config wiki}]
+    }
+    set results
+} -cleanup {
+    unset -nocomplain ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    array set ::env $savedCdn
+} -result {1 1 1 1 1 1}
 
 unset ::env(ENV)
 array set ::env $savedEnv

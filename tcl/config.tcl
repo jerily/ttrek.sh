@@ -278,10 +278,10 @@ proc ::app_config::content_images_from_ini {path root} {
     return [content_images [dict create content_images [ini_section $path content_images]] $root]
 }
 
-# Private image storage shared by the documentation and blog snapshots.
+# Private storage with separate local image roots for documentation and blog.
 proc ::app_config::content_images {config root} {
-    set settings [dict create bucket {} region {} directory content/docs prefix ttrek/content/images \
-        url_expiry_seconds 3600 endpoint {}]
+    set settings [dict create bucket {} region {} docs_directory content/docs blog_directory content/blog prefix ttrek/content/images \
+        url_expiry_seconds 3600 endpoint {} cloudfront_enabled false assets_prefix cdn]
     if {[dict exists $config content_images]} {
         dict for {name value} [dict get $config content_images] {
             if {![dict exists $settings $name]} {error "unknown content_images setting: $name"}
@@ -302,14 +302,19 @@ proc ::app_config::content_images {config root} {
     if {![string is integer -strict $expiry] || $expiry < 1 || $expiry > 604800} {
         error "content_images.url_expiry_seconds must be between 1 and 604800"
     }
-    set prefix [string trim [dict get $settings prefix] /]
-    if {$prefix eq {} || ![regexp {^[a-zA-Z0-9_./-]+$} $prefix] ||
-            "." in [split $prefix /] || ".." in [split $prefix /]} {
-        error "content_images.prefix must be an S3 key prefix without dot segments"
+    foreach key {prefix assets_prefix} {
+        set prefix [string trim [dict get $settings $key] /]
+        if {$prefix eq {} || ![regexp {^[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$} $prefix]} {
+            error "content_images.$key must be an S3 key prefix without empty or dot segments"
+        }
+        dict set settings $key $prefix
     }
-    dict set settings prefix $prefix
-    if {[dict get $settings directory] eq {}} {error "content_images.directory must not be empty"}
-    # Leave symlinks visible for the packages' image-directory validation.
-    dict set settings directory [file join $root [dict get $settings directory]]
+    set enabled [dict get $settings cloudfront_enabled]
+    if {![string is boolean -strict $enabled]} {error "content_images.cloudfront_enabled must be a boolean"}
+    foreach key {docs_directory blog_directory} {
+        if {[dict get $settings $key] eq {}} {error "content_images.$key must not be empty"}
+        # Leave symlinks visible for the packages' image-directory validation.
+        dict set settings $key [file join $root [dict get $settings $key]]
+    }
     return $settings
 }

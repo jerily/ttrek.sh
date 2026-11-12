@@ -215,6 +215,81 @@ test assets-layouts {Site and package-rendered layouts resolve the manifest} -bo
     lsort -unique $results
 } -result 1
 
+test assets-cdn {PROD uses CloudFront for CSS, scripts and favicons on every host and package layout} -setup {
+    set savedCdn [array get ::env CONTENT_IMAGES_CLOUDFRONT_URL]
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
+    set imageSettings [::app_config::content_images {content_images {cloudfront_enabled true assets_prefix cdn}} $root]
+    set cdnRouter [::tpathexp::router]
+    set ::env(ENV) PROD
+    ::site::configure [dict replace $settings content_images $imageSettings]
+    ::site::mount $cdnRouter
+} -body {
+    set checks {}
+    foreach path {/ /packages /docs /docs/getting-started /blog /request-monitor} {
+        set response [::site::dispatch $cdnRouter [dict create method GET path $path]]
+        set html [dict get $response body]
+        lappend checks [expr {[dict get $response statusCode] == 200}] \
+            [string match {*href="https://cdn.example/cdn/favicon.ico"*} $html] \
+            [string match {*href="https://cdn.example/cdn/assets/favicon.svg"*} $html] \
+            [expr {[string first [::assets::url /css/site.css] $html] >= 0}]
+        foreach {tag url} [regexp -all -inline {<script[^>]* src="([^"]+)"} $html] {
+            lappend checks [string match https://cdn.example/cdn/* $url]
+        }
+        if {[string match /docs* $path] || $path in {/blog /request-monitor}} {
+            set policy [::responses::header $response Content-Security-Policy]
+            foreach directive {script-src style-src img-src} {
+                lappend checks [regexp [format {%s [^;]*https://cdn[.]example} $directive] $policy]
+            }
+            lappend checks [string match {*frame-ancestors 'none'*} $policy]
+        }
+        if {$path eq "/request-monitor"} {
+            lappend checks [string match {*src="https://cdn.example/cdn/request-monitor/_assets/charts.js"*} $html] \
+                [expr {[string first [::assets::url /js/chart.umd.js] $html] >= 0}]
+        }
+    }
+    lsort -unique $checks
+} -cleanup {
+    $cdnRouter destroy
+    unset ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    array set ::env $savedCdn
+    set ::env(ENV) LOCAL
+    ::site::configure $settings
+} -result 1
+
+test assets-cdn-disabled {disabled PROD and enabled LOCAL keep existing asset URLs and package CSP} -setup {
+    set savedCdn [array get ::env CONTENT_IMAGES_CLOUDFRONT_URL]
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
+} -body {
+    set checks {}
+    foreach {mode enabled} {PROD false LOCAL true} {
+        set ::env(ENV) $mode
+        set imageSettings [::app_config::content_images [dict create content_images \
+            [dict create cloudfront_enabled $enabled]] $root]
+        set localRouter [::tpathexp::router]
+        try {
+            ::site::configure [dict replace $settings content_images $imageSettings]
+            ::site::mount $localRouter
+            foreach path {/ /docs /blog /request-monitor} {
+                set response [::site::dispatch $localRouter [dict create method GET path $path]]
+                set html [dict get $response body]
+                lappend checks [expr {[string first https://cdn.example $html] < 0}] \
+                    [string match {*href="/favicon.ico"*} $html] \
+                    [string match {*href="/assets/favicon.svg"*} $html] \
+                    [expr {[string first https://cdn.example [::responses::header $response Content-Security-Policy]] < 0}]
+                if {$path eq "/request-monitor"} {
+                    lappend checks [string match {*src="/request-monitor/_assets/charts.js"*} $html]
+                }
+            }
+        } finally {$localRouter destroy}
+    }
+    lsort -unique $checks
+} -cleanup {
+    unset ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    array set ::env $savedCdn
+    set ::env(ENV) LOCAL
+    ::site::configure $settings
+} -result 1
+
 test assets-html {Host HTML revalidates and package no-store policies are preserved} -body {
     list [dict get [request /] headers Cache-Control] [dict get [request /docs] headers cache-control]
 } -result {no-cache no-store}
@@ -340,14 +415,20 @@ namespace eval ::site_image_test {}
 proc ::site_image_test::client {method bucket key args} {
     lappend ::site_image_test::calls [list $method $bucket $key {*}$args]
     if {$method eq "ls"} {return [dict keys $::site_image_test::objects $key]}
-    dict set ::site_image_test::objects $key 1
+    if {$method eq "get"} {
+        set channel [open [lindex $args 0] wb]
+        try {puts -nonewline $channel [dict get $::site_image_test::objects $key]} finally {close $channel}
+    } elseif {$method eq "put"} {
+        set channel [open [lindex $args 0] rb]
+        try {dict set ::site_image_test::objects $key [read $channel]} finally {close $channel}
+    } else {error "Unexpected image method: $method"}
 }
-test static-images-config {the default image directory serves both mounts and stays hidden in doc navigation} -setup {
+test static-images-config {separate image directories and keys serve both mounts and stay hidden in doc navigation} -setup {
     set savedImageEnv [array get ::env ENV]
     set ::env(ENV) LOCAL
     set imageRoot [makeDirectory static-image-site]
     foreach name {www public etc tcl} {file link -symbolic [file join $imageRoot $name] [file join $root $name]}
-    file mkdir [file join $imageRoot content docs images] [file join $imageRoot content blog]
+    file mkdir [file join $imageRoot content docs images] [file join $imageRoot content blog images]
     foreach name {docs/guide.md blog/2026-11-11-guide.md} {
         set channel [open [file join $imageRoot content $name] w]
         puts $channel "# Guide\n\n!\[Image\](images/pixel.png)"
@@ -355,6 +436,9 @@ test static-images-config {the default image directory serves both mounts and st
     }
     set channel [open [file join $imageRoot content docs images pixel.png] wb]
     puts -nonewline $channel [binary format H* 89504e470d0a00ff]
+    close $channel
+    set channel [open [file join $imageRoot content blog images pixel.png] wb]
+    puts -nonewline $channel blog-image
     close $channel
     set savedClients $::content_images::clients
     set ::content_images::clients [dict create {region eu-central-1} ::site_image_test::client]
@@ -375,10 +459,10 @@ test static-images-config {the default image directory serves both mounts and st
     }
     ::site::mount $imageRouter
     set result {}
-    foreach path {/docs/guide /blog/2026-11-11-guide} {
+    foreach {directory path} {docs /docs/guide blog /blog/2026-11-11-guide} {
         set response [$imageRouter dispatch [dict create method GET path $path]]
         lappend result [dict get $response statusCode] \
-            [string match {*<img src="https://configured-images.example/configured-prefix/*} [dict get $response body]]
+            [string match "*<img src=\"https://configured-images.example/configured-prefix/$directory/images/pixel.png?*" [dict get $response body]]
     }
     lappend result [dict size $::site_image_test::objects] \
         [llength [lsearch -all -index 0 $::site_image_test::calls put]] \
@@ -393,7 +477,7 @@ test static-images-config {the default image directory serves both mounts and st
     unset ::env(ENV)
     array set ::env $savedImageEnv
     removeDirectory static-image-site
-} -result {200 1 200 1 1 1 0}
+} -result {200 1 200 1 2 2 0}
 
 $::site::router destroy
 set failed $::tcltest::numTests(Failed)
