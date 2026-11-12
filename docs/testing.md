@@ -66,7 +66,7 @@ not connect to Valkey, AWS or the telemetry database. CI runs them before packag
 `npm test` checks deterministic asset fingerprints, byte preservation, manifest
 updates, combined bundle startup and retained older files after rebuilds. `tests/static-content.test` also
 checks manifest URLs in every shared layout, ETags, weak/list/wildcard conditions,
-empty GET/HEAD `304` responses, missing/corrupt assets, cache policies, gzip
+empty GET/HEAD `304` responses, missing assets, manifest-derived ETags, cache policies, gzip
 negotiation and canonical-host redirects.
 The local stack checks these policies through the packaged Lambda and mock S3,
 including changed objects and both API Gateway payload versions.

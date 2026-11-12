@@ -74,8 +74,9 @@ proc ::responses::prepare {request response} {
                     dict set response body [binary encode base64 -maxlen 0 $bytes]
                     dict set response isBase64Encoded true
                     set_header response Content-Encoding gzip
-                    if {[header $response ETag] ne {}} {
-                        set_header response ETag "\"sha256-[::assets::digest $bytes]\""
+                    set etag [header $response ETag]
+                    if {$etag ne {}} {
+                        set_header response ETag "[string range $etag 0 end-1]-gzip\""
                     }
                 }
             }
