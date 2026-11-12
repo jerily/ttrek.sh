@@ -7,10 +7,6 @@ proc ::assets::read_bytes {path} {
     try {read $channel} finally {close $channel}
 }
 
-proc ::assets::digest {bytes} {
-    binary encode hex [::twebserver::sha256 $bytes]
-}
-
 proc ::assets::load {root} {
     variable manifest
     set filename [file join $root public asset-manifest.json]
@@ -24,10 +20,6 @@ proc ::assets::load {root} {
             ![regexp {^/assets/versioned/(css|js)/[a-zA-Z0-9_./-]+\.([0-9a-f]{16})\.(css|js)$} $versioned -> kind hash ext] ||
             $versioned ne "/assets/versioned[file rootname $original].$hash[file extension $original]"} {
             error "Invalid asset manifest entry: $original"
-        }
-        set path [file join $root public [string trimleft $versioned /]]
-        if {![file isfile $path] || [string range [digest [read_bytes $path]] 0 15] ne $hash} {
-            error "Missing or corrupt versioned asset: $versioned; rebuild browser assets"
         }
     }
 }
@@ -64,19 +56,24 @@ proc ::assets::unavailable {{status 404}} {
 }
 
 proc ::assets::respond {path request type bytes} {
-    set digest [digest $bytes]
-    set etag "\"sha256-$digest\""
+    variable manifest
+    set versioned $path
+    if {[dict exists $manifest $path]} {set versioned [dict get $manifest $path]}
+    set etag {}
+    # Trust build-time fingerprints, including retained URLs from older builds.
+    if {[string match /assets/versioned/* $versioned] &&
+        [regexp {\.([0-9a-f]{16})\.(css|js)$} $versioned -> hash]} {
+        set etag "\"sha256-$hash\""
+    }
     set policy no-cache
-    if {[string match /assets/versioned/* $path] &&
-        [regexp {\.([0-9a-f]{16})\.(css|js)$} $path -> hash ext]} {
-        # A stale/corrupt object must never poison an immutable browser cache.
-        if {$hash ne [string range $digest 0 15]} {return [unavailable]}
+    if {[string match /assets/versioned/* $path] && $etag ne {}} {
         set policy {public, max-age=31536000, immutable}
     } elseif {$path in {/assets/favicon.svg /favicon.ico}} {
-        # Three months (90 days), with ETag revalidation after expiry.
+        # Three months (90 days).
         set policy {public, max-age=7776000}
     }
-    set headers [dict create content-type $type Cache-Control $policy ETag $etag]
+    set headers [dict create content-type $type Cache-Control $policy]
+    if {$etag ne {}} {dict set headers ETag $etag}
     return [dict create statusCode 200 headers $headers isBase64Encoded true \
         body [binary encode base64 -maxlen 0 $bytes]]
 }

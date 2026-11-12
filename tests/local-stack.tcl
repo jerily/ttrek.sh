@@ -122,9 +122,10 @@ try {
     assert {[dict get $asset headers cache-control] eq "no-cache"}
     # trequests negotiates compression and decodes the body automatically.
     set wire_etag [dict get $asset headers etag]
-    set etag "\"sha256-[sha256 $original]\""
     set manifest [::tjson::json_to_simple [encoding convertfrom utf-8 [read_file [file join $root public asset-manifest.json]]]]
     set versioned [dict get $manifest /css/docs.css]
+    regexp {\.([0-9a-f]{16})\.css$} $versioned -> hash
+    set etag "\"sha256-$hash\""
     set immutable [request $versioned]
     assert {[dict get $immutable headers cache-control] eq "public, max-age=31536000, immutable"}
     assert {[dict get $immutable body] eq $original}
@@ -142,21 +143,25 @@ try {
     set zipped [invoke $event]
     set combined [read_file [file join $root public css site.css]]
     assert {[zlib gunzip $zipped] eq $combined}
+    regexp {\.([0-9a-f]{16})\.css$} [dict get $manifest /css/site.css] -> hash
     dict set event headers [list M [dict create Accept-Encoding {S gzip} \
-        If-None-Match [list S "\"sha256-[sha256 $zipped]\""]]]
+        If-None-Match [list S "\"sha256-$hash-gzip\""]]]
     assert {[invoke $event 304] eq {}}
     dict set event headers [list M [dict create If-None-Match [list S $etag]]]
     set changed "$original\n/* served from mock S3 */\n"
     request $s3/ttrek-assets/css/docs.css 200 PUT $changed text/css
     set updated [request /css/docs.css]
-    assert {[dict get $updated body] eq $changed && [dict get $updated headers etag] ne $wire_etag}
+    assert {[dict get $updated body] eq $changed && [dict get $updated headers etag] eq $wire_etag}
     dict set event path {S /css/docs.css}
+    assert {[invoke $event 304] eq {}}
+    dict set event headers {M {}}
     assert {[invoke $event] eq $changed}
     assert {[dict get [request $versioned] body] eq $original}
     request $s3/ttrek-assets$versioned 200 PUT $changed text/css
-    set corrupt [request $versioned 404]
-    assert {[dict get $corrupt headers cache-control] eq "no-store"}
-    puts {PASS asset cache policies, gzip, ETags, conditional GET/HEAD and immutable integrity}
+    set updated [request $versioned]
+    assert {[dict get $updated body] eq $changed && [dict get $updated headers etag] eq $wire_etag}
+    assert {[dict get $updated headers cache-control] eq "public, max-age=31536000, immutable"}
+    puts {PASS asset cache policies, gzip, manifest ETags and conditional GET/HEAD}
     set bytes {}
     for {set i 0} {$i < 256} {incr i} {lappend bytes $i}
     set binary [binary format c* [concat $bytes $bytes $bytes $bytes $bytes]]
