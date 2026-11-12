@@ -75,25 +75,28 @@ Templates reference `asset_urls['/css/site.css']`. The homepage and package page
 load one stylesheet and one script; documentation/blog omit the unused script,
 and the monitor retains its dedicated chart scripts. The root layouts bind the
 manifest at startup, so inherited blocks work in host, wiki, blog and monitor
-renderers. The monitor also receives its versioned Chart.js URL. Startup and
-packaging fail if a referenced asset is missing or its fingerprint is incorrect.
+renderers. The monitor also receives its versioned Chart.js URL. Startup validates
+the manifest entries without reading or hashing the referenced asset files.
 Generated files are ignored by Git and included in the Lambda archive and S3 seed.
 
-The shared asset handler reads exact bytes and sends a quoted SHA-256 `ETag`.
+The shared asset handler serves exact bytes and uses the manifest's precomputed
+fingerprint for the `ETag`. Retained versioned URLs use their embedded fingerprint.
+Assets without a manifest entry or versioned fingerprint have no ETag.
 Fixed CSS/JS/SVG URLs use `Cache-Control: no-cache`: clients may store them but
-must revalidate before reuse, so edits are visible immediately. Matching
+must revalidate before reuse. Rebuild assets and restart workers to update
+manifest-derived validators after edits. Matching
 `If-None-Match` values (strong, weak, lists or `*`) produce an empty `304` with the
 same ETag and cache policy. GET and HEAD work in direct HTTP and Lambda, including
-the mock-S3 backend. Changed bytes produce a new ETag and a `200` response.
+the mock-S3 backend.
 
 The shared layout links to `/assets/favicon.svg` and a `/favicon.ico` fallback
 with 16, 32 and 48 pixel sizes. Both use `Cache-Control: public, max-age=7776000`
-(three months, defined as 90 days), with the same ETag and GET/HEAD support.
+(three months, defined as 90 days), with GET/HEAD support and no ETag.
 The authored SVG and ICO live under `public/` and are included in the Lambda
 archive and mock-S3 seed without an asset build.
 
-Verified fingerprint URLs use `Cache-Control: public, max-age=31536000, immutable`.
-An asset whose bytes do not match its filename is rejected with `404, no-store`.
+Fingerprint URLs use `Cache-Control: public, max-age=31536000, immutable`.
+The handler trusts build-time fingerprints without checking asset contents.
 Ordinary host HTML uses `no-cache`; package-owned HTML keeps its stricter
 `no-store` policy. Build output retains previous fingerprints. Deployment builds
 restore and preserve this history as described in [Deployment](deployment.md).
@@ -102,7 +105,8 @@ restore and preserve this history as described in [Deployment](deployment.md).
 JSON, text and SVG responses of at least 1 KiB when gzip is accepted and reduces
 the size. It honors encoding quality values, preserves `Vary` fields, and skips
 already encoded, partial and `no-transform` responses. Gzip and identity assets
-have distinct strong ETags based on their actual bytes. HEAD and conditional
+have distinct ETags: gzip adds a `-gzip` suffix to the existing validator without
+hashing the compressed bytes. HEAD and conditional
 requests select the representation before removing the body. The direct server's
 own compression is disabled to avoid compressing twice; Lambda returns the gzip
 bytes through its existing base64 response envelope.
