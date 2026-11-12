@@ -3,7 +3,7 @@ package require Tcl 9.1
 set packages $argv
 if {![llength $packages]} {
     set packages {
-        twebserver topenapi thread sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
+        twebserver topenapi sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
         awss3 awskms awsssm tconfig::decrypt tconfig::encrypt
         tratelimit treqmon
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3 tdbc::postgres

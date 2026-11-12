@@ -18,12 +18,7 @@ proc ::recipe_search::reset {} {
 }
 
 proc ::recipe_search::database {command args} {
-    set script [list ::telemetry::$command {*}$args]
-    set config [::site::config]
-    if {[dict exists $config telemetry_thread_id]} {
-        return [thread::send [dict get $config telemetry_thread_id] $script]
-    }
-    {*}$script
+    ::telemetry::$command {*}$args
 }
 
 proc ::recipe_search::refresh {} {

@@ -7,6 +7,13 @@ connection needs them: `tdbc::sqlite3` for `ENV=LOCAL`, `tdbc::postgres` for
 
 ## Storage
 
+Each direct-server worker and Lambda interpreter owns one connection shared by
+telemetry, search and content. Telemetry writes complete before the request
+returns; their database latency is part of response time. Direct-server event
+failures are logged without failing the HTTP request, preserving its previous
+best-effort policy. Lambda retains synchronous error propagation. No dedicated
+telemetry thread or cross-thread queue is used.
+
 - Direct LOCAL server: `data/telemetry.sqlite3` under the checkout.
 - Local Lambda: `telemetry.sqlite3` under `TTREK_LOCAL_RUNTIME_DATA`; the local
   launcher supplies its runtime data directory. Without that override the

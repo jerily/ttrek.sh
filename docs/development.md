@@ -166,11 +166,12 @@ The default bridge inherits the shared site master and loads the monitor's scope
 CSS and the package's `/request-monitor/_assets/charts.js`. Missing templates fail startup.
 Chart colors come from the site's `--treqmon-chart-color` and `--treqmon-chart-fill`.
 
-`[request_monitor] store` selects `memory` or `valkey`; the default is memory in
-LOCAL mode and Valkey in PROD mode. `history_max_events` bounds retained history.
+Request monitoring uses Valkey in both LOCAL and PROD modes. The optional
+`[request_monitor] store` setting accepts only `valkey`; `history_max_events` bounds retained history.
 Both direct HTTP and Lambda use the package's middleware and store implementations.
-The Valkey store receives `[redis]` connection, ACL and TLS settings. Memory uses
-treqmon's shared-variable store within a process; different processes have separate history.
+The Valkey store receives `[redis]` connection, ACL and TLS settings and shares
+history across workers and processes. A `[redis]` section is required; local
+launchers fail if it is missing and never manage the Valkey service.
 
 The shared footer links to the CLI source, public registry and request monitor.
 The host renders the footer year from the system clock on each request, including

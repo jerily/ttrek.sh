@@ -1,7 +1,6 @@
 package require Tcl 9.1
 package require twebserver
 package require tjson
-package require thread
 package require tratelimit 1.0.1
 package require treqmon 2.1.0
 package require web-static-wiki 0.1.4

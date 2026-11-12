@@ -3,12 +3,17 @@ set ::env(ENV) LOCAL
 package require tcltest 2
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tests fixtures deny-thread.tcl]
 source [file join $root tcl site.tcl]
 source [file join $root tcl config.tcl]
 source [file join $root tcl telemetry.tcl]
 ::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root registry]]
 set settings [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}] \
-    content_connection $::telemetry::connection content_images {} treqmon {store {tsvstore {history_max_events 100}}}]
+    content_connection $::telemetry::connection content_images {} treqmon {store {valkeystore {}}}]
+# Rendering tests stub only the store I/O; integration tests exercise real Valkey.
+proc ::treqmon::middleware::valkeystore::init {config} {}
+proc ::treqmon::middleware::valkeystore::get_history_events {} {return {}}
+proc ::treqmon::middleware::valkeystore::register_datapoint {datapoint} {}
 foreach {kind directory} {wiki docs blog blog} {
     ::web::static::${kind}::initdb $::telemetry::connection
     set store [dict get [::content_images::database_stores $::telemetry::connection {}] $kind]

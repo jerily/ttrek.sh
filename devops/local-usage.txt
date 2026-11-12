@@ -16,10 +16,14 @@ Run the package script before starting. These services execute trusted local
 code. In another terminal, run `ttrek run -script initdb-local`, then
 `ttrek run -script sync-local` to import the packaged content and registry.
 Pass `-- --lambda-port PORT` to these scripts when using a custom port. Runtime state
-and uploaded mock objects are disposable. Stop with Ctrl-C; the supervisor stops all three services.
+and uploaded mock objects are disposable. Stop with Ctrl-C; the supervisor stops
+all three mock services. Your configured Valkey service remains running.
 
 TTREK_SITE_PREFIX selects installed dependencies. TTREK_SITE_ZIP,
 TTREK_SITE_PORT, TTREK_LAMBDA_PORT and TTREK_LOCAL_DIR supply defaults.
 MOCK_LAMBDA_APP, MOCK_PROXY_APP and MOCK_S3_APP can select package directories.
 
-TTREK_LOCAL_CONFIG selects another local INI for public release settings.
+TTREK_LOCAL_CONFIG selects another local INI for releases and monitoring.
+start-local and start-lambda require a [redis] section for your running local
+Valkey service and fail before starting services if it is missing.
+Request monitoring always uses Valkey; remove old store=memory settings.

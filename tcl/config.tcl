@@ -13,7 +13,7 @@ proc ::app_config::load {root} {
         set path [file join $root etc config.local.ini]
         if {![file exists $path]} {error "ENV=LOCAL requires etc/config.local.ini"}
         set config [::tconfig::read_config $path]
-        dict set config redis host localhost
+        if {[dict exists $config redis]} {dict set config redis host localhost}
     } else {
         set encrypted [file join $root etc config.enc]
         set plain [file join $root etc config.ini]
@@ -44,6 +44,9 @@ proc ::app_config::load {root} {
 }
 
 proc ::app_config::valkey {config} {
+    if {![dict exists $config redis]} {
+        error {Application configuration requires a [redis] section}
+    }
     set settings [dict merge [dict create username appuser timeout 5000 ssl true \
         ssl_ca_file /etc/ssl/certs/ca-certificates.crt] [dict get $config redis]]
     if {[mode] eq "PROD"} {
@@ -132,18 +135,16 @@ proc ::app_config::request_monitor {config} {
 }
 
 proc ::app_config::monitor_store {config} {
-    set settings [dict merge [dict create history_max_events 100000 \
-        store [expr {[mode] eq "LOCAL" ? "memory" : "valkey"}]] [request_monitor $config]]
+    set settings [dict merge {history_max_events 100000 store valkey} [request_monitor $config]]
     set history [dict get $settings history_max_events]
     if {![string is integer -strict $history] || $history < 1} {
         error "request_monitor.history_max_events must be a positive integer"
     }
-    switch -- [dict get $settings store] {
-        memory {return [dict create tsvstore [dict create history_max_events $history]]}
-        valkey {return [dict create valkeystore [dict merge [valkey $config] \
-            [dict create history_max_events $history]]]}
-        default {error "request_monitor.store must be memory or valkey"}
+    if {[dict get $settings store] ne "valkey"} {
+        error "request_monitor.store must be valkey"
     }
+    return [dict create valkeystore [dict merge [valkey $config] \
+        [dict create history_max_events $history]]]
 }
 
 proc ::app_config::lambda_middleware {config} {

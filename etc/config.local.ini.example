@@ -1,10 +1,15 @@
-# Copy to etc/config.local.ini (gitignored). Local Lambda mocks use memory stores.
+# Copy to etc/config.local.ini (gitignored) and configure your running Valkey service.
+[redis]
+host=localhost
+port=6379
+ssl=false
+
 [ratelimit]
 window_millis=10000
 limit=1000
 
 [request_monitor]
-store=memory
+store=valkey
 master_template=request-monitor-master.html.jinja
 history_max_events=10000
 

@@ -42,6 +42,19 @@ proc compare_matches {query left right} {
 }
 try {
     foreach name {app.tcl run.sh tcl www public schemas bin content} {file copy [file join $root $name] $app}
+    set guard [read_file [file join $root tests fixtures deny-thread.tcl]]
+    foreach name {app.tcl tcl/init-thread.tcl} {
+        set path [file join $app $name]
+        write_file $path "$guard\n[read_file $path]"
+    }
+    set path [file join $app tcl init-thread.tcl]
+    set workerScript [read_file $path]
+    append workerScript {
+        if {$::telemetry::connection ne [dict get [::site::config] content_connection]} {
+            error "Worker telemetry and content must share one database connection"
+        }
+    }
+    write_file $path $workerScript
     write_file [file join $app app.tcl] [string map [list {$server_handle 4433} "\$server_handle $httpsPort" \
         {$server_handle 8080} "\$server_handle $httpPort"] [read_file [file join $app app.tcl]]]
     set registryDir {package registry}
@@ -163,6 +176,21 @@ try {
         request /telemetry/collect/tcl/9.1.0 $expected POST $payload $contentType
     }
     puts {PASS telemetry request schemas and HTTP 400 errors}
+    set identity [string repeat a 64]
+    request /telemetry/register/$identity 200 POST runtime-smoke text/plain
+    set packageName smoke-[pid]
+    set eventOptions [list -headers [list ttrek-environment-id $identity]]
+    for {set i 0} {$i < 6} {incr i} {
+        request /telemetry/collect/$packageName/1.0 200 POST $valid application/json $eventOptions
+    }
+    ::telemetry::connect $databaseSettings
+    try {
+        assert {[::telemetry::stats $packageName 1.0] eq {{{Linux x86_64} 6 6 0}}} \
+            {successful telemetry responses must have committed their events}
+    } finally {::telemetry::close}
+    request /telemetry/collect/$packageName/1.0 200 POST $valid application/json \
+        [list -headers [list ttrek-environment-id [string repeat b 64]]]
+    puts {PASS HTTP telemetry commits across workers and best-effort failure responses}
     if {$mode eq "LOCAL"} {
         set url https://localhost:$httpsPort/
         set response [request $url 200 GET {} {} [list -cafile [file join $app cert.pem]]]

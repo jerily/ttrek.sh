@@ -132,8 +132,8 @@ display-only fields such as URLs remain immediately visible without rebuilding.
 For atomic database maintenance, acquire `::telemetry::lock_search_snapshot` before
 editing inside `::telemetry::transaction`, then call
 `::telemetry::publish_search_snapshot` before committing. Requests never scan
-recipe files or load `etc/search-index.json`. The direct server uses the telemetry
-thread for database calls; Lambda uses its existing connection.
+recipe files or load `etc/search-index.json`. Each direct-server worker and Lambda
+interpreter uses its own database connection, shared with telemetry and content.
 
 All version descriptions and tags are indexed, with one result per package.
 Description hits display the matched text; name and tag hits use the first nonempty

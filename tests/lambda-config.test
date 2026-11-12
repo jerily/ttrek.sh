@@ -38,11 +38,23 @@ test lambda-config-postgres-2 {Production rejects plaintext PostgreSQL credentia
 test lambda-config-4 {Local mode ignores bundled production config and uses the selected local INI} -body {
     set ::env(ENV) LOCAL
     set ::env(TTREK_LOCAL_CONFIG) [file join $root etc config.local.ini]
-    ::tconfig::write_config {ratelimit {limit 2 window_millis 1000}} $::env(TTREK_LOCAL_CONFIG)
+    ::tconfig::write_config {ratelimit {limit 2 window_millis 1000} redis {port 6379 ssl false}} $::env(TTREK_LOCAL_CONFIG)
     set settings [::app_config::lambda_middleware [::app_config::lambda_config $root]]
     list [dict keys [dict get $settings tratelimit store]] [dict keys [dict get $settings treqmon store]] \
         [dict get $settings tratelimit global_limits by_ip limit]
-} -result {localstore tsvstore 2}
+} -result {localstore valkeystore 2}
+
+test lambda-config-missing-redis {Local launchers reject a missing redis section before starting services} -body {
+    set ::env(TTREK_LOCAL_CONFIG) [file join $root etc config.local.ini]
+    ::tconfig::write_config {} $::env(TTREK_LOCAL_CONFIG)
+    set result {}
+    foreach launcher {start-local.sh start-lambda.sh} {
+        set code [catch {exec [file join $sourceRoot bin $launcher] --state-dir [file join $root state]} message]
+        lappend result [list $code [expr {[string first {requires a [redis] section} $message] >= 0}] \
+            [file exists [file join $root state]]]
+    }
+    set result
+} -result {{1 1 0} {1 1 0}}
 
 test lambda-config-5 {Production requires authenticated TLS for both shared stores} -body {
     set ::env(ENV) PROD
@@ -73,10 +85,12 @@ test lambda-config-8 {Monitor layout comes from the selected INI with a shared-s
         [dict get [::app_config::request_monitor {}] master_template]
 } -result {custom-master.html.jinja request-monitor-master.html.jinja}
 
-test lambda-config-9 {Local memory monitoring needs no Valkey settings and honors history limits} -body {
+test lambda-config-9 {Local monitoring defaults to Valkey and honors history limits} -body {
     set ::env(ENV) LOCAL
-    ::app_config::monitor_store {request_monitor {store memory history_max_events 42}}
-} -result {tsvstore {history_max_events 42}}
+    set settings [dict get [::app_config::monitor_store {request_monitor {history_max_events 42} \
+        redis {port 6381 ssl false}}] valkeystore]
+    list [dict get $settings host] [dict get $settings port] [dict get $settings history_max_events]
+} -result {localhost 6381 42}
 
 test lambda-config-10 {An explicit local Valkey monitor receives INI connection details} -body {
     set ::env(ENV) LOCAL
@@ -90,10 +104,14 @@ test lambda-config-10 {An explicit local Valkey monitor receives INI connection 
 
 test lambda-config-11 {Invalid monitor store selection fails during configuration} -body {
     ::app_config::monitor_store {request_monitor {store unknown}}
-} -returnCodes error -result {request_monitor.store must be memory or valkey}
+} -returnCodes error -result {request_monitor.store must be valkey}
+
+test lambda-config-memory {The removed memory monitor is rejected explicitly} -body {
+    ::app_config::monitor_store {request_monitor {store memory}}
+} -returnCodes error -result {request_monitor.store must be valkey}
 
 test lambda-config-12 {Invalid monitor history limits fail during configuration} -body {
-    ::app_config::monitor_store {request_monitor {store memory history_max_events 0}}
+    ::app_config::monitor_store {request_monitor {history_max_events 0}}
 } -returnCodes error -result {request_monitor.history_max_events must be a positive integer}
 
 # Run the real Lambda initializer with disposable configuration. Only KMS
@@ -161,7 +179,7 @@ test lambda-releases-1 {Production startup loads releases and resolves the manif
 test lambda-releases-2 {Local mock release overrides remain independent of the production configuration} -body {
     set ::env(ENV) LOCAL
     set ::env(TTREK_LOCAL_CONFIG) [file join $root etc config.local.ini]
-    ::tconfig::write_config {} $::env(TTREK_LOCAL_CONFIG)
+    ::tconfig::write_config {redis {port 6379 ssl false}} $::env(TTREK_LOCAL_CONFIG)
     set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:9999
     set ::env(TTREK_LOCAL_RELEASES) [dict create prefix test/2.0.0 version 2.0.0 \
         checksums [dict create linux-amd64-glibc [string repeat b 64]]]
