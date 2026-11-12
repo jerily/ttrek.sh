@@ -43,7 +43,7 @@ proc recipe {directory name version metadata} {
 }
 proc metadata_rows {} {
     ::telemetry::rows [db_order_by [db_join [db_select packages -expr {
-        name, version, pkg_id, description, url
+        name, version, pkg_id, description, url, license
     }] package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}] -expr {name, version}]
 }
 
@@ -56,6 +56,7 @@ dict for {table definition} [::telemetry::table_definitions] {
     if {$table eq "packages"} {
         dict unset definition columns description
         dict unset definition columns url
+        dict unset definition columns license
         dict unset definition columns tags
         dict unset definition columns listed
     }
@@ -73,7 +74,7 @@ set legacy_id [dict get [lindex [::telemetry::rows [db_select packages]] 0] pkg_
 
 set description {Quotes ' " < & Unicode λ 日本語}
 set url {https://example.org/project?q='quoted'&lang=en}
-recipe $public demo 1.0.0 [dict create description [list S $description] url [list S $url]]
+recipe $public demo 1.0.0 [dict create description [list S $description] url [list S $url] license {S MIT}]
 recipe $public demo 2.0.0 {description {S {New version}} url {S https://example.org/v2}}
 recipe $private private-app 1.0.0 {description {S Private} url {S https://github.com/example/private}}
 
@@ -82,8 +83,9 @@ test metadata-migrate {Old databases gain metadata without losing IDs or telemet
     set row [lindex [metadata_rows] 0]
     list [expr {[dict get $row pkg_id] == $legacy_id}] \
         [expr {[dict get $row description] eq $description}] [expr {[dict get $row url] eq $url}] \
+        [dict get $row license] \
         [::telemetry::stats demo] [llength [metadata_rows]]
-} -result {1 1 1 {{{Linux x86_64} 1 1 0}} 3}
+} -result {1 1 1 MIT {{{Linux x86_64} 1 1 0}} 3}
 
 test metadata-idempotent {Repeated imports retain every version and identifier} -body {
     set before [metadata_rows]
@@ -92,11 +94,12 @@ test metadata-idempotent {Repeated imports retain every version and identifier} 
 } -result {3 1}
 
 test metadata-update {Recipe edits update existing rows, including explicit empty values} -body {
-    recipe $public demo 1.0.0 {description {S Edited} url {S {}}}
+    recipe $public demo 1.0.0 {description {S Edited} url {S {}} license {S {MIT OR Apache-2.0}}}
     ::telemetry::sync_registry_metadata $public
     set row [lindex [metadata_rows] 0]
-    list [dict get $row description] [dict get $row url] [expr {[dict get $row pkg_id] == $legacy_id}]
-} -result {Edited {} 1}
+    list [dict get $row description] [dict get $row url] [dict get $row license] \
+        [expr {[dict get $row pkg_id] == $legacy_id}]
+} -result {Edited {} {MIT OR Apache-2.0} 1}
 
 test metadata-optional {Missing fields preserve known metadata and default to empty on new rows} -body {
     recipe $public demo 1.0.0 {}
@@ -104,13 +107,20 @@ test metadata-optional {Missing fields preserve known metadata and default to em
     ::telemetry::sync_registry_metadata $public
     set rows [metadata_rows]
     list [dict get [lindex $rows 0] description] \
-        [dict get [lindex $rows 2] description] [dict get [lindex $rows 2] url]
-} -result {Edited {} {}}
+        [dict get [lindex $rows 2] description] [dict get [lindex $rows 2] url] \
+        [dict get [lindex $rows 0] license] [dict get [lindex $rows 2] license]
+} -result {Edited {} {} {MIT OR Apache-2.0} {}}
+
+test metadata-license-empty {An explicit empty license clears previously imported metadata} -body {
+    recipe $public demo 1.0.0 {license {S {}}}
+    ::telemetry::sync_registry_metadata $public
+    dict get [lindex [metadata_rows] 0] license
+} -result {}
 
 test metadata-validation {Bad metadata is rejected before any catalog changes are written} -body {
     set before [metadata_rows]
     set results {}
-    foreach field {description url} {
+    foreach field {description url license} {
         foreach value {42 null {{}} {[]}} {
             set path [recipe $private z-invalid 1.0.0 {}]
             set channel [open $path w]
