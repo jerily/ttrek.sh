@@ -138,7 +138,7 @@ test releases-5 {Metadata contains the configured version, target, checksum and 
     set saved_release_env [array get ::env ENV]
     set ::env(ENV) PROD
     set test_releases [::app_config::releases [dict create releases [dict create \
-        bucket public-releases region us-east-1 version 1.1.0 prefix ttrek/1.1.0 \
+        bucket public-releases region us-east-1 version 1.2.0 prefix ttrek/1.2.0 \
         checksums_file [file join $root tests fixtures release-checksums.json]]]]
     set s3_url "https://public-releases.s3.amazonaws.com/ttrek?X-Amz-Signature=[string repeat a 64]"
 } -body {
@@ -151,7 +151,7 @@ test releases-5 {Metadata contains the configured version, target, checksum and 
 } -cleanup {
     unset -nocomplain ::env(ENV)
     array set ::env $saved_release_env
-} -result {200 1.1.0 macos-arm64 1 1 no-store ttrek/1.1.0/macos-arm64/ttrek}
+} -result {200 1.2.0 macos-arm64 1 1 no-store ttrek/1.2.0/macos-arm64/ttrek}
 
 test releases-6 {Metadata requires a published checksum and supported target} -body {
     list [dict get [get_release_handler {} {pathParameters {target linux-amd64-glibc}}] status] \
@@ -213,7 +213,7 @@ test releases-7 {The real SDK generates a signed URL without an AWS request} -se
     set ::releases::client [::aws::s3::create {region eu-west-1 aws_access_key_id test aws_secret_access_key test}]
 } -body {
     set url [::releases::signed_url linux-amd64-glibc]
-    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.0.0/linux-amd64-glibc/ttrek?*} $url] \
+    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.2.0/linux-amd64-glibc/ttrek?*} $url] \
         [regexp {[?&]X-Amz-Expires=300(&|$)} $url] \
         [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
 } -cleanup {
