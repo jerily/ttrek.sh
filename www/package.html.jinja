@@ -12,6 +12,7 @@
                 {% for tag in tags %}<li><a href="/search?q={{ tag|urlencode }}">{{ tag }}</a></li>{% endfor %}
             </ul>{% endif %}
             {% if project_url %}<p>Project: <a href="{{ project_url }}">{{ project_url }}</a></p>{% endif %}
+            {% if license %}<p>License: {{ license }}</p>{% endif %}
             <p class="content-subhead">Install:</p>
             {{ bashline("ttrek install " ~ package_name) }}
             <p class="content-subhead">Versions:</p>

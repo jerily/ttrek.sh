@@ -6,14 +6,14 @@ The public package catalog lives in the `registry` Git submodule. See
 [setup](install.md#get-the-source) to clone the website with its registry.
 Commands below run from the website checkout.
 
-Recipes carry a top-level `description`, optional `tags`, and project `url`. The package overview
-shows the latest version's description and HTTP(S) project link.
+Recipes carry a top-level `description`, optional `tags`, project `url`, and SPDX `license` string.
+The package overview shows the latest version's description, HTTP(S) project link, and license when present.
 
 The explicit `task_sync_website` invocation (`sync-local` for the local Lambda) imports the configured/bundled registry
-into the telemetry `packages` table, storing `description`, `url`, and JSON `tags` per version. Package names are stored in `package_names`.
+into the telemetry `packages` table, storing `description`, `url`, `license`, and JSON `tags` per version. Package names are stored in `package_names`.
 Schema upgrades belong to `task_initdb_website`, independently of synchronization. Repeated imports
 update changed metadata without replacing package IDs or installation history;
-unchanged rows are not rewritten. Missing descriptions/URLs preserve existing values and
+unchanged rows are not rewritten. Missing descriptions/URLs/licenses preserve existing values and
 default to empty strings for new packages. Missing tags become an empty array.
 The `listed` flag separates current recipes from telemetry-only names and withdrawn
 versions without deleting installation history. Old telemetry backups remain restorable;

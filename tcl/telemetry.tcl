@@ -116,6 +116,7 @@ proc ::telemetry::table_definitions {} {
         pkg_id $id pkg_name_id $required version {type text not_null 1} \
         description [dict create type text not_null 1 default [db_value {} -type text]] \
         url [dict create type text not_null 1 default [db_value {} -type text]] \
+        license [dict create type text not_null 1 default [db_value {} -type text]] \
         tags [dict create type text not_null 1 default [db_value {[]} -type text]] \
         listed [dict create type integer not_null 1 default [db_value 0 -type integer]]] \
         -unique {{pkg_name_id version}} \
@@ -169,6 +170,7 @@ proc ::telemetry::initdb {} {
         foreach {column definition} {
             description {TEXT NOT NULL DEFAULT ''}
             url {TEXT NOT NULL DEFAULT ''}
+            license {TEXT NOT NULL DEFAULT ''}
             tags {TEXT NOT NULL DEFAULT '[]'}
             listed {INTEGER NOT NULL DEFAULT 0}
         } {
@@ -232,7 +234,7 @@ proc ::telemetry::sync_registry_metadata {args} {
                 set tags [::registry_metadata::tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $path]
             }
             set metadata [dict create tags [::tjson::typed_to_json [list L [lmap tag $tags {list S $tag}]]]]
-            foreach field {description url} {
+            foreach field {description url license} {
                 if {![::tjson::has_object_item $spec $field]} continue
                 set item [::tjson::get_object_item $spec $field]
                 if {![::tjson::is_string $item]} {error "$field must be a string in $path"}
@@ -249,7 +251,7 @@ proc ::telemetry::sync_registry_metadata {args} {
         # Avoid rewriting unchanged catalog rows during repeated syncs.
         lock_search_snapshot
         set existing {}
-        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, tags, listed}] \
+        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, license, tags, listed}] \
             package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
         foreach row [rows $query] {
             dict set existing [list [dict get $row name] [dict get $row version]] $row
@@ -294,7 +296,7 @@ proc ::telemetry::sync_registry_metadata {args} {
 proc ::telemetry::registry_catalog {args} {
     package require tjson
     if {[llength $args] > 1} {error "Expected an optional list of package names"}
-    set query [db_join [db_select packages -expr {name, version, description, url, tags}] \
+    set query [db_join [db_select packages -expr {name, version, description, url, license, tags}] \
         package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
     set predicate [db_eq [db_col listed] [db_value 1 -type integer]]
     if {[llength $args]} {
