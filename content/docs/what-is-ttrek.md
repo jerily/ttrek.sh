@@ -22,7 +22,7 @@ This installs Tcl, which runs Tcl programs, and `tjson`, which helps those
 programs read and write JSON data.
 
 Each project keeps its packages in its own
-[ttrek-venv directory](/docs/ttrek-venv). That lets two projects use different
+[ttrek-venv directory](/docs/understanding-ttrek-venv). That lets two projects use different
 versions without replacing each other's packages.
 
 Follow [Getting started](/docs/getting-started) to install ttrek and create
