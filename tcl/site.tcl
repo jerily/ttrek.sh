@@ -3,8 +3,8 @@ package require twebserver
 package require tjson
 package require tratelimit 1.0.1
 package require treqmon 2.1.0
-package require web-static-wiki 0.1.5
-package require web-static-blog 0.1.4
+package require web-static-wiki 0.1.6
+package require web-static-blog 0.1.5
 package require tpathexp 1.1.0
 
 namespace eval ::site {

@@ -60,6 +60,51 @@ test patch-sync {sync updates rows through package APIs and preserves the websit
     }
 } -result {{wiki blog registry} {Getting started} 1 1}
 
+test patch-sync-content {sync publishes body edits and removes deleted docs and posts} -setup {
+    set contentRoot [makeDirectory patch-content]
+    file mkdir [file join $contentRoot content docs] [file join $contentRoot content blog]
+    foreach {name markdown} {
+        docs/guide.md {# Display guide}
+        docs/removed.md {# Removed guide}
+        blog/2026-11-13-post.md {# Display post
+
+[Guide](/docs/broken)}
+        blog/2026-11-13-removed.md {# Removed post}
+    } {
+        set channel [open [file join $contentRoot content $name] w]
+        try {puts $channel $markdown} finally {close $channel}
+    }
+    rename ::site::config ::site::original_config
+    proc ::site::config {} {
+        dict replace [original_config] rootdir $::contentRoot
+    }
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_website"}} {}
+} -body {
+    set stores [::content_images::database_stores $::telemetry::connection {}]
+    set wiki [dict get $stores wiki]
+    set blog [dict get $stores blog]
+    set before [::web::static::blog::render_markdown $blog [::web::static::blog::load $blog /2026-11-13-post]]
+    set channel [open [file join $contentRoot content blog 2026-11-13-post.md] w]
+    try {puts $channel {# Display post
+
+[Guide](/docs/guide)}} finally {close $channel}
+    file delete [file join $contentRoot content docs removed.md] \
+        [file join $contentRoot content blog 2026-11-13-removed.md]
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_website"}} {}
+    set after [::web::static::blog::render_markdown $blog [::web::static::blog::load $blog /2026-11-13-post]]
+    list [string match {*href="/docs/broken"*} $before] \
+        [string match {*href="/docs/guide"*} $after] \
+        [string match {*href="/docs/broken"*} $after] \
+        [catch {::web::static::wiki::load $wiki /removed}] \
+        [catch {::web::static::blog::load $blog /2026-11-13-removed}] \
+        [dict get [::web::static::wiki::load $wiki /guide] title] \
+        [llength [::web::static::blog::posts $blog]]
+} -cleanup {
+    rename ::site::config {}
+    rename ::site::original_config ::site::config
+    removeDirectory patch-content
+} -result {1 1 0 1 1 {Display guide} 1}
+
 test patch-initdb-preserves-content {repeated initialization preserves populated content, registry IDs and telemetry} -setup {
     ::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}
     ::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_website"}} {}
