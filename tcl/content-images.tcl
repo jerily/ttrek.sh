@@ -42,8 +42,8 @@ proc ::content_images::options {settings kind {uploadMissing {}}} {
 
 # Build and runtime use the same directories, image options and navigation rules.
 proc ::content_images::snapshots {root settings {uploadMissing {}}} {
-    package require web-static-wiki 0.1.5
-    package require web-static-blog 0.1.4
+    package require web-static-wiki 0.1.6
+    package require web-static-blog 0.1.5
     set stores {}
     foreach {kind title directory} {wiki Documentation docs blog Blog blog} {
         set imageOptions [options $settings $kind $uploadMissing]
@@ -59,8 +59,8 @@ proc ::content_images::snapshots {root settings {uploadMissing {}}} {
 # Lightweight database handles: no source reads, image hashing, schema changes,
 # or content queries until a route requests an item or listing.
 proc ::content_images::database_stores {connection settings} {
-    package require web-static-wiki 0.1.5
-    package require web-static-blog 0.1.4
+    package require web-static-wiki 0.1.6
+    package require web-static-blog 0.1.5
     set stores {}
     foreach {kind title} {wiki Documentation blog Blog} {
         set imageOptions [options $settings $kind 0]

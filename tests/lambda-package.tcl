@@ -4,7 +4,7 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 if {[llength $argv] != 1} {error "Usage: lambda-package.tcl ARCHIVE"}
 set archive [file normalize [lindex $argv 0]]
 set ::env(ENV) PROD
-package require web-static-wiki 0.1.5
+package require web-static-wiki 0.1.6
 
 proc read_bytes {path} {
     set channel [open $path rb]

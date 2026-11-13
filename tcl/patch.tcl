@@ -13,8 +13,8 @@ proc ::site_patch::run {task context} {
 proc ::site_patch::task_initdb_website {context} {
     set initialized {}
     ::tpersist::db_transaction $::telemetry::connection {
-        package require web-static-wiki 0.1.5
-        package require web-static-blog 0.1.4
+        package require web-static-wiki 0.1.6
+        package require web-static-blog 0.1.5
         ::telemetry::initdb
         lappend initialized ::telemetry::initdb
         set dialect [::tpersist::db_dialect $::telemetry::connection]
