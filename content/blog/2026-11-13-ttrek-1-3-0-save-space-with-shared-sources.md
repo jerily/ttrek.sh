@@ -17,7 +17,7 @@ recipe unpacked its own full copy. The updated recipes let those services
 reuse one shared SDK copy within your project.
 
 Each service still has its own build folder and logs. The shared files stay
-inside your project's [ttrek-venv directory](/docs/ttrek-venv), under
+inside your project's [ttrek-venv directory](/docs/understanding-ttrek-venv), under
 `build/shared-source`, and are marked read-only to prevent accidental changes.
 ttrek checks the archive's fingerprint before choosing a cached copy, and
 only reuses an extraction that finished successfully.
