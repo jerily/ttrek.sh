@@ -165,7 +165,7 @@ test releases-config-4 {Mock S3 endpoint is restricted to loopback in LOCAL mode
 set checksums_fixture [file join [file dirname [info script]] fixtures release-checksums.json]
 test releases-config-5 {Checksums are selected by environment and version without falling back} -body {
     set result {}
-    foreach {mode version} {LOCAL 1.0.0 PROD 1.0.0 PROD 1.2.0 PROD 9.0.0 LOCAL 1.2.0} {
+    foreach {mode version} {LOCAL 1.0.0 PROD 1.0.0 PROD 1.3.0 PROD 9.0.0 LOCAL 1.3.0} {
         set ::env(ENV) $mode
         set settings [::app_config::releases [dict create releases [dict create checksums_file $checksums_fixture version $version]]]
         lappend result [dict get $settings checksums]
@@ -226,7 +226,7 @@ test releases-config-9 {Unrelated local configuration keeps default release sett
     puts $channel "\[registry\]\ndirectory=registry"
     close $channel
     dict get [::app_config::releases_from_ini $path $root] version
-} -result 1.2.0
+} -result 1.3.0
 
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env
