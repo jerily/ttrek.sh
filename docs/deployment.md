@@ -723,6 +723,10 @@ continue using the package tables during this preparation. If deploying in place
 search returns 503 until these tasks complete; package listings and overviews still
 read the package tables. Repeated initialization preserves an existing snapshot.
 
+Deploy changed or deleted Markdown files before running `task_sync_website`.
+Sync replaces the stored content from that deployment, including body-only edits,
+and removes pages/posts absent from it. It does not fetch the latest GitHub files.
+
 Tasks run the code and content currently deployed in the website Lambda. Both LOCAL and PROD startup do no schema or
 content synchronization; pages/posts query their rows on demand. Existing content
 stays under `ttrek.sh/content`, and there is no separate patch Lambda project.
@@ -731,5 +735,6 @@ payloads against its local Lambda endpoint. With `start-local` running, invoke
 `ttrek run -script initdb-local` and `ttrek run -script sync-local` from another
 terminal. The local stack is disposable, so repeat these after restarting it.
 
-The pinned registry supplies `web-static-wiki` 0.1.4 and `web-static-blog` 0.1.3,
-which provide the explicit initialization and synchronization procedures.
+The website requires `web-static-wiki` 0.1.6 and `web-static-blog` 0.1.5.
+Both use filename-based URLs. Existing content filenames match their prior URLs
+so this upgrade preserves incoming links.

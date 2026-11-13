@@ -7,6 +7,8 @@ Complete [setup](install.md) first. Run these commands from the website checkout
 ## Edit website content
 
 Documentation lives in `content/docs/`; dated blog posts live in `content/blog/`.
+URLs follow the filenames without `.md`; headings only control display titles.
+Keep existing filenames when editing content to preserve links.
 The public packages `web-static-wiki` and `web-static-blog` serve database content
 without browser write routes. Blog filenames use `YYYY-MM-DD-title.md`.
 
@@ -15,6 +17,10 @@ Edit Markdown, repackage, and restart the local services. Run `initdb-local`, th
 Neither startup nor HTTP requests import Markdown, upload content images, create
 schemas, or build search indexes. Each worker owns its router and loads search
 indexes lazily from the published database snapshot.
+
+Sync imports body edits and removes pages/posts whose files were deleted from
+the packaged content. Running sync on an older package republishes its older
+files; it does not read changes from your checkout.
 
 The footer's **Request Monitor** link opens `/request-monitor`. Its shared site
 layout is selected by `[request_monitor] master_template` in the INI configuration,
