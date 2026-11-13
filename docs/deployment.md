@@ -330,8 +330,8 @@ and SAM with pip, then checks the CMake and compiler versions. These tools are
 needed to build the site's dependencies even though ttrek itself is downloaded.
 The build:
 
-1. Downloads the ttrek 1.2.0 Linux AMD64 glibc binary from
-   `s3://jerily-ttrek-app/ttrek/1.2.0/linux-amd64-glibc/ttrek`, makes it executable,
+1. Downloads the ttrek 1.3.0 Linux AMD64 glibc binary from
+   `s3://jerily-ttrek-app/ttrek/1.3.0/linux-amd64-glibc/ttrek`, makes it executable,
    and checks that it starts with `ttrek self-update -version`.
 2. Uses that binary to install from the private registry (build tools) and the
    pinned public `registry` submodule (runtime recipes).

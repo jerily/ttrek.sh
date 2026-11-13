@@ -169,12 +169,12 @@ test lambda-releases-1 {Production startup loads releases and resolves the manif
     list [dict get $releases bucket] [dict get $releases version] \
         [expr {[dict get $releases checksums_file] eq [file join $root etc releases.json]}] \
         [expr {[dict get $releases checksums $artifact] eq [string repeat c 64]}] \
-        [string match {https://jerily-ttrek-app.s3.eu-central-1.amazonaws.com/ttrek/1.2.0/macos-arm64/ttrek?*} $url] \
+        [string match {https://jerily-ttrek-app.s3.eu-central-1.amazonaws.com/ttrek/1.3.0/macos-arm64/ttrek?*} $url] \
         [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
 } -cleanup {
     ::aws::s3::destroy $::releases::client
     set ::releases::client {}
-} -result {jerily-ttrek-app 1.2.0 1 1 1 1}
+} -result {jerily-ttrek-app 1.3.0 1 1 1 1}
 
 test lambda-releases-2 {Local mock release overrides remain independent of the production configuration} -body {
     set ::env(ENV) LOCAL
