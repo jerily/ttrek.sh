@@ -8,12 +8,14 @@ source [file join $root tcl content-images.tcl]
 source [file join $root tcl telemetry.tcl]
 source [file join $root tcl patch.tcl]
 source [file join $root tcl lambda.tcl]
+set patchRoot [makeDirectory patch-site]
+file copy [file join $root content] [file join $patchRoot content]
+file copy [file join $root tests fixtures registry] [file join $patchRoot registry]
 set saved [array get ::env]
 set ::env(ENV) LOCAL
 namespace eval ::site {}
 proc ::site::config {} {
-    global root
-    dict create rootdir $root registry_dir [file join $root registry] content_images {}
+    dict create rootdir $::patchRoot content_images {}
 }
 set schema {}
 if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
@@ -62,6 +64,7 @@ test patch-sync {sync updates rows through package APIs and preserves the websit
 
 test patch-sync-content {sync publishes body edits and removes deleted docs and posts} -setup {
     set contentRoot [makeDirectory patch-content]
+    file copy [file join $root tests fixtures registry] [file join $contentRoot registry]
     file mkdir [file join $contentRoot content docs] [file join $contentRoot content blog]
     foreach {name markdown} {
         docs/guide.md {# Display guide}
@@ -173,6 +176,40 @@ test patch-initdb-migrates-listing {The pre-tags schema keeps its rows but needs
         [expr {[::telemetry::registry_catalog] eq $published}] [::telemetry::stats initdb-test]
 } -result {{} 1 1 {{{Linux x86_64} 1 1 0}}}
 
+test patch-sync-missing-registry {A missing bundled registry cannot clear the published catalog} -setup {
+    file rename [file join $patchRoot registry] [file join $patchRoot hidden-registry]
+} -body {
+    set before [::telemetry::registry_catalog]
+    set code [catch {::site_patch::task_sync_website {}} message]
+    list $code [string match {The deployed package has no registry snapshot*} $message] \
+        [expr {$before eq [::telemetry::registry_catalog]}]
+} -cleanup {
+    file rename [file join $patchRoot hidden-registry] [file join $patchRoot registry]
+} -result {1 1 1}
+
+test patch-sync-invalid-registry {A bad recipe rolls back content, recipes and search together} -setup {
+    set invalid [file join $patchRoot registry broken 1.0.0]
+    file mkdir $invalid
+    set channel [open [file join $invalid ttrek.json] w]
+    puts $channel {{"scripts":{"broken":{"file":"missing.sh"}}}}
+    close $channel
+} -body {
+    set tables {packages registry_search_snapshot web_static_wiki_items web_static_blog_items}
+    set before {}
+    foreach table $tables {
+        dict set before $table [lsort [::tpersist::_raw $::telemetry::connection "SELECT * FROM $table"]]
+    }
+    set code [catch {::site_patch::task_sync_website {}} message]
+    foreach table $tables {
+        if {[dict get $before $table] ne [lsort [::tpersist::_raw $::telemetry::connection "SELECT * FROM $table"]]} {
+            error "Failed sync changed $table"
+        }
+    }
+    list $code [string match {Recipe script must be a regular file*} $message]
+} -cleanup {
+    file delete -force [file join $patchRoot registry broken]
+} -result {1 1}
+
 test patch-provider-failure {broken installed schema providers fail the task} -setup {
     package ifneeded web-wiki 99.0 {namespace eval ::web::wiki {}; proc ::web::wiki::initdb {db} {error {schema failure}}; package provide web-wiki 99.0}
 } -body {
@@ -200,6 +237,7 @@ if {$schema ne {}} {::tpersist::_raw $::telemetry::connection "DROP SCHEMA $sche
 ::telemetry::close
 array unset ::env
 array set ::env $saved
+removeDirectory patch-site
 set failed $::tcltest::numTests(Failed)
 cleanupTests
 exit [expr {$failed > 0}]

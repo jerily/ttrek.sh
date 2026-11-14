@@ -1,0 +1,42 @@
+{
+	"name": "tink-cc",
+	"license": "Apache-2.0",
+	"description": "C++ cryptographic library for encryption, signatures, and key management.",
+	"tags": ["cpp", "cryptography", "encryption", "signatures", "security"],
+	"url": "https://github.com/tink-crypto/tink-cc",
+	"version": "2.1.1",
+	"scripts": {
+	},
+	"dependencies":	{
+		"openssl": "^3.0.13",
+		"abseil-cpp": "=20230802.1.0",
+		"protobuf":	"=21.9.0"
+	},
+	"devDependencies": {
+	},
+	"build": {
+		"default": [
+			{ "cmd": "download", "url": "https://github.com/tink-crypto/tink-cc/archive/refs/tags/v2.1.1.tar.gz" },
+			{ "cmd": "unpack" },
+			{ "cmd": "patch", "p_num": "1", "filename": "fix-configure.diff" },
+			{ "cmd": "cd" },
+			{
+				"cmd": "cmake_config",
+				"options": [
+					{ "name": "TINK_BUILD_SHARED_LIB", "value": "ON" },
+					{ "name": "TINK_USE_INSTALLED_ABSEIL", "value": "ON" },
+					{ "name": "TINK_USE_SYSTEM_OPENSSL", "value": "ON" },
+					{ "name": "TINK_USE_INSTALLED_PROTOBUF", "value": "ON" },
+					{ "name": "TINK_USE_INSTALLED_RAPIDJSON", "value": "OFF" },
+					{ "name": "TINK_RAPIDJSON_PATCH", "value": "$PATCH_DIR/patch-$PACKAGE-$VERSION-rapidjson-1.1.0.diff" },
+					{ "name": "CMAKE_POLICY_VERSION_MINIMUM", "value": "3.5" },
+					{ "name": "TINK_BUILD_TESTS", "value": "OFF" },
+					{ "name": "CMAKE_SKIP_RPATH", "value": "ON" },
+					{ "name": "CMAKE_BUILD_TYPE", "value": "Release" }
+				]
+			},
+			{ "cmd": "make", "parallel": true },
+			{ "cmd": "make_install" }
+		]
+	}
+}

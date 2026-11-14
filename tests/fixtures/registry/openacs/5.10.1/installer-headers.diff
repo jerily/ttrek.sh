@@ -1,0 +1,17 @@
+--- a/packages/acs-bootstrap-installer/installer.tcl
++++ b/packages/acs-bootstrap-installer/installer.tcl
+@@ -153,11 +153,10 @@
+         set page_title $page_title_prefix
+     }
+ 
+-    return "HTTP/1.0 $status OK
+-MIME-Version: 1.0
+-Content-Type: text/html
++    # Let NaviServer frame streamed responses and manage keep-alive.
++    ns_headers $status text/html
+ 
+-<html>
++    return "<html>
+   <head>
+     <title>$page_title</title>
+   </head>

@@ -17,7 +17,7 @@ proc ::site_lambda::initialize {root} {
     if {[info exists ::env(TTREK_LOCAL_RUNTIME_DATA)]} {
         set dataDirectory $::env(TTREK_LOCAL_RUNTIME_DATA)
     }
-    set settings [dict merge [dict create rootdir $root registry_dir [file join $root registry] \
+    set settings [dict merge [dict create rootdir $root \
         releases [::app_config::releases $config $root] \
         content_images [::app_config::content_images $config $root] \
         request_monitor [::app_config::request_monitor $config]] [::app_config::lambda_middleware $config]]

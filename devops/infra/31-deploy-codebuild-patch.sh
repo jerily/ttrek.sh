@@ -9,7 +9,7 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
     "WebsiteFunctionName=${TTREK_WEBSITE_FUNCTION_NAME:-prod-Api-TtrekWebsite-Function}" \
-    "TaskName=${TTREK_PATCH_TASK:-task_sync_website}" \
+    "TaskName=${TTREK_PATCH_TASK:-task_initdb_website}" \
   --profile "${AWS_PROFILE:-ttrek-prod-neo}" \
   --region "${AWS_REGION:-${AWS_DEFAULT_REGION:-eu-central-1}}" \
   --no-fail-on-empty-changeset

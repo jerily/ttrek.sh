@@ -1,0 +1,41 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root devops stage-registry.tcl]
+set work [makeDirectory registry-stage]
+set revision [string repeat a 40]
+set commands {}
+set fail false
+rename ::registry_build::git ::registry_build::real_git
+proc ::registry_build::git {args} {
+    lappend ::commands $args
+    if {[lindex $args 0] eq "clone"} {
+        set destination [lindex $args end]
+        file copy [file join $::root tests fixtures registry] $destination
+        file mkdir [file join $destination .git]
+        if {$::fail} {error "GitHub unavailable"}
+    } else {return $::revision}
+}
+test stage-fresh {Packaging checks out the default branch, records its revision and excludes Git metadata} -body {
+    set result [::registry_build::stage $work]
+    set channel [open [file join $work etc registry-revision]]
+    set stored [string trim [read $channel]]
+    close $channel
+    list [lrange [lindex $commands 0] 0 end-1] [expr {$result eq $revision && $stored eq $revision}] \
+        [file isfile [file join $work registry openacs 5.10.1 init-local.sh]] \
+        [file exists [file join $work registry .git]]
+} -result {{clone --quiet --depth 1 --single-branch --no-tags -- https://github.com/jerily/ttrek-registry.git} 1 1 0}
+test stage-no-reuse {An existing checkout cannot silently replace a fresh fetch} -body {
+    ::registry_build::stage $work
+} -returnCodes error -match glob -result {Registry staging directory already exists:*}
+test stage-failure {Failed checkouts abort packaging and remove partial files} -setup {
+    file delete -force [file join $work registry]
+    set fail true
+} -body {
+    set code [catch {::registry_build::stage $work} message]
+    list $code $message [file exists [file join $work registry]]
+} -result {1 {GitHub unavailable} 0}
+removeDirectory registry-stage
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed != 0}]

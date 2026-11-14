@@ -59,6 +59,8 @@ dict for {table definition} [::telemetry::table_definitions] {
         dict unset definition columns license
         dict unset definition columns tags
         dict unset definition columns listed
+        dict unset definition columns recipe
+        dict unset definition columns patches
     }
     db_create_table $::telemetry::connection $definition
 }
@@ -210,6 +212,68 @@ test metadata-tags-invalid {Invalid tags roll back the import without changing p
 } -cleanup {
     file delete -force [file join $private invalid-tags]
 } -result {1 1}
+
+test metadata-payload {Sync resolves file scripts and preserves patch bytes in the database} -setup {
+    set payload [recipe $public payload 1.0.0 {
+        dependencies {M {tcl {S ^9.1.0}}} build {M {default {L {}}}}
+        scripts {M {demo {M {file {S demo.sh}}}}}
+    }]
+    set directory [file dirname $payload]
+    set script "#!/bin/sh\r\nprintf 'café\\n'\r\n"
+    set patch "--- before\r\n+++ after\r\n\xff"
+    foreach {name bytes} [list demo.sh [encoding convertto utf-8 $script] change.diff $patch] {
+        set channel [open [file join $directory $name] wb]
+        puts -nonewline $channel $bytes
+        close $channel
+    }
+} -body {
+    ::telemetry::sync_registry_metadata $public $private
+    set stored [::telemetry::registry_recipe payload 1.0.0]
+    set data [::tjson::json_to_simple [dict get $stored recipe]]
+    set patches [::tjson::json_to_simple [dict get $stored patches]]
+    list [expr {[dict get $data scripts demo] eq $script}] \
+        [expr {[binary decode base64 [dict get $patches change.diff]] eq $patch}] \
+        [dict get $data dependencies tcl]
+} -result {1 1 ^9.1.0}
+
+test metadata-payload-replacement {Edits replace dependencies, scripts and patches while keeping the version ID} -body {
+    set payloadID [dict get [lindex [::tpersist::_raw $::telemetry::connection {
+        SELECT pkg_id FROM packages JOIN package_names USING (pkg_name_id) WHERE name = 'payload'
+    }] 0] pkg_id]
+    recipe $public payload 1.0.0 {dependencies {M {replacement {S ^2.0}}} build {M {default {L {}}}}}
+    file delete [file join $directory change.diff] [file join $directory demo.sh]
+    ::telemetry::sync_registry_metadata $public $private
+    set stored [::telemetry::registry_recipe payload 1.0.0]
+    set data [::tjson::json_to_simple [dict get $stored recipe]]
+    set id [dict get [lindex [::tpersist::_raw $::telemetry::connection {
+        SELECT pkg_id FROM packages JOIN package_names USING (pkg_name_id) WHERE name = 'payload'
+    }] 0] pkg_id]
+    list [expr {$id == $payloadID}] [dict get $data dependencies] [dict get $data scripts] \
+        [::tjson::json_to_simple [dict get $stored patches]]
+} -result {1 {replacement ^2.0} {} {}}
+
+test metadata-payload-invalid {Missing script references reject the whole import before any rows change} -body {
+    set before [::telemetry::rows [db_order_by [db_select packages] pkg_id]]
+    recipe $public payload 1.0.0 {scripts {M {demo {M {file {S missing.sh}}}}}}
+    set code [catch {::telemetry::sync_registry_metadata $public $private} message]
+    list $code [string match {Recipe script must be a regular file*} $message] \
+        [expr {$before eq [::telemetry::rows [db_order_by [db_select packages] pkg_id]]}]
+} -cleanup {
+    file delete -force [file join $public payload]
+} -result {1 1 1}
+
+test metadata-payload-withdrawal {Withdrawal hides recipes and dependencies; republication keeps the ID} -body {
+    ::telemetry::sync_registry_metadata $public $private
+    set hidden [list [::telemetry::registry_recipe payload 1.0.0] [::telemetry::registry_versions payload]]
+    recipe $public payload 1.0.0 {dependencies {M {restored {S ^3.0}}}}
+    ::telemetry::sync_registry_metadata $public $private
+    set id [dict get [lindex [::tpersist::_raw $::telemetry::connection {
+        SELECT pkg_id FROM packages JOIN package_names USING (pkg_name_id) WHERE name = 'payload'
+    }] 0] pkg_id]
+    list $hidden [expr {$id == $payloadID}] [::telemetry::registry_versions payload]
+} -cleanup {
+    file delete -force [file join $public payload]
+} -result {{{} {}} 1 {1.0.0 {M {restored {S ^3.0}}}}}
 
 test metadata-listed {Removed recipes and telemetry-only names stay out of discovery without losing history} -body {
     file delete -force [file join $public demo]

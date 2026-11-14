@@ -1,0 +1,69 @@
+{
+  "name": "openacs",
+  "license": "GPL-2.0-or-later",
+  "description": "Tcl web application framework and collaboration platform.",
+  "tags": ["tcl", "naviserver", "web", "framework", "collaboration"],
+  "url": "https://github.com/openacs/openacs-core",
+  "version": "5.10.1",
+  "scripts": {
+    "init-local": {
+      "file": "init-local.sh"
+    },
+    "start-local": {
+      "file": "start-local.sh"
+    }
+  },
+  "dependencies": {
+    "tcl": "^8.6.18",
+    "naviserver": "=5.1.1",
+    "nsdbpg": "=5.1.1",
+    "nssmtpd": "=5.1.1",
+    "nsstats": "=5.1.1",
+    "postgresql": "=16.15.0",
+    "nsf": "^2.5.0",
+    "tcllib": "^2.0.0",
+    "tdom": "^0.9.6",
+    "thread-naviserver": "=2.8.13"
+  },
+  "devDependencies": {},
+  "build": {
+    "default": [
+      {
+        "cmd": "download",
+        "url": "https://github.com/openacs/openacs-core/archive/refs/tags/openacs-5-10-1-final.tar.gz"
+      },
+      {
+        "cmd": "unpack"
+      },
+      {
+        "cmd": "patch",
+        "filename": "installer-headers.diff",
+        "p_num": "1"
+      },
+      {
+        "cmd": "patch",
+        "filename": "ttrek-install.diff",
+        "p_num": "1"
+      },
+      {
+        "cmd": "cd",
+        "dirname": "$SOURCE_DIR"
+      },
+      {
+        "cmd": "make_install",
+        "options": [
+          {
+            "name": "-f"
+          },
+          {
+            "name": "ttrek.mk"
+          },
+          {
+            "name": "prefix",
+            "value": "$INSTALL_DIR"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -191,10 +191,6 @@ proc get_index_page_handler {ctx req} {
     return $res
 }
 
-proc get_registry_dir {} {
-    return [dict get [::site::config] registry_dir]
-}
-
 proc get_packages_page_handler {ctx req} {
     if {[catch {::recipe_search::catalog_entries [::recipe_search::database registry_catalog]} catalog]} {
         return [::recipe_search::unavailable]
@@ -214,39 +210,8 @@ proc get_logo_handler {ctx req} {
     return $res
 }
 
-proc get_package_versions {registry_dir package_name} {
-    set versions [list]
-    foreach path [glob -nocomplain -type d -directory [file join $registry_dir $package_name] *] {
-        lappend versions [file tail $path]
-    }
-    return [lsort -command compare_versions -decreasing $versions]
-}
-
-proc get_package_version_dependencies {registry_dir package_name version} {
-    set deps [list]
-    set spec_path [file join $registry_dir $package_name $version ttrek.json]
-    if {![file exists $spec_path]} {
-        error "spec file not found: $package_name $version"
-    }
-
-    set fp [open $spec_path]
-    set data [read $fp]
-    close $fp
-
-    if { [catch {
-        ::tjson::parse $data spec_handle
-    } err] } {
-        return -code error "Error while parsing json file for \"$package_name\"\
-            version \"$version\": $err"
-    }
-    set deps_handle [::tjson::get_object_item $spec_handle dependencies]
-    return [::tjson::to_typed $deps_handle]
-}
-
-proc get_latest_version {registry_dir package_name} {
-    set versions [get_package_versions $registry_dir $package_name]
-    set latest_version [lindex $versions 0]
-    return $latest_version
+proc get_package_versions {package_name} {
+    return [lsort -command compare_versions -decreasing [dict keys [::telemetry::registry_versions $package_name]]]
 }
 
 proc validate_environment_id {environment_id} {
@@ -276,13 +241,14 @@ proc post_telemetry_register_handler {ctx req} {
 }
 
 proc get_package_versions_handler {ctx req} {
-    set registry_dir [get_registry_dir]
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_reg_get_pkg -pkg_name $package_name
-    set versions_typed [list]
-    foreach version [get_package_versions $registry_dir $package_name] {
-        set deps_typed [get_package_version_dependencies $registry_dir $package_name $version]
-        lappend versions_typed $version $deps_typed
+    if {[catch {::telemetry::registry_versions $package_name} versions]} {
+        return [::recipe_search::unavailable]
+    }
+    set versions_typed {}
+    foreach version [lsort -command compare_versions -decreasing [dict keys $versions]] {
+        lappend versions_typed $version [dict get $versions $version]
     }
     return [::twebserver::build_response 200 application/json \
         [::tjson::typed_to_json [list M $versions_typed]]]
@@ -299,64 +265,6 @@ proc compute_iuse_flags {spec_handle} {
     return $iuse_unique
 }
 
-proc resolve_recipe_scripts {scripts_typed directory} {
-    lassign $scripts_typed type scripts
-    if {$type ne "M"} {error "recipe scripts must be an object"}
-    set result {}
-    dict for {name script} $scripts {
-        if {$name eq {}} {error "recipe script names must not be empty"}
-        lassign $script type value
-        if {$type eq "S"} {
-            lappend result $name $script
-            continue
-        }
-        if {$type ne "M" || ![dict exists $value file] ||
-            [dict size $value] != 1 + [dict exists $value args] ||
-            [lindex [dict get $value file] 0] ne "S"} {
-            error "recipe scripts must have string bodies or a file reference with optional args"
-        }
-        set presets {}
-        if {[dict exists $value args]} {
-            lassign [dict get $value args] args_type args
-            if {$args_type ne "L"} {error "recipe script args must be an array of strings"}
-            foreach arg $args {
-                lassign $arg arg_type arg_value
-                if {$arg_type ne "S"} {error "recipe script args must be an array of strings"}
-                append presets " '" [string map [list ' {'"'"'}] $arg_value] "'"
-            }
-        }
-        set filename [lindex [dict get $value file] 1]
-        if {![regexp {^[A-Za-z0-9._+-]+$} $filename] || $filename in {. ..}} {
-            error "Invalid recipe script filename"
-        }
-        set path [file join $directory $filename]
-        if {![file exists $path] || [file type $path] ne "file"} {
-            error "Recipe script must be a regular file in its recipe directory: $path"
-        }
-        set fp [open $path rb]
-        try {
-            set body [encoding convertfrom utf-8 [read $fp]]
-        } finally {
-            close $fp
-        }
-        if {[string first \u0000 $body] >= 0} {error "Recipe script must not contain NUL bytes"}
-        if {$presets ne {}} {
-            # Return a self-contained shell body with literal presets before runtime arguments.
-            set position 0
-            if {[string range $body 0 1] eq "#!"} {
-                set position [string first \n $body]
-                if {$position < 0} {
-                    append body \n
-                    set position [string length $body]
-                } else {incr position}
-            }
-            set body "[string range $body 0 $position-1]set --$presets \"\$@\"\n[string range $body $position end]"
-        }
-        lappend result $name [list S $body]
-    }
-    return [list M $result]
-}
-
 proc get_package_spec_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
@@ -367,40 +275,18 @@ proc get_package_spec_handler {ctx req} {
         -pkg_name $package_name -pkg_version $package_version \
         -os $os -arch $machine
 
-    set registry_dir [get_registry_dir]
-
-    puts "package_name: $package_name package_version: $package_version os: $os machine: $machine"
-
-    if { $package_version eq "latest" } {
-        set package_version [get_latest_version $registry_dir $package_name]
-        if { $package_version eq {} } {
-            return [::twebserver::build_response 404 text/plain "not found"]
+    if {[catch {
+        if {$package_version eq "latest"} {
+            set package_version [lindex [get_package_versions $package_name] 0]
         }
-    }
-
-    set spec_path [file join $registry_dir $package_name $package_version ttrek.json]
-    if {![file exists $spec_path]} {
+        set stored [::telemetry::registry_recipe $package_name $package_version]
+    }]} {return [::recipe_search::unavailable]}
+    if {$stored eq {}} {
         return [::twebserver::build_response 404 text/plain "not found"]
     }
-
-    set fp [open $spec_path]
-    set data [read $fp]
-    close $fp
-
-    if { [catch {
-        ::tjson::parse $data spec_handle
-    } err] } {
-        return -code error "Error while parsing json file for \"$package_name\"\
-            version \"$package_version\": $err"
-    }
-    set deps_handle [::tjson::get_object_item $spec_handle dependencies]
-    set deps_typed [::tjson::to_typed $deps_handle]
-
-    set scripts_typed [list M {}]
-    if {[::tjson::has_object_item $spec_handle scripts]} {
-        set scripts_typed [resolve_recipe_scripts \
-            [::tjson::to_typed [::tjson::get_object_item $spec_handle scripts]] [file dirname $spec_path]]
-    }
+    ::tjson::parse [dict get $stored recipe] spec_handle
+    set deps_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle dependencies]]
+    set scripts_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle scripts]]
 
     set spec_build_handle [::tjson::get_object_item $spec_handle build]
     set platform [string tolower "$os.$machine"]
@@ -414,13 +300,7 @@ proc get_package_spec_handler {ctx req} {
 
     set spec_build_typed [::tjson::to_typed $spec_build_handle]
 
-    set patches_typed [list]
-    foreach patch_path [glob -nocomplain -type f -directory [file join $registry_dir $package_name $package_version] *.diff] {
-        set fp [open $patch_path]
-        set data [read $fp]
-        close $fp
-        lappend patches_typed [file tail $patch_path] [list S [::twebserver::base64_encode $data]]
-    }
+    set patches_typed [lindex [::tjson::json_to_typed [dict get $stored patches]] 1]
 
     set iuse_unique [compute_iuse_flags $spec_handle]
 
@@ -502,23 +382,13 @@ proc get_package_version_page_handler {ctx req} {
     set package_version [::twebserver::get_path_param $req package_version]
     telemetry_event_common req_pkg_version_get -pkg_name $package_name -pkg_version $package_version
 
-    set registry_dir [get_registry_dir]
-
-    set spec_path [file join $registry_dir $package_name $package_version ttrek.json]
-    if {![file exists $spec_path]} {
+    if {[catch {::telemetry::registry_recipe $package_name $package_version} stored]} {
+        return [::recipe_search::unavailable]
+    }
+    if {$stored eq {}} {
         return [::twebserver::build_response 404 text/plain "not found"]
     }
-
-    set fp [open $spec_path]
-    set data [read $fp]
-    close $fp
-
-    if { [catch {
-        ::tjson::parse $data spec_handle
-    } err] } {
-        return -code error "Error while parsing json file for \"$package_name\"\
-            version \"$package_version\": $err"
-    }
+    ::tjson::parse [dict get $stored recipe] spec_handle
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
     set deps_size [::tjson::size $deps_handle]
     set deps [list]

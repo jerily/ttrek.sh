@@ -30,8 +30,10 @@
   for a missing target.
 - The package registry contains published package specifications independently
   of the website's own dependencies. It lives in
-  [jerily/ttrek-registry](https://github.com/jerily/ttrek-registry), included here
-  as the `registry` Git submodule at a pinned commit.
+  [jerily/ttrek-registry](https://github.com/jerily/ttrek-registry). Each Lambda
+  build fetches its latest default-branch commit and bundles it in the ZIP.
+  Manual sync publishes that snapshot to the database; HTTP handlers read only
+  the database, including dependencies, install recipes, scripts and patches.
 
 ## Directory layout
 
@@ -44,8 +46,8 @@
   `etc/lambda.json` declares the function and `tcl/lambda.tcl` owns app callbacks.
 - `tcl/`: application modules; `www/`: Jinja templates; `schemas/`: request schemas.
 - `assets/js/`: browser source bundled by Rollup; `content/` and `public/`:
-  authored content and public assets; `registry/`: pinned
-  package recipes. `build/`, `dist/`, and `var/` contain generated output or state.
+  authored content and public assets. `registry/` exists only in staged Lambda
+  packages. `build/`, `dist/`, and `var/` contain generated output or state.
 
 ## Project commands
 

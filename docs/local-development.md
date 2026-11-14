@@ -41,7 +41,9 @@ packages. `TTREK_LOCAL_CONFIG` may select a local INI for release settings.
 The `package-lambda` script packages both content directories for local testing
 and deployment. It calls `bin/package-lambda.sh`, the same entry point used by
 the infrastructure build scripts.
-Repackage the site after changing Markdown for the local Lambda stack or deployment.
+Packaging fetches the latest public registry from GitHub and bundles it in the
+ZIP. Repackage and restart to pick up new recipes or Markdown, then invoke
+`sync-local` manually. Sync uses the packaged files, not a checkout on the host.
 
 Start your local Valkey service and configure its connection in the required
 `[redis]` section of your local INI, then run the website through all three mocks

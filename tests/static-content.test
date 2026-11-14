@@ -7,8 +7,8 @@ source [file join $root tests fixtures deny-thread.tcl]
 source [file join $root tcl site.tcl]
 source [file join $root tcl config.tcl]
 source [file join $root tcl telemetry.tcl]
-::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root registry]]
-set settings [dict create rootdir $root registry_dir [file join $root registry] releases [::app_config::releases {}] \
+::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root tests fixtures registry]]
+set settings [dict create rootdir $root releases [::app_config::releases {}] \
     content_connection $::telemetry::connection content_images {} treqmon {store {valkeystore {}}}]
 # Rendering tests stub only the store I/O; integration tests exercise real Valkey.
 proc ::treqmon::middleware::valkeystore::init {config} {}

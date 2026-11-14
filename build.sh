@@ -208,12 +208,12 @@ if [ ! -f "$INSTALL_DIR/lib/libtink.so" ]; then
     echo "Build Tink ..."
     fetch_source rapidjson-1.1.0 https://github.com/Tencent/rapidjson/archive/refs/tags/v1.1.0.tar.gz
     if [ ! -f "$SOURCE_DIR/rapidjson-1.1.0/.patched" ]; then
-        patch -d "$SOURCE_DIR/rapidjson-1.1.0" -p1 < "$SELF_DIR/registry/tink-cc/2.1.1/rapidjson-1.1.0.diff"
+        patch -d "$SOURCE_DIR/rapidjson-1.1.0" -p1 < "$SELF_DIR/devops/patches/tink-cc-2.1.1/rapidjson-1.1.0.diff"
         touch "$SOURCE_DIR/rapidjson-1.1.0/.patched"
     fi
     fetch_source tink-cc-2.1.1 https://github.com/tink-crypto/tink-cc/archive/refs/tags/v2.1.1.tar.gz
     if [ ! -f "$SOURCE_DIR/tink-cc-2.1.1/.patched" ]; then
-        patch -d "$SOURCE_DIR/tink-cc-2.1.1" -p1 < "$SELF_DIR/registry/tink-cc/2.1.1/fix-configure.diff"
+        patch -d "$SOURCE_DIR/tink-cc-2.1.1" -p1 < "$SELF_DIR/devops/patches/tink-cc-2.1.1/fix-configure.diff"
         touch "$SOURCE_DIR/tink-cc-2.1.1/.patched"
     fi
     cmake_install tink-cc-2.1.1 \

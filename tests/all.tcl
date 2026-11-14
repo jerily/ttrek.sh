@@ -4,7 +4,6 @@ namespace import ::tcltest::test
 
 set root [file dirname [file dirname [file normalize [info script]]]]
 set test_root $root
-set test_registry [file join $root registry]
 set test_stats {}
 source [file join $root tcl config.tcl]
 set test_releases [::app_config::releases {}]
@@ -15,7 +14,7 @@ package require treqmon 2.2.0
 namespace eval ::twebserver {
     proc get_rootdir {} {return $::test_root}
     proc get_config_dict {} {
-        return [dict create tratelimit {} treqmon {} registry_dir $::test_registry releases $::test_releases]
+        return [dict create tratelimit {} treqmon {} releases $::test_releases]
     }
     proc create_router {args} {uplevel 1 {set router test_router}}
     proc add_middleware {args} {}
@@ -228,10 +227,9 @@ foreach version {1.0.0 2.0.0} {
     file copy -force [file join $root tests fixtures ttrek.json] \
         [file join $registry_fixture demo $version ttrek.json]
 }
-file copy -force [file join $root registry tink-cc 2.1.1 rapidjson-1.1.0.diff] \
+file copy -force [file join $root tests fixtures registry tink-cc 2.1.1 rapidjson-1.1.0.diff] \
     [file join $registry_fixture demo 2.0.0 rapidjson-1.1.0.diff]
 set test_root $fixture
-set test_registry $registry_fixture
 ::telemetry::sync_registry_metadata $registry_fixture
 ::telemetry::publish_search_snapshot
 
@@ -426,7 +424,7 @@ test handlers-tags-optional {Missing and empty tags keep overview and listing us
     ::telemetry::publish_search_snapshot
 } -result {200 0 200 0 200 0 200 0}
 
-test handlers-database-catalog {Overview, listing, and search use stored metadata without recipe files} -setup {
+test handlers-database-catalog {Every package page and API works without recipe files} -setup {
     ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
         [dict create description {Stored overview} tags {["json"]} url https://example.org/stored license MIT]]
     file rename $registry_fixture ${registry_fixture}.hidden
@@ -434,6 +432,14 @@ test handlers-database-catalog {Overview, listing, and search use stored metadat
     ::recipe_search::reset
 } -body {
     set overview [get_package_page_handler {} {pathParameters {package_name demo}}]
+    set version_page [get_package_version_page_handler {} {pathParameters {package_name demo package_version 2.0.0}}]
+    set versions [::tjson::json_to_simple [body [get_package_versions_handler {} {pathParameters {package_name demo}}]]]
+    set spec [::tjson::json_to_simple [body [get_package_spec_handler {} {pathParameters {
+        package_name demo package_version latest os Linux machine x86_64}}]]]
+    if {[dict get $version_page status] != 200 || [dict get $versions 2.0.0 tcl] ne "^9.1.0" ||
+        [dict get $spec version] ne "2.0.0" || ![dict exists $spec patches rapidjson-1.1.0.diff]} {
+        error "Package requests require the deleted registry"
+    }
     set listing [get_packages_page_handler {} {}]
     set search [get_search_page_handler {} {queryStringParameters {q json}}]
     set api [::tjson::json_to_simple [body [get_search_handler {} {queryStringParameters {q json}}]]]
@@ -507,7 +513,7 @@ test handlers-6 {Static assets read exact bytes from the configured server root}
 } -result [list {body {color: red;}} $fixture/public/ttrek-init $fixture/www/plume.png]
 
 test registry-1 {Static options are conditional USE flags} -setup {
-    set test_registry [file join $root registry]
+    ::telemetry::sync_registry_metadata [file join $root tests fixtures registry]
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name jinja2-tcl package_version 0.1.0 os Linux machine x86_64}]]
@@ -524,13 +530,13 @@ test registry-1 {Static options are conditional USE flags} -setup {
     }
     list [dict get $response status] [expr {"+static" in [dict get $spec iuse]}] $static_option
 } -cleanup {
-    set test_registry $registry_fixture
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result {200 1 1}
 
 test registry-2 {Shared defaults remain unconditional before static overrides} -body {
     set result {}
     foreach {name version} {abseil-cpp 20230802.1.0 aws-sdk-cpp 1.11.157 protobuf 21.9.0} {
-        set fp [open [file join $root registry $name $version ttrek.json]]
+        set fp [open [file join $root tests fixtures registry $name $version ttrek.json]]
         set spec [::tjson::json_to_simple [read $fp]]
         close $fp
         set shared {}
@@ -548,7 +554,7 @@ test registry-2 {Shared defaults remain unconditional before static overrides} -
 } -result {{ON 0 OFF +static} {ON 0 OFF +static} {ON 0 OFF +static}}
 
 test registry-3 {Build recipes retain their embedded patches} -setup {
-    set test_registry [file join $root registry]
+    ::telemetry::sync_registry_metadata [file join $root tests fixtures registry]
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name tink-cc package_version 2.1.1 os Linux machine x86_64}]]
@@ -557,10 +563,10 @@ test registry-3 {Build recipes retain their embedded patches} -setup {
     list [dict get $response status] \
         [contains $patch {GenericStringRef& operator=}] [llength [dict get $spec install_script]]
 } -cleanup {
-    set test_registry $registry_fixture
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result {200 1 7}
 
-test registry-4 {Version API reads dependencies from the configured directory} -body {
+test registry-4 {Version API reads dependencies from the database} -body {
     set response [get_package_versions_handler {} {pathParameters {package_name demo}}]
     set versions [::tjson::json_to_simple [body $response]]
     list [dict get $response status] [dict keys $versions] \
@@ -573,6 +579,7 @@ test registry-dev-dependencies-1 {Version and recipe APIs expose only runtime de
     set fp [open [file join $directory ttrek.json] w]
     puts $fp {{"dependencies":{"tcl":"^9.1.0","conditional":{"version":"^1.0.0","if":"+static"}},"devDependencies":{"mock":"^0.1.0"},"build":{"default":[]}}}
     close $fp
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set versions [::tjson::json_to_simple [body [get_package_versions_handler {} {pathParameters {package_name dev-tool}}]]]
     set recipe [::tjson::json_to_simple [body [get_package_spec_handler {} [dict create pathParameters \
@@ -587,6 +594,7 @@ test registry-dev-dependencies-2 {A recipe with only development tools exposes n
     set fp [open [file join $directory ttrek.json] w]
     puts $fp {{"dependencies":{},"devDependencies":{"missing-test-tool":"^1.0.0"},"build":{"default":[]}}}
     close $fp
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set versions [::tjson::json_to_simple [body [get_package_versions_handler {} {pathParameters {package_name dev-only}}]]]
     set recipe [::tjson::json_to_simple [body [get_package_spec_handler {} [dict create pathParameters \
@@ -609,6 +617,7 @@ test registry-scripts-2 {Recipes without scripts return an empty scripts object}
     file mkdir [file join $registry_fixture no-scripts 1.0.0]
     file copy -force [file join $root tests fixtures no-scripts.json] \
         [file join $registry_fixture no-scripts 1.0.0 ttrek.json]
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name no-scripts package_version 1.0.0 os Linux machine x86_64}]]
@@ -627,6 +636,7 @@ test registry-script-files-1 {Recipe files preserve UTF-8, CRLF and final newlin
     set fp [open [file join $recipe_dir ttrek.json] w]
     puts $fp {{"dependencies":{},"scripts":{"demo":{"file":"demo.sh"},"inline":"echo inline"},"build":{"default":[]}}}
     close $fp
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name file-demo package_version 1.0.0 os Linux machine x86_64}]]
@@ -640,7 +650,7 @@ test registry-script-files-2 {Reject missing files, paths and invalid reference 
     foreach reference [list {M {}} {M {file {N 42}}} {M {file {S demo.sh} extra {B true}}} \
             {M {file {S missing.sh}}} {M {file {S ../outside.sh}}} \
             {M {file {S /etc/passwd}}} {M {file {S .}}} {M {file {S ..}}}] {
-        lappend errors [catch {resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir}]
+        lappend errors [catch {::registry_metadata::resolve_scripts [list M [list demo $reference]] $recipe_dir}]
     }
     set errors
 } -result {1 1 1 1 1 1 1 1}
@@ -654,7 +664,7 @@ test registry-script-files-3 {Reject symbolic links, directories and NUL bytes} 
 } -body {
     set errors {}
     foreach filename {linked.sh folder.sh nul.sh} {
-        lappend errors [catch {resolve_recipe_scripts \
+        lappend errors [catch {::registry_metadata::resolve_scripts \
             [list M [list demo [list M [list file [list S $filename]]]]] $recipe_dir}]
     }
     set errors
@@ -670,6 +680,7 @@ for arg do printf '%s\n' "$arg"; done
     set reference [list M [list file {S args.sh} args [list L [lmap arg $presets {list S $arg}]]]]
     writeFile [file join $recipe_dir ttrek.json] [::tjson::typed_to_json \
         [list M [list dependencies {M {}} scripts [list M [list demo $reference]] build {M {default {L {}}}}]]]
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name file-demo package_version 1.0.0 os Linux machine x86_64}]]
@@ -688,12 +699,12 @@ for arg do printf '%s\n' "$arg"; done
 
 test registry-script-args-2 {Empty presets preserve bytes and scripts can omit a shebang or final newline} -body {
     set reference {M {file {S args.sh} args {L {}}}}
-    lassign [resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir] type scripts
+    lassign [::registry_metadata::resolve_scripts [list M [list demo $reference]] $recipe_dir] type scripts
     set results [list [expr {[lindex [dict get $scripts demo] 1] eq $script_body}]]
     foreach content [list {printf '%s\n' "$@"} {#!/bin/sh}] {
         writeFile [file join $recipe_dir plain.sh] $content
         set reference {M {file {S plain.sh} args {L {{S plain}}}}}
-        lassign [resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir] type scripts
+        lassign [::registry_metadata::resolve_scripts [list M [list demo $reference]] $recipe_dir] type scripts
         lappend results [exec sh -c [lindex [dict get $scripts demo] 1] -- tail]
     }
     set results
@@ -707,13 +718,13 @@ test registry-script-args-3 {Reject malformed preset arrays and unknown referenc
         {M {file {S args.sh} args {L {{N 1}}}}}
         {M {file {S args.sh} args {L {}} extra {B true}}}
     } {
-        lappend errors [catch {resolve_recipe_scripts [list M [list demo $reference]] $recipe_dir}]
+        lappend errors [catch {::registry_metadata::resolve_scripts [list M [list demo $reference]] $recipe_dir}]
     }
     set errors
 } -result {1 1 1 1}
 
-test registry-scripts-3 {Pinned OpenACS recipe exposes the installed-package entry points} -setup {
-    set test_registry [file join $root registry]
+test registry-scripts-3 {OpenACS fixture recipe exposes the installed-package entry points} -setup {
+    ::telemetry::sync_registry_metadata [file join $root tests fixtures registry]
 } -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name openacs package_version 5.10.1 os Linux machine x86_64}]]
@@ -721,10 +732,10 @@ test registry-scripts-3 {Pinned OpenACS recipe exposes the installed-package ent
     list [dict get $response status] [lsort [dict keys [dict get $spec scripts]]] \
         [contains [dict get $spec scripts init-local] {$PROJECT_INSTALL_DIR}]
 } -cleanup {
-    set test_registry $registry_fixture
+    ::telemetry::sync_registry_metadata $registry_fixture
 } -result {200 {init-local start-local} 1}
 
-test registry-5 {Latest recipe and patches use the configured directory with literal glob characters} -body {
+test registry-5 {Latest recipe and patches use the imported snapshot} -body {
     set response [get_package_spec_handler {} [dict create pathParameters \
         {package_name demo package_version latest os Linux machine x86_64}]]
     set spec [::tjson::json_to_simple [body $response]]
