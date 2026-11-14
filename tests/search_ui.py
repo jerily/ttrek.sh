@@ -2,6 +2,7 @@
 import time
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
+from homepage_ui import check_homepage
 
 
 def check_layout(page, base):
@@ -49,6 +50,7 @@ def check(base):
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         try:
+            check_homepage(browser, base)
             page = browser.new_page(viewport={"width": 1440, "height": 1000})
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))

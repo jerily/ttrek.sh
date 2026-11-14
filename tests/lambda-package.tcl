@@ -58,6 +58,9 @@ try {
         }
     }
     set assetManifest [read_bytes [file join $mount public asset-manifest.json]]
+    if {[read_bytes [file join $mount etc homepage.json]] ne [read_bytes [file join $root etc homepage.json]]} {
+        error "Packaged homepage configuration differs from the checkout"
+    }
     if {$assetManifest ne [read_bytes [file join $root public asset-manifest.json]]} {
         error "Packaged browser asset manifest differs from the upload sources"
     }
