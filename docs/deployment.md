@@ -197,10 +197,32 @@ charges; application event destinations can be added separately.
 exported identity and configuration set. Deploy the SES stack before creating
 or updating the SAM stack, which imports those ARNs. The deployment policies
 manage SES resources and read their status; the application role owns sending.
-The current isolated VPC still needs an SES **API** interface endpoint on TCP 443
-with private DNS and security-group access from Lambda, or outbound internet
-access. An SMTP endpoint cannot serve `awsses` API requests. This identity stack
-does not change the VPC. See [SES VPC endpoints](https://docs.aws.amazon.com/ses/latest/dg/send-email-set-up-vpc-endpoints.html).
+`devops/infra/20-infra-vpc0.yml` provides the SES **API** interface endpoint
+(`com.amazonaws.${AWS::Region}.email`) in the same private subnet as the website
+Lambda. Private DNS routes the SDK's regional SES hostname to the endpoint.
+Its security group accepts TCP 443 from Lambda, and Lambda has matching egress;
+the VPC remains isolated without a NAT or internet gateway. Sending permissions
+remain controlled by the Lambda execution role. The base stack does not import
+the SES identity exports, so the existing stack deployment order is preserved.
+An SMTP endpoint cannot serve `awsses` API requests. See
+[SES VPC endpoints](https://docs.aws.amazon.com/ses/latest/dg/send-email-set-up-vpc-endpoints.html).
+
+For an existing deployment, run `devops/infra/20-deploy-infra-vpc0.sh` to add the
+endpoint and security-group rules. No application rebuild is required for this
+network change. Confirm regional sending is enabled and production access is
+approved before sending to arbitrary recipients:
+
+```sh
+aws sesv2 get-account \
+  --profile "${AWS_PROFILE:-ttrek-prod-neo}" \
+  --region "${AWS_REGION:-${AWS_DEFAULT_REGION:-eu-central-1}}" \
+  --query '{ProductionAccessEnabled:ProductionAccessEnabled,SendingEnabled:SendingEnabled}'
+```
+
+This account-level check requires `ses:GetAccount`, which the deployment user's
+identity-scoped SES read permissions do not grant; use an authorized operator or
+the SES console. After the endpoint is available, request a fresh verification
+email through the website to exercise the Lambda role and network path.
 
 ### Deployment IAM policy
 
