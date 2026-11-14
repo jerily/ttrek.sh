@@ -35,6 +35,10 @@
       "macos-arm64": "55b2a73fe090d5fde41c56245554f5569f8288c7dffd3484c57477880777a40d",
       "macos-universal2": "38457d7869d63ee532bfd4d8885fff5bbe4d6cc5ce4590e988bbac24c17392d3",
       "macos-x86_64": "f6d840a2d63f082091c5a0b084ce8c34d057194157dfe988c78822b1721a4e4b"
+    },
+    "1.4.0": {
+      "linux-amd64-glibc": "8c68e0959db2b8c1ef4744fd9dd83fb12b0c49d4f7c97621ab1690a8ce27212a",
+      "linux-amd64-musl": "d6dac64713845924fa581c803d20215bd340a030583750c7448bb0faee73f92b"
     }
   }
 }
