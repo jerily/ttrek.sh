@@ -2,7 +2,67 @@
 from playwright.sync_api import expect
 
 
+def check_homepage_loading(browser, base):
+    # Hold the module and screenshots independently: the first styled frame,
+    # enhancement, and image decoding must all leave search in the same place.
+    for width, font_size, single in ((390, 16, False), (1440, 16, False),
+                                    (390, 32, False), (390, 16, True)):
+        for order in (('script', 'image'), ('image', 'script')):
+            page = browser.new_page(viewport={"width": width, "height": 1000}, reduced_motion='reduce')
+            pending = {'script': [], 'image': []}
+            blocked = set(pending)
+
+            def hold(route):
+                kind = route.request.resource_type
+                if kind in blocked:
+                    pending[kind].append(route)
+                else:
+                    route.fallback()
+
+            def geometry():
+                return page.evaluate("""() => ['.home-showcase', '.registry-search'].map(selector => {
+                    const rect = document.querySelector(selector).getBoundingClientRect();
+                    return [rect.top + scrollY, rect.width, rect.height];
+                })""")
+
+            page.route('**/*', hold)
+            try:
+                page.goto(base + '/', wait_until='commit')
+                expect(page.locator('.footer')).to_be_attached()
+                expect(page.locator('.home-showcase')).to_have_css('border-radius', '14px')
+                page.evaluate('(size) => document.documentElement.style.fontSize = `${size}px`', font_size)
+                if single:
+                    # Exercise the valid one-slide configuration without reserving
+                    # a controls row that enhancement will subsequently remove.
+                    page.locator('.showcase-slide, .showcase-dot').evaluate_all("""elements => {
+                        elements.filter(element => element.matches(':not(:first-child)')).forEach(element => element.remove());
+                    }""")
+                expect(page.locator('.home-showcase')).not_to_have_class('home-showcase is-enhanced')
+                expect(page.locator('.showcase-slide:visible')).to_have_count(1)
+                expect(page.locator('.showcase-controls')).to_be_hidden()
+                assert not page.locator('.showcase-slide img').first.evaluate('image => image.complete')
+                before = geometry()
+                for kind in order:
+                    blocked.remove(kind)
+                    for route in pending[kind]:
+                        route.fallback()
+                    if kind == 'script':
+                        expect(page.locator('.home-showcase')).to_have_class('home-showcase is-enhanced')
+                    else:
+                        page.locator('.showcase-slide img').evaluate_all("""images => Promise.all(images.map(image => {
+                            image.loading = 'eager';
+                            return image.decode();
+                        }))""")
+                    assert geometry() == before, (width, font_size, single, order, kind, before, geometry())
+                assert page.locator('.home-showcase').evaluate(
+                    'element => element.scrollWidth <= element.clientWidth'), (width, font_size, single, order)
+            finally:
+                page.close()
+    print('PASS showcase geometry before scripts, during delayed images and after decoding, including enlarged text and a single slide')
+
+
 def check_homepage(browser, base):
+    check_homepage_loading(browser, base)
     page = browser.new_page(viewport={"width": 1440, "height": 1000})
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))

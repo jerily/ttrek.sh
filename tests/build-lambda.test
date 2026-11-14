@@ -17,6 +17,7 @@ proc build_read {path} {
 build_write [file join $work bin aws] {#!/bin/sh
 set -eu
 [ "$1 $2" = "s3 cp" ] || exit 91
+[ "$3" = s3://jerily-ttrek-app/ttrek/1.4.0/linux-amd64-glibc/ttrek ] || exit 98
 cp "$TTREK_TEST_BINARY" "$4"
 }
 build_write [file join $work ttrek-fixture] {#!/bin/sh
