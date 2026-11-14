@@ -1,5 +1,12 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 source [file join [file dirname [info script]] search-snapshot.tcl]
 
+# Read the search query from the request.
 proc ::recipe_search::query {text} {
     if {[string length $text] > 255 || ![regexp {^[A-Za-z0-9._+ -]+$} $text]} {error "Invalid search query"}
     set text [fold [string trim $text " "]]
@@ -7,6 +14,7 @@ proc ::recipe_search::query {text} {
     return $text
 }
 
+# Discard cached search state for this worker.
 proc ::recipe_search::reset {} {
     foreach command {index descriptions} {
         if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
@@ -17,10 +25,12 @@ proc ::recipe_search::reset {} {
     unset -nocomplain ::recipe_search::revision
 }
 
+# Return the worker’s configured search database.
 proc ::recipe_search::database {command args} {
     ::telemetry::$command {*}$args
 }
 
+# Refresh the search snapshot when its revision changes.
 proc ::recipe_search::refresh {} {
     variable revision
     try {
@@ -34,6 +44,7 @@ proc ::recipe_search::refresh {} {
     }
 }
 
+# Build the response used when this resource is unavailable.
 proc ::recipe_search::unavailable {} {
     set response [::twebserver::build_response 503 text/plain {Package search is temporarily unavailable.}]
     dict set response headers Retry-After 30
@@ -64,6 +75,7 @@ proc ::recipe_search::catalog_entries {rows} {
     return $catalog
 }
 
+# Build the search-results response from matching packages.
 proc ::recipe_search::results {text {limit 0}} {
     variable revision
     for {set attempt 0} {$attempt < 3} {incr attempt} {
@@ -95,6 +107,7 @@ proc ::recipe_search::results {text {limit 0}} {
     error "Search catalog changed repeatedly during the request"
 }
 
+# Compare search candidates for stable ranking.
 proc ::recipe_search::compare {a b} {
     foreach field {tier distance negative_coverage unmatched} {
         set left [dict get $a $field]
@@ -105,6 +118,7 @@ proc ::recipe_search::compare {a b} {
     string compare [dict get $a name] [dict get $b name]
 }
 
+# Find and rank package matches for the normalized query.
 proc ::recipe_search::search {text} {
     variable entries
     variable documents
@@ -146,6 +160,7 @@ proc ::recipe_search::search {text} {
     return $results
 }
 
+# Extract and validate search query parameters.
 proc ::recipe_search::request_query {request} {
     # Decode raw query text once; preserve repeated values as arrays for validation.
     set values {}
@@ -173,6 +188,7 @@ proc ::recipe_search::request_query {request} {
     return [query [lindex $values 0]]
 }
 
+# Return search handler for the caller.
 proc get_search_handler {ctx req} {
     if {[catch {::recipe_search::request_query $req} query]} {
         return [::twebserver::build_response 400 text/plain \
@@ -212,6 +228,7 @@ proc get_autocomplete_handler {ctx req} {
         [::tjson::typed_to_json [list L $suggestions]]]
 }
 
+# Render the matching package cards for the search page.
 proc ::recipe_search::cards {matches} {
     set cards {}
     foreach match $matches {
@@ -230,6 +247,7 @@ proc ::recipe_search::cards {matches} {
     return [list L $cards]
 }
 
+# Return search page handler for the caller.
 proc get_search_page_handler {ctx req} {
     set status 200
     set matches {}

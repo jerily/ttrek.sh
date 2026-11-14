@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require Tcl 9.1
 package require tcltest 2
 namespace import ::tcltest::*
@@ -32,6 +38,7 @@ test image-config-endpoint {LOCAL accepts only loopback mock endpoints} -setup {
 
 package provide awss3 1.0.17
 namespace eval ::aws::s3 {}
+# Provide the create test fixture.
 proc ::aws::s3::create {settings} {lappend ::createdClients $settings; return test_image_client}
 set createdClients {}
 test image-config-pass {bucket, directory and signing settings reach both packages using one client} -body {

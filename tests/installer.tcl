@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Run the real installer against Tcl mocks and disposable installation homes.
 package require Tcl 8.6 9
 package require tcltest 2
@@ -8,6 +14,7 @@ namespace eval ::installer_test {
     variable done
 }
 
+# Provide the read output test fixture.
 proc ::installer_test::read_output {channel} {
     variable output
     variable done
@@ -15,6 +22,7 @@ proc ::installer_test::read_output {channel} {
     if {[eof $channel]} {set done complete}
 }
 
+# Provide the run test fixture.
 proc ::installer_test::run {command} {
     variable output {}
     variable done {}
@@ -37,6 +45,7 @@ proc ::installer_test::run {command} {
     return $output
 }
 
+# Provide the read file test fixture.
 proc ::installer_test::read_file {path} {
     set channel [open $path rb]
     try {read $channel} finally {close $channel}

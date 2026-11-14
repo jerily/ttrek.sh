@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require Tcl 9.1
 package require tcltest 2
 namespace import ::tcltest::*
@@ -17,14 +23,16 @@ foreach {kind directory} {wiki docs blog blog} {
 ::site::init_worker $settings
 set config $::homepage::config
 set stores [::homepage::stores]
+# Provide the slides test fixture.
 proc slides {} {
     ::tjson::json_to_simple [::tjson::typed_to_json [dict get [::homepage::data] slides]]
 }
+# Provide the homepage test fixture.
 proc homepage {} {
     dict get [::site::dispatch $::site::router {method GET path / headers {Host ttrek.sh}}] body
 }
 
-test homepage-five {Published configuration renders five slides including the 1.4.0 post} -body {
+test homepage-five {Published configuration renders five slides including the 1.5.0 post} -body {
     set data [slides]
     set post [lindex $data 3]
     set html [homepage]
@@ -34,7 +42,7 @@ test homepage-five {Published configuration renders five slides including the 1.
         [regexp -all {class="showcase-dot"} $html] \
         [expr {![regexp {<article[^>]*(aria-hidden="true"|inert)} $html]}] \
         [string match {*Source on GitHub*Registry on GitHub*Request Monitor*} $html]
-} -result {{personal community guide blog packages} 1.4.0 /blog/2026-11-14-ttrek-140-build-cleanly-keep-what-you-need 2026-11-14 1 5 1 1}
+} -result {{personal community guide blog packages} 1.5.0 /blog/2026-11-14-bug-fixes-in-ttrek-150 2026-11-14 1 5 1 1}
 
 test homepage-limits {Missing and duplicate entries are filtered before the five-slide limit} -body {
     set guide [lindex [dict get $config slides] 2]
@@ -47,6 +55,7 @@ test homepage-limits {Missing and duplicate entries are filtered before the five
 
 test homepage-unavailable {Unavailable optional sources keep search and the installer usable} -setup {
     rename ::recipe_search::database ::recipe_search::saved_database
+    # Provide the database test fixture.
     proc ::recipe_search::database {args} {error unavailable}
     ::site::configure [dict remove $settings content_connection]
 } -body {
@@ -87,7 +96,7 @@ test homepage-sync {An already configured worker sees a new post, then withdrawa
     ::web::static::blog::sync [dict get $stores blog] $directory
     list [dict get $post url] [dict get $post version] \
         [string match {*A new &lt;release&gt; &amp; &quot;news&quot;*} $html] \
-        [expr {[string first {Build cleanly. Keep what you need.} $html] < 0}] \
+        [expr {[string first {Small fixes. Smoother builds.} $html] < 0}] \
         [lmap slide [slides] {dict get $slide id}]
 } -cleanup {
     removeDirectory $directory
@@ -113,6 +122,7 @@ test homepage-image-delivery {Published references use the package CDN/signing r
         url_expiry_seconds 30 http_endpoint {} upload_missing false]]
     rename ::aws::s3::generate_presigned_url ::aws::s3::saved_generate_presigned_url
     set calls 0
+    # Provide the generate presigned url test fixture.
     proc ::aws::s3::generate_presigned_url {args} {
         incr ::calls
         return "https://s3.example.test/image?X-Amz-Signature=[string repeat a 64]&generation=$::calls"

@@ -1,7 +1,14 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Scheduled telemetry export/restore. Uses the existing PostgreSQL driver and
 # AWS SDK; no external executables. HTTP requests cannot enter this handler.
 namespace eval ::telemetry_maintenance {}
 
+# Open the database connection used by this service.
 proc ::telemetry_maintenance::connect {settings} {
     package require tdbc::postgres
     set options {}
@@ -14,10 +21,12 @@ proc ::telemetry_maintenance::connect {settings} {
     return $db
 }
 
+# Stop maintenance before exhausting the invocation deadline.
 proc ::telemetry_maintenance::check_deadline {deadline} {
     if {[clock milliseconds] >= $deadline} {error "Telemetry maintenance time budget exceeded"}
 }
 
+# Serialize one record into the maintenance backup.
 proc ::telemetry_maintenance::write_record {channel record} {
     puts $channel [::tjson::typed_to_json [list M $record]]
 }
@@ -75,12 +84,14 @@ proc ::telemetry_maintenance::backup {db path deadline} {
     } finally {close $channel}
 }
 
+# Upload the selected artifacts to the configured storage service.
 proc ::telemetry_maintenance::upload {path bucket key} {
     package require awss3
     set client [::aws::s3::create [dict create region $::env(AWS_REGION)]]
     try {$client put $bucket $key $path} finally {$client destroy}
 }
 
+# Execute the selected maintenance operation with validated settings.
 proc ::telemetry_maintenance::run {settings context} {
     if {[::app_config::mode] ne "PROD" || [dict get $settings dialect] ne "postgresql"} {
         error "Scheduled telemetry maintenance requires PROD PostgreSQL"

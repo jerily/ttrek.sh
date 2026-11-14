@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Reproducible local benchmark; all database writes use an in-memory fixture.
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl telemetry.tcl]
@@ -7,12 +13,14 @@ set rows [::telemetry::registry_catalog]
 set inputs [::recipe_search::snapshot_inputs $rows]
 set snapshot [::telemetry::search_snapshot]
 set iterations 50
+# Provide the build native test fixture.
 proc build_native {} {
     ::ttrie::create bench_names [dict get $::inputs names]
     ::ttrigrams::create bench_descriptions [dict get $::inputs texts]
     bench_names destroy
     bench_descriptions destroy
 }
+# Provide the load native test fixture.
 proc load_native {} {
     ::ttrie::load bench_names [dict get $::snapshot names]
     ::ttrigrams::load bench_descriptions [dict get $::snapshot descriptions]

@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Check the actual production ZIP, without decrypting config or connecting to AWS.
 package require Tcl 9.1
 set root [file dirname [file dirname [file normalize [info script]]]]
@@ -6,11 +12,13 @@ set archive [file normalize [lindex $argv 0]]
 set ::env(ENV) PROD
 package require web-static-wiki 0.1.6
 
+# Provide the read bytes test fixture.
 proc read_bytes {path} {
     set channel [open $path rb]
     try {read $channel} finally {close $channel}
 }
 
+# Provide the image objects test fixture.
 proc image_objects {directory {relative {}}} {
     set objects {}
     foreach path [lsort [glob -nocomplain -directory $directory *]] {

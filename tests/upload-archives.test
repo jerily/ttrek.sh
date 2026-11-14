@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 namespace import ::tcltest::test
 set root [file dirname [file dirname [file normalize [info script]]]]
@@ -6,26 +12,31 @@ set work [::tcltest::makeDirectory upload-archives-fixture]
 set registry [file join $work {registry with spaces}]
 set savedEnv [array get ::env]
 
+# Provide the write file test fixture.
 proc write_file {path text} {
     file mkdir [file dirname $path]
     set channel [open $path w]
     try {puts -nonewline $channel $text} finally {close $channel}
 }
+# Provide the read file test fixture.
 proc read_file {path} {
     set channel [open $path r]
     try {read $channel} finally {close $channel}
 }
+# Provide the download test fixture.
 proc download {url args} {
     set step [dict create cmd {S download} url [list S $url]]
     foreach {key value} $args {dict set step $key [list S $value]}
     return [list M $step]
 }
+# Provide the spec test fixture.
 proc spec {package build} {
     set path [file join $::registry $package 1.0.0 ttrek.json]
     write_file $path [::tjson::typed_to_json [list M [dict create \
         name [list S $package] version {S 1.0.0} build [list M $build]]]]
     return $path
 }
+# Provide the reset fixture test fixture.
 proc reset_fixture {} {
     file delete -force $::registry
     file mkdir $::registry
@@ -34,6 +45,7 @@ proc reset_fixture {} {
     set ::uploads {}
     set ::temporaryFiles {}
 }
+# Provide the argument test fixture.
 proc argument {command option} {lindex $command [expr {[lsearch -exact $command $option] + 1}]}
 
 # Stub only external commands and log output; exercise real spec parsing,
@@ -41,8 +53,11 @@ proc argument {command option} {lindex $command [expr {[lsearch -exact $command 
 rename ::archive_mirror::run_command ::archive_mirror::real_run_command
 rename ::archive_mirror::require_commands ::archive_mirror::real_require_commands
 rename ::archive_mirror::log ::archive_mirror::real_log
+# Provide the require commands test fixture.
 proc ::archive_mirror::require_commands {} {}
+# Provide the log test fixture.
 proc ::archive_mirror::log {level message} {lappend ::logs [list $level $message]}
+# Provide the run command test fixture.
 proc ::archive_mirror::run_command {command} {
     lappend ::calls $command
     if {"head-object" in $command} {

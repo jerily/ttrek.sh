@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Shared by the direct HTTP server and the Lambda HTTP-event adapter.
 return {
     GET /debug get_debug_handler get_debug

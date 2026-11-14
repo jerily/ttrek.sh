@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require awss3 1.0.12
 
 namespace eval ::releases {
@@ -18,6 +24,7 @@ proc ::releases::artifact {target} {
     }
 }
 
+# Generate a short-lived URL for a release artifact.
 proc ::releases::signed_url {artifact} {
     set settings [dict get [::site::config] releases]
     set key "$artifact/ttrek"
@@ -27,6 +34,7 @@ proc ::releases::signed_url {artifact} {
     return [signed_key $key [dict get $settings url_expiry_seconds]]
 }
 
+# Generate a short-lived URL for a package source archive.
 proc ::releases::source_url {artifact} {
     if {![regexp {^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,199}-[0-9a-f]{64}\.archive$} $artifact]} {
         error "Invalid source archive name"
@@ -35,6 +43,7 @@ proc ::releases::source_url {artifact} {
     return [signed_key "[dict get $settings source_prefix]/$artifact" [dict get $settings source_url_expiry_seconds]]
 }
 
+# Sign a validated object key in the configured distribution bucket.
 proc ::releases::signed_key {key expiry} {
     variable client
     set settings [dict get [::site::config] releases]

@@ -1,20 +1,29 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 namespace eval ::assets {
     variable manifest {}
     variable cdn_origin {}
     variable cdn_prefix {}
 }
 
+# Apply the worker settings and initialize shared site resources.
 proc ::assets::configure {settings} {
     variable cdn_origin [::content_images::cdn_url $settings]
     variable cdn_prefix {}
     if {$cdn_origin ne {}} {set cdn_prefix [dict get $settings assets_prefix]}
 }
 
+# Return bytes for the caller.
 proc ::assets::read_bytes {path} {
     set channel [open $path rb]
     try {read $channel} finally {close $channel}
 }
 
+# Load the environment-specific application configuration.
 proc ::assets::load {root} {
     variable manifest
     set filename [file join $root public asset-manifest.json]
@@ -32,6 +41,7 @@ proc ::assets::load {root} {
     }
 }
 
+# Resolve a public asset to its configured versioned URL.
 proc ::assets::url {path} {
     variable manifest
     variable cdn_origin
@@ -84,12 +94,14 @@ proc ::assets::matches {value etag} {
     return $matched
 }
 
+# Build the response used when this resource is unavailable.
 proc ::assets::unavailable {{status 404}} {
     set response [::twebserver::build_response $status text/plain {Asset unavailable}]
     dict set response headers Cache-Control no-store
     return $response
 }
 
+# Serve the selected asset with the appropriate response metadata.
 proc ::assets::respond {path request type bytes} {
     variable manifest
     set versioned $path

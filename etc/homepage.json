@@ -50,10 +50,10 @@
       "kicker": "From the blog",
       "link_text": "Read the latest post",
       "highlights": {
-        "/2026-11-14-ttrek-140-build-cleanly-keep-what-you-need": {
-          "description": "Successful installs now clean up sources and build files. Use -keep when you want a closer look.",
-          "version": "1.4.0",
-          "note": "Build cleanly. Keep what you need."
+        "/2026-11-14-bug-fixes-in-ttrek-150": {
+          "description": "Fixes for Snap CMake builds, clearer missing-tool errors, and dependency order that stays yours.",
+          "version": "1.5.0",
+          "note": "Small fixes. Smoother builds."
         }
       }
     },

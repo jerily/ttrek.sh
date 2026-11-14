@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tjson
 package require twebserver
 
@@ -6,12 +12,14 @@ namespace eval ::archive_mirror {
     variable counts {}
 }
 
+# Write an uploader progress message to standard error.
 proc ::archive_mirror::log {level message} {
     set channel [expr {$level eq "WARN" ? "stderr" : "stdout"}]
     puts $channel "$level: $message"
     flush $channel
 }
 
+# Return command-line usage instructions.
 proc ::archive_mirror::usage {} {
     return {Usage: upload-archives-to-s3.sh [options] [REGISTRY_DIRECTORY]
   --dry-run         List URL/key mappings without AWS calls or downloads
@@ -24,6 +32,7 @@ The registry defaults to the sibling ttrek-registry checkout. Uses the AWS CLI
 credential chain, including AWS_PROFILE. Archive failures are logged and skipped.}
 }
 
+# Parse and validate uploader command-line options.
 proc ::archive_mirror::options {arguments} {
     variable root
     set region eu-central-1
@@ -70,16 +79,19 @@ proc ::archive_mirror::field {node name type} {
     return $value
 }
 
+# Check that the uploader’s external commands are installed.
 proc ::archive_mirror::require_commands {} {
     foreach command {aws curl} {
         if {[auto_execok $command] eq {}} {error "Required command not found: $command"}
     }
 }
 
+# Execute an external command with its arguments kept separate.
 proc ::archive_mirror::run_command {command} {
     exec {*}$command 2>@1
 }
 
+# Mirror release files into the destination storage prefix.
 proc ::archive_mirror::mirror {settings url key} {
     variable counts
     set bucket [dict get $settings bucket]
@@ -120,6 +132,7 @@ proc ::archive_mirror::mirror {settings url key} {
     } finally {file delete -force $archive}
 }
 
+# Validate and process one artifact upload specification.
 proc ::archive_mirror::process_spec {settings path seenVar} {
     variable counts
     upvar 1 $seenVar seen
@@ -190,6 +203,7 @@ proc ::archive_mirror::process_spec {settings path seenVar} {
     }
 }
 
+# Run this command-line entry point with validated arguments.
 proc ::archive_mirror::main {arguments} {
     variable counts
     if {$arguments in {{--help} {-h}}} {puts [usage]; return}

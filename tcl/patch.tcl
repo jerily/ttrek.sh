@@ -1,12 +1,15 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Private tasks invoked directly through the Lambda Invoke API. API Gateway
 # requests retain their HTTP envelope and cannot select this dispatch path.
 namespace eval ::site_patch {}
+# Execute the selected maintenance operation with validated settings.
 proc ::site_patch::run {task context} {
-    if {$task ni {task_initdb_website task_sync_website task_publish_search}} {error "Unknown patch task"}
+    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts}} {error "Unknown patch task"}
     set completed {}
     foreach name [::site_patch::$task $context] {lappend completed [list S $name]}
     ::tjson::typed_to_json [list M [dict create ok {BOOL 1} task [list S $task] completed [list L $completed]]]
@@ -48,6 +51,7 @@ proc ::site_patch::task_initdb_website {context} {
     return $initialized
 }
 
+# Import website content and registry metadata in one transaction.
 proc ::site_patch::task_sync_website {context} {
     set settings [::site::config]
     set root [dict get $settings rootdir]
@@ -73,4 +77,12 @@ proc ::site_patch::task_sync_website {context} {
 proc ::site_patch::task_publish_search {context} {
     ::telemetry::publish_search_snapshot true
     return {search}
+}
+
+# Expose bounded account maintenance only through the private task dispatcher.
+proc ::site_patch::task_prune_accounts {context} {
+    set counts [::accounts::prune]
+    set result {}
+    dict for {name count} $counts {lappend result "$name:$count"}
+    return $result
 }

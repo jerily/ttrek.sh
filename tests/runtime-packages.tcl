@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Load real dependencies in a fresh interpreter, without opening service connections.
 package require Tcl 9.1
 set packages $argv
@@ -5,7 +11,7 @@ if {![llength $packages]} {
     set packages {
         twebserver topenapi sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
         awss3 awskms awsssm tconfig::decrypt tconfig::encrypt
-        tratelimit treqmon
+        tratelimit treqmon web-user tcaptcha tclgd awsses
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3 tdbc::postgres
         mock-proxy-app mock-lambda-app mock-s3-app trequests
     }

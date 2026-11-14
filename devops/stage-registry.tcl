@@ -1,7 +1,15 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Build-time input only. CodeBuild supplies its synced public checkout; local
 # packaging can fetch one. The deployed sync task imports the bundled snapshot.
 namespace eval ::registry_build {}
+# Run Git against the explicitly selected registry checkout.
 proc ::registry_build::git {args} {exec git {*}$args}
+# Copy the selected registry snapshot into the build staging tree.
 proc ::registry_build::stage {root {source {}}} {
     set directory [file join $root registry]
     if {[file exists $directory]} {error "Registry staging directory already exists: $directory"}

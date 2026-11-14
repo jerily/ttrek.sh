@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 namespace import ::tcltest::test
 source [file join [file dirname [info script]] .. tcl config.tcl]
@@ -9,7 +15,9 @@ foreach name {config.ini config.enc config.local.ini} {
 }
 set saved_env [array get ::env ENV]
 namespace eval ::tconfig {
+    # Provide the read config test fixture.
     proc read_config {path} {dict create redis {host production.example port 6379 password test} loaded [file tail $path]}
+    # Provide the load config test fixture.
     proc load_config {path} {read_config $path}
 }
 
@@ -61,6 +69,7 @@ test config-7 {Local plain TCP supports the existing unauthenticated loopback se
 test config-8 {Relative certificate paths resolve against the project root} -setup {
     close [open [file join $root etc config.local.ini] w]
     rename ::tconfig::read_config ::tconfig::saved_read_config
+    # Provide the read config test fixture.
     proc ::tconfig::read_config {path} {dict create redis {host localhost ssl_ca_file local/cert.pem}}
 } -body {
     set ::env(ENV) LOCAL
@@ -155,6 +164,7 @@ test releases-config-6 {Missing and malformed checksum manifests fail startup} -
 test releases-config-7 {Checksum paths resolve from the application root in both config modes} -setup {
     file copy -force $checksums_fixture [file join $root etc releases.json]
     rename ::tconfig::read_config ::tconfig::saved_read_config
+    # Provide the read config test fixture.
     proc ::tconfig::read_config {path} {dict create redis {host localhost} releases {version 1.0.0 checksums_file etc/releases.json}}
     set saved_cwd [pwd]
     cd /tmp
@@ -188,7 +198,7 @@ test releases-config-9 {Unrelated local configuration keeps default release sett
     puts $channel "\[registry\]\ndirectory=registry"
     close $channel
     dict get [::app_config::releases_from_ini $path $root] version
-} -result 1.3.0
+} -result 1.5.0
 
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env

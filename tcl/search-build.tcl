@@ -1,6 +1,13 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Build-only registry reader. Runtime workers source search.tcl and call load.
 source [file join [file dirname [info script]] search.tcl]
 
+# Read the registry metadata needed by the search builder.
 proc ::recipe_search::metadata {path} {
     set channel [open $path r]
     try {
@@ -24,6 +31,7 @@ proc ::recipe_search::metadata {path} {
     return [dict create description $text tags $tags]
 }
 
+# Build the search assets from validated registry metadata.
 proc ::recipe_search::build {directory destination} {
     if {![file isdirectory $directory]} {error "Search registry directory does not exist"}
     set rows {}
