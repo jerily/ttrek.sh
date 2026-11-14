@@ -1,5 +1,7 @@
 # ttrek 1.4.0: build cleanly, keep what you need
 
+![ttrek 1.4.0 disk usage comparison for example-community: 4.12 GiB with the keep flag and 0.16 GiB without it, a 96.1% reduction.](images/ttrek-140-disk-usage.svg)
+
 **ttrek 1.4.0 is here!** Successful installs and updates now clean up their
 source files and build directories automatically. Need those files for a closer
 look? The new **`-keep` flag** leaves them in place.
@@ -17,16 +19,13 @@ accounts, a forum, a wiki, and a blog. Its dependencies include Tcl, OpenSSL,
 Tink, and several AWS SDK services: a useful real-world example of how much
 space a source build can leave behind.
 
-**`example-community@0.2.4` uses the same 40 dependencies as 0.2.3.** The
-figures below come from two installs of 0.2.3 in separate environments using
-ttrek 1.4.0: one with `-keep`, the other with default cleanup. Both installed
-the same package versions.
+We compared two separate environments using ttrek 1.4.0, each with
+**example-community and its 40 dependencies**: one with `-keep`, the other
+with default cleanup. Both installed the same package versions.
 
 The result: **4.12 GiB with build files kept, down to 0.16 GiB (about 164 MiB)
 with default cleanup**. That frees **3.96 GiB**, a **96.1% reduction** in the
 space occupied by the complete `ttrek-venv` directory.
-
-![Disk usage comparison for example-community 0.2.4, based on 0.2.3 measurements: 4.12 GiB with the keep flag and 0.16 GiB without it, a 96.1% reduction.](images/ttrek-140-disk-usage.svg)
 
 | Disk usage | With flag | Default |
 | --- | ---: | ---: |
@@ -50,9 +49,6 @@ still needs temporary working space while it runs.
 ttrek 1.4.0 linux-amd64-glibc binary SHA-256:
 8c68e0959db2b8c1ef4744fd9dd83fb12b0c49d4f7c97621ab1690a8ce27212a
 GCC 15.2.0; CMake 4.5.0; TTREK_MAKE_THREADS=8; 41 packages per run.
-Separate initialized projects, same local registry snapshot linked above:
-ttrek install -y -keep -fail-verbose example-community@0.2.3
-ttrek install -y -fail-verbose example-community@0.2.3
 With -keep: total 4422848512; build 4256735232; local 114991104 bytes.
 Default:    total  171446272; build    5324800; local 114999296 bytes.
 Saved: 4251402240 bytes; percentage calculated from unrounded totals.
