@@ -50,6 +50,17 @@ Resources:
           ToPort: 1
           CidrIp: 127.0.0.1/32
 
+  TTrekSesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private SES API endpoint
+      VpcId: !Ref TTrekVpc0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 1
+          ToPort: 1
+          CidrIp: 127.0.0.1/32
+
   TTrekLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -66,6 +77,10 @@ Resources:
           FromPort: 443
           ToPort: 443
           DestinationSecurityGroupId: !Ref TTrekKmsSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          DestinationSecurityGroupId: !Ref TTrekSesSecurityGroup
 
   TTrekValkeyIngress:
     Type: AWS::EC2::SecurityGroupIngress
@@ -80,6 +95,15 @@ Resources:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       GroupId: !Ref TTrekKmsSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref TTrekLambdaSecurityGroup
+
+  TTrekSesIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TTrekSesSecurityGroup
       IpProtocol: tcp
       FromPort: 443
       ToPort: 443
@@ -141,6 +165,19 @@ Resources:
             Principal: '*'
             Action: kms:Decrypt
             Resource: !ImportValue Infra-DevOps-TTREK-Keys-KMSMasterKeyArn
+
+  TTrekSesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      VpcEndpointType: Interface
+      # awsses uses the HTTPS API, not the email-smtp service.
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.email
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref TTrekPrivateSubnet1]
+      SecurityGroupIds: [!Ref TTrekSesSecurityGroup]
+      # Sending permissions remain scoped by the Lambda execution role. Keep
+      # this base stack independent of the SES identity stack's exports.
 
 Outputs:
   TTrekVpc0Id:
