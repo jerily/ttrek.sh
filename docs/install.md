@@ -26,10 +26,12 @@ git clone https://github.com/jerily/ttrek.sh.git
 cd ttrek.sh
 ```
 
-The registry is an independent repository. Lambda packaging fetches its latest
-default-branch commit and includes the recipes, scripts and patches in the ZIP.
-Packaging requires Git and HTTPS access to GitHub; Lambda itself needs no public
-internet access. A failed checkout fails the build.
+The registry is an independent repository. CodeBuild syncs it before installing
+dependencies and reuses that checkout when packaging recipes, scripts and patches
+in the ZIP. Local packaging fetches its latest default-branch commit unless
+`TTREK_PUBLIC_REGISTRY` selects an existing checkout; see [registry inputs](registry.md).
+Fetching requires Git and HTTPS access to GitHub; Lambda itself needs no public
+internet access. A failed sync or invalid supplied checkout fails the build.
 
 ## Install dependencies
 

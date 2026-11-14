@@ -56,3 +56,7 @@ Use `ttrek install -y` to install a project's declared dependencies. See
 
 For a complete project to try, follow [Build websites with ttrek](/docs/build-websites-with-ttrek)
 to run a personal site and a community site with accounts.
+
+To learn how an app saves data between runs, try
+[Database Persistence Layer with tpersist](/docs/database-persistence-layer).
+Build a task list with a JSON schema, SQLite locally, and PostgreSQL in production.

@@ -333,13 +333,16 @@ The build:
 1. Downloads the ttrek 1.3.0 Linux AMD64 glibc binary from
    `s3://jerily-ttrek-app/ttrek/1.3.0/linux-amd64-glibc/ttrek`, makes it executable,
    and checks that it starts with `ttrek self-update -version`.
-2. Uses that binary to install from the private registry (build tools) and the
-   independently fetched public registry (runtime dependencies).
+2. Runs `ttrek sync` into `build/public-registry`, then installs from the private
+   registry (build tools) followed by that public checkout (runtime dependencies).
+   A failed sync stops the build before installation.
 3. Restores retained browser assets, builds browser assets, then the
    application and asset checks.
 4. Generates encrypted production config from SSM and packages with tdevops using
-   `--local-only`. Packaging checks out the latest `jerily/ttrek-registry` default
-   branch into the ZIP, excludes `.git`, and records `etc/registry-revision`.
+   `--local-only`. `TTREK_PUBLIC_REGISTRY` tells packaging to reuse the synced
+   dependency checkout. It exports that commit into the ZIP, excludes Git metadata
+   and ignored files, and records `etc/registry-revision` without another fetch.
+   The later `task_sync_website` imports this same bundled snapshot.
    It validates the staged recipes in an in-memory database and sets executable
    ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,

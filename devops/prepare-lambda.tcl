@@ -2,7 +2,11 @@ package require Tcl 9.1
 source [file join [file dirname [file dirname [info script]]] runtime paths.tcl]
 set siteRoot $::tdevops::runtime::root
 source [file join $siteRoot devops stage-registry.tcl]
-::registry_build::stage $siteRoot
+set registrySource {}
+if {[info exists ::env(TTREK_PUBLIC_REGISTRY)]} {
+    set registrySource $::env(TTREK_PUBLIC_REGISTRY)
+}
+::registry_build::stage $siteRoot $registrySource
 foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js public/js/chart.umd.js} {
     if {![file isfile [file join $siteRoot $asset]]} {
         error "Missing browser asset $asset; run ttrek run -script build-assets before packaging"
