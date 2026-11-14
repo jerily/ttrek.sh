@@ -38,6 +38,7 @@ aws s3 sync "$ASSET_HISTORY" public/assets/versioned/ --only-show-errors
 ttrek run -script build-assets
 npm test
 "$TCLSH" tests/all.tcl
+"$TCLSH" tests/homepage.test
 "$TCLSH" tests/static-content.test
 "$TCLSH" tests/content-images.test
 "$TCLSH" tests/content-images-build.test

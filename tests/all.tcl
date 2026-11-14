@@ -239,14 +239,14 @@ proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
     dict size $::views::templates
-} -result 11
+} -result 12
 
 test templates-2 {Index layout and literal clipboard command} -setup {
     set saved_env [array get ::env ENV]
     unset -nocomplain ::env(ENV)
 } -body {
     set html [body [get_index_page_handler {} {}]]
-    list [contains $html {<h1 class="splash-head">Install ttrek</h1>}] \
+    list [contains $html {<h1 class="splash-head">Your next Tcl project starts here.</h1>}] \
         [contains $html {data-clipboard-text="curl --proto &#39;=https&#39; --tlsv1.2 -sSf https://ttrek.sh/init | sh"}] \
         [contains $html {<title>ttrek: registry, website, and command-line interface</title>}]
 } -cleanup {

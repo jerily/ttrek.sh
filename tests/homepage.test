@@ -1,0 +1,150 @@
+package require Tcl 9.1
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tests fixtures deny-thread.tcl]
+source [file join $root tcl site.tcl]
+source [file join $root tcl config.tcl]
+source [file join $root tcl telemetry.tcl]
+::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root tests fixtures registry]]
+set settings [dict create rootdir $root releases [::app_config::releases {}] \
+    content_connection $::telemetry::connection content_images {}]
+foreach {kind directory} {wiki docs blog blog} {
+    ::web::static::${kind}::initdb $::telemetry::connection
+    set store [dict get [::content_images::database_stores $::telemetry::connection {}] $kind]
+    ::web::static::${kind}::sync $store [file join $root content $directory]
+}
+::site::init_worker $settings
+set config $::homepage::config
+set stores [::homepage::stores]
+proc slides {} {
+    ::tjson::json_to_simple [::tjson::typed_to_json [dict get [::homepage::data] slides]]
+}
+proc homepage {} {
+    dict get [::site::dispatch $::site::router {method GET path / headers {Host ttrek.sh}}] body
+}
+
+test homepage-five {Published configuration renders five slides including the 1.4.0 post} -body {
+    set data [slides]
+    set post [lindex $data 3]
+    set html [homepage]
+    list [lmap slide $data {dict get $slide id}] [dict get $post version] \
+        [dict get $post url] [dict get $post date] \
+        [expr {[string first {class="home-showcase"} $html] < [string first {class="registry-search"} $html]}] \
+        [regexp -all {class="showcase-dot"} $html] \
+        [expr {![regexp {<article[^>]*(aria-hidden="true"|inert)} $html]}] \
+        [string match {*Source on GitHub*Registry on GitHub*Request Monitor*} $html]
+} -result {{personal community guide blog packages} 1.4.0 /blog/2026-11-14-ttrek-140-build-cleanly-keep-what-you-need 2026-11-14 1 5 1 1}
+
+test homepage-limits {Missing and duplicate entries are filtered before the five-slide limit} -body {
+    set guide [lindex [dict get $config slides] 2]
+    set entries [list [dict replace $guide path /missing] [dict replace $guide id duplicate] \
+        [dict replace $guide id duplicate]]
+    foreach id {a b c d e f} {lappend entries [dict replace $guide id $id]}
+    set data [::tjson::json_to_simple [::tjson::typed_to_json [::homepage::resolve $entries $stores]]]
+    lmap slide $data {dict get $slide id}
+} -result {duplicate a b c d}
+
+test homepage-unavailable {Unavailable optional sources keep search and the installer usable} -setup {
+    rename ::recipe_search::database ::recipe_search::saved_database
+    proc ::recipe_search::database {args} {error unavailable}
+    ::site::configure [dict remove $settings content_connection]
+} -body {
+    set html [homepage]
+    list [llength [slides]] [string match {*class="registry-search"*} $html] \
+        [string match {*data-clipboard-text=*} $html] [string match {*class="home-showcase"*} $html]
+} -cleanup {
+    rename ::recipe_search::database {}
+    rename ::recipe_search::saved_database ::recipe_search::database
+    ::site::configure $settings
+} -result {0 1 1 0}
+
+test homepage-packages {Only selected published packages appear, in editorial order} -setup {
+    set entry [lindex [dict get $config slides] 4]
+    dict set entry packages {missing tjson jinja2-tcl}
+} -body {
+    set data [::tjson::json_to_simple [::tjson::typed_to_json [::homepage::resolve [list $entry] $stores]]]
+    lmap package [dict get [lindex $data 0] packages] {dict get $package name}
+} -result {tjson jinja2-tcl}
+
+test homepage-missing-image {An unavailable screenshot is omitted without losing the other entries} -body {
+    set entries [dict get $config slides]
+    lset entries 0 [dict replace [lindex $entries 0] image images/missing.png]
+    set data [::tjson::json_to_simple [::tjson::typed_to_json [::homepage::resolve $entries $stores]]]
+    lmap slide $data {dict get $slide id}
+} -result {community guide blog packages}
+
+test homepage-sync {An already configured worker sees a new post, then withdrawal, without stale release copy} -setup {
+    set directory [makeDirectory homepage-blog]
+    set channel [open [file join $directory 2026-11-15-new-post.md] w]
+    puts $channel {# A new <release> & "news"}
+    close $channel
+} -body {
+    ::web::static::blog::sync [dict get $stores blog] $directory
+    set post [lindex [slides] 3]
+    set html [homepage]
+    file delete [file join $directory 2026-11-15-new-post.md]
+    ::web::static::blog::sync [dict get $stores blog] $directory
+    list [dict get $post url] [dict get $post version] \
+        [string match {*A new &lt;release&gt; &amp; &quot;news&quot;*} $html] \
+        [expr {[string first {Build cleanly. Keep what you need.} $html] < 0}] \
+        [lmap slide [slides] {dict get $slide id}]
+} -cleanup {
+    removeDirectory $directory
+    ::web::static::blog::sync [dict get $stores blog] [file join $root content blog]
+} -result {/blog/2026-11-15-new-post {} 1 1 {personal community guide packages}}
+
+test homepage-image-local {Only configured image IDs are served, with exact binary bytes and HEAD support} -body {
+    set response [::site::dispatch $::site::router {method GET path /homepage/images/personal headers {Host ttrek.sh}}]
+    set bytes [::assets::read_bytes [file join $root content docs images build-websites personal-home.png]]
+    set head [::site::dispatch $::site::router {method HEAD path /homepage/images/personal headers {Host ttrek.sh}}]
+    set bad [::site::dispatch $::site::router {method GET path /homepage/images/unknown headers {Host ttrek.sh}}]
+    list [dict get $response statusCode] [expr {[binary decode base64 [dict get $response body]] eq $bytes}] \
+        [::responses::header $response Content-Type] [dict get $head body] [dict get $bad statusCode]
+} -result {200 1 image/png {} 404}
+
+test homepage-image-delivery {Published references use the package CDN/signing resolver, with fresh signed URLs} -setup {
+    set entry [lindex [dict get $config slides] 0]
+    set source [dict get $entry image]
+    set key ttrek/content/images/docs/$source
+    set item [dict create image_references [dict create $source [list $key {}]]]
+    set store [dict replace [dict get $stores wiki] -s3 [dict create \
+        client test bucket private prefix ttrek/content/images/docs cdn_url https://cdn.example.test \
+        url_expiry_seconds 30 http_endpoint {} upload_missing false]]
+    rename ::aws::s3::generate_presigned_url ::aws::s3::saved_generate_presigned_url
+    set calls 0
+    proc ::aws::s3::generate_presigned_url {args} {
+        incr ::calls
+        return "https://s3.example.test/image?X-Amz-Signature=[string repeat a 64]&generation=$::calls"
+    }
+} -body {
+    set cdn [::homepage::image $entry $store $item]
+    set noCalls $calls
+    dict set store -s3 cdn_url {}
+    set first [::homepage::image $entry $store $item]
+    set second [::homepage::image $entry $store $item]
+    list [string match "*src=\"https://cdn.example.test/$key\"*" $cdn] $noCalls $calls \
+        [expr {$first ne $second}] [string match {*&amp;generation=2*} $second]
+} -cleanup {
+    rename ::aws::s3::generate_presigned_url {}
+    rename ::aws::s3::saved_generate_presigned_url ::aws::s3::generate_presigned_url
+} -result {1 0 2 1 1}
+
+test homepage-config {Malformed configuration fails open to the search and install homepage} -setup {
+    set directory [makeDirectory homepage-config]
+    file mkdir [file join $directory etc]
+    set channel [open [file join $directory etc homepage.json] w]
+    puts $channel {{"version": 1, "slides": {}, "autoplay": "true"}}
+    close $channel
+} -body {
+    ::homepage::configure $directory
+    list [dict get $::homepage::config slides] [dict get $::homepage::config autoplay]
+} -cleanup {
+    removeDirectory $directory
+    ::homepage::configure $root
+} -result {{} false}
+
+$::site::router destroy
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

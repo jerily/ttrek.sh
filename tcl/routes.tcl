@@ -2,6 +2,7 @@
 return {
     GET /debug get_debug_handler get_debug
     GET / get_index_page_handler get_index
+    GET /homepage/images/:id get_homepage_image_handler get_homepage_image
     GET /init get_ttrek_init_handler get_ttrek_init
     GET /packages get_packages_page_handler get_packages
     GET /search get_search_page_handler get_search_page

@@ -12,6 +12,35 @@ Keep existing filenames when editing content to preserve links.
 The public packages `web-static-wiki` and `web-static-blog` serve database content
 without browser write routes. Blog filenames use `YYYY-MM-DD-title.md`.
 
+### Homepage carousel
+
+The compact homepage carousel is selected by `etc/homepage.json`. Its ordered
+`slides` list supports `example`, `doc`, `latest_blog`, and `packages` entries.
+Keep IDs unique. Examples/docs refer to published documentation paths; example
+images are relative to `content/docs/` and use the existing content-image
+delivery settings. With image storage disabled, the homepage serves only those
+configured images locally. Select up to three published package names per
+packages entry. Missing content is omitted before the five-slide limit.
+
+The latest-blog entry reads its title, date, and URL from the published blog
+metadata on every homepage request. Optional `highlights`, keyed by the exact
+post path, add release-specific copy (currently 1.4.0); newer posts automatically
+use the generic preview until given their own highlight. No Markdown is scanned
+and no database schema is created during homepage requests. Existing tpersist
+0.1.4 JSON schemas remain the source of the content and registry data.
+
+Set `autoplay` to `false` for manual rotation. When enabled, playback starts once
+the first image and carousel are visible: 15 seconds on the first slide, then
+12 seconds each, stopping on the last. Pause, manual selection, keyboard/touch
+interaction, search focus, and install-copy interaction stop playback until
+Play. Hover, a hidden tab, and scrolling off-screen temporarily suspend it;
+returning starts a full interval. Reduced motion starts paused and disables the
+250 ms crossfade. Without JavaScript, all entries appear as ordinary sections.
+Repackage/restart after changing the JSON; content syncs reach warm workers on
+their next homepage request.
+
+### Publish content edits
+
 Edit Markdown, repackage, and restart the local services. Run `initdb-local`, then
 `sync-local`, against the running local Lambda to publish the packaged files.
 Neither startup nor HTTP requests import Markdown, upload content images, create

@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "autoplay": true,
+  "slides": [
+    {
+      "id": "personal",
+      "type": "example",
+      "label": "Build a website",
+      "kicker": "Tcl in action",
+      "title": "A website, ready to become yours.",
+      "description": "Your own homepage, journal, and notebook. Start with a working example and make it your own.",
+      "path": "/build-websites-with-ttrek",
+      "link_text": "Build your website",
+      "image": "images/build-websites/personal-home.png",
+      "image_alt": "The personal website example, with Alex Rivers's introduction and notebook",
+      "image_width": 1280,
+      "image_height": 1694,
+      "preview_label": "your own little corner of the web"
+    },
+    {
+      "id": "community",
+      "type": "example",
+      "label": "Start a community",
+      "kicker": "Better together",
+      "title": "A place for your people to gather.",
+      "description": "Accounts, discussions, and a shared notebook. Bring a community to life with Tcl.",
+      "path": "/build-websites-with-ttrek",
+      "link_text": "Explore the community example",
+      "image": "images/build-websites/community-home.png",
+      "image_alt": "Juniper Yard, the community website example, with a garden illustration and discussion links",
+      "image_width": 1280,
+      "image_height": 2058,
+      "preview_label": "a small place to bring people together"
+    },
+    {
+      "id": "guide",
+      "type": "doc",
+      "label": "Getting started",
+      "kicker": "A good place to begin",
+      "title": "Your first project, one step at a time.",
+      "description": "Set up your tools, create a project, and add your first packages. The guide walks you through it.",
+      "path": "/getting-started",
+      "link_text": "Read the getting started guide",
+      "commands": "$ mkdir my-project\n$ cd my-project\n$ ttrek init -y\n$ ttrek install -y tcl tjson"
+    },
+    {
+      "id": "blog",
+      "type": "latest_blog",
+      "label": "Latest blog post",
+      "kicker": "From the blog",
+      "link_text": "Read the latest post",
+      "highlights": {
+        "/2026-11-14-ttrek-140-build-cleanly-keep-what-you-need": {
+          "description": "Successful installs now clean up sources and build files. Use -keep when you want a closer look.",
+          "version": "1.4.0",
+          "note": "Build cleanly. Keep what you need."
+        }
+      }
+    },
+    {
+      "id": "packages",
+      "type": "packages",
+      "label": "Featured packages",
+      "kicker": "Featured packages",
+      "title": "Find your next building block.",
+      "description": "A few useful starting points for working with JSON, serving websites, and rendering templates.",
+      "link_text": "Explore the registry",
+      "packages": ["tjson", "twebserver", "jinja2-tcl"]
+    }
+  ]
+}

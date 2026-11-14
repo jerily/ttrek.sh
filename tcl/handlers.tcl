@@ -186,6 +186,7 @@ proc get_index_page_handler {ctx req} {
     set data [dict create title {S {Install ttrek}} \
         pagetitle {S {ttrek: registry, website, and command-line interface}} \
         install_command [list S $install_command]]
+    set data [dict merge $data [::homepage::data]]
     set html [::views::render index.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
