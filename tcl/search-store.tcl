@@ -1,12 +1,15 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
 # Derived data is deliberately outside telemetry::table_definitions and backups.
 namespace eval ::telemetry {variable search_module [file join [file dirname [info script]] search-snapshot.tcl]}
 
+# Apply the derived schema and ensure its singleton row.
 proc ::telemetry::init_search_snapshot {} {
     variable connection
-    set fields {id {type integer primary_key 1} format {type integer not_null 1}}
-    foreach field {revision fingerprint mapping} {dict set fields $field {type text not_null 1}}
-    foreach field {names descriptions} {dict set fields $field {type binary not_null 1}}
-    db_create_table $connection [db_define_table registry_search_snapshot $fields] -if_not_exists true
+    variable schema_dir
+    db_apply_schema $connection [file join $schema_dir search-snapshot.json] -additive true
     set defaults [dict create format [db_value 3 -type integer]]
     foreach field {revision fingerprint mapping} {dict set defaults $field [db_value {} -type text]}
     foreach field {names descriptions} {dict set defaults $field [db_value [binary format a0 {}] -type binary]}

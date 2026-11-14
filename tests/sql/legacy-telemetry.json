@@ -1,0 +1,400 @@
+{
+  "version": 1,
+  "tables": [
+    {
+      "name": "environments",
+      "columns": {
+        "env_id": {
+          "type": "integer",
+          "primary_key": true,
+          "auto_increment": true
+        },
+        "hash": {
+          "type": "binary",
+          "not_null": true
+        },
+        "description": {
+          "type": "text",
+          "not_null": true
+        },
+        "last_seen": {
+          "type": "bigint",
+          "not_null": true
+        }
+      }
+    },
+    {
+      "name": "environment_keys",
+      "columns": {
+        "key_id": {
+          "type": "integer",
+          "primary_key": true,
+          "auto_increment": true
+        },
+        "hash": {
+          "type": "binary",
+          "unique": true,
+          "not_null": true
+        },
+        "touched": {
+          "type": "bigint",
+          "not_null": true
+        }
+      }
+    },
+    {
+      "name": "package_names",
+      "columns": {
+        "pkg_name_id": {
+          "type": "integer",
+          "primary_key": true,
+          "auto_increment": true
+        },
+        "name": {
+          "type": "text",
+          "unique": true,
+          "not_null": true
+        }
+      }
+    },
+    {
+      "name": "packages",
+      "columns": {
+        "pkg_id": {
+          "type": "integer",
+          "primary_key": true,
+          "auto_increment": true
+        },
+        "pkg_name_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "version": {
+          "type": "text",
+          "not_null": true
+        }
+      },
+      "unique": [
+        [
+          "pkg_name_id",
+          "version"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "pkg_name_id"
+          ],
+          "table": "package_names",
+          "referenced_columns": [
+            "pkg_name_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "platforms",
+      "columns": {
+        "platform_id": {
+          "type": "integer",
+          "primary_key": true,
+          "auto_increment": true
+        },
+        "os": {
+          "type": "text",
+          "not_null": true
+        },
+        "arch": {
+          "type": "text",
+          "not_null": true
+        }
+      },
+      "unique": [
+        [
+          "os",
+          "arch"
+        ]
+      ]
+    },
+    {
+      "name": "req_dist_get",
+      "columns": {
+        "timestamp": {
+          "type": "bigint",
+          "not_null": true
+        },
+        "env_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "platform_id": {
+          "type": "integer",
+          "not_null": true
+        }
+      },
+      "foreign_keys": [
+        {
+          "columns": [
+            "env_id"
+          ],
+          "table": "environments",
+          "referenced_columns": [
+            "env_id"
+          ]
+        },
+        {
+          "columns": [
+            "platform_id"
+          ],
+          "table": "platforms",
+          "referenced_columns": [
+            "platform_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "req_pkg_get",
+      "columns": {
+        "timestamp": {
+          "type": "bigint",
+          "not_null": true
+        },
+        "env_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "pkg_name_id": {
+          "type": "integer",
+          "not_null": true
+        }
+      },
+      "foreign_keys": [
+        {
+          "columns": [
+            "env_id"
+          ],
+          "table": "environments",
+          "referenced_columns": [
+            "env_id"
+          ]
+        },
+        {
+          "columns": [
+            "pkg_name_id"
+          ],
+          "table": "package_names",
+          "referenced_columns": [
+            "pkg_name_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "req_pkg_version_get",
+      "columns": {
+        "timestamp": {
+          "type": "bigint",
+          "not_null": true
+        },
+        "env_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "pkg_id": {
+          "type": "integer",
+          "not_null": true
+        }
+      },
+      "foreign_keys": [
+        {
+          "columns": [
+            "env_id"
+          ],
+          "table": "environments",
+          "referenced_columns": [
+            "env_id"
+          ]
+        },
+        {
+          "columns": [
+            "pkg_id"
+          ],
+          "table": "packages",
+          "referenced_columns": [
+            "pkg_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "req_pkg_install_event",
+      "columns": {
+        "timestamp": {
+          "type": "bigint",
+          "not_null": true
+        },
+        "env_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "pkg_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "platform_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "install_outcome": {
+          "type": "integer",
+          "not_null": true
+        },
+        "install_is_toplevel": {
+          "type": "integer",
+          "not_null": true
+        }
+      },
+      "foreign_keys": [
+        {
+          "columns": [
+            "env_id"
+          ],
+          "table": "environments",
+          "referenced_columns": [
+            "env_id"
+          ]
+        },
+        {
+          "columns": [
+            "pkg_id"
+          ],
+          "table": "packages",
+          "referenced_columns": [
+            "pkg_id"
+          ]
+        },
+        {
+          "columns": [
+            "platform_id"
+          ],
+          "table": "platforms",
+          "referenced_columns": [
+            "platform_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "req_reg_get_pkg_spec",
+      "columns": {
+        "timestamp": {
+          "type": "bigint",
+          "not_null": true
+        },
+        "env_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "pkg_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "platform_id": {
+          "type": "integer",
+          "not_null": true
+        }
+      },
+      "foreign_keys": [
+        {
+          "columns": [
+            "env_id"
+          ],
+          "table": "environments",
+          "referenced_columns": [
+            "env_id"
+          ]
+        },
+        {
+          "columns": [
+            "pkg_id"
+          ],
+          "table": "packages",
+          "referenced_columns": [
+            "pkg_id"
+          ]
+        },
+        {
+          "columns": [
+            "platform_id"
+          ],
+          "table": "platforms",
+          "referenced_columns": [
+            "platform_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "req_reg_get_pkg",
+      "columns": {
+        "timestamp": {
+          "type": "bigint",
+          "not_null": true
+        },
+        "env_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "pkg_name_id": {
+          "type": "integer",
+          "not_null": true
+        }
+      },
+      "foreign_keys": [
+        {
+          "columns": [
+            "env_id"
+          ],
+          "table": "environments",
+          "referenced_columns": [
+            "env_id"
+          ]
+        },
+        {
+          "columns": [
+            "pkg_name_id"
+          ],
+          "table": "package_names",
+          "referenced_columns": [
+            "pkg_name_id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "req_logo_get",
+      "columns": {
+        "timestamp": {
+          "type": "bigint",
+          "not_null": true
+        },
+        "env_id": {
+          "type": "integer",
+          "not_null": true
+        }
+      },
+      "foreign_keys": [
+        {
+          "columns": [
+            "env_id"
+          ],
+          "table": "environments",
+          "referenced_columns": [
+            "env_id"
+          ]
+        }
+      ]
+    }
+  ]
+}
