@@ -2,6 +2,9 @@
   "name": "ttrek_sh",
   "version": "1.0.0",
   "scripts": {
+    "importdb-local": {
+      "file": "bin/importdb-local.sh"
+    },
     "generate-account-keys": {
       "file": "bin/generate-account-keys.sh"
     },
@@ -70,7 +73,7 @@
     "libpq": "^16.15.0",
     "tcl": "^9.1.0",
     "jinja2-tcl": "^0.1.0",
-    "tink-tcl": "^20240704.0.1",
+    "tink-tcl": "^20240704.0.2",
     "tjson": "^1.0.26",
     "topenapi": "^0.2.0",
     "tpathexp": "^1.2.0",
@@ -83,7 +86,7 @@
     "tratelimit": "^1.1.0",
     "treqmon": "^2.2.0",
     "aws-sdk-tcl-s3": "^1.0.18",
-    "tpersist": "^0.1.4",
+    "tpersist": "^0.1.5",
     "tconfig": "^1.0.0",
     "web-user": "^0.3.0",
     "tcaptcha": "^0.1.0"

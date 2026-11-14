@@ -26,62 +26,23 @@ proc ::telemetry_maintenance::check_deadline {deadline} {
     if {[clock milliseconds] >= $deadline} {error "Telemetry maintenance time budget exceeded"}
 }
 
-# Serialize one record into the maintenance backup.
-proc ::telemetry_maintenance::write_record {channel record} {
-    puts $channel [::tjson::typed_to_json [list M $record]]
-}
-
-# A repeatable-read snapshot includes all dimensions and events consistently.
-# Server-side cursors bound memory even when an event table grows large.
-proc ::telemetry_maintenance::backup {db path deadline} {
-    set channel [open $path wb]
-    zlib push gzip $channel
-    fconfigure $channel -encoding utf-8 -translation lf
-    set definitions [::telemetry::table_definitions]
-    set tables {}
-    foreach table [dict keys $definitions] {lappend tables [list S $table]}
-    set counts {}
+# Export every application table in the current schema, including its live JSON
+# schema. The maintenance connection keeps the advisory lock while this dedicated
+# tpersist connection owns the consistent export snapshot.
+proc ::telemetry_maintenance::backup {settings path deadline} {
+    package require tpersist 0.1.5
+    set startup {}
+    if {[dict exists $settings options]} {set startup [dict get $settings options]}
+    dict set settings options "$startup -c statement_timeout=20000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000"
+    set options {-autobegin false}
+    dict for {key value} $settings {lappend options -$key $value}
+    set connection [::tpersist::db_connect {*}$options]
     try {
-        $db allrows {BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY}
-        write_record $channel [dict create format {S ttrek-telemetry} version {N 1} \
-            created_at [list N [clock seconds]] tables [list L $tables]]
-        dict for {table definition} $definitions {
-            set count 0
-            set query [::tpersist::db_compile [::tpersist::db_select $table] -dialect postgresql]
-            $db allrows "DECLARE telemetry_export NO SCROLL CURSOR FOR [dict get $query sql]"
-            while {1} {
-                check_deadline $deadline
-                set timeout [expr {max(1, min(20000, $deadline - [clock milliseconds]))}]
-                $db allrows "SET LOCAL statement_timeout = $timeout"
-                set rows [$db allrows {FETCH FORWARD 256 FROM telemetry_export}]
-                if {![llength $rows]} break
-                foreach row $rows {
-                    set values {}
-                    dict for {column spec} [dict get $definition columns] {
-                        set value [dict get $row $column]
-                        switch -- [dict get $spec type] {
-                            binary {set value [list S [binary encode base64 -maxlen 0 $value]]}
-                            text {set value [list S $value]}
-                            default {set value [list N $value]}
-                        }
-                        dict set values $column $value
-                    }
-                    write_record $channel [dict create table [list S $table] values [list M $values]]
-                    incr count
-                }
-                # Leave room for the runtime in Lambda's default 512 MiB /tmp.
-                flush $channel
-                if {[file size $path] > 400 * 1024 * 1024} {error "Telemetry backup exceeds 400 MiB"}
-            }
-            $db allrows {CLOSE telemetry_export}
-            dict set counts $table [list N $count]
-        }
-        $db allrows COMMIT
-        write_record $channel [dict create complete {BOOL 1} counts [list M $counts]]
-    } on error {message options} {
-        catch {$db allrows ROLLBACK}
-        return -options $options $message
-    } finally {close $channel}
+        # Bound database waits independently of the per-batch export deadline.
+        # TDBC's PostgreSQL startup options preserve the selected search_path.
+        return [::tpersist::db_export_jsonl $connection $path -gzip true \
+            -deadline $deadline -max_bytes [expr {400 * 1024 * 1024}]]
+    } finally {::tpersist::db_disconnect $connection}
 }
 
 # Upload the selected artifacts to the configured storage service.
@@ -113,7 +74,7 @@ proc ::telemetry_maintenance::run {settings context} {
         set channel [file tempfile path /tmp/ttrek-telemetry-XXXXXX]
         close $channel
         set phase backup
-        backup $db $path $deadline
+        backup $settings $path $deadline
         check_deadline $deadline
         set id [dict get $context lambda-runtime-aws-request-id]
         if {![regexp {^[A-Za-z0-9-]+$} $id]} {error "Invalid invocation ID"}
