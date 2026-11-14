@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require topenapi 0.2.0
 
 namespace eval ::request_validation {
@@ -16,6 +22,7 @@ foreach name {search telemetry-collect} {
 }
 unset name channel validator
 
+# Validate the request against its operation schema.
 proc ::request_validation::check {name request} {
     variable validators
     set normalized [::topenapi::from_twebserver $request]
@@ -26,6 +33,7 @@ proc ::request_validation::check {name request} {
     return $normalized
 }
 
+# Return the validator for the selected request operation.
 proc ::request_validation::validator {name} {
     variable validators
     return [dict get $validators $name]

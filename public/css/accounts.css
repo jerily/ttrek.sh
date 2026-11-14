@@ -1,0 +1,40 @@
+/* Account forms share the site's navy and blue palette, with visible focus states. */
+.account-main { max-width: 650px; padding-top: clamp(2rem, 6vw, 4rem); }
+.account-intro { text-align: center; margin-bottom: 1.5rem; }
+.account-intro .eyebrow { margin-bottom: .3rem; }
+.account-intro p { margin-top: 0; }
+.account-panel { background: #fff; border: 1px solid #dce5ef; border-radius: 18px; padding: clamp(1.3rem, 5vw, 2.5rem); box-shadow: 0 12px 35px #172b460a; }
+.account-panel h1 { margin: 0 0 1.5rem; color: #172b46; font-size: clamp(1.65rem, 5vw, 2rem); line-height: 1.2; letter-spacing: -.035em; }
+.account-panel label { display: block; margin: 1.1rem 0; font-weight: 650; font-size: .9rem; }
+.account-panel input:not([type=hidden]):not([type=checkbox]) { display: block; width: 100%; min-width: 0; min-height: 48px; margin-top: .4rem; padding: .7rem .85rem; border: 1px solid #bbc9d9; border-radius: 9px; background: #fcfdff; color: #172b46; font: inherit; font-weight: 400; transition: border-color .15s, box-shadow .15s; }
+.account-panel input:focus { outline: 2px solid #225d98; outline-offset: 2px; border-color: #225d98; box-shadow: 0 0 0 5px #225d9812; }
+.account-panel .account-remember { display: flex; align-items: flex-start; gap: .8rem; padding: 1rem; border: 1px solid #dce5ef; border-radius: 10px; background: #f7f9fc; cursor: pointer; }
+.account-panel .account-remember:hover { background: #edf4fc; border-color: #a8bfd8; }
+.account-panel .account-remember:focus-within { outline: 2px solid #225d98; outline-offset: 3px; }
+.account-panel .account-remember input { flex: 0 0 auto; width: 20px; height: 20px; margin: .1rem 0 0; accent-color: #225d98; cursor: pointer; }
+.account-panel .account-remember strong { display: block; color: #253e5a; line-height: 1.4; }
+.account-panel .account-remember-hint { display: block; margin-top: .2rem; color: #617086; font-size: .82rem; font-weight: 400; line-height: 1.45; }
+.account-panel p { font-size: .9rem; overflow-wrap: anywhere; }
+.account-panel form > p { color: #617086; }
+.account-panel .account-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; width: 100%; min-height: 48px; margin-top: .8rem; padding: .8rem 1.2rem; border: 1px solid #225d98; border-radius: 9px; background: #225d98; box-shadow: 0 3px 7px #172b461c; color: #fff; font: 650 .95rem/1.3 system-ui, sans-serif; text-decoration: none; cursor: pointer; transition: background .15s, box-shadow .15s, transform .15s; }
+.account-panel .account-button:hover { background: #194a7b; border-color: #194a7b; box-shadow: 0 5px 12px #172b4626; }
+.account-panel .account-button:active { transform: translateY(1px); box-shadow: none; }
+.account-panel .account-button:focus-visible { outline: 3px solid #58aafa; outline-offset: 3px; }
+.account-panel .account-button-secondary { background: #f3f7fc; border-color: #c6d5e6; color: #194a7b; box-shadow: none; }
+.account-panel .account-button-secondary:hover { background: #e6eff9; border-color: #9db7d4; }
+.account-panel .account-danger { color: #b42318; }
+.account-panel .account-danger:hover { color: #8f1c13; }
+.account-panel .account-button-danger { background: #b42318; border-color: #b42318; }
+.account-panel .account-button-danger:hover { background: #8f1c13; border-color: #8f1c13; }
+.account-panel .account-button:disabled { opacity: .55; cursor: default; transform: none; }
+.account-panel [role=status] { padding: .9rem 1rem; background: #edf5ff; border-left: 3px solid #3975b1; border-radius: 6px; }
+.account-panel .account-verified { color: #276544; font-weight: 650; }
+.account-panel .captcha { margin: 1.4rem 0; padding: 1rem; border: 1px solid #dce5ef; border-radius: 10px; background: #f7f9fc; }
+.account-panel .captcha > p:first-child { margin-top: 0; }
+.account-panel .captcha img { display: block; max-width: 100%; height: auto; border-radius: 5px; }
+.account-panel .captcha input { letter-spacing: .15em; font-family: ui-monospace, monospace; }
+.account-panel .captcha > p:last-child { margin-bottom: 0; }
+.account-panel .local-code { display: block; margin: 1rem 0; padding: .8rem; border: 1px dashed #d3a646; border-radius: 8px; background: #fff9e9; font-size: .8rem; }
+.account-panel .local-code code { display: block; margin-top: .35rem; font-size: 1.15rem; letter-spacing: .15em; }
+.account-panel .qr svg { max-width: 100%; height: auto; }
+@media (prefers-reduced-motion: reduce) { .account-panel input, .account-panel .account-button { transition: none; } }

@@ -1,0 +1,385 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+package require tcltest
+package require web-user
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl site.tcl]
+source [file join $root tcl patch.tcl]
+source [file join $root tcl lambda.tcl]
+set ::env(ENV) LOCAL
+set work [makeDirectory account-site]
+set db [::tpersist::db_connect -database :memory: -autobegin false]
+::web::user::initdb $db
+::web::static::wiki::initdb $db
+::web::static::blog::initdb $db
+foreach kind {wiki blog} directory {docs blog} {
+    ::web::static::${kind}::sync [dict get [::content_images::database_stores $db {}] $kind] [file join $root content $directory]
+}
+set account [::app_config::account {} $root $work]
+dict set account policy bcrypt_cost 4
+set settings [dict create rootdir $root content_connection $db content_images {} account $account]
+::site::init_worker $settings
+namespace eval ::accountstest {
+    variable cookie {}; variable csrf {}; variable last {}; variable origin http://localhost:8080
+    variable lambdaVersion {}; variable extraCookies {}
+}
+
+# Exercise the JSON transport boundary, including API Gateway's cookie array and nullable maps.
+proc ::accountstest::lambda_request {request version} {
+    set headers [dict get $request headers]
+    set event [dict create path [list S [dict get $request path]] \
+        httpMethod [list S [dict get $request method]]]
+    if {$version eq "2.0"} {
+        dict set event version {S 2.0}
+        dict set event rawPath [list S [dict get $request path]]
+        dict set event rawQueryString [list S [dict get $request queryString]]
+        dict set event requestContext [list M [dict create http [list M [dict create \
+            method [list S [dict get $request method]] sourceIp {S 127.0.0.1}]]]]
+        set cookies {}
+        foreach cookie [split [dict get $headers cookie] {;}] {
+            if {[string trim $cookie] ne {}} {lappend cookies [list S [string trim $cookie]]}
+        }
+        dict set event cookies [list L $cookies]
+        dict unset headers cookie
+    } else {
+        dict set event pathParameters {N null}
+        dict set event multiValueHeaders {N null}
+        dict set event multiValueQueryStringParameters {N null}
+        dict set event queryStringParameters {N null}
+        foreach pair [split [dict get $request queryString] &] {
+            set at [string first = $pair]
+            if {$at < 0} {continue}
+            set key [::web::user::decode [string range $pair 0 [expr {$at - 1}]]]
+            set value [::web::user::decode [string range $pair [expr {$at + 1}] end]]
+            dict set query $key [list S $value]
+        }
+        if {[info exists query]} {dict set event queryStringParameters [list M $query]}
+    }
+    dict set event headers [list M [::web::user::text_fields $headers]]
+    if {[dict exists $request body]} {
+        dict set event body [list S [binary encode base64 -maxlen 0 [dict get $request body]]]
+        dict set event isBase64Encoded {BOOL 1}
+    }
+    set ::site_lambda::router $::site::router
+    set response [::tjson::json_to_simple [::site_lambda::handle \
+        [encoding convertto utf-8 [::tjson::typed_to_json [list M $event]]] {}]]
+    dict set response body [encoding convertfrom utf-8 [binary decode base64 [dict get $response body]]]
+    dict set response isBase64Encoded false
+    return $response
+}
+# Send a real site request while retaining the browser's account cookie and CSRF token.
+proc ::accountstest::request {method path {fields {}}} {
+    variable cookie
+    variable csrf
+    variable last
+    variable origin
+    variable lambdaVersion
+    variable extraCookies
+    set at [string first ? $path]
+    set query {}
+    if {$at >= 0} {
+        set query [string range $path [expr {$at + 1}] end]
+        set path [string range $path 0 [expr {$at - 1}]]
+    }
+    set request [dict create method $method path $path queryString $query \
+        headers [dict create cookie [join [concat [list $cookie] $extraCookies] {; }] Host [lindex [split $origin /] 2]]]
+    if {$method eq "POST"} {
+        dict set fields csrf $csrf
+        set pairs {}
+        dict for {name value} $fields {lappend pairs [::tmfa::_uri_component $name]=[::tmfa::_uri_component $value]}
+        dict set request body [join $pairs &]
+        dict set request headers content-type application/x-www-form-urlencoded
+        dict set request headers Origin $origin
+    }
+    if {$lambdaVersion eq {}} {
+        set last [::site::dispatch $::site::router $request {addr 127.0.0.1}]
+    } else {
+        set last [lambda_request $request $lambdaVersion]
+    }
+    if {[dict exists $last headers Set-Cookie]} {set cookie [lindex [split [dict get $last headers Set-Cookie] {;}] 0]}
+    regexp {name="csrf" value="([^"]+)"} [dict get $last body] -> csrf
+    return [dict get $last statusCode]
+}
+rename ::tcaptcha::image ::tcaptcha::site_test_image
+# Capture the generated answer only inside this test interpreter.
+proc ::tcaptcha::image {text} {set ::accountstest::answer $text; site_test_image $text}
+
+test accounts-config {site defaults enable CAPTCHA, six-character password minimum, and persistent development keys} -body {
+    set again [::app_config::account {} $root $work]
+    list [dict get $account policy registration_captcha] [dict get $account policy password_min_length] \
+        [expr {[dict get $account keys] eq [dict get $again keys]}]
+} -result {true 6 1}
+
+test accounts-guests {Signed-out visitors see only sign-in in the account navigation} -body {
+    set result {}
+    foreach path {/ /docs /blog /user/register /user/login} {
+        lappend result [::accountstest::request GET $path]
+        set html [dict get $::accountstest::last body]
+        lappend result [expr {![string match {*class="pure-menu-link">Sign up</a>*} $html]}] \
+            [string match {*class="pure-menu-link">Sign in</a>*} $html] \
+            [expr {![string match {*class="pure-menu-link">Account</a>*} $html]}]
+    }
+    lsort -unique $result
+} -result {1 200}
+
+test accounts-redirect {An anonymous protected page redirects to sign-in with the original destination} -body {
+    list [::accountstest::request GET /user/profile?tab=security] \
+        [dict get $::accountstest::last headers Location] \
+        [::accountstest::request HEAD /user] [dict get $::accountstest::last body]
+} -result {302 /user/login?return_to=%2Fuser%2Fprofile%3Ftab%3Dsecurity 302 {}}
+
+test accounts-local-origins {Browser registration accepts localhost and loopback addresses on local ports} -body {
+    set result {}
+    set number 0
+    foreach origin {http://localhost:8080 http://127.0.0.1:8080 http://localhost:8181 http://127.0.0.1:8181} {
+        set ::accountstest::origin $origin
+        set ::accountstest::cookie {}
+        set ::accountstest::csrf {}
+        ::accountstest::request GET /user/register
+        regexp {name="captcha_id" value="([^"]+)"} [dict get $::accountstest::last body] -> id
+        lappend result [::accountstest::request POST /user/register [dict create \
+            email loopback[incr number]@example.com password abcdef first_name Local last_name Member \
+            captcha_id $id captcha_answer $::accountstest::answer]]
+        lappend result [string match {*action="/user/verify"*} [dict get $::accountstest::last body]]
+    }
+    set result
+} -cleanup {
+    set ::accountstest::origin http://localhost:8080
+    set ::accountstest::cookie {}
+    set ::accountstest::csrf {}
+} -result {200 1 200 1 200 1 200 1}
+
+test accounts-lambda-registration {Lambda payloads preserve cookies through registration, verification and login} -body {
+    set result {}
+    set number 0
+    foreach {version extras} {2.0 {} 2.0 {theme=dark} 1.0 {theme=dark}} {
+        set ::accountstest::lambdaVersion $version
+        set ::accountstest::extraCookies $extras
+        set ::accountstest::origin http://127.0.0.1:8080
+        set ::accountstest::cookie {}
+        set ::accountstest::csrf {}
+        set email lambda[incr number]@example.com
+        set suffix ?return_to=%2Fdocs
+        ::accountstest::request GET /user/register$suffix
+        regexp {name="captcha_id" value="([^"]+)"} [dict get $::accountstest::last body] -> id
+        lappend result [::accountstest::request POST /user/register$suffix [dict create \
+            email $email password abcdef first_name Lambda last_name Member \
+            captcha_id $id captcha_answer $::accountstest::answer]]
+        regexp {id="local-code">([0-9]+)</code>} [dict get $::accountstest::last body] -> code
+        lappend result [::accountstest::request POST /user/verify$suffix [dict create code $code]] \
+            [::accountstest::request POST /user/login$suffix [dict create email $email password abcdef]] \
+            [dict get $::accountstest::last headers Location]
+        lappend result [::accountstest::request GET /user] \
+            [string match {*class="pure-menu-link">Account</a>*} [dict get $::accountstest::last body]]
+    }
+    set result
+} -cleanup {
+    set ::accountstest::lambdaVersion {}
+    set ::accountstest::extraCookies {}
+    set ::accountstest::origin http://localhost:8080
+    set ::accountstest::cookie {}
+    set ::accountstest::csrf {}
+} -result {200 200 302 /docs 200 1 200 200 302 /docs 200 1 200 200 302 /docs 200 1}
+
+test accounts-register {real registration uses the shared layout, CAPTCHA and requested password minimum} -body {
+    set result [list [::accountstest::request GET /user/register]]
+    set html [dict get $::accountstest::last body]
+    regexp {name="captcha_id" value="([^"]+)"} $html -> id
+    lappend result [expr {[string first {class="account-button"} $html] >= 0}] \
+        [expr {[string first {class="site-header"} $html] >= 0}] \
+        [expr {[string first {minlength="6"} $html] >= 0}] \
+        [::responses::header $::accountstest::last Cache-Control]
+    lappend result [::accountstest::request POST /user/register [dict create email site@example.com password abcdef \
+        first_name Site last_name Member captcha_id $id captcha_answer $::accountstest::answer]]
+    regexp {id="local-code">([0-9]+)</code>} [dict get $::accountstest::last body] -> code
+    lappend result [::accountstest::request POST /user/verify [dict create code $code]] \
+        [::accountstest::request POST /user/login {email site@example.com password abcdef}]
+    lappend result [string match {*class="pure-menu-link">Account</a>*} [dict get $::accountstest::last body]]
+    set result
+} -result {200 1 1 1 no-store 200 200 200 1}
+
+test accounts-members {Signed-in navigation follows the session and changes back immediately on logout} -body {
+    set result {}
+    foreach path {/ /docs /blog /user} {
+        ::accountstest::request GET $path
+        set html [dict get $::accountstest::last body]
+        lappend result [string match {*class="pure-menu-link">Account</a>*} $html] \
+            [expr {![string match {*class="pure-menu-link">Sign in</a>*} $html]}] \
+            [expr {[::responses::header $::accountstest::last Cache-Control] eq "no-store"}]
+    }
+    ::accountstest::request POST /user/logout
+    lappend result [string match {*class="pure-menu-link">Sign in</a>*} [dict get $::accountstest::last body]]
+    ::accountstest::request GET /
+    lappend result [string match {*class="pure-menu-link">Sign in</a>*} [dict get $::accountstest::last body]]
+    lsort -unique $result
+} -result 1
+
+test accounts-persistence {Lambda login redirects preserve opt-in cookie lifetime and default to browser sessions} -body {
+    set result {}
+    foreach version {1.0 2.0} {
+        set ::accountstest::lambdaVersion $version
+        foreach remember {0 1} {
+            set ::accountstest::cookie {}
+            set ::accountstest::csrf {}
+            ::accountstest::request GET /user/login
+            regexp {<input type="checkbox" name="stay_signed_in"[^>]*>} [dict get $::accountstest::last body] input
+            lappend result [expr {[string first checked $input] < 0}]
+            set fields {email site@example.com password abcdef}
+            if {$remember} {dict set fields stay_signed_in 1}
+            lappend result [::accountstest::request POST /user/login?return_to=%2Fdocs $fields] \
+                [dict get $::accountstest::last headers Location]
+            set age -1
+            regexp {; Max-Age=([0-9]+)} [dict get $::accountstest::last headers Set-Cookie] -> age
+            lappend result [expr {$remember ? ($age > 2591990 && $age <= 2592000) : $age == -1}] \
+                [::accountstest::request GET /user]
+            ::accountstest::request POST /user/logout
+        }
+    }
+    set result
+} -cleanup {
+    set ::accountstest::lambdaVersion {}
+    set ::accountstest::cookie {}
+    set ::accountstest::csrf {}
+} -result {1 302 /docs 1 200 1 302 /docs 1 200 1 302 /docs 1 200 1 302 /docs 1 200}
+
+test accounts-recovery {forgotten-password renders CAPTCHA and the scheduler can invoke bounded cleanup} -body {
+    set status [::accountstest::request GET /user/forgot]
+    set maintenance [::tjson::json_to_simple [::site_lambda::handle {{"source":"ttrek.patch","task":"task_prune_accounts"}} {}]]
+    list $status [expr {[string first {name="captcha_id"} [dict get $::accountstest::last body]] >= 0}] \
+        [dict get $maintenance ok] [llength [dict get $maintenance completed]]
+} -result {200 1 1 3}
+
+test accounts-form-errors {direct and Lambda failures render account forms with the shared site layout and permit recovery retries} -body {
+    set result {}
+    foreach version {{} 1.0 2.0} {
+        set ::accountstest::lambdaVersion $version
+        set ::accountstest::cookie {}
+        set ::accountstest::csrf {}
+        ::accountstest::request GET /user/login?return_to=%2Fdocs
+        set fields {email nobody@example.com password wrong-password-secret stay_signed_in 1}
+        if {[regexp {name="captcha_id" value="([^"]+)"} [dict get $::accountstest::last body] -> id]} {
+            dict set fields captcha_id $id
+            dict set fields captcha_answer $::accountstest::answer
+        }
+        lappend result [::accountstest::request POST /user/login?return_to=%2Fdocs $fields]
+        set html [dict get $::accountstest::last body]
+        lappend result [::responses::header $::accountstest::last Content-Type] \
+            [string match {*class="site-header"*} $html] \
+            [string match {*action="/user/login?return_to=%2Fdocs"*} $html] \
+            [string match {*Invalid email or password.*} $html] \
+            [expr {[string first wrong-password-secret $html] < 0}]
+        ::accountstest::request GET /user/forgot
+        lappend result [::accountstest::request POST /user/forgot {email not-an-email}]
+        set html [dict get $::accountstest::last body]
+        lappend result [string match {*action="/user/forgot"*} $html] \
+            [string match {*value="not-an-email"*} $html]
+        regexp {name="captcha_id" value="([^"]+)"} $html -> id
+        lappend result [::accountstest::request POST /user/forgot [dict create email nobody@example.com \
+            captcha_id $id captcha_answer $::accountstest::answer]]
+    }
+    set result
+} -cleanup {
+    set ::accountstest::lambdaVersion {}
+    set ::accountstest::cookie {}
+    set ::accountstest::csrf {}
+} -result {401 {text/html; charset=utf-8} 1 1 1 1 400 1 1 200 401 {text/html; charset=utf-8} 1 1 1 1 400 1 1 200 401 {text/html; charset=utf-8} 1 1 1 1 400 1 1 200}
+
+test accounts-close-account {direct and Lambda account closure confirms the password and immediately updates navigation} -body {
+    set result {}
+    set serial 0
+    foreach version {{} 1.0 2.0} {
+        set ::accountstest::lambdaVersion $version
+        set ::accountstest::cookie {}
+        set ::accountstest::csrf {}
+        set email close[incr serial]@example.com
+        ::accountstest::request GET /user/register
+        regexp {name="captcha_id" value="([^"]+)"} [dict get $::accountstest::last body] -> id
+        ::accountstest::request POST /user/register [dict create email $email password abcdef \
+            first_name Closing last_name Member captcha_id $id captcha_answer $::accountstest::answer]
+        regexp {id="local-code">([0-9]+)</code>} [dict get $::accountstest::last body] -> code
+        ::accountstest::request POST /user/verify [dict create code $code]
+        ::accountstest::request GET /user/login
+        set fields [dict create email $email password abcdef]
+        if {[regexp {name="captcha_id" value="([^"]+)"} [dict get $::accountstest::last body] -> id]} {
+            dict set fields captcha_id $id
+            dict set fields captcha_answer $::accountstest::answer
+        }
+        lappend result [::accountstest::request POST /user/login $fields] \
+            [string match {*class="account-danger" href="/user/close-account">Close account*} [dict get $::accountstest::last body]] \
+            [::accountstest::request GET /user/close-account]
+        set html [dict get $::accountstest::last body]
+        lappend result [string match {*class="account-button account-button-danger"*} $html] \
+            [string match {*name="current_password" type="password"*} $html] \
+            [string match {*This cannot be undone.*} $html] \
+            [::accountstest::request POST /user/close-account {current_password wrong}]
+        set html [dict get $::accountstest::last body]
+        lappend result [string match {*Invalid current password.*action="/user/close-account"*} $html] \
+            [::accountstest::request POST /user/close-account {current_password abcdef}]
+        set html [dict get $::accountstest::last body]
+        lappend result [string match {*Your account has been closed.*} $html] \
+            [string match {*class="pure-menu-link">Sign in</a>*} $html] \
+            [expr {![string match {*class="pure-menu-link">Account</a>*} $html]}] \
+            [expr {[::web::user::user_by_email $::accounts::store $email] eq {}}] \
+            [::accountstest::request GET /user]
+    }
+    set result
+} -cleanup {
+    set ::accountstest::lambdaVersion {}
+    set ::accountstest::cookie {}
+    set ::accountstest::csrf {}
+} -result {200 1 200 1 1 1 401 1 200 1 1 1 1 302 200 1 200 1 1 1 401 1 200 1 1 1 1 302 200 1 200 1 1 1 401 1 200 1 1 1 1 302}
+
+test accounts-ses {production configuration sends verification and recovery through the configured SES sender} -setup {
+    package require tconfig::decrypt
+    package require awsses 1.0.16
+    rename ::aws::ses::create ::accountstest::real_ses_create
+    # Capture SES client configuration without contacting AWS.
+    proc ::aws::ses::create {options} {
+        set ::accountstest::ses_options $options
+        return ::accountstest::ses_client
+    }
+    # Capture the outgoing message and require the caller to release its client.
+    proc ::accountstest::ses_client {method args} {
+        if {$method eq "send_email"} {set ::accountstest::ses_message [lindex $args 0]}
+        if {$method eq "destroy"} {set ::accountstest::ses_destroyed 1}
+    }
+} -body {
+    set ::env(ENV) PROD
+    set input [::tconfig::read_config [file join $root devops config.prod.ini]]
+    dict for {key value} [dict get $account keys] {dict set input account $key $value}
+    set production [::app_config::account $input $root]
+    set mail [dict create -store [dict replace $::accounts::store -env PROD] \
+        -config [dict get $production display] -prefix [dict get $production display prefix] -deliver {}]
+    ::web::user::validate_email_config $mail
+    set result [list [dict get $production policy email_verification_required] \
+        [dict get $production policy verification_emails_enabled] [dict get $production display email_enabled]]
+    foreach purpose {verify reset} {
+        set ::accountstest::ses_destroyed 0
+        ::web::user::deliver $mail $purpose member@example.com 012345
+        set message $::accountstest::ses_message
+        lappend result [list [dict get $::accountstest::ses_options region] [dict get $message from] \
+            [dict get $message to] [string match {*012345*} [dict get $message text]] $::accountstest::ses_destroyed]
+    }
+    set result
+} -cleanup {
+    set ::env(ENV) LOCAL
+    rename ::aws::ses::create {}
+    rename ::accountstest::real_ses_create ::aws::ses::create
+    rename ::accountstest::ses_client {}
+} -result {true true true {eu-central-1 noreply@ttrek.sh member@example.com 1 1} {eu-central-1 noreply@ttrek.sh member@example.com 1 1}}
+
+rename ::tcaptcha::image {}
+rename ::tcaptcha::site_test_image ::tcaptcha::image
+$::site::router destroy
+::tpersist::db_disconnect $db
+foreach handle $::accounts::handles {::tink::unregister_keyset $handle}
+set ::accounts::handles {}
+removeDirectory $work
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

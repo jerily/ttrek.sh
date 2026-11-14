@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require Tcl 9.1
 package require tcltest 2
 namespace import ::tcltest::test
@@ -12,19 +18,28 @@ package require twebserver
 package provide tratelimit 1.1.0
 package require treqmon 2.2.0
 namespace eval ::twebserver {
+    # Provide the get rootdir test fixture.
     proc get_rootdir {} {return $::test_root}
+    # Provide the get config dict test fixture.
     proc get_config_dict {} {
         return [dict create tratelimit {} treqmon {} releases $::test_releases]
     }
+    # Provide the create router test fixture.
     proc create_router {args} {uplevel 1 {set router test_router}}
+    # Provide the add middleware test fixture.
     proc add_middleware {args} {}
+    # Provide the add route test fixture.
     proc add_route {args} {}
+    # Provide the get path param test fixture.
     proc get_path_param {request name} {return [dict get $request pathParameters $name]}
+    # Provide the get query param test fixture.
     proc get_query_param {request name} {
         if {[dict exists $request queryStringParameters $name]} {return [dict get $request queryStringParameters $name]}
         error "query parameter not found"
     }
+    # Provide the base64 encode test fixture.
     proc base64_encode {value} {binary encode base64 $value}
+    # Provide the build response test fixture.
     proc build_response {args} {
         if {[lindex $args 0] eq "-return_file"} {
             return [dict create status [lindex $args 1] file [lindex $args 3]]
@@ -32,6 +47,7 @@ namespace eval ::twebserver {
         lassign $args status type body
         return [dict create status $status type $type body $body]
     }
+    # Provide the build redirect test fixture.
     proc build_redirect {status location} {
         return [dict create status $status headers [dict create Location $location] body {}]
     }
@@ -39,13 +55,16 @@ namespace eval ::twebserver {
 namespace eval ::tratelimit {proc init_middleware {config} {}}
 namespace eval ::treqmon {proc init_middleware {config} {}}
 source [file join $root tcl site.tcl]
+# Provide the config test fixture.
 proc ::site::config {} {
     dict merge [dict create rootdir $::test_root] [::twebserver::get_config_dict]
 }
 source [file join $root tcl telemetry.tcl]
 ::telemetry::init_local {dialect sqlite database :memory:}
 ::site::configure [::site::config]
+# Provide the telemetry event common test fixture.
 proc telemetry_event_common {args} {}
+# Provide the telemetry stats test fixture.
 proc telemetry_stats {args} {lmap {a b c d} $::test_stats {list $a $b $c $d}}
 
 source [file join $root tests search.test]
@@ -54,10 +73,12 @@ source [file join $root tests request-validation.test]
 # Stub only AWS calls; retain the real distribution handler and key selection.
 rename ::aws::s3::create ::aws::s3::real_create
 rename ::aws::s3::generate_presigned_url ::aws::s3::real_generate_presigned_url
+# Provide the create test fixture.
 proc ::aws::s3::create {settings} {
     set ::s3_settings $settings
     return test_s3_client
 }
+# Provide the generate presigned url test fixture.
 proc ::aws::s3::generate_presigned_url {args} {
     lappend ::s3_calls $args
     if {$::s3_url eq "error"} {error "signer unavailable"}
@@ -212,7 +233,7 @@ test releases-7 {The real SDK generates a signed URL without an AWS request} -se
     set ::releases::client [::aws::s3::create {region eu-west-1 aws_access_key_id test aws_secret_access_key test}]
 } -body {
     set url [::releases::signed_url linux-amd64-glibc]
-    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.3.0/linux-amd64-glibc/ttrek?*} $url] \
+    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.5.0/linux-amd64-glibc/ttrek?*} $url] \
         [regexp {[?&]X-Amz-Expires=300(&|$)} $url] \
         [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
 } -cleanup {
@@ -233,13 +254,15 @@ set test_root $fixture
 ::telemetry::sync_registry_metadata $registry_fixture
 ::telemetry::publish_search_snapshot
 
+# Provide the body test fixture.
 proc body {response} {dict get $response body}
+# Provide the contains test fixture.
 proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
     dict size $::views::templates
-} -result 12
+} -result 14
 
 test templates-2 {Index layout and literal clipboard command} -setup {
     set saved_env [array get ::env ENV]
@@ -280,6 +303,7 @@ test templates-4 {Empty collections stay JSON arrays} -body {
 test templates-year {Copyright follows the clock for each render, including a warm worker across New Year} -setup {
     rename ::clock ::original_clock
     set test_year 2030
+    # Provide the clock test fixture.
     proc ::clock {operation args} {
         if {$operation eq "seconds"} {return [::original_clock scan "$::test_year-01-15"]}
         ::original_clock $operation {*}$args
@@ -458,6 +482,7 @@ test handlers-catalog-cache {Unchanged database metadata reuses worker indexes} 
     get_packages_page_handler {} {}
     foreach name {ttrie ttrigrams} {
         rename ::${name}::create ::${name}::saved_create
+        # Provide the create test fixture.
         proc ::${name}::create {args} {error "Unexpected index rebuild"}
     }
     try {

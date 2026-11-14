@@ -1,9 +1,16 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tjson
 package require trequests 1.1.0
 namespace eval ::local_patch {}
 
+# Attach the route name and invoke its handler.
 proc ::local_patch::invoke {task port function} {
-    if {$task ni {task_initdb_website task_sync_website task_publish_search}} {error "Unknown patch task"}
+    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts}} {error "Unknown patch task"}
     if {![string is integer -strict $port] || $port < 1 || $port > 65535} {error "Invalid Lambda port"}
     if {![regexp {^[A-Za-z0-9_-]+$} $function]} {error "Invalid Lambda function name"}
     set payload [::tjson::typed_to_json [list M [dict create source {S ttrek.patch} task [list S $task]]]]
@@ -25,9 +32,10 @@ proc ::local_patch::invoke {task port function} {
     } finally {$response destroy}
 }
 
+# Run this command-line entry point with validated arguments.
 proc ::local_patch::main {root arguments} {
     if {![llength $arguments] || "--help" in $arguments || "-h" in $arguments} {
-        return "Usage: invoke-patch-local.sh task_initdb_website|task_sync_website|task_publish_search ?--lambda-port PORT?"
+        return "Usage: invoke-patch-local.sh task_initdb_website|task_sync_website|task_publish_search|task_prune_accounts ?--lambda-port PORT?"
     }
     set task [lindex $arguments 0]
     set options [lrange $arguments 1 end]

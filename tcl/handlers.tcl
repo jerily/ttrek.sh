@@ -1,9 +1,17 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
+# Return debug handler for the caller.
 proc get_debug_handler {ctx req} {
     set data [dict merge $ctx $req]
     set res [::twebserver::build_response 200 "text/plain; charset=utf-8" $data]
     return $res
 }
 
+# Record a telemetry event using the configured failure policy.
 proc telemetry_event { event_type args } {
     try {
         ::telemetry::event $event_type {*}$args
@@ -19,6 +27,7 @@ proc telemetry_event { event_type args } {
     }
 }
 
+# Read aggregate telemetry statistics for display.
 proc telemetry_stats {package_name {package_version {}}} {
     # Statistics must not break package pages when the database is unavailable.
     if {[catch {
@@ -30,6 +39,7 @@ proc telemetry_stats {package_name {package_version {}}} {
     return $result
 }
 
+# Attach shared request metadata to a telemetry event.
 proc telemetry_event_common { event_type args } {
     upvar 1 req req
     if { ![dict exists [dict get $req headers] ttrek-environment-id] } {
@@ -43,6 +53,7 @@ proc telemetry_event_common { event_type args } {
     telemetry_event $event_type -env $environment_id {*}$args
 }
 
+# Validate and record a submitted telemetry event.
 proc post_telemetry_collect_handler {ctx req} {
     if {[catch {
         [::request_validation::validator telemetry-collect] bind [::topenapi::from_twebserver $req] {
@@ -65,6 +76,7 @@ proc post_telemetry_collect_handler {ctx req} {
     return [::twebserver::build_response 200 text/plain "ok"]
 }
 
+# Return dist handler for the caller.
 proc get_dist_handler {ctx req} {
     set arch [::twebserver::get_path_param $req arch]
     set ext [::twebserver::get_path_param $req ext]
@@ -84,6 +96,7 @@ proc get_dist_handler {ctx req} {
     return $response
 }
 
+# Return source download handler for the caller.
 proc get_source_download_handler {ctx req} {
     set artifact [::twebserver::get_path_param $req artifact]
     if {![regexp {^[a-zA-Z0-9][a-zA-Z0-9._+-]{0,199}-[0-9a-f]{64}\.archive$} $artifact]} {
@@ -105,6 +118,7 @@ proc get_source_download_handler {ctx req} {
     return $response
 }
 
+# Return release handler for the caller.
 proc get_release_handler {ctx req} {
     set target [::releases::artifact [::twebserver::get_path_param $req target]]
     if {$target eq ""} {
@@ -124,6 +138,7 @@ proc get_release_handler {ctx req} {
     return $response
 }
 
+# Join validated path components for a registry resource.
 proc path_join {args} {
     set rootdir [file normalize [::site::root]]
     set path ""
@@ -143,6 +158,7 @@ proc path_join {args} {
     return $normalized_path
 }
 
+# Return assets handler for the caller.
 proc get_assets_handler {ctx req} {
     set path [dict get $req path]
     set dir [file normalize [::site::root]]
@@ -166,11 +182,13 @@ proc get_assets_handler {ctx req} {
     return [::assets::respond $path $req $mimetype [::assets::read_bytes $filepath]]
 }
 
+# Return ttrek init handler for the caller.
 proc get_ttrek_init_handler {ctx req} {
     set dir [file normalize [::site::root]]
     return [::twebserver::build_response -return_file 200 application/octet-stream $dir/public/ttrek-init]
 }
 
+# Return index page handler for the caller.
 proc get_index_page_handler {ctx req} {
 #    set host [::twebserver::get_header $req host]
 #    if { $host ne {} } {
@@ -192,6 +210,7 @@ proc get_index_page_handler {ctx req} {
     return $res
 }
 
+# Return packages page handler for the caller.
 proc get_packages_page_handler {ctx req} {
     if {[catch {::recipe_search::catalog_entries [::recipe_search::database registry_catalog]} catalog]} {
         return [::recipe_search::unavailable]
@@ -204,6 +223,7 @@ proc get_packages_page_handler {ctx req} {
     return $res
 }
 
+# Return logo handler for the caller.
 proc get_logo_handler {ctx req} {
     set dir [file normalize [::site::root]]
     set filepath [path_join $dir www plume.png]
@@ -211,10 +231,12 @@ proc get_logo_handler {ctx req} {
     return $res
 }
 
+# Return package versions for the caller.
 proc get_package_versions {package_name} {
     return [lsort -command compare_versions -decreasing [dict keys [::telemetry::registry_versions $package_name]]]
 }
 
+# Reject malformed telemetry environment identifiers.
 proc validate_environment_id {environment_id} {
     # Check that environment_id consists of 32 characters in
     # the range [1-9a-f] (hexadecimal characters)
@@ -225,6 +247,7 @@ proc validate_environment_id {environment_id} {
     return $valid
 }
 
+# Register a telemetry environment from the validated request.
 proc post_telemetry_register_handler {ctx req} {
     set environment_id [::twebserver::get_path_param $req environment_id]
     if { [validate_environment_id $environment_id] } {
@@ -241,6 +264,7 @@ proc post_telemetry_register_handler {ctx req} {
     return [::twebserver::build_response 200 text/plain "ok"]
 }
 
+# Return package versions handler for the caller.
 proc get_package_versions_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_reg_get_pkg -pkg_name $package_name
@@ -255,6 +279,7 @@ proc get_package_versions_handler {ctx req} {
         [::tjson::typed_to_json [list M $versions_typed]]]
 }
 
+# Collect the feature flags exposed by a recipe.
 proc compute_iuse_flags {spec_handle} {
     set if_use_nodes [::tjson::query $spec_handle {$..if}]
 
@@ -266,6 +291,7 @@ proc compute_iuse_flags {spec_handle} {
     return $iuse_unique
 }
 
+# Return package spec handler for the caller.
 proc get_package_spec_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
@@ -328,6 +354,7 @@ proc get_package_spec_handler {ctx req} {
     return $res
 }
 
+# Order package versions for registry presentation.
 proc compare_versions {a b} {
     set a_parts [split $a .]
     set b_parts [split $b .]
@@ -344,6 +371,7 @@ proc compare_versions {a b} {
     return 0
 }
 
+# Return package page handler for the caller.
 proc get_package_page_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_pkg_get -pkg_name $package_name
@@ -378,6 +406,7 @@ proc get_package_page_handler {ctx req} {
     return $res
 }
 
+# Return package version page handler for the caller.
 proc get_package_version_page_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
@@ -422,14 +451,17 @@ proc get_package_version_page_handler {ctx req} {
 
 }
 
+# Return package stats for the caller.
 proc get_package_stats {package_name} {
     telemetry_stats $package_name
 }
 
+# Return package version stats for the caller.
 proc get_package_version_stats {package_name package_version} {
     telemetry_stats $package_name $package_version
 }
 
+# Return catchall handler for the caller.
 proc get_catchall_handler {ctx req} {
     set res [::twebserver::build_response 404 text/plain "not found"]
     return $res

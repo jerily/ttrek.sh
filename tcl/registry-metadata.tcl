@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 namespace eval ::registry_metadata {}
 
 # Tags are optional metadata; callers use an empty list when the field is absent.
@@ -16,6 +22,7 @@ proc ::registry_metadata::tags {typed {path recipe}} {
     return [lsort -ascii -unique $result]
 }
 
+# Resolve recipe script files into the registry metadata.
 proc ::registry_metadata::resolve_scripts {scripts_typed directory} {
     lassign $scripts_typed type scripts
     if {$type ne "M"} {error "recipe scripts must be an object"}

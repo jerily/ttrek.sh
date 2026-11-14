@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Drivers are loaded by tpersist only when the selected backend connects.
 package require tpersist 0.1.4
@@ -91,6 +93,7 @@ proc ::telemetry::transaction {script {schema false}} {
     }
 }
 
+# Close the database connection owned by this service.
 proc ::telemetry::close {} {
     variable connection
     if {$connection ne {}} {
@@ -120,6 +123,7 @@ proc ::telemetry::initdb {} {
     } true
 }
 
+# Read tenant-scoped rows and normalize nullable profile fields.
 proc ::telemetry::rows {statement} {
     variable connection
     dict get [db_execute $connection $statement] rows
@@ -260,6 +264,7 @@ proc ::telemetry::registry_query {columns name {version {}}} {
     return $query
 }
 
+# Read available registry versions from the SQL catalog.
 proc ::telemetry::registry_versions {name} {
     set result {}
     foreach row [rows [registry_query {version recipe} $name]] {
@@ -272,6 +277,7 @@ proc ::telemetry::registry_versions {name} {
     return $result
 }
 
+# Read one version’s registry recipe from SQL.
 proc ::telemetry::registry_recipe {name version} {
     if {$version eq {}} {return {}}
     set row [lindex [rows [registry_query {recipe patches} $name $version]] 0]
@@ -281,6 +287,7 @@ proc ::telemetry::registry_recipe {name version} {
     return $row
 }
 
+# Persist the normalized telemetry event.
 proc ::telemetry::event {event_type args} {
     variable connection
     variable event_list
@@ -343,6 +350,7 @@ proc ::telemetry::event {event_type args} {
     return
 }
 
+# Read the requested aggregate telemetry statistics.
 proc ::telemetry::stats {package_name {package_version {}}} {
     set query [db_select [db_table req_pkg_install_event -as ev] -expr {
         pl.os AS os, pl.arch AS arch, COUNT(*) AS total,

@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Check image publication and database-backed content initialization.
 package require Tcl 9.1
@@ -11,16 +13,20 @@ source [file join $root tcl config.tcl]
 source [file join $root tcl content-images.tcl]
 package provide awss3 1.0.17
 namespace eval ::aws::s3 {}
+# Provide the create test fixture.
 proc ::aws::s3::create {settings} {return ::build_images::client}
+# Provide the generate presigned url test fixture.
 proc ::aws::s3::generate_presigned_url {args} {
     return "https://images.example/[lindex $args end]?X-Amz-Signature=[string repeat a 64]"
 }
 namespace eval ::build_images {}
+# Provide the write test fixture.
 proc ::build_images::write {path data} {
     file mkdir [file dirname $path]
     set channel [open $path wb]
     try {puts -nonewline $channel $data} finally {close $channel}
 }
+# Provide the setup test fixture.
 proc ::build_images::setup {} {
     variable root [makeDirectory build-images-fixture]
     variable calls {}; variable objects {}; variable failure {}
@@ -32,6 +38,7 @@ proc ::build_images::setup {} {
     write [file join $root content blog images pixel.png] blog-image
     variable settings [::app_config::content_images {content_images {bucket test-images region eu-central-1}} $root]
 }
+# Provide the client test fixture.
 proc ::build_images::client {method bucket key args} {
     variable calls; variable objects; variable failure
     lappend calls [list $method $bucket $key {*}$args]
@@ -47,6 +54,7 @@ proc ::build_images::client {method bucket key args} {
         default {error "Unexpected S3 method: $method"}
     }
 }
+# Provide the cleanup test fixture.
 proc ::build_images::cleanup {} {
     unset ::env(ENV)
     array set ::env $::build_images::savedEnv

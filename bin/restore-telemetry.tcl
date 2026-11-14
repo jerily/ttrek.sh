@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Run using the installed application Tcl runtime. The target configuration is
 # explicit: never accidentally restore into the website's production database.
 if {[llength $argv] != 2} {

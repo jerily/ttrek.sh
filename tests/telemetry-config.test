@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 namespace import ::tcltest::test
 source [file join [file dirname [info script]] .. tcl config.tcl]
@@ -24,6 +30,7 @@ test telemetry-config-4 {Local Lambda database persists in its runtime data dire
 test telemetry-config-5 {Connection failures redact driver diagnostics and credentials} -setup {
     source [file join [file dirname [info script]] .. tcl telemetry.tcl]
     rename ::tpersist::db_connect ::tpersist::db_connect_real
+    # Provide the db connect test fixture.
     proc ::tpersist::db_connect {args} {error "driver diagnostic containing [dict get $args -password]"}
 } -body {
     set marker [string repeat x 40]

@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Start a disposable direct server and an isolated TLS Valkey instance.
 set root [file dirname [file dirname [file normalize [info script]]]]
@@ -23,10 +25,12 @@ dict for {key value} $environment {lappend envCommand $key=$value}
 set app [::test_support::temporary [file join $root build] runtime-smoke-]
 set appProcess {}
 set valkeyProcess {}
+# Provide the request test fixture.
 proc request {path args} {
     if {![string match http* $path]} {set path $::base$path}
     ::test_support::request $path {*}$args
 }
+# Provide the rank test fixture.
 proc rank {match query} {
     set tier [dict get {exact 0 prefix 1 substring 2 description 3 fuzzy 5 description-fuzzy 6} [dict get $match match]]
     if {[dict exists $match field] && [dict get $match field] eq "tags"} {incr tier}
@@ -35,6 +39,7 @@ proc rank {match query} {
     set unmatched [expr {$tier in {1 2} ? [string length [dict get $match name]] - [string length $query] : 0}]
     list $tier $distance $coverage $unmatched [dict get $match name]
 }
+# Provide the compare matches test fixture.
 proc compare_matches {query left right} {
     set a [rank $left $query]
     set b [rank $right $query]

@@ -11,6 +11,7 @@ additional requirements described below.
 ttrek run -script build-assets
 npm test
 ttrek run tclsh9.1 "$PWD/tests/homepage.test"
+ttrek run tclsh9.1 "$PWD/tests/accounts.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"

@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Derived data is deliberately outside telemetry::table_definitions and backups.
 namespace eval ::telemetry {variable search_module [file join [file dirname [info script]] search-snapshot.tcl]}
@@ -30,12 +32,14 @@ proc ::telemetry::lock_search_snapshot {} {
     if {![llength $found]} {error "Search snapshot schema is not initialized"}
 }
 
+# Read the current search snapshot revision from SQL.
 proc ::telemetry::search_snapshot_revision {} {
     set rows [rows [db_where [db_select registry_search_snapshot -columns revision] [db_eq [db_col id] [db_value 1 -type integer]]]]
     if {![llength $rows]} {return {}}
     dict get [lindex $rows 0] revision
 }
 
+# Load the published search snapshot from SQL.
 proc ::telemetry::search_snapshot {} {
     set rows [rows [db_where [db_select registry_search_snapshot] [db_eq [db_col id] [db_value 1 -type integer]]]]
     if {![llength $rows] || [dict get [lindex $rows 0] revision] eq {}} {error "Search snapshot has not been published"}

@@ -1,5 +1,12 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 namespace eval ::responses {}
 
+# Read a request header without case sensitivity.
 proc ::responses::header {message wanted} {
     set values {}
     if {[dict exists $message headers]} {
@@ -15,6 +22,7 @@ proc ::responses::header {message wanted} {
     join $values ,
 }
 
+# Replace a response header without duplicating its casing variants.
 proc ::responses::set_header {responseVar name value} {
     upvar 1 $responseVar response
     foreach key [dict keys [dict get $response headers]] {
@@ -23,6 +31,7 @@ proc ::responses::set_header {responseVar name value} {
     if {$value ne {}} {dict set response headers $name $value}
 }
 
+# Check whether the client accepts gzip encoding.
 proc ::responses::accepts_gzip {request} {
     set qualities {}
     foreach item [split [header $request Accept-Encoding] ,] {
@@ -47,6 +56,7 @@ proc ::responses::accepts_gzip {request} {
     expr {$quality > 0}
 }
 
+# Convert a response body into the transport byte representation.
 proc ::responses::bytes {response} {
     if {[dict exists $response isBase64Encoded] && [dict get $response isBase64Encoded]} {
         return [binary decode base64 [dict get $response body]]

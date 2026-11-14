@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Register the package and load its dependencies.
 package require Tcl 9.1
@@ -17,13 +19,16 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {assets responses templates releases content-images request-validation search handlers homepage} {
+foreach module {assets responses templates releases content-images request-validation search handlers homepage accounts} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
+# Return the current worker configuration.
 proc ::site::config {} {variable settings; return $settings}
+# Return the configured application root directory.
 proc ::site::root {} {dict get [config] rootdir}
 
+# Apply the worker settings and initialize shared site resources.
 proc ::site::configure {config} {
     variable settings $config
     set imageSettings {}
@@ -53,6 +58,7 @@ proc ::site::mount {router} {
     if {![dict exists $settings content_connection]} {
         dict set settings content_connection [::content_images::connect [dict get $settings content_database]]
     }
+    if {[dict exists $settings account]} {::accounts::mount $router $settings $templates}
     set stores [::content_images::database_stores [dict get $settings content_connection] $imageSettings]
     foreach {kind directory prefix} {wiki docs /docs blog blog /blog} {
         set store [dict get $stores $kind]
@@ -81,6 +87,7 @@ proc ::site::mount {router} {
     }
 }
 
+# Build a router and mount the configured worker services.
 proc ::site::init_worker {settings} {
     variable router
     configure $settings
@@ -88,11 +95,13 @@ proc ::site::init_worker {settings} {
     mount $router
 }
 
+# Attach the route name and invoke its handler.
 proc ::site::invoke {handler name request context params} {
     dict set context route_name $name
     $handler $context $request
 }
 
+# Normalize the request and preserve package-owned response policies.
 proc ::site::dispatch {router request {context {}}} {
     if {![dict exists $request method]} {dict set request method [dict get $request httpMethod]}
     dict set request httpMethod [dict get $request method]
@@ -129,10 +138,12 @@ proc ::site::dispatch {router request {context {}}} {
         # Keep package-owned no-store policies; ordinary site HTML revalidates
         # so a deployment promptly switches browsers to the new asset URLs.
         if {!$has_policy} {dict set response headers Cache-Control no-cache}
+        set response [::accounts::navigation $request $response $context]
     }
     return [::responses::prepare $request $response]
 }
 
+# Serve a native connection and report unexpected handler failures.
 proc ::site::process_conn {context request} {
     variable router
     if {[catch {dispatch $router $request $context} response options]} {

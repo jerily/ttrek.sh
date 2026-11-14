@@ -1,12 +1,20 @@
 #!/usr/bin/env tclsh
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Resolve a public Route 53 zone without requiring application packages.
 package require Tcl 8.6 9.0
 
+# Read an optional environment setting with its fallback.
 proc env_value {name default} {
     if {[info exists ::env($name)] && $::env($name) ne {}} {return $::env($name)}
     return $default
 }
 
+# Normalize a Route 53 hosted-zone identifier.
 proc zone_id {value} {
     set prefix /hostedzone/
     if {[string first $prefix $value] == 0} {
@@ -15,6 +23,7 @@ proc zone_id {value} {
     return $value
 }
 
+# Resolve the configured resource using its validated settings.
 proc resolve {} {
     # An explicitly empty value selects external DNS without a lookup.
     if {[info exists ::env(TTREK_HOSTED_ZONE_ID)]} {

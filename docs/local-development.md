@@ -24,7 +24,7 @@ packages entry. Missing content is omitted before the five-slide limit.
 
 The latest-blog entry reads its title, date, and URL from the published blog
 metadata on every homepage request. Optional `highlights`, keyed by the exact
-post path, add release-specific copy (currently 1.4.0); newer posts automatically
+post path, add release-specific copy (currently 1.5.0); newer posts automatically
 use the generic preview until given their own highlight. No Markdown is scanned
 and no database schema is created during homepage requests. Existing tpersist
 0.1.4 JSON schemas remain the source of the content and registry data.

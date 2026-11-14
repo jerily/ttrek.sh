@@ -1,7 +1,14 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 source [file join $root tcl search-build.tcl]
 set search_fixture [::tcltest::makeDirectory search-registry]
 set search_artifacts [::tcltest::makeDirectory search-artifacts]
 set search_snapshot [file join $search_artifacts search.json]
+# Provide the search recipe test fixture.
 proc search_recipe {root name version {description {}} {tags {}}} {
     set directory [file join $root $name $version]
     file mkdir $directory
@@ -35,6 +42,7 @@ file mkdir [file join $search_fixture tclz 1.0.0]
 ::telemetry::publish_search_snapshot
 ::recipe_search::build $search_fixture $search_snapshot
 ::recipe_search::load $search_snapshot
+# Provide the search names test fixture.
 proc search_names {query} {
     lmap match [::recipe_search::search $query] {dict get $match name}
 }
@@ -211,6 +219,7 @@ test search-9 {Fresh workers load without registry files or index construction} 
         worker eval {
             foreach name {ttrie ttrigrams} {
                 rename ::${name}::create {}
+                # Provide the create test fixture.
                 proc ::${name}::create {args} {error "Index construction is forbidden at runtime"}
             }
         }

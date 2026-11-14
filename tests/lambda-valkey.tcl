@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Two independent Lambda adapters must share limits and history over TLS Valkey.
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tests support.tcl]
