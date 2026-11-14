@@ -46,15 +46,15 @@
     "tink-tcl": "^20240704.0.1",
     "tjson": "^1.0.26",
     "topenapi": "^0.2.0",
-    "tpathexp": "^1.1.0",
+    "tpathexp": "^1.2.0",
     "ttrie": "=0.2.0",
     "ttrigrams": "=0.2.0",
     "valkey-tcl": "^1.0.3",
     "tdbcpostgres": ">=1.1.8",
     "web-static-blog": "^0.1.5",
     "web-static-wiki": "^0.1.6",
-    "tratelimit": "^1.0.1",
-    "treqmon": "^2.1.0",
+    "tratelimit": "^1.1.0",
+    "treqmon": "^2.2.0",
     "aws-sdk-tcl-s3": "^1.0.17",
     "tpersist": "^0.1.0",
     "tconfig": "^1.0.0"
@@ -62,7 +62,7 @@
   "devDependencies": {
     "tcllib": "^2.0.0",
     "trequests": "^1.1.0",
-    "twebserver": "^1.47.55",
+    "twebserver": "^1.47.57",
     "tdevops": "^0.2.0"
   }
 }

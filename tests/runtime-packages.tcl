@@ -24,8 +24,9 @@ foreach name $packages {
             ttrie {package require ttrie 0.2.0}
             ttrigrams {package require ttrigrams 0.2.0}
             trequests {package require trequests 1.1.0}
-            treqmon {package require treqmon 2.1.0}
-            tratelimit {package require tratelimit 1.0.1}
+            treqmon {package require treqmon 2.2.0}
+            tratelimit {package require tratelimit 1.1.0}
+            tpathexp {package require tpathexp 1.2.0}
             awss3 {package require awss3 1.0.17}
             awskms - awsssm {package require $name 1.0.12}
             web-static-wiki {package require $name 0.1.6}
