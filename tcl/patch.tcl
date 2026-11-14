@@ -1,3 +1,7 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
 # Private tasks invoked directly through the Lambda Invoke API. API Gateway
 # requests retain their HTTP envelope and cannot select this dispatch path.
 namespace eval ::site_patch {}
@@ -13,8 +17,8 @@ proc ::site_patch::run {task context} {
 proc ::site_patch::task_initdb_website {context} {
     set initialized {}
     ::tpersist::db_transaction $::telemetry::connection {
-        package require web-static-wiki 0.1.6
-        package require web-static-blog 0.1.5
+        package require web-static-wiki 0.1.7
+        package require web-static-blog 0.1.6
         ::telemetry::initdb
         lappend initialized ::telemetry::initdb
         set dialect [::tpersist::db_dialect $::telemetry::connection]

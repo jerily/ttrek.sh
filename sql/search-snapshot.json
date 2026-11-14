@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "tables": [
+    {
+      "name": "registry_search_snapshot",
+      "columns": {
+        "id": {
+          "type": "integer",
+          "primary_key": true
+        },
+        "format": {
+          "type": "integer",
+          "not_null": true
+        },
+        "revision": {
+          "type": "text",
+          "not_null": true
+        },
+        "fingerprint": {
+          "type": "text",
+          "not_null": true
+        },
+        "mapping": {
+          "type": "text",
+          "not_null": true
+        },
+        "names": {
+          "type": "binary",
+          "not_null": true
+        },
+        "descriptions": {
+          "type": "binary",
+          "not_null": true
+        }
+      }
+    }
+  ]
+}
