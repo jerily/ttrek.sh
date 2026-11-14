@@ -105,8 +105,9 @@ At **05:00 America/New_York**, EventBridge Scheduler invokes the existing
 There is no public maintenance URL. IAM authorizes the scheduler to invoke the
 website Lambda; no additional HTTP credential is required.
 
-The invocation exports a consistent repeatable-read snapshot of every telemetry
-table, uploads it, then runs `VACUUM (ANALYZE)` outside the snapshot transaction.
+The invocation uses tpersist 0.1.5 to export a consistent repeatable-read snapshot
+of every application table in the PostgreSQL connection's current schema, uploads
+it, then runs `VACUUM (ANALYZE)` outside the snapshot transaction.
 Autovacuum remains enabled throughout the day. The export is compressed JSONL at
 `s3://jerily-ttrek-app/telemetry/backups/YYYY/MM/DD/...jsonl.gz`.
 The bucket applies SSE-S3 encryption. UTC dates identify the backup folders.
@@ -115,16 +116,23 @@ creation, including older backups already present when the rule is deployed.
 S3 processes expiration asynchronously; this is an age-based policy, not a count
 of seven files. Other bucket prefixes are unaffected.
 
-The first JSONL record identifies format `ttrek-telemetry`, version `1`, export
-time and table order. Each following record has `table` and `values`. Text stays
-text, numbers stay numeric, and binary hashes use base64. A final `complete`
-record contains counts for every table, including empty tables. The application
-schema supplies table definitions, keys and indexes; exports contain telemetry
-data, not PostgreSQL roles, extensions or other databases. Schema changes must
-also update the backup format and restore implementation.
+The first JSONL record identifies format `tpersist`, version `1`, export time,
+and a live JSON schema snapshot. Each following record has `table` and `values`.
+Scalar values are strings to preserve large integers and decimal precision;
+SQL NULL stays null and binary columns use base64. A final `complete` record has
+counts for every table, including empty tables. The embedded schemas include
+columns, defaults, keys, foreign keys, identity columns and indexes, so restore
+does not depend on schema files in a later package release.
 
-The existing TDBC PostgreSQL driver handles snapshot cursors and maintenance SQL;
-tpersist supplies the table definitions and compiled, bound restore inserts.
+Discovery includes account tables, static content tables, the search snapshot,
+and future application tables without maintaining a telemetry allowlist. System
+tables, views and extension-owned tables are excluded. Unsupported schema features
+fail the export before upload rather than silently disappearing from the backup.
+See tpersist's `docs/jsonl.md` for the portable schema limits.
+
+The existing TDBC PostgreSQL driver handles maintenance SQL. A dedicated tpersist
+connection owns the export snapshot while the maintenance connection holds the
+advisory lock. Both have bounded statement and lock waits.
 There are no PostgreSQL command-line tools or new runtime dependencies. Cursors
 fetch 256 rows at a time. A database advisory lock prevents simultaneous jobs
 across website Lambda instances without serializing ordinary website requests.
@@ -162,17 +170,36 @@ ttrek run tclsh9.1 bin/restore-telemetry.tcl backup.jsonl.gz /protected/restore-
 ```
 
 The target configuration is mandatory, so the website's configuration is never
-selected implicitly. Restore creates the telemetry schema if missing and refuses
-to insert into nonempty tables. It validates format, table names, columns and
-row counts, then restores all rows in one transaction and advances ID sequences.
-The derived search snapshot is excluded from the backup table list, so existing
-version 1 backups remain compatible. A successful restore invalidates its revision
-in the restore transaction; the restore CLI then rebuilds it from the restored
-package tables. If publication fails, the CLI reports that data was restored and
-asks for `task_publish_search`. Older backups without listing flags need a registry
-sync to repopulate the published catalog.
-An invalid or incomplete backup rolls back the imported rows and invalidation. Treat backups as
-private data and restore only trusted files.
+selected implicitly. For new `tpersist` backups, restore creates missing tables
+and indexes from the archived JSON schemas, refuses populated or incompatible
+tables, validates every row and the completion footer, and restores everything in
+one transaction. It advances identity generators beyond imported IDs. Do not run
+package initialization first: it may seed tables such as the search snapshot.
+The restored search snapshot is included in the archive.
+
+Historical `ttrek-telemetry` version 1 backups remain supported by the same CLI.
+Only that legacy path reads package telemetry schemas, adds defaults for older
+metadata, and rebuilds the search snapshot after restoring telemetry. It does not
+restore accounts or content because those records were absent from old archives.
+
+For a local SQLite restore from a new backup:
+
+```sh
+ttrek run -script importdb-local -- backup.jsonl.gz
+# Optional destination and table subset (a Tcl list):
+ttrek run -script importdb-local -- backup.jsonl.gz --data-dir /tmp/ttrek-review --tables 'web_user_users web_user_profiles'
+```
+
+The local script always selects SQLite. It defaults to `TTREK_LOCAL_RUNTIME_DATA`
+or `/tmp/ttrek-local`, matching the local Lambda runtime; `--data-dir` overrides
+that directory. It creates `telemetry.sqlite3` there and uses the archive's schemas.
+Stop the local services before import, and use an empty destination. Selection
+does not add foreign-key parents automatically. It never deletes existing rows.
+Application encryption keys and external S3 objects are separate from this SQL
+backup; retain the original keys when restoring encrypted account data.
+
+Invalid or incomplete backups roll back imported rows and newly created tables.
+Treat backups as private data and restore only trusted files.
 
 Tail the shared function's logs:
 
