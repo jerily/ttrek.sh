@@ -1,11 +1,11 @@
 package require Tcl 9.1
 package require twebserver
 package require tjson
-package require tratelimit 1.0.1
-package require treqmon 2.1.0
+package require tratelimit 1.1.0
+package require treqmon 2.2.0
 package require web-static-wiki 0.1.6
 package require web-static-blog 0.1.5
-package require tpathexp 1.1.0
+package require tpathexp 1.2.0
 
 namespace eval ::site {
     variable settings
@@ -59,12 +59,19 @@ proc ::site::mount {router} {
         set monitor_master [dict get [config] request_monitor master_template]
     }
     ::treqmon::mount $router -prefix /request-monitor \
+        -middleware [dict exists $settings treqmon] \
         -include_active_users [expr {![catch {package present tsession}]}] \
         -config [dict create master_template [dict get $templates $monitor_master] \
             templates [dict create master.html.jinja [dict get $templates master.html.jinja]] \
             chart_script [::assets::url /js/chart.umd.js]]
+    # Monitoring is outermost so rate-limit responses are recorded as well.
+    if {[dict exists $settings tratelimit]} {::tratelimit::mount $router}
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {
-        $router add $method $pattern [list ::site::invoke $handler $name] -strict true
+        set hooks {}
+        if {[dict exists $settings tratelimit]} {
+            set hooks [list -enter_proc [list ::tratelimit::middleware::enter_route $name]]
+        }
+        $router add $method $pattern [list ::site::invoke $handler $name] -strict true {*}$hooks
     }
 }
 
@@ -81,7 +88,6 @@ proc ::site::invoke {handler name request context params} {
 }
 
 proc ::site::dispatch {router request {context {}}} {
-    variable settings
     if {![dict exists $request method]} {dict set request method [dict get $request httpMethod]}
     dict set request httpMethod [dict get $request method]
     set request [dict merge [dict create headers {} queryString {} version HTTP/1.1 \
@@ -99,21 +105,10 @@ proc ::site::dispatch {router request {context {}}} {
         return $response
     }
     set context [dict merge {addr 127.0.0.1 port 8080} $context]
-    if {[dict exists $settings treqmon]} {
-        set request [::treqmon::middleware::enter $context $request]
-    }
-    if {[dict exists $settings tratelimit]} {
-        if {[catch {::tratelimit::middleware::enter $context $request} result options]} {
-            if {[dict exists $options statusCode]} {return $options}
-            return -options $options $result
-        }
-        set request $result
-    }
     # Render HEAD as GET so compression and validators select identical headers.
     set routed_request $request
     if {[dict get $request method] eq "HEAD"} {
         dict set routed_request method GET
-        dict set routed_request httpMethod GET
     }
     set response [$router dispatch $routed_request $context]
     set content_type {}
@@ -128,9 +123,6 @@ proc ::site::dispatch {router request {context {}}} {
         # Keep package-owned no-store policies; ordinary site HTML revalidates
         # so a deployment promptly switches browsers to the new asset URLs.
         if {!$has_policy} {dict set response headers Cache-Control no-cache}
-    }
-    if {[dict exists $settings treqmon]} {
-        set response [::treqmon::middleware::leave $context $request $response]
     }
     return [::responses::prepare $request $response]
 }

@@ -154,7 +154,14 @@ this typed JSON contract.
 
 ## Request monitoring and shared layout
 
-The request-monitor page is mounted by treqmon 2.1.0 on the site's `tpathexp`
+During mounting, `treqmon::mount` installs monitoring on the tpathexp 1.2.0
+router before `tratelimit::mount` installs global limits. Each custom route in
+`tcl/routes.tcl` gets a named `tratelimit::middleware::enter_route` hook. Configure
+`route_limits` using those names, such as `get_search`, to limit individual
+routes. Global limits run once per request; monitoring also records HTTP 429
+responses. The dispatcher only adapts requests and prepares responses.
+
+The request-monitor page is mounted by treqmon 2.2.0 on the site's `tpathexp`
 router, with the website's layout and local Chart.js asset. There is no site-local
 monitor handler, rendering module or monitoring middleware. Set `master_template` in the
 INI's `[request_monitor]` section to a trusted filename in `www/`; the default is

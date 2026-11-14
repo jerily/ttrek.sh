@@ -16,6 +16,8 @@ if {[llength $argv] == 3 && [lindex $argv 0] eq "--worker"} {
     ::tratelimit::init_middleware [dict get $::site::settings tratelimit]
     ::treqmon::init_middleware [dict get $::site::settings treqmon]
     set ::site_lambda::router [::tpathexp::router]
+    ::treqmon::mount $::site_lambda::router
+    ::tratelimit::mount $::site_lambda::router
     $::site_lambda::router add GET / {apply {{request context params} {
         ::twebserver::build_response 200 text/plain ok
     }}} -strict true
@@ -26,7 +28,7 @@ if {[llength $argv] == 3 && [lindex $argv 0] eq "--worker"} {
         assert {[llength [::treqmon::get_history_events]] == 1}
     } else {
         assert {[dict get $response statusCode] == 429} {limit was not shared between processes}
-        assert {[llength [::treqmon::get_history_events]] == 1} {history was not shared between processes}
+        assert {[llength [::treqmon::get_history_events]] == 2} {history was not shared between processes}
         # Changing a forwarded header cannot evade the gateway's source-IP limit.
         set event [string map {198.51.100.99 198.51.100.100} $event]
         set response [::tjson::json_to_simple [::site_lambda::handle $event {}]]
@@ -34,7 +36,7 @@ if {[llength $argv] == 3 && [lindex $argv 0] eq "--worker"} {
         set event [string map {203.0.113.17 203.0.113.18} $event]
         set response [::tjson::json_to_simple [::site_lambda::handle $event {}]]
         assert {[dict get $response statusCode] == 200}
-        assert {[llength [::treqmon::get_history_events]] == 2}
+        assert {[llength [::treqmon::get_history_events]] == 4}
     }
     exit
 }
