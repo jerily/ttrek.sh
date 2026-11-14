@@ -1,0 +1,51 @@
+--- /dev/null
++++ b/ttrek.mk
+@@ -0,0 +1,10 @@
++prefix ?= /usr/local
++appdir = $(DESTDIR)$(prefix)/share/openacs-5.10.1
++
++.PHONY: install
++install:
++	mkdir -p "$(appdir)" "$(DESTDIR)$(prefix)/bin"
++	cp -R bin content-repository-content-files etc packages tcl www license.txt readme.txt "$(appdir)/"
++	cp -R packages/acs-bootstrap-installer/installer/www/. "$(appdir)/www/"
++	cp -R packages/acs-bootstrap-installer/installer/tcl/. "$(appdir)/tcl/"
++	install -m 755 openacs-create-instance "$(DESTDIR)$(prefix)/bin/openacs-create-instance"
+--- /dev/null
++++ b/openacs-create-instance
+@@ -0,0 +1,35 @@
++#!/bin/sh
++# Copy the installed OpenACS template to a new writable instance.
++set -eu
++
++if [ "$#" -ne 1 ]; then
++    echo "Usage: openacs-create-instance DIRECTORY" >&2
++    exit 2
++fi
++
++prefix=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
++case $1 in
++    /*) instance=$1 ;;
++    *) instance=$PWD/$1 ;;
++esac
++
++# An existing instance may contain user uploads and locally installed packages.
++# mkdir deliberately fails if the destination already exists.
++umask 077
++mkdir "$instance"
++cp -R "$prefix/share/openacs-5.10.1/." "$instance/"
++mkdir -p "$instance/log" "$instance/etc" "$instance/packages/acs-subsite/www/admin"
++cp "$prefix/share/nsstats/"* "$instance/packages/acs-subsite/www/admin/"
++cat > "$instance/etc/ttrek-config.tcl" <<'CONFIG'
++# Override database and listener defaults using oacs_* environment variables.
++set serverroot [file dirname [file dirname [file normalize [ns_info config]]]]
++set homedir [file dirname [file dirname [ns_info nsd]]]
++source [file join $homedir conf openacs-config.tcl]
++ns_section ns/db/driver/postgres {
++    ns_param pgbin [file join $homedir postgresql bin]
++}
++CONFIG
++
++printf 'Created OpenACS instance: %s\n' "$instance"
++printf 'Configuration: %s/etc/ttrek-config.tcl\n' "$instance"
++printf 'Configure the database, then run: %s/bin/nsd -f -t "%s/etc/ttrek-config.tcl"\n' "$prefix" "$instance"

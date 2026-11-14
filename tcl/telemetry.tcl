@@ -118,6 +118,8 @@ proc ::telemetry::table_definitions {} {
         url [dict create type text not_null 1 default [db_value {} -type text]] \
         license [dict create type text not_null 1 default [db_value {} -type text]] \
         tags [dict create type text not_null 1 default [db_value {[]} -type text]] \
+        recipe [dict create type text not_null 1 default [db_value {{}} -type text]] \
+        patches [dict create type text not_null 1 default [db_value {{}} -type text]] \
         listed [dict create type integer not_null 1 default [db_value 0 -type integer]]] \
         -unique {{pkg_name_id version}} \
         -foreign_keys {{columns pkg_name_id table package_names referenced_columns pkg_name_id}}]
@@ -173,6 +175,8 @@ proc ::telemetry::initdb {} {
             license {TEXT NOT NULL DEFAULT ''}
             tags {TEXT NOT NULL DEFAULT '[]'}
             listed {INTEGER NOT NULL DEFAULT 0}
+            recipe {TEXT NOT NULL DEFAULT '{}'}
+            patches {TEXT NOT NULL DEFAULT '{}'}
         } {
             if {$column ni $columns} {
                 set guard [expr {$dialect eq "postgresql" ? "IF NOT EXISTS " : ""}]
@@ -233,7 +237,8 @@ proc ::telemetry::sync_registry_metadata {args} {
             if {[::tjson::has_object_item $spec tags]} {
                 set tags [::registry_metadata::tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $path]
             }
-            set metadata [dict create tags [::tjson::typed_to_json [list L [lmap tag $tags {list S $tag}]]]]
+            set metadata [::registry_metadata::payload $spec $path]
+            dict set metadata tags [::tjson::typed_to_json [list L [lmap tag $tags {list S $tag}]]]
             foreach field {description url license} {
                 if {![::tjson::has_object_item $spec $field]} continue
                 set item [::tjson::get_object_item $spec $field]
@@ -251,7 +256,7 @@ proc ::telemetry::sync_registry_metadata {args} {
         # Avoid rewriting unchanged catalog rows during repeated syncs.
         lock_search_snapshot
         set existing {}
-        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, license, tags, listed}] \
+        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, license, tags, listed, recipe, patches}] \
             package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
         foreach row [rows $query] {
             dict set existing [list [dict get $row name] [dict get $row version]] $row
@@ -310,6 +315,39 @@ proc ::telemetry::registry_catalog {args} {
         lappend result $row
     }
     return $result
+}
+
+# Listed rows are the published registry; telemetry-only and withdrawn rows stay hidden.
+proc ::telemetry::registry_query {columns name {version {}}} {
+    set query [db_join [db_select packages -columns $columns] package_names \
+        -expr {packages.pkg_name_id = package_names.pkg_name_id}]
+    set query [db_where $query [db_and [db_eq [db_col name] [db_value $name -type text]] \
+        [db_eq [db_col listed] [db_value 1 -type integer]]]]
+    if {$version ne {}} {
+        set query [db_where $query [db_eq [db_col version] [db_value $version -type text]]]
+    }
+    return $query
+}
+
+proc ::telemetry::registry_versions {name} {
+    set result {}
+    foreach row [rows [registry_query {version recipe} $name]] {
+        set recipe [lindex [::tjson::json_to_typed [dict get $row recipe]] 1]
+        if {![dict exists $recipe dependencies]} {
+            error "Registry recipes need task_sync_website after schema migration"
+        }
+        dict set result [dict get $row version] [dict get $recipe dependencies]
+    }
+    return $result
+}
+
+proc ::telemetry::registry_recipe {name version} {
+    if {$version eq {}} {return {}}
+    set row [lindex [rows [registry_query {recipe patches} $name $version]] 0]
+    if {$row ne {} && [dict get $row recipe] eq {{}}} {
+        error "Registry recipes need task_sync_website after schema migration"
+    }
+    return $row
 }
 
 proc ::telemetry::event {event_type args} {

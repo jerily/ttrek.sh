@@ -334,11 +334,14 @@ The build:
    `s3://jerily-ttrek-app/ttrek/1.3.0/linux-amd64-glibc/ttrek`, makes it executable,
    and checks that it starts with `ttrek self-update -version`.
 2. Uses that binary to install from the private registry (build tools) and the
-   pinned public `registry` submodule (runtime recipes).
+   independently fetched public registry (runtime dependencies).
 3. Restores retained browser assets, builds browser assets, then the
    application and asset checks.
-4. Generates encrypted production config from SSM, packages with tdevops using
-   `--local-only`, and sets executable ZIP attributes. This skips the numeric
+4. Generates encrypted production config from SSM and packages with tdevops using
+   `--local-only`. Packaging checks out the latest `jerily/ttrek-registry` default
+   branch into the ZIP, excludes `.git`, and records `etc/registry-revision`.
+   It validates the staged recipes in an in-memory database and sets executable
+   ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,
    dependency resolution, and staged-site checks still run.
 5. Validates the SAM template and packaged image settings/bytes, preserves the
@@ -665,16 +668,20 @@ The existing website Lambda accepts private direct invocations with
 `{"source":"ttrek.patch","task":"task_initdb_website"}` or
 `{"source":"ttrek.patch","task":"task_sync_website"}`. The first initializes the
 installed packages' schemas; the second synchronizes wiki/blog content, images,
-and registry metadata, then publishes both search indexes in the same transaction.
+and the bundled registry's complete recipes, then publishes both search indexes
+in the same transaction. The sync is invoked manually after deployment;
+CodeBuild never runs it.
 `{"source":"ttrek.patch","task":"task_publish_search"}` republishes search from
 the stored package tables without importing recipes or content. HTTP request
 envelopes cannot select these tasks. IAM
 `lambda:InvokeFunction` authorizes the whole function, including its existing
 backup task; IAM does not restrict individual task names.
 
-`devops/infra/31-codebuild-patch.yml` defines the new, independent
+`devops/infra/31-codebuild-patch.yml` defines the independent
 `Infra-DevOps-TTREK-Patch` CodeBuild project. It needs only Lambda invocation and
 its own log permissions; the Lambda uses its existing VPC/database access.
+This runner accepts only initialization and search publication; synchronization
+is deliberately excluded.
 The website deployment build does not invoke it. Redeploy the group policies with
 `00-deploy-iam-policy.sh` using an administrator profile to allow management of
 the new project, role and log group. Deploy the patch stack separately with its
@@ -684,8 +691,6 @@ companion script, then select the task when starting a build:
 bash devops/infra/31-deploy-codebuild-patch.sh
 aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
   --environment-variables-override name=PATCH_TASK,value=task_initdb_website,type=PLAINTEXT
-aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
-  --environment-variables-override name=PATCH_TASK,value=task_sync_website,type=PLAINTEXT
 # Republish directly edited/restored database metadata without importing recipes:
 aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
   --environment-variables-override name=PATCH_TASK,value=task_publish_search,type=PLAINTEXT
@@ -693,13 +698,38 @@ aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
 
 The script uses the standard AWS profile/region defaults above.
 `TTREK_WEBSITE_FUNCTION_NAME` overrides the target Lambda and `TTREK_PATCH_TASK`
-sets the project's default task (otherwise `task_sync_website`). Deploying the
+sets the project's default task (otherwise `task_initdb_website`). Deploying the
 stack does not start a build or run a task.
+
+Invoke synchronization yourself after reviewing/deploying the ZIP:
+
+```sh
+aws lambda invoke --function-name prod-Api-TtrekWebsite-Function \
+  --invocation-type RequestResponse --cli-read-timeout 320 \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"source":"ttrek.patch","task":"task_sync_website"}' \
+  /tmp/ttrek-sync-response.json
+cat /tmp/ttrek-sync-response.json
+```
+
+Use the intended AWS profile and region. Check that the invocation has no
+`FunctionError` and the response contains `"ok":true`. Lambda reads the bundled
+registry; it does not access GitHub. To pick up newer recipes, build/deploy a new
+ZIP before invoking sync. A checkout failure fails packaging. A missing or
+invalid bundled registry fails sync without clearing the published database.
+No new public internet route or S3 registry handoff is needed.
 
 Run initialization before the first sync on a new database. Initialization creates
 missing tables/indexes and applies additive schema upgrades; repeated runs preserve
 existing content, registry IDs, and telemetry. It does not drop or clear tables or
 import content.
+
+The database-recipe upgrade requires both tasks once: `task_initdb_website`,
+then a manual `task_sync_website`. Initialization adds `recipe` and `patches`
+without changing package IDs or telemetry. Existing rows have no recipe payload
+until sync, so recipe/dependency APIs and version pages return 503 in that gap.
+To avoid that gap, initialize and sync with the new code before switching traffic.
+Subsequent initialization preserves stored recipes.
 
 When upgrading an existing site from Markdown snapshots to database-backed content,
 run both tasks in order once: `task_initdb_website`, then `task_sync_website`.

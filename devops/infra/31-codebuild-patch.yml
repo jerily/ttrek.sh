@@ -8,8 +8,8 @@ Parameters:
     AllowedPattern: '[A-Za-z0-9_-]{1,54}'
   TaskName:
     Type: String
-    Default: task_sync_website
-    AllowedValues: [task_initdb_website, task_sync_website, task_publish_search]
+    Default: task_initdb_website
+    AllowedValues: [task_initdb_website, task_publish_search]
 
 Resources:
   PatchBuildLogs:
@@ -73,7 +73,7 @@ Resources:
                 - |
                   set -euo pipefail
                   case "$PATCH_TASK" in
-                    task_initdb_website|task_sync_website|task_publish_search) ;;
+                    task_initdb_website|task_publish_search) ;;
                     *) echo 'Unknown patch task' >&2; exit 1 ;;
                   esac
                   printf '{"source":"ttrek.patch","task":"%s"}' "$PATCH_TASK" > payload.json

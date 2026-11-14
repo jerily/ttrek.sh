@@ -18,6 +18,7 @@ ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry-dispatch.test"
 ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
+ttrek run tclsh9.1 "$PWD/tests/stage-registry.test"
 ttrek run tclsh9.1 "$PWD/tests/patch.test"
 ttrek run tclsh9.1 "$PWD/tests/invoke-patch-local.test"
 ttrek run tclsh9.1 "$PWD/tests/search-store.test"
@@ -134,7 +135,12 @@ and Lambda Valkey workers reject attempts to load the Thread package.
 
 `tests/registry-metadata.test` uses the same backend selection. It covers existing
 schema upgrades, per-version metadata, imports from multiple registries, repeated
-and concurrent imports, invalid recipes, and preservation of IDs and telemetry.
+and concurrent imports, invalid recipes, and preservation of IDs and telemetry. It also covers complete recipe replacement,
+resolved script files, exact patch bytes, withdrawal/republication, and failures
+before writes. Handler tests use fixed fixtures and check that every package page
+and API works after recipe files are removed. `tests/stage-registry.test` checks
+fresh checkouts, revision recording, Git metadata exclusion, and failed builds
+without contacting GitHub.
 
 `tests/patch.test` also uses that backend selection. It verifies that repeated
 `task_initdb_website` calls preserve populated wiki/blog content, registry IDs,
@@ -153,12 +159,12 @@ transport errors and task confirmation. PostgreSQL maintenance tests cover deriv
 snapshot invalidation and rebuilding after restore without changing backup tables.
 
 Run `ttrek run tclsh9.1 "$PWD/tests/benchmark-search.tcl"` for a reproducible
-in-memory benchmark using the checkout's registry. It reports the two blob sizes,
+in-memory benchmark using the sibling `../ttrek-registry` checkout. It reports the two blob sizes,
 mapping size, native construction/loading times and complete validated build/load
 times. It does not connect to production or write persistent application data.
 
 On 2026-11-12, an x86_64 local run with Tcl 9.1, ttrie/ttrigrams 0.2.0 and the
-bundled registry (101 packages, 215 versions, 599 documents) averaged the following
+registry snapshot at that time (101 packages, 215 versions, 599 documents) averaged the following
 over 50 iterations:
 
 | Measurement | Result |

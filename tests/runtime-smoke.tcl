@@ -58,7 +58,7 @@ try {
     write_file [file join $app app.tcl] [string map [list {$server_handle 4433} "\$server_handle $httpsPort" \
         {$server_handle 8080} "\$server_handle $httpPort"] [read_file [file join $app app.tcl]]]
     set registryDir {package registry}
-    file copy [file join $root registry] [file join $app $registryDir]
+    file copy [file join $root tests fixtures registry] [file join $app $registryDir]
     file delete -force [file join $app $registryDir .git]
     write_file [file join $app $registryDir tclx 1.0.0 ttrek.json] {{}}
     file mkdir [file join $app build] [file join $app etc]
@@ -66,7 +66,7 @@ try {
     exec {*}$envCommand [file join $prefix bin openssl] req -x509 -newkey rsa:2048 -config /dev/null \
         -nodes -keyout [file join $app key.pem] -out [file join $app cert.pem] -days 1 -subj /CN=localhost \
         -addext subjectAltName=DNS:localhost,IP:127.0.0.1 >[file join $app certificate.log] 2>@1
-    set config [string map [list {{registry_dir}} $registryDir {{port}} $valkeyPort {{ca_file}} [file join $app cert.pem] \
+    set config [string map [list {{port}} $valkeyPort {{ca_file}} [file join $app cert.pem] \
         {{key}} [binary encode base64 -maxlen 0 [read_file [file join $app key.pem]]] \
         {{certificate}} [binary encode base64 -maxlen 0 [read_file [file join $app cert.pem]]]] \
         [read_file [file join $root tests fixtures local-config.ini.in]]]

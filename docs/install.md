@@ -19,18 +19,17 @@ for the explicit initialization and synchronization workflow.
 
 ## Get the source
 
-Clone the website with its registry:
+Clone the website:
 
 ```bash
-git clone --recurse-submodules https://github.com/jerily/ttrek.sh.git
+git clone https://github.com/jerily/ttrek.sh.git
 cd ttrek.sh
 ```
 
-For an existing checkout, initialize or update the registry after pulling:
-
-```bash
-git submodule update --init --recursive
-```
+The registry is an independent repository. Lambda packaging fetches its latest
+default-branch commit and includes the recipes, scripts and patches in the ZIP.
+Packaging requires Git and HTTPS access to GitHub; Lambda itself needs no public
+internet access. A failed checkout fails the build.
 
 ## Install dependencies
 
@@ -105,7 +104,7 @@ dependencies. Tcl's bundled SQLite package comes with the Tcl runtime.
 
 `build.sh` installs public runtime dependencies, including TLS-enabled Valkey and
 `tink-tcl` 20240704.0.1 with Tcl stubs. Tink and RapidJSON patches live in
-`registry/tink-cc/2.1.1/`. Completed installs are reused. Set `TTREK_MAKE_THREADS`
+`devops/patches/tink-cc-2.1.1/`. Completed installs are reused. Set `TTREK_MAKE_THREADS`
 to control parallelism (default: 4). Its final package check now also expects the
 static content and mock packages; use the [ttrek installation](#install-dependencies)
 for the complete site.

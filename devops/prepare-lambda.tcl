@@ -1,6 +1,8 @@
 package require Tcl 9.1
 source [file join [file dirname [file dirname [info script]]] runtime paths.tcl]
 set siteRoot $::tdevops::runtime::root
+source [file join $siteRoot devops stage-registry.tcl]
+::registry_build::stage $siteRoot
 foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js public/js/chart.umd.js} {
     if {![file isfile [file join $siteRoot $asset]]} {
         error "Missing browser asset $asset; run ttrek run -script build-assets before packaging"
@@ -19,16 +21,15 @@ if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONF
     if {[dict get $images bucket] eq {}} {error "Production configuration requires content_images.bucket"}
 }
 file mkdir [file join $siteRoot data]
-::site::configure [dict create rootdir $siteRoot registry_dir [file join $siteRoot registry] \
-    releases $releases]
+::site::configure [dict create rootdir $siteRoot releases $releases]
 set router [::tpathexp::router]
 set savedEnv [array get ::env ENV]
 try {
     # Provision only a disposable in-memory fixture for packaging smoke checks.
     # Runtime startup never initializes or imports a database in either mode.
     set ::env(ENV) LOCAL
-    # Catalog pages now read the database; validate them against a disposable
-    # import of the staged recipes without contacting the production database.
+    # Validate every staged recipe in a disposable catalog without contacting
+    # the production database. The deployed database changes only on manual sync.
     source [file join $siteRoot tcl telemetry.tcl]
     ::telemetry::init_local {dialect sqlite database :memory:} [list [file join $siteRoot registry]]
     dict set ::site::settings content_connection $::telemetry::connection
