@@ -1,3 +1,8 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
+# Check image publication and database-backed content initialization.
 package require Tcl 9.1
 package require tcltest 2
 namespace import ::tcltest::*
@@ -58,7 +63,7 @@ test build-images-upload {build separates both collections and repeats without w
 } -cleanup ::build_images::cleanup -result {2 2 -1 image/png}
 
 test build-images-runtime {database stores query content without scans, hashes or S3 operations} -setup ::build_images::setup -body {
-    package require tpersist 0.1.2
+    package require tpersist 0.1.4
     set db [::tpersist::db_connect -database :memory: -autobegin 0]
     try {
         set stores [::content_images::database_stores $db $build_images::settings]
@@ -81,7 +86,7 @@ test build-images-runtime {database stores query content without scans, hashes o
 } -cleanup ::build_images::cleanup -result {{} {1 1}}
 
 test build-images-delivery {stored paths switch between signing and CDN without another sync} -setup ::build_images::setup -body {
-    package require tpersist 0.1.2
+    package require tpersist 0.1.4
     set savedCdn [array get ::env CONTENT_IMAGES_CLOUDFRONT_URL]
     set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
     set db [::tpersist::db_connect -database :memory: -autobegin 0]

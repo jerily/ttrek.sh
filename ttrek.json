@@ -51,12 +51,12 @@
     "ttrigrams": "=0.2.0",
     "valkey-tcl": "^1.0.3",
     "tdbcpostgres": ">=1.1.8",
-    "web-static-blog": "^0.1.5",
-    "web-static-wiki": "^0.1.6",
+    "web-static-blog": "^0.1.6",
+    "web-static-wiki": "^0.1.7",
     "tratelimit": "^1.1.0",
     "treqmon": "^2.2.0",
-    "aws-sdk-tcl-s3": "^1.0.17",
-    "tpersist": "^0.1.0",
+    "aws-sdk-tcl-s3": "^1.0.18",
+    "tpersist": "^0.1.4",
     "tconfig": "^1.0.0"
   },
   "devDependencies": {

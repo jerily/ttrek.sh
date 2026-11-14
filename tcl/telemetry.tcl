@@ -1,12 +1,13 @@
 # Copyright Jerily LTD. All Rights Reserved.
-# SPDX-FileCopyrightText: 2024 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
 
 # Drivers are loaded by tpersist only when the selected backend connects.
-package require tpersist
+package require tpersist 0.1.4
 source [file join [file dirname [info script]] registry-metadata.tcl]
 
 namespace eval ::telemetry {
+    variable schema_dir [file normalize [file join [file dirname [info script]] .. sql]]
     namespace import ::tpersist::db_*
     variable connection {}
     variable dialect {}
@@ -83,7 +84,7 @@ proc ::telemetry::transaction {script {schema false}} {
         } on error {message opts} {
             set state [lindex [dict get $opts -errorcode] 2]
             set retry [expr {($dialect eq "sqlite" && $message in {"database is locked" "database table is locked"}) ||
-                $state in {40001 40P01} || ($schema && $state in {23505 42P07 42710})}]
+                $state in {40001 40P01} || ($schema && $state in {23505 42P07 42710 42701})}]
             if {!$retry || $attempt >= 4} {return -options $opts $message}
             after [expr {50 * ($attempt + 1)}]
         }
@@ -98,93 +99,23 @@ proc ::telemetry::close {} {
     }
 }
 
+# Expose the declared telemetry tables for backups and restores.
 proc ::telemetry::table_definitions {} {
-    variable event_list
+    variable schema_dir
     set definitions {}
-    set id {type integer primary_key 1 auto_increment 1}
-    set required {type integer not_null 1}
-    dict set definitions environments [db_define_table environments [dict create \
-        env_id $id hash {type binary not_null 1} description {type text not_null 1} \
-        last_seen {type bigint not_null 1}]]
-    # Serialize registrations per hash without indexing descriptions, which
-    # may be larger than PostgreSQL's B-tree index entry limit.
-    dict set definitions environment_keys [db_define_table environment_keys [dict create \
-        key_id $id hash {type binary unique 1 not_null 1} touched {type bigint not_null 1}]]
-    dict set definitions package_names [db_define_table package_names [dict create \
-        pkg_name_id $id name {type text unique 1 not_null 1}]]
-    dict set definitions packages [db_define_table packages [dict create \
-        pkg_id $id pkg_name_id $required version {type text not_null 1} \
-        description [dict create type text not_null 1 default [db_value {} -type text]] \
-        url [dict create type text not_null 1 default [db_value {} -type text]] \
-        license [dict create type text not_null 1 default [db_value {} -type text]] \
-        tags [dict create type text not_null 1 default [db_value {[]} -type text]] \
-        recipe [dict create type text not_null 1 default [db_value {{}} -type text]] \
-        patches [dict create type text not_null 1 default [db_value {{}} -type text]] \
-        listed [dict create type integer not_null 1 default [db_value 0 -type integer]]] \
-        -unique {{pkg_name_id version}} \
-        -foreign_keys {{columns pkg_name_id table package_names referenced_columns pkg_name_id}}]
-    dict set definitions platforms [db_define_table platforms [dict create \
-        platform_id $id os {type text not_null 1} arch {type text not_null 1}] \
-        -unique {{os arch}}]
-    dict for {event parameters} $event_list {
-        if {$event eq "register_environment"} continue
-        set columns [dict create timestamp {type bigint not_null 1} env_id $required]
-        set foreignKeys {{columns env_id table environments referenced_columns env_id}}
-        if {"-pkg_version" in $parameters} {
-            dict set columns pkg_id $required
-            lappend foreignKeys {columns pkg_id table packages referenced_columns pkg_id}
-        } elseif {"-pkg_name" in $parameters} {
-            dict set columns pkg_name_id $required
-            lappend foreignKeys {columns pkg_name_id table package_names referenced_columns pkg_name_id}
-        }
-        if {"-os" in $parameters} {
-            dict set columns platform_id $required
-            lappend foreignKeys {columns platform_id table platforms referenced_columns platform_id}
-        }
-        if {$event eq "req_pkg_install_event"} {
-            dict set columns install_outcome $required
-            dict set columns install_is_toplevel $required
-        }
-        dict set definitions $event [db_define_table $event $columns -foreign_keys $foreignKeys]
+    foreach definition [dict get [db_read_schema [file join $schema_dir telemetry.json]] tables] {
+        dict set definitions [dict get $definition name] $definition
     }
     return $definitions
 }
 
+# Apply schema changes inside the existing retryable transaction.
 proc ::telemetry::initdb {} {
     variable connection
-    variable dialect
+    variable schema_dir
     transaction {
-        dict for {table definition} [table_definitions] {
-            db_create_table $connection $definition -if_not_exists true
-        }
-        # Upgrade existing databases without replacing package IDs or event rows.
-        # Adding listed defaults legacy rows to 0 until the first registry sync
-        # identifies published recipes. Existing listed flags are never reset.
-        # tpersist has no ALTER TABLE helper; only fixed schema identifiers enter SQL.
-        if {$dialect eq "sqlite"} {
-            set columns [lmap row [::tpersist::_raw $connection {PRAGMA table_info(packages)}] {dict get $row name}]
-        } else {
-            set columns [lmap row [::tpersist::_raw $connection {
-                SELECT attname FROM pg_attribute
-                WHERE attrelid = 'packages'::regclass AND attnum > 0 AND NOT attisdropped
-            }] {dict get $row attname}]
-        }
-        foreach {column definition} {
-            description {TEXT NOT NULL DEFAULT ''}
-            url {TEXT NOT NULL DEFAULT ''}
-            license {TEXT NOT NULL DEFAULT ''}
-            tags {TEXT NOT NULL DEFAULT '[]'}
-            listed {INTEGER NOT NULL DEFAULT 0}
-            recipe {TEXT NOT NULL DEFAULT '{}'}
-            patches {TEXT NOT NULL DEFAULT '{}'}
-        } {
-            if {$column ni $columns} {
-                set guard [expr {$dialect eq "postgresql" ? "IF NOT EXISTS " : ""}]
-                ::tpersist::_raw $connection "ALTER TABLE packages ADD COLUMN ${guard}$column $definition"
-            }
-        }
-        db_create_index $connection idx_environments_hash environments {hash} -if_not_exists true
-        db_create_index $connection idx_install_package req_pkg_install_event {pkg_id platform_id} -if_not_exists true
+        # Defaults preserve legacy IDs and keep unpublished recipes unlisted.
+        db_apply_schema $connection [file join $schema_dir telemetry.json] -additive true
         init_search_snapshot
     } true
 }

@@ -1,13 +1,17 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
 # Application policy; packaging and service mechanics live in tdevops.
 ::tdevops::configure {
     archive ttrek-sh.zip
-    files {tcl www schemas public LICENSE etc/rds-global-bundle.pem etc/releases.json devops/prepare-lambda.tcl devops/stage-registry.tcl}
+    files {tcl sql www schemas public LICENSE etc/rds-global-bundle.pem etc/releases.json devops/prepare-lambda.tcl devops/stage-registry.tcl}
     lambda-config etc/lambda.json
     routes etc/routes.json
     content-collections {docs blog}
     prepare devops/prepare-lambda.tcl
     services {s3 lambda proxy}
-    required-files {tcl/lambda.tcl content/docs/getting-started.md etc/releases.json}
+    required-files {sql/telemetry.json sql/search-snapshot.json tcl/lambda.tcl content/docs/getting-started.md etc/releases.json}
     environment {TTREK_SITE_ZIP --zip TTREK_SITE_PORT --port
         TTREK_LAMBDA_PORT --lambda-port TTREK_LOCAL_DIR --state-dir}
     package-help devops/package-usage.txt
@@ -16,6 +20,7 @@
 }
 
 namespace eval ::project_devops {}
+# Configure local services from the checkout settings.
 proc ::project_devops::local {options work} {
     set root $::tdevops::root
     # Read public release settings from the checkout's local INI.

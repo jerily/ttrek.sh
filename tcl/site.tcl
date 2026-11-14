@@ -1,10 +1,15 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
+# Register the package and load its dependencies.
 package require Tcl 9.1
 package require twebserver
 package require tjson
 package require tratelimit 1.1.0
 package require treqmon 2.2.0
-package require web-static-wiki 0.1.6
-package require web-static-blog 0.1.5
+package require web-static-wiki 0.1.7
+package require web-static-blog 0.1.6
 package require tpathexp 1.2.0
 
 namespace eval ::site {

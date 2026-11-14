@@ -1,3 +1,7 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
 # Start a disposable direct server and an isolated TLS Valkey instance.
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tests support.tcl]
@@ -41,7 +45,7 @@ proc compare_matches {query left right} {
     string compare [lindex $a 4] [lindex $b 4]
 }
 try {
-    foreach name {app.tcl run.sh tcl www public schemas bin content} {file copy [file join $root $name] $app}
+    foreach name {app.tcl run.sh tcl sql www public schemas bin content} {file copy [file join $root $name] $app}
     set guard [read_file [file join $root tests fixtures deny-thread.tcl]]
     foreach name {app.tcl tcl/init-thread.tcl} {
         set path [file join $app $name]

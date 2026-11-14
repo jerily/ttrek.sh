@@ -1,3 +1,8 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
+# Share image-store clients across the content collections.
 namespace eval ::content_images {variable clients {}}
 
 # One production toggle and imported origin for images and browser assets.
@@ -42,8 +47,8 @@ proc ::content_images::options {settings kind {uploadMissing {}}} {
 
 # Build and runtime use the same directories, image options and navigation rules.
 proc ::content_images::snapshots {root settings {uploadMissing {}}} {
-    package require web-static-wiki 0.1.6
-    package require web-static-blog 0.1.5
+    package require web-static-wiki 0.1.7
+    package require web-static-blog 0.1.6
     set stores {}
     foreach {kind title directory} {wiki Documentation docs blog Blog blog} {
         set imageOptions [options $settings $kind $uploadMissing]
@@ -59,8 +64,8 @@ proc ::content_images::snapshots {root settings {uploadMissing {}}} {
 # Lightweight database handles: no source reads, image hashing, schema changes,
 # or content queries until a route requests an item or listing.
 proc ::content_images::database_stores {connection settings} {
-    package require web-static-wiki 0.1.6
-    package require web-static-blog 0.1.5
+    package require web-static-wiki 0.1.7
+    package require web-static-blog 0.1.6
     set stores {}
     foreach {kind title} {wiki Documentation blog Blog} {
         set imageOptions [options $settings $kind 0]
@@ -73,7 +78,7 @@ proc ::content_images::database_stores {connection settings} {
 }
 
 proc ::content_images::connect {settings} {
-    package require tpersist 0.1.2
+    package require tpersist 0.1.4
     set options {-autobegin false}
     dict for {key value} $settings {lappend options -$key $value}
     if {[catch {::tpersist::db_connect {*}$options} connection]} {

@@ -1,3 +1,7 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+
 # Uses a disposable SQLite database, or an isolated PostgreSQL schema selected
 # by the same TTREK_TEST_POSTGRES settings as telemetry.test.
 package require tcltest 2
@@ -52,18 +56,7 @@ set options {-autobegin false}
 dict for {key value} $settings {lappend options -$key $value}
 set ::telemetry::connection [db_connect {*}$options]
 set ::telemetry::dialect [dict get $settings dialect]
-dict for {table definition} [::telemetry::table_definitions] {
-    if {$table eq "packages"} {
-        dict unset definition columns description
-        dict unset definition columns url
-        dict unset definition columns license
-        dict unset definition columns tags
-        dict unset definition columns listed
-        dict unset definition columns recipe
-        dict unset definition columns patches
-    }
-    db_create_table $::telemetry::connection $definition
-}
+db_apply_schema $::telemetry::connection [file join $root tests sql legacy-telemetry.json] -additive true
 set identity [string repeat a 64]
 dict for {event parameters} $::telemetry::event_list {
     dict set ::telemetry::event_list $event [lsort $parameters]
