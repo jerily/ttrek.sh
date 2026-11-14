@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="470" viewBox="0 0 960 470" role="img" aria-labelledby="title desc">
+  <title id="title">The JSON blueprint and the saved records</title>
+  <desc id="desc">A simplified excerpt from schema.json describes id as integer, title as text, and done as boolean with default false. db_apply_schema creates the table structure. A separate insert adds the row: 1, Water the plant, false.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 8 4 0 8Z" fill="#47637c"/></marker>
+  </defs>
+  <rect width="960" height="470" rx="24" fill="#f4f7fb"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#172f46">
+    <text x="40" y="51" font-size="29" font-weight="700">The blueprint and the records</text>
+    <text x="40" y="84" font-size="19" fill="#47637c">The schema describes columns. Your app adds rows.</text>
+    <rect x="40" y="115" width="375" height="285" rx="18" fill="#172f46"/>
+    <text x="64" y="153" font-size="24" font-weight="700" fill="#fff">sql/schema.json</text>
+    <text x="64" y="183" font-size="17" fill="#b9cfe3">Simplified column definitions</text>
+    <g font-family="monospace" font-size="19" fill="#e3efff">
+      <text x="64" y="226">id:</text><text x="190" y="226" fill="#aadbc0">integer</text>
+      <text x="64" y="271">title:</text><text x="190" y="271" fill="#aadbc0">text</text>
+      <text x="64" y="316">done:</text><text x="190" y="316" fill="#aadbc0">boolean</text>
+      <text x="64" y="369" font-size="17" fill="#b9cfe3">done defaults to false</text>
+    </g>
+    <path d="M428 234H513" fill="none" stroke="#47637c" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="473" y="190" text-anchor="middle" font-size="17" fill="#47637c">Creates</text>
+    <text x="473" y="212" text-anchor="middle" font-size="17" fill="#47637c">structure</text>
+    <rect x="530" y="115" width="390" height="285" rx="18" fill="#fff" stroke="#a9c8e6" stroke-width="2"/>
+    <text x="554" y="153" font-size="24" font-weight="700">tasks table</text>
+    <rect x="550" y="183" width="350" height="48" rx="6" fill="#e6f1ff"/>
+    <g font-size="19" font-weight="700">
+      <text x="562" y="214">id</text><text x="615" y="214">title</text><text x="841" y="214">done</text>
+    </g>
+    <rect x="550" y="237" width="350" height="51" rx="6" fill="#e9f6ee"/>
+    <g font-size="18">
+      <text x="562" y="269">1</text><text x="615" y="269">Water the plant</text><text x="841" y="269">false</text>
+    </g>
+    <path d="M725 330V301" stroke="#47637c" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="725" y="362" text-anchor="middle" font-size="20" font-weight="700">An insert adds this row</text>
+    <text x="480" y="439" text-anchor="middle" font-size="20" fill="#47637c">Editing the JSON file does not edit a task's title or completion status.</text>
+  </g>
+</svg>

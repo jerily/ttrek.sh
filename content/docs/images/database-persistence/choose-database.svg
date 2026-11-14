@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="590" viewBox="0 0 960 590" role="img" aria-labelledby="title desc">
+  <title id="title">One app, two database choices</title>
+  <desc id="desc">The same tasks.tcl program and sql/schema.json blueprint use tpersist with either dialect sqlite for a local file or dialect postgresql for a server. After configuring both connections, change the dialect property to select one. Switching does not copy data.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 8 4 0 8Z" fill="#47637c"/></marker>
+  </defs>
+  <rect width="960" height="590" rx="24" fill="#f4f7fb"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#172f46">
+    <text x="40" y="51" font-size="29" font-weight="700">One app, two database choices</text>
+    <text x="40" y="84" font-size="19" fill="#47637c">Configure both connections. Change one dialect property to select one.</text>
+    <rect x="170" y="113" width="620" height="92" rx="18" fill="#fff" stroke="#a9c8e6" stroke-width="2"/>
+    <text x="480" y="149" text-anchor="middle" font-size="23" font-weight="700">Same Tcl code + same JSON schema</text>
+    <text x="480" y="181" text-anchor="middle" font-size="19" fill="#47637c">tasks.tcl + sql/schema.json</text>
+    <path d="M480 206V225" stroke="#47637c" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="360" y="238" width="240" height="56" rx="14" fill="#215ea0"/>
+    <text x="480" y="275" text-anchor="middle" font-size="26" font-weight="700" fill="#fff">tpersist</text>
+    <path d="M480 295V314H250V337" fill="none" stroke="#47637c" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M480 314H710V337" fill="none" stroke="#47637c" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <rect x="40" y="350" width="420" height="166" rx="18" fill="#e6f1ff" stroke="#a9c8e6" stroke-width="2"/>
+    <rect x="66" y="373" width="56" height="38" rx="4" fill="none" stroke="#215ea0" stroke-width="3"/>
+    <path d="M58 420H130" stroke="#215ea0" stroke-width="4" stroke-linecap="round"/>
+    <text x="146" y="397" font-size="25" font-weight="700">Local SQLite</text>
+    <text x="66" y="457" font-size="22" font-family="monospace" fill="#215ea0">dialect sqlite</text>
+    <text x="66" y="491" font-size="19">A file: data/tasks.sqlite3</text>
+
+    <rect x="500" y="350" width="420" height="166" rx="18" fill="#e9f6ee" stroke="#94c4a4" stroke-width="2"/>
+    <rect x="526" y="373" width="50" height="19" rx="4" fill="none" stroke="#26613c" stroke-width="3"/>
+    <rect x="526" y="400" width="50" height="19" rx="4" fill="none" stroke="#26613c" stroke-width="3"/>
+    <circle cx="565" cy="382" r="3" fill="#26613c"/><circle cx="565" cy="409" r="3" fill="#26613c"/>
+    <text x="598" y="390" font-size="24" font-weight="700">Production</text>
+    <text x="598" y="419" font-size="24" font-weight="700">PostgreSQL</text>
+    <text x="526" y="457" font-size="22" font-family="monospace" fill="#26613c">dialect postgresql</text>
+    <text x="526" y="491" font-size="19">A database on a server</text>
+    <text x="480" y="555" text-anchor="middle" font-size="19" fill="#47637c">Each database has its own records. Switching does not copy them.</text>
+  </g>
+</svg>

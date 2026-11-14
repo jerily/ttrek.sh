@@ -15,10 +15,15 @@ chmod 0755 "$TTREK_BIN_DIR/ttrek"
 export PATH="$TTREK_BIN_DIR:$PATH"
 export JOBS=${TTREK_MAKE_THREADS:-4}
 
-# The private registry supplies build tools; ttrek fetches the public registry
-# independently for dependency resolution.
+# Resolve dependencies and publish the catalog from one public checkout.
+export TTREK_PUBLIC_REGISTRY="$SITE_ROOT/build/public-registry"
+ttrek sync "$TTREK_PUBLIC_REGISTRY"
+
+# The private registry supplies build tools; public packages come from the
+# synced checkout that packaging will reuse for the website's later sync.
 # Include the failing recipe's log in CodeBuild output for diagnosis.
-ttrek install -y -fail-verbose -registry "$CODEBUILD_SRC_DIR_PrivateRegistry" -add-pubreg
+ttrek install -y -fail-verbose -registry "$CODEBUILD_SRC_DIR_PrivateRegistry" \
+  -registry "$TTREK_PUBLIC_REGISTRY"
 
 export TTREK_SITE_PREFIX="$SITE_ROOT/ttrek-venv/local"
 export LD_LIBRARY_PATH="$TTREK_SITE_PREFIX/lib:$TTREK_SITE_PREFIX/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -46,6 +51,7 @@ npm test
 "$TCLSH" tests/telemetry.test
 "$TCLSH" tests/registry-metadata.test
 "$TCLSH" tests/stage-registry.test
+"$TCLSH" tests/build-lambda.test
 "$TCLSH" tests/search-store.test
 "$TCLSH" tests/telemetry-maintenance.test
 "$TCLSH" tests/installer.tcl

@@ -4,10 +4,22 @@
 
 The public package catalog lives independently in
 [jerily/ttrek-registry](https://github.com/jerily/ttrek-registry).
-Each Lambda build (including local packaging) makes a fresh shallow checkout of
-its default branch into the staged ZIP's `registry/` directory. Git metadata is
-excluded; `etc/registry-revision` records the exact commit. There is no registry
-submodule in the website repository.
+CodeBuild runs `ttrek sync` into `build/public-registry` before installing
+dependencies. The private registry supplies build tools, followed by this public
+checkout for public packages. Packaging reuses that checkout through
+`TTREK_PUBLIC_REGISTRY`, exporting its committed files into the ZIP's `registry/`
+directory without another fetch. Git metadata and ignored files are excluded;
+`etc/registry-revision` records the exact commit. A missing or modified supplied
+checkout fails packaging. There is no registry submodule in the website repository.
+
+Local packaging still makes a fresh shallow checkout of the public registry's
+default branch when `TTREK_PUBLIC_REGISTRY` is unset. To reuse a specific local
+snapshot, sync it first and pass its absolute path when packaging:
+
+```sh
+ttrek sync "$PWD/build/public-registry"
+TTREK_PUBLIC_REGISTRY="$PWD/build/public-registry" ttrek run -script package-lambda -- --local-only
+```
 
 Recipes carry a top-level `description`, optional `tags`, project `url`, and SPDX `license` string.
 The package overview shows the latest version's description, HTTP(S) project link, and license when present.

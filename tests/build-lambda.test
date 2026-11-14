@@ -1,0 +1,68 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+set work [makeDirectory lambda-build]
+file mkdir [file join $work devops] [file join $work bin] [file join $work {private registry}]
+file copy [file join $root devops build-lambda.sh] [file join $work devops build-lambda.sh]
+
+proc build_write {path text} {
+    set channel [open $path w]
+    try {puts $channel $text} finally {close $channel}
+    file attributes $path -permissions 0755
+}
+proc build_read {path} {
+    set channel [open $path]
+    try {string trim [read $channel]} finally {close $channel}
+}
+build_write [file join $work bin aws] {#!/bin/sh
+set -eu
+[ "$1 $2" = "s3 cp" ] || exit 91
+cp "$TTREK_TEST_BINARY" "$4"
+}
+build_write [file join $work ttrek-fixture] {#!/bin/sh
+set -eu
+printf '%s\n' "$1" >> "$TTREK_TEST_LOG"
+case "$1" in
+    self-update) exit 0 ;;
+    sync)
+        [ "$TTREK_TEST_SYNC_STATUS" = 0 ] || exit "$TTREK_TEST_SYNC_STATUS"
+        [ "$2" = "$TTREK_PUBLIC_REGISTRY" ] || exit 92
+        mkdir -p "$2"
+        touch "$2/synced"
+        ;;
+    install)
+        [ -f "$TTREK_PUBLIC_REGISTRY/synced" ] || exit 93
+        [ "$#" = 7 ] && [ "$2" = -y ] && [ "$3" = -fail-verbose ] || exit 94
+        [ "$4" = -registry ] && [ "$5" = "$CODEBUILD_SRC_DIR_PrivateRegistry" ] || exit 95
+        [ "$6" = -registry ] && [ "$7" = "$TTREK_PUBLIC_REGISTRY" ] || exit 96
+        # Stop here: the test must not install packages, upload or deploy.
+        exit 73
+        ;;
+    *) exit 97 ;;
+esac
+}
+proc run_build {syncStatus} {
+    global work env
+    file delete -force [file join $work build] [file join $work commands.log]
+    set failed [catch {exec env PATH=[file join $work bin]:$env(PATH) \
+        CODEBUILD_SRC_DIR_PrivateRegistry=[file join $work {private registry}] \
+        TTREK_TEST_BINARY=[file join $work ttrek-fixture] \
+        TTREK_TEST_LOG=[file join $work commands.log] \
+        TTREK_TEST_SYNC_STATUS=$syncStatus \
+        bash [file join $work devops build-lambda.sh] 2>@1} message options]
+    list $failed [lindex [dict get $options -errorcode] end] \
+        [split [build_read [file join $work commands.log]] \n]
+}
+
+test build-registry-order {The build syncs before installing and passes the same checkout after the private registry} -body {
+    run_build 0
+} -result {1 73 {self-update sync install}}
+
+test build-registry-sync-failure {A failed sync stops the build before dependency installation} -body {
+    run_build 42
+} -result {1 42 {self-update sync}}
+
+removeDirectory lambda-build
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed != 0}]
