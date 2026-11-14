@@ -96,6 +96,19 @@ uploads missing content images, and publishes the search indexes. Initialization
 preserves existing rows. Search returns 503 until a snapshot has been published.
 
 
+To restore a downloaded application backup instead of initializing and syncing,
+stop the local services and import into an empty local database:
+
+```sh
+ttrek run -script importdb-local -- backup.jsonl.gz
+```
+
+This creates tables from the JSON schemas inside the backup. It defaults to
+`TTREK_LOCAL_RUNTIME_DATA` or `/tmp/ttrek-local`; use `--data-dir DIRECTORY` for a
+different destination and `--tables 'table1 table2'` for selected tables. Existing
+populated tables are refused. See [backup and restore](telemetry.md#restore).
+
+
 Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor starts:
 
 | Service | Default port | Responsibility |

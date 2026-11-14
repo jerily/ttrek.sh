@@ -1,0 +1,55 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-License-Identifier: MIT.
+package require tcltest 2
+package require tpersist 0.1.5
+namespace import ::tcltest::test
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root bin importdb-local.tcl]
+set work [::tcltest::makeDirectory importdb-local-fixture]
+set savedEnv [array get ::env]
+set source [::tpersist::db_connect -database :memory: -autobegin false]
+foreach name {users notes} {
+    ::tpersist::db_create_table $source [::tpersist::db_define_table $name {id {type integer primary_key 1} value {type text}}]
+    ::tpersist::db_execute $source [::tpersist::db_values [::tpersist::db_insert $name] {id 1 value restored}]
+}
+set backup [file join $work backup.jsonl.gz]
+::tpersist::db_export_jsonl $source $backup
+::tpersist::db_disconnect $source
+
+test importdb-local-help {Help needs no config and documents the backup argument} -body {
+    string match {Usage: importdb-local.sh BACKUP*} [::local_import::main $root --help]
+} -result 1
+
+test importdb-local-all {Local import uses archived schemas without initialization or production connections} -body {
+    set ::env(ENV) PROD
+    set directory [file join $work all]
+    set result [::local_import::main $root [list $backup --data-dir $directory]]
+    set db [::tpersist::db_connect -database [file join $directory telemetry.sqlite3] -autobegin false]
+    try {
+        list $::env(ENV) [::tpersist::db_tables $db] [dict get [::tpersist::db_execute $db [::tpersist::db_select users]] rows]
+    } finally {::tpersist::db_disconnect $db}
+} -result {LOCAL {notes users} {{id 1 value restored}}}
+
+test importdb-local-subset {Table selection and runtime data override are forwarded} -body {
+    set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $work subset]
+    ::local_import::main $root [list $backup --tables users]
+    set db [::tpersist::db_connect -database [file join $::env(TTREK_LOCAL_RUNTIME_DATA) telemetry.sqlite3] -autobegin false]
+    try {::tpersist::db_tables $db} finally {::tpersist::db_disconnect $db}
+} -result users
+
+test importdb-local-nonempty {Repeated import refuses populated tables} -body {
+    catch {::local_import::main $root [list $backup --data-dir [file join $work all]]} message options
+    dict get $options -errorcode
+} -result {TPERSIST VALIDATION}
+
+test importdb-local-arguments {Unexpected flags are rejected before creating a database} -body {
+    list [catch {::local_import::main $root [list $backup --data-dir]}] \
+        [catch {::local_import::main $root [list $backup --config prod.ini]}]
+} -result {1 1}
+
+array unset ::env
+array set ::env $savedEnv
+::tcltest::removeDirectory importdb-local-fixture
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed != 0}]

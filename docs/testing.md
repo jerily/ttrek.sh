@@ -196,3 +196,9 @@ database, it also checks JSONL backup/restore, binary/text round trips, cursor
 paging, truncated exports, sequence advancement, advisory locking, cleanup and
 combined backup/vacuum execution. S3 upload is stubbed; no AWS resources are used.
 No Docker or PostgreSQL command-line clients are required by the application.
+
+`tests/importdb-local.test` verifies archive-driven local initialization, table
+selection, destination overrides and refusal to overwrite populated tables.
+`tests/telemetry-maintenance.test` also tests catalog-discovered application
+tables, embedded schemas and PostgreSQL-to-SQLite restoration; enable its
+existing `TTREK_TEST_POSTGRES` disposable-database setting for those cases.
