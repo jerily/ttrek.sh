@@ -198,7 +198,7 @@ try {
     if {$mode eq "LOCAL"} {
         set url https://localhost:$httpsPort/
         set response [request $url 200 GET {} {} [list -cafile [file join $app cert.pem]]]
-        assert {[::test_support::contains $response {Install ttrek}]}
+        assert {[::test_support::contains $response {Your next Tcl project starts here.}]}
         assert {[catch {request $url}]} {an untrusted certificate was accepted}
         set session [::trequests::session -cafile [file join $app cert.pem]]
         try {

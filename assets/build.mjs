@@ -7,7 +7,7 @@ export const fingerprint = bytes => createHash('sha256').update(bytes).digest('h
 // Preserve the existing cascade: framework, shared layout, then scoped pages.
 export const stylesheets = [
     'pure/pure-min.css', 'pure/grids-responsive-min.css', 'styles.css',
-    'search.css', 'docs.css', 'request-monitor.css',
+    'search.css', 'home-showcase.css', 'docs.css', 'request-monitor.css',
 ];
 
 async function files(directory) {

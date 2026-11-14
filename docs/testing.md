@@ -10,6 +10,7 @@ additional requirements described below.
 ```bash
 ttrek run -script build-assets
 npm test
+ttrek run tclsh9.1 "$PWD/tests/homepage.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
@@ -93,7 +94,10 @@ for isolated service processes and native checksums.
 Optional browser regression checks require Python Playwright and Chromium in
 your test environment. After packaging, run `TTREK_BROWSER_TESTS=1 ttrek run
 tclsh9.1 "$PWD/tests/local-stack.tcl"`. `PLAYWRIGHT_PYTHON` can select that Python
-interpreter. `tests/search_ui.py` is the only Python test. It covers keyboard and pointer selection, throttling,
+interpreter. `tests/search_ui.py` also runs `tests/homepage_ui.py` for carousel
+timing, permanent stops versus temporary suspension, explicit replay, reduced
+motion, keyboard controls, fixed search position, and the no-JavaScript fallback.
+The search checks cover keyboard and pointer selection, throttling,
 out-of-order responses, escaping, network errors, mobile widths and search with
 JavaScript disabled. Browser tooling is not needed to build or run the site.
 

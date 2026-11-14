@@ -17,7 +17,7 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {assets responses templates releases content-images request-validation search handlers} {
+foreach module {assets responses templates releases content-images request-validation search handlers homepage} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -30,6 +30,7 @@ proc ::site::configure {config} {
     if {[dict exists $config content_images]} {set imageSettings [dict get $config content_images]}
     ::assets::configure $imageSettings
     ::views::init [file join [root] www]
+    ::homepage::configure [root]
     # Defer database reads until a catalog request, so provisioning tasks can
     # initialize a new deployment before its first public request.
     ::recipe_search::reset

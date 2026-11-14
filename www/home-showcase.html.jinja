@@ -1,0 +1,50 @@
+{% if slides %}
+<section class="home-showcase" aria-label="Explore ttrek" data-autoplay="{% if autoplay %}true{% else %}false{% endif %}">
+    <button type="button" class="showcase-rotation" data-rotation-control aria-label="Start automatic slide rotation" aria-controls="showcase-slides" hidden>Play</button>
+    <div class="showcase-slides" id="showcase-slides">
+        {% for slide in slides %}
+        <article class="showcase-slide" id="showcase-{{ slide.id }}" data-label="{{ slide.label }}">
+            <div class="showcase-copy">
+                <p class="showcase-kicker">{{ slide.kicker }}{% if slide.date %} <time datetime="{{ slide.date }}">{{ slide.date }}</time>{% endif %}</p>
+                <h2>{{ slide.title }}</h2>
+                <p class="showcase-description">{{ slide.description }}</p>
+                <a class="showcase-link" href="{{ slide.url }}">{{ slide.link_text }} <span aria-hidden="true">↗</span></a>
+            </div>
+            {% if slide.type == 'example' %}
+            <a class="showcase-window" href="{{ slide.url }}" aria-label="{{ slide.label }}">
+                <div class="showcase-window-bar" aria-hidden="true"><span class="showcase-lights">● ● ●</span><span>{{ slide.preview_label }}</span><span>↗</span></div>
+                {{ slide.image_html | safe }}
+            </a>
+            {% elif slide.type == 'doc' %}
+            <div class="showcase-terminal" aria-label="Example project setup commands">
+                <div class="showcase-window-bar"><span class="showcase-lights" aria-hidden="true">● ● ●</span><span>my-project / terminal</span></div>
+                <pre><code>{{ slide.commands }}</code></pre>
+                <p>A small beginning. Room to grow.</p>
+            </div>
+            {% elif slide.type == 'latest_blog' %}
+            <div class="showcase-release">
+                <div><span>ttrek</span><span>{% if slide.version %}Release notes{% else %}From the blog{% endif %}</span></div>
+                <strong>{% if slide.version %}{{ slide.version }}{% else %}Latest{% endif %}<span aria-hidden="true">.</span></strong>
+                <p>{{ slide.note }}</p>
+            </div>
+            {% elif slide.type == 'packages' %}
+            <div class="showcase-packages" aria-label="Featured packages">
+                {% for package in slide.packages %}
+                <a href="{{ package.url }}"><span class="showcase-package-symbol" aria-hidden="true">{ }</span><span><strong>{{ package.name }}</strong><small>{{ package.description }}</small></span><span aria-hidden="true">↗</span></a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+    <div class="showcase-controls" hidden>
+        <span class="showcase-current-label" data-current-label></span>
+        <div class="showcase-dots" role="group" aria-label="Choose a featured item">
+            {% for slide in slides %}
+            <button type="button" class="showcase-dot" aria-label="Show {{ slide.label }}, slide {{ loop.index }} of {{ slides | length }}" aria-controls="showcase-{{ slide.id }}" aria-pressed="false"><span aria-hidden="true"></span><span class="showcase-tooltip">{{ slide.label }}</span></button>
+            {% endfor %}
+        </div>
+    </div>
+    <p class="visually-hidden" role="status" aria-live="polite" aria-atomic="true" data-slide-status></p>
+</section>
+{% endif %}
