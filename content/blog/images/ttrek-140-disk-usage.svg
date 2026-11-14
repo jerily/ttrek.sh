@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800" role="img" aria-labelledby="title description">
+  <title id="title">ttrek 1.4.0: 96.1% less disk usage after installation</title>
+  <desc id="description">Disk usage comparison for example-community 0.2.4, based on two installs of 0.2.3 with the same 40 dependencies on Linux x86_64 using ttrek 1.4.0. Total disk usage of ttrek-venv was 4.12 GiB with the keep flag and 0.16 GiB without it. Bars share a zero baseline and are proportional to the measured byte totals. Measured November 14, 2026; results vary by platform and dependencies.</desc>
+  <rect width="800" height="800" rx="16" fill="#f5f7fb"/>
+  <g font-family="Inter, Arial, sans-serif">
+    <text x="48" y="62" fill="#225d98" font-size="24" font-weight="700" letter-spacing="2">TTREK 1.4.0</text>
+    <text x="48" y="125" fill="#172b46" font-size="44" font-weight="700" letter-spacing="-1">A smaller footprint.</text>
+    <text x="44" y="255" fill="#225d98" font-size="112" font-weight="700" letter-spacing="-6">96.1%</text>
+    <text x="48" y="306" fill="#34455d" font-size="30">less disk usage after installation</text>
+    <path d="M48 347H752" stroke="#d7deed"/>
+
+    <text x="48" y="398" fill="#536176" font-size="28">Build files kept</text>
+    <text x="752" y="458" text-anchor="end" fill="#536176" font-size="64" font-weight="700" letter-spacing="-2">4.12<tspan font-size="30" letter-spacing="0"> GiB</tspan></text>
+    <text x="48" y="451" fill="#536176" font-size="24">With keep flag</text>
+    <rect x="48" y="482" width="704" height="14" rx="7" fill="#a7b5c8"/>
+
+    <text x="48" y="549" fill="#225d98" font-size="28">Default Cleanup</text>
+    <text x="752" y="609" text-anchor="end" fill="#225d98" font-size="64" font-weight="700" letter-spacing="-2">0.16<tspan font-size="30" letter-spacing="0"> GiB</tspan></text>
+    <text x="48" y="602" fill="#536176" font-size="24">Without keep flag</text>
+    <rect x="48" y="633" width="704" height="14" rx="7" fill="#e0e6ef"/>
+    <rect id="cleaned-bar" x="48" y="633" width="27.2897" height="14" rx="7" fill="#225d98"/>
+
+    <text x="48" y="709" fill="#34455d" font-size="26">example-community 0.2.4 · 41 packages</text>
+    <text x="48" y="751" fill="#536176" font-size="24">Total Disk Usage · Linux x86_64</text>
+  </g>
+</svg>
