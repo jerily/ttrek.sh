@@ -479,6 +479,38 @@ test static-images-config {separate image directories and keys serve both mounts
     removeDirectory static-image-site
 } -result {200 1 200 1 2 2 0}
 
+test static-rate-limits {Mounted custom-route limits count once, record rejections and issue no cookies} -setup {
+    source [file join $root tcl local-ratelimit.tcl]
+    set limitedSettings $settings
+    dict set limitedSettings tratelimit {
+        store {localstore {}}
+        global_limits {by_ip {window_millis 60000 limit 10}}
+        route_limits {get_debug {by_ip {window_millis 60000 limit 1}}}
+    }
+    ::site::configure $limitedSettings
+    set limitRouter [::tpathexp::router]
+    ::site::mount $limitRouter
+    set monitored {}
+    rename ::treqmon::middleware::valkeystore::register_datapoint ::saved_register_datapoint
+    proc ::treqmon::middleware::valkeystore::register_datapoint {point} {lappend ::monitored $point}
+} -body {
+    # Direct router dispatch proves the hooks belong to the mount.
+    set first [$limitRouter dispatch {method GET path /debug} {addr 127.0.0.1}]
+    # Site dispatch must also prepare a rejected HEAD response and retain its method.
+    set limited [::site::dispatch $limitRouter {method HEAD path /debug}]
+    set other [::site::dispatch $limitRouter {method GET path /logo}]
+    list [dict get $first statusCode] [dict get $limited statusCode] [dict get $limited body] \
+        [dict get $limited headers Retry-After] [dict get $other statusCode] \
+        [llength $monitored] \
+        [llength [dict get $::tratelimit::middleware::localstore::requests __RL__/__GLOBAL__/ip/127.0.0.1]] \
+        [::responses::header $first Set-Cookie] [::responses::header $limited Set-Cookie]
+} -cleanup {
+    $limitRouter destroy
+    rename ::treqmon::middleware::valkeystore::register_datapoint {}
+    rename ::saved_register_datapoint ::treqmon::middleware::valkeystore::register_datapoint
+    ::site::configure $settings
+} -result {200 429 {} 60 200 3 3 {} {}}
+
 $::site::router destroy
 set failed $::tcltest::numTests(Failed)
 cleanupTests
