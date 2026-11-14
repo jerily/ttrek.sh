@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Share image-store clients across the content collections.
 namespace eval ::content_images {variable clients {}}
@@ -77,6 +79,7 @@ proc ::content_images::database_stores {connection settings} {
     return $stores
 }
 
+# Open the database connection used by this service.
 proc ::content_images::connect {settings} {
     package require tpersist 0.1.4
     set options {-autobegin false}
@@ -87,6 +90,7 @@ proc ::content_images::connect {settings} {
     return $connection
 }
 
+# Upload the selected artifacts to the configured storage service.
 proc ::content_images::upload {root settings} {
     if {[dict get $settings bucket] eq {}} {error "Production image uploads require content_images.bucket"}
     # Validate both collections before uploading from their prepared inventories.

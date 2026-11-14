@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 package require tjson
 namespace import ::tcltest::test
@@ -15,6 +21,7 @@ test maintenance-lazy {Loading maintenance does not load database drivers} -body
 } -result 1
 
 rename ::telemetry_maintenance::run ::telemetry_maintenance::real_run
+# Provide the run test fixture.
 proc ::telemetry_maintenance::run {settings context} {incr ::calls; return {status completed}}
 set ::site_lambda::maintenanceSettings {}
 set calls 0
@@ -71,16 +78,19 @@ if {$postgres} {
     set db [::telemetry_maintenance::connect $settings]
     set dump [file join $work backup.jsonl.gz]
     set deadline [expr {[clock milliseconds] + 60000}]
+    # Provide the reset target test fixture.
     proc reset_target {} {
         $::admin allrows "DROP SCHEMA $::targetSchema CASCADE"
         $::admin allrows "CREATE SCHEMA $::targetSchema"
         ::telemetry::init_local $::targetSettings
         ::telemetry::close
     }
+    # Provide the read dump test fixture.
     proc read_dump {path} {
         set ch [open $path rb]
         try {return [encoding convertfrom utf-8 [zlib gunzip [read $ch]]]} finally {close $ch}
     }
+    # Provide the write dump test fixture.
     proc write_dump {path data} {
         set ch [open $path wb]
         try {puts -nonewline $ch [zlib gzip [encoding convertto utf-8 $data]]} finally {close $ch}
@@ -203,6 +213,7 @@ test maintenance-deadline {An expired export rolls back its snapshot} -constrain
 
 if {$postgres} {
     rename ::telemetry_maintenance::upload ::telemetry_maintenance::real_upload
+    # Provide the upload test fixture.
     proc ::telemetry_maintenance::upload {path bucket key} {
         set ::uploaded $path
         set records [split [string trimright [read_dump $path] \n] \n]
@@ -236,6 +247,7 @@ test maintenance-snapshot {Writes committed during export cannot mix dimensions 
     set concurrent [::telemetry_maintenance::connect $settings]
     rename ::telemetry_maintenance::write_record ::telemetry_maintenance::original_write_record
     set wrote false
+    # Provide the write record test fixture.
     proc ::telemetry_maintenance::write_record {channel record} {
         if {!$::wrote && [dict exists $record table]} {
             set ::wrote true

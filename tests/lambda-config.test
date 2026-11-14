@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 package require tconfig::decrypt
 namespace import ::tcltest::test
@@ -8,6 +14,7 @@ set saved_env [array get ::env]
 set root [::tcltest::makeDirectory lambda-config-fixture]
 file mkdir [file join $root etc]
 set prod [file join $root etc config.ini]
+set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $root data]
 
 test lambda-config-1 {Production fails closed without an encrypted password} -body {
     ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example password plaintext}} $prod
@@ -23,6 +30,24 @@ test lambda-config-3 {Encrypted input is accepted without making a KMS call} -bo
     ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy} postgres {host db.example database test username test enc:password dummy}} $prod
     ::app_config::validate_lambda_config $prod
 } -result {}
+
+test lambda-config-account {Account secrets require ciphertext and reject plaintext alongside it} -body {
+    set base {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy} postgres {host db.example database test username test enc:password dummy}}
+    foreach name {aead_keyset mac_keyset email_hash_salt} {dict set base account enc:$name dummy}
+    ::tconfig::write_config $base $prod
+    set result [list [catch {::app_config::validate_lambda_config $prod}]]
+    foreach name {aead_keyset mac_keyset email_hash_salt} {
+        set invalid $base
+        dict unset invalid account enc:$name
+        ::tconfig::write_config $invalid $prod
+        lappend result [catch {::app_config::validate_lambda_config $prod}]
+        dict set invalid account enc:$name dummy
+        dict set invalid account $name plaintext
+        ::tconfig::write_config $invalid $prod
+        lappend result [catch {::app_config::validate_lambda_config $prod}]
+    }
+    set result
+} -result {0 1 1 1 1 1 1}
 
 test lambda-config-postgres-1 {Production rejects missing PostgreSQL credentials} -body {
     ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy}} $prod
@@ -117,18 +142,22 @@ test lambda-config-12 {Invalid monitor history limits fail during configuration}
 # Run the real Lambda initializer with disposable configuration. Only KMS
 # decryption, database connections and router startup are replaced.
 file mkdir [file join $root tcl]
-foreach name {config local-ratelimit patch} {
+foreach name {config local-ratelimit patch accounts} {
     file copy [file join $sourceRoot tcl $name.tcl] [file join $root tcl $name.tcl]
 }
 foreach {name script} {
     site {
         namespace eval ::site {variable router test_router}
+        # Provide the init worker test fixture.
         proc ::site::init_worker {config} {variable settings $config}
+        # Provide the config test fixture.
         proc ::site::config {} {variable settings; return $settings}
     }
     telemetry {
         namespace eval ::telemetry {}
+        # Provide the init local test fixture.
         proc ::telemetry::init_local {args} {error "Startup must not provision or sync"}
+        # Provide the connect test fixture.
         proc ::telemetry::connect {settings} {set ::telemetry::connection test; set ::telemetry::registries {}}
     }
     telemetry-maintenance {}
@@ -146,11 +175,20 @@ foreach section {redis postgres} {
     dict unset config $section password
     dict set config $section enc:password dummy
 }
+foreach name {aead_keyset mac_keyset email_hash_salt} {
+    dict unset config account $name
+    dict set config account enc:$name dummy
+}
 ::tconfig::write_config $config $prod
 rename ::tconfig::load_config ::tconfig::real_load_config
+# Provide the load config test fixture.
 proc ::tconfig::load_config {path} {
     set config [read_config $path]
     foreach section {redis postgres} {dict set config $section password dummy}
+    foreach name {aead_keyset mac_keyset email_hash_salt} {
+        dict unset config account enc:$name
+        dict set config account $name dummy
+    }
     return $config
 }
 source [file join $sourceRoot tcl lambda.tcl]
@@ -169,12 +207,12 @@ test lambda-releases-1 {Production startup loads releases and resolves the manif
     list [dict get $releases bucket] [dict get $releases version] \
         [expr {[dict get $releases checksums_file] eq [file join $root etc releases.json]}] \
         [expr {[dict get $releases checksums $artifact] eq [string repeat c 64]}] \
-        [string match {https://jerily-ttrek-app.s3.eu-central-1.amazonaws.com/ttrek/1.4.0/macos-arm64/ttrek?*} $url] \
+        [string match {https://jerily-ttrek-app.s3.eu-central-1.amazonaws.com/ttrek/1.5.0/macos-arm64/ttrek?*} $url] \
         [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
 } -cleanup {
     ::aws::s3::destroy $::releases::client
     set ::releases::client {}
-} -result {jerily-ttrek-app 1.4.0 1 1 1 1}
+} -result {jerily-ttrek-app 1.5.0 1 1 1 1}
 
 test lambda-releases-2 {Local mock release overrides remain independent of the production configuration} -body {
     set ::env(ENV) LOCAL

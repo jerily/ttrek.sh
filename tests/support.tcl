@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Local integration-test utilities. No application services or AWS are shared.
 package require Tcl 9.1
 package require trequests 1.1.0
@@ -6,18 +12,22 @@ namespace eval ::test_support {
     variable jobs {}
     variable tick 0
 }
+# Provide the assert test fixture.
 proc ::test_support::assert {condition {message {assertion failed}}} {
     if {![uplevel 1 [list expr $condition]]} {error $message}
 }
+# Provide the read file test fixture.
 proc ::test_support::read_file {path} {
     set channel [open $path rb]
     try {read $channel} finally {close $channel}
 }
+# Provide the write file test fixture.
 proc ::test_support::write_file {path data} {
     file mkdir [file dirname $path]
     set channel [open $path wb]
     try {puts -nonewline $channel $data} finally {close $channel}
 }
+# Provide the temporary test fixture.
 proc ::test_support::temporary {parent prefix} {
     file mkdir $parent
     set channel [file tempfile path [file join $parent $prefix]]
@@ -26,6 +36,7 @@ proc ::test_support::temporary {parent prefix} {
     file mkdir $path
     return $path
 }
+# Provide the ports test fixture.
 proc ::test_support::ports {count} {
     set listeners {}
     set ports {}
@@ -38,11 +49,13 @@ proc ::test_support::ports {count} {
         return $ports
     } finally {foreach listener $listeners {close $listener}}
 }
+# Provide the pause test fixture.
 proc ::test_support::pause {milliseconds} {
     variable tick
     after $milliseconds {incr ::test_support::tick}
     vwait ::test_support::tick
 }
+# Provide the drain test fixture.
 proc ::test_support::drain {channel} {
     variable jobs
     puts -nonewline [dict get $jobs $channel log] [read $channel]
@@ -56,6 +69,7 @@ proc ::test_support::drain {channel} {
         dict set jobs $channel message $message
     }
 }
+# Provide the start test fixture.
 proc ::test_support::start {command logPath {environment {}} {directory {}}} {
     variable jobs
     set launch [list {*}[auto_execok env]]
@@ -73,11 +87,13 @@ proc ::test_support::start {command logPath {environment {}} {directory {}}} {
     fileevent $channel readable [list ::test_support::drain $channel]
     return $channel
 }
+# Provide the running test fixture.
 proc ::test_support::running {channel} {
     variable jobs
     update
     expr {![dict get $jobs $channel finished]}
 }
+# Provide the stop test fixture.
 proc ::test_support::stop {channel {timeout 30000}} {
     variable jobs
     if {$channel eq {} || ![running $channel]} {return}
@@ -93,11 +109,13 @@ proc ::test_support::stop {channel {timeout 30000}} {
         error "process group $process did not shut down within $timeout ms"
     }
 }
+# Provide the port open test fixture.
 proc ::test_support::port_open {port} {
     if {[catch {socket 127.0.0.1 $port} channel]} {return 0}
     close $channel
     return 1
 }
+# Provide the wait port test fixture.
 proc ::test_support::wait_port {port process} {
     for {set i 0} {$i < 100} {incr i} {
         assert {[running $process]} "process exited before port $port opened"
@@ -106,6 +124,7 @@ proc ::test_support::wait_port {port process} {
     }
     error "timed out waiting for port $port"
 }
+# Provide the request test fixture.
 proc ::test_support::request {url {status 200} {method GET} {data {}} {type application/octet-stream} {options {}}} {
     if {$method ni {GET HEAD}} {lappend options -data_binary $data -content_type $type}
     set response [::trequests::request $method $url -timeout 30000 -timeout_connect 1000 {*}$options]
@@ -116,9 +135,11 @@ proc ::test_support::request {url {status 200} {method GET} {data {}} {type appl
         return [dict create body [$response content] headers $headers status [$response status_code]]
     } finally {$response destroy}
 }
+# Provide the json test fixture.
 proc ::test_support::json {response} {
     ::tjson::json_to_simple [encoding convertfrom utf-8 [dict get $response body]]
 }
+# Provide the sha256 test fixture.
 proc ::test_support::sha256 {data} {
     # OpenSSL is already a site dependency; use its native digest for large ZIPs.
     set channel [open [list | {*}[auto_execok openssl] dgst -sha256] r+]
@@ -131,6 +152,7 @@ proc ::test_support::sha256 {data} {
     if {![regexp {([a-f0-9]{64})\s*$} $output -> digest]} {error {invalid OpenSSL digest}}
     return $digest
 }
+# Provide the contains test fixture.
 proc ::test_support::contains {response text} {
     expr {[string first $text [dict get $response body]] >= 0}
 }

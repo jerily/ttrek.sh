@@ -1,6 +1,15 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Application policy for the shared tdevops Lambda runtime.
+package require http
+
 namespace eval ::site_lambda {}
 
+# Initialize the application services for this Lambda worker.
 proc ::site_lambda::initialize {root} {
     variable router
     variable maintenanceSettings
@@ -37,6 +46,7 @@ proc ::site_lambda::initialize {root} {
         dict set settings content_images [::app_config::content_images [dict create content_images $images] $root]
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
+    dict set settings account [::app_config::account $config $root $dataDirectory]
     set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]
     ::telemetry::connect $maintenanceSettings
     dict set settings content_connection $::telemetry::connection
@@ -44,6 +54,7 @@ proc ::site_lambda::initialize {root} {
     set router $::site::router
 }
 
+# Dispatch a Lambda HTTP envelope or an explicitly private maintenance event.
 proc ::site_lambda::handle {payload context} {
     variable router
     set event [::tjson::json_to_simple [encoding convertfrom utf-8 $payload]]
@@ -70,9 +81,14 @@ proc ::site_lambda::handle {payload context} {
     if {[dict exists $event headers] && [dict get $event headers] ne "null"} {
         dict for {key value} [dict get $event headers] {dict set headers [string tolower $key] $value}
     }
-    if {[dict exists $event cookies]} {dict set headers cookie [join [dict get $event cookies] {; }]}
+    if {[dict exists $event cookies]} {
+        if {[dict get $event cookies] ne "null"} {dict set headers cookie [join [dict get $event cookies] {; }]}
+        # Lambda's cookie array is now represented by the ordinary Cookie header.
+        # The native request adapter uses "cookies" for a dictionary instead.
+        dict unset event cookies
+    }
     dict set event headers $headers
-    foreach key {queryStringParameters multiValueQueryStringParameters} {
+    foreach key {pathParameters queryStringParameters multiValueQueryStringParameters multiValueHeaders} {
         if {[dict exists $event $key] && [dict get $event $key] eq "null"} {
             dict unset event $key
         }

@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Shared codec for maintenance publishers and lazy worker caches. Only search
 # inputs are snapshotted; display metadata remains in the package tables.
 package require tjson
@@ -6,21 +12,26 @@ package require ttrigrams 0.2.0
 source [file join [file dirname [info script]] registry-metadata.tcl]
 namespace eval ::recipe_search {}
 
+# Normalize search text for consistent indexing and lookup.
 proc ::recipe_search::fold {text} {
     string map {A a B b C c D d E e F f G g H h I i J j K k L l M m N n O o P p Q q R r S s T t U u V v W w X x Y y Z z} $text
 }
+# Check whether a package name is safe for the search snapshot.
 proc ::recipe_search::valid_name {name} {
     expr {[string length $name] >= 1 && [string length $name] <= 255 &&
           $name ni {. ..} && [regexp {^[A-Za-z0-9._+-]+$} $name]}
 }
+# Read a typed field from a serialized search snapshot.
 proc ::recipe_search::snapshot_value {value type} {
     if {[llength $value] != 2 || [lindex $value 0] ne $type} {error "Invalid search snapshot mapping"}
     return [lindex $value 1]
 }
+# Create a builder for the published search snapshot.
 proc ::recipe_search::snapshot_builder {} {
     # Bump the first component when normalization, document order or indexing changes.
     return "1/ttrie-[package present ttrie]/ttrigrams-[package present ttrigrams]"
 }
+# Compute the digest used to identify snapshot content.
 proc ::recipe_search::snapshot_digest {bytes} {
     package require twebserver
     binary encode hex [::twebserver::sha256 $bytes]
@@ -69,6 +80,7 @@ proc ::recipe_search::snapshot_inputs {rows} {
         texts $texts fingerprint [snapshot_digest [encoding convertto utf-8 $inputs]]]
 }
 
+# Validate and decode the snapshot’s typed mapping.
 proc ::recipe_search::decode_snapshot_mapping {json} {
     set fields [snapshot_value [::tjson::json_to_typed $json] M]
     if {[lsort [dict keys $fields]] ne {builder documents names} ||
@@ -97,12 +109,14 @@ proc ::recipe_search::decode_snapshot_mapping {json} {
     return [dict create entries $entries documents $documents]
 }
 
+# Read the published snapshot revision.
 proc ::recipe_search::snapshot_revision {snapshot} {
     set parts [list [dict get $snapshot format] [dict get $snapshot fingerprint]]
     lappend parts [snapshot_digest [encoding convertto utf-8 [dict get $snapshot mapping]]]
     foreach field {names descriptions} {lappend parts [snapshot_digest [dict get $snapshot $field]]}
     snapshot_digest [encoding convertto utf-8 $parts]
 }
+# Build a complete search snapshot from registry metadata.
 proc ::recipe_search::build_snapshot {inputs} {
     try {
         ::ttrie::create ::recipe_search::build_names [dict get $inputs names]
@@ -120,11 +134,13 @@ proc ::recipe_search::build_snapshot {inputs} {
         }
     }
 }
+# Release a staged snapshot that will not be published.
 proc ::recipe_search::discard_staged {} {
     foreach command {next_names next_descriptions} {
         if {[llength [info commands ::recipe_search::$command]]} {::recipe_search::$command destroy}
     }
 }
+# Prepare a replacement snapshot before publication.
 proc ::recipe_search::stage_snapshot {snapshot} {
     if {[dict get $snapshot format] ne "3"} {error "Unsupported search snapshot format"}
     if {![regexp {^[0-9a-f]{64}$} [dict get $snapshot fingerprint]] ||
@@ -143,6 +159,7 @@ proc ::recipe_search::stage_snapshot {snapshot} {
         return -options $options $message
     }
 }
+# Load and validate the current published snapshot.
 proc ::recipe_search::load_snapshot {snapshot} {
     set data [stage_snapshot $snapshot]
     try {
@@ -165,6 +182,7 @@ proc ::recipe_search::snapshot_json {snapshot} {
     foreach field {names descriptions} {dict set fields $field [list S [binary encode base64 -maxlen 0 [dict get $snapshot $field]]]}
     ::tjson::typed_to_json [list M $fields]
 }
+# Load the environment-specific application configuration.
 proc ::recipe_search::load {path} {
     if {![file isfile $path]} {error "Search snapshot is missing; run the build-search script"}
     set channel [open $path r]

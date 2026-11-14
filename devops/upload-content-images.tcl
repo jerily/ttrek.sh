@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Run after artifact validation and before deployment. Read only public image
 # settings from the exact generated configuration packaged into the Lambda ZIP.
 package require Tcl 9.1

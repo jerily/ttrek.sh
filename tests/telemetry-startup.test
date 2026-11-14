@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
@@ -16,7 +22,9 @@ test telemetry-connect {connecting leaves schema creation to the explicit initdb
 test telemetry-prepared {runtime startup and requests never call initdb or registry sync} -body {
     rename ::telemetry::initdb ::telemetry::real_initdb
     rename ::telemetry::sync_registry_metadata ::telemetry::real_sync_registry_metadata
+    # Provide the initdb test fixture.
     proc ::telemetry::initdb {} {error "Runtime schema work forbidden"}
+    # Provide the sync registry metadata test fixture.
     proc ::telemetry::sync_registry_metadata {args} {error "Runtime registry sync forbidden"}
     try {
         ::telemetry::connect $settings

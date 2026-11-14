@@ -1,12 +1,20 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root bin invoke-patch-local.tcl]
 rename ::trequests::request ::trequests::real_request
+# Provide the request test fixture.
 proc ::trequests::request {method url args} {
     set ::invocation [list $method $url $args]
     return ::patch_response
 }
+# Provide the patch response test fixture.
 proc ::patch_response {method} {
     switch $method {
         status_code {return $::http_status}
@@ -16,6 +24,7 @@ proc ::patch_response {method} {
         destroy {incr ::destroyed}
     }
 }
+# Provide the reset response test fixture.
 proc reset_response {} {
     set ::http_status 200
     set ::response_headers {}

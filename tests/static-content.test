@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require Tcl 9.1
 set ::env(ENV) LOCAL
 package require tcltest 2
@@ -12,7 +18,9 @@ set settings [dict create rootdir $root releases [::app_config::releases {}] \
     content_connection $::telemetry::connection content_images {} treqmon {store {valkeystore {}}}]
 # Rendering tests stub only the store I/O; integration tests exercise real Valkey.
 proc ::treqmon::middleware::valkeystore::init {config} {}
+# Provide the get history events test fixture.
 proc ::treqmon::middleware::valkeystore::get_history_events {} {return {}}
+# Provide the register datapoint test fixture.
 proc ::treqmon::middleware::valkeystore::register_datapoint {datapoint} {}
 foreach {kind directory} {wiki docs blog blog} {
     ::web::static::${kind}::initdb $::telemetry::connection
@@ -20,6 +28,7 @@ foreach {kind directory} {wiki docs blog blog} {
     ::web::static::${kind}::sync $store [file join $root content $directory]
 }
 ::site::init_worker $settings
+# Provide the request test fixture.
 proc request {path {method GET} {headers {}}} {
     ::site::dispatch $::site::router [dict create method $method path $path headers $headers]
 }
@@ -412,6 +421,7 @@ test canonical-host-local {LOCAL keeps localhost available} -setup {
 
 
 namespace eval ::site_image_test {}
+# Provide the client test fixture.
 proc ::site_image_test::client {method bucket key args} {
     lappend ::site_image_test::calls [list $method $bucket $key {*}$args]
     if {$method eq "ls"} {return [dict keys $::site_image_test::objects $key]}
@@ -445,6 +455,7 @@ test static-images-config {separate image directories and keys serve both mounts
     set ::site_image_test::calls {}
     set ::site_image_test::objects {}
     rename ::aws::s3::generate_presigned_url ::site_image_test::real_sign
+    # Provide the generate presigned url test fixture.
     proc ::aws::s3::generate_presigned_url {args} {
         return "https://[lindex $args end-1].example/[lindex $args end]?X-Amz-Signature=[string repeat a 64]"
     }
@@ -492,6 +503,7 @@ test static-rate-limits {Mounted custom-route limits count once, record rejectio
     ::site::mount $limitRouter
     set monitored {}
     rename ::treqmon::middleware::valkeystore::register_datapoint ::saved_register_datapoint
+    # Provide the register datapoint test fixture.
     proc ::treqmon::middleware::valkeystore::register_datapoint {point} {lappend ::monitored $point}
 } -body {
     # Direct router dispatch proves the hooks belong to the mount.

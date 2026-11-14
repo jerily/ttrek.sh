@@ -1,9 +1,16 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Editorial configuration is loaded once per worker. Published metadata is read
 # on each homepage request so syncs reach warm workers without invalidation.
 namespace eval ::homepage {
     variable config {autoplay false slides {}}
 }
 
+# Apply the worker settings and initialize shared site resources.
 proc ::homepage::configure {root} {
     variable config
     set config {autoplay false slides {}}
@@ -23,12 +30,14 @@ proc ::homepage::configure {root} {
     }
 }
 
+# Encode ordinary fields as explicit JSON strings.
 proc ::homepage::text_fields {values} {
     set result {}
     dict for {key value} $values {dict set result $key [list S $value]}
     return $result
 }
 
+# Build the database-backed content stores for the homepage.
 proc ::homepage::stores {} {
     set settings [::site::config]
     if {![dict exists $settings content_connection]} {return {}}
@@ -69,6 +78,7 @@ proc ::homepage::image {entry store item} {
     return $markup
 }
 
+# Resolve the configured resource using its validated settings.
 proc ::homepage::resolve {entries stores} {
     set slides {}
     set seen {}
@@ -150,6 +160,7 @@ proc ::homepage::resolve {entries stores} {
     return [list L $slides]
 }
 
+# Assemble the homepage content and presentation fields.
 proc ::homepage::data {} {
     variable config
     set stores {}

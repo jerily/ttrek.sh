@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require Tcl 9.1
 package require jinja2 0.1.0
 package require tjson
@@ -53,10 +59,12 @@ proc ::views::stamp_year {html} {
     string map [list {<!-- ttrek-current-year -->} [clock format [clock seconds] -format %Y]] $html
 }
 
+# Encode a sequence as explicit JSON strings.
 proc ::views::strings {values} {
     return [list L [lmap value $values {list S $value}]]
 }
 
+# Encode platform totals as typed JSON table rows.
 proc ::views::platform_stats {rows} {
     set values {}
     foreach row $rows {

@@ -34,6 +34,15 @@ Parameters:
     Type: String
     Default: Infra-DevOps-TTREK-CloudFrontCDN
     Description: CDN stack exporting BaseUrl; deploy it before this application stack.
+  AccountCleanupSchedule:
+    Type: String
+    Default: rate(5 minutes)
+    Description: Frequency of bounded account cleanup; retention grace is configured in account.cleanup_grace_period.
+  AccountCleanupState:
+    Type: String
+    Default: ENABLED
+    AllowedValues: [ENABLED, DISABLED]
+    Description: Enable after the account schema has been initialized.
 
 Resources:
   SiteLogs:
@@ -112,6 +121,30 @@ Resources:
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
                 Resource: !GetAtt SiteLogs.Arn
 
+  AccountCleanupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${FunctionName}-cleanup
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: scheduler.amazonaws.com}
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnEquals:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:scheduler:${AWS::Region}:${AWS::AccountId}:schedule-group/default
+      Policies:
+        - PolicyName: InvokeAccountCleanup
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt SiteFunction.Arn
+
   SiteFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -124,6 +157,21 @@ Resources:
       MemorySize: 256
       Timeout: 300
       ReservedConcurrentExecutions: 50
+      Events:
+        AccountCleanup:
+          Type: ScheduleV2
+          Properties:
+            Name: !Sub ${FunctionName}-prune
+            Description: Prune expired account registrations, sessions, CAPTCHA challenges, and counters after their retention grace.
+            ScheduleExpression: !Ref AccountCleanupSchedule
+            ScheduleExpressionTimezone: America/New_York
+            State: !Ref AccountCleanupState
+            FlexibleTimeWindow: {Mode: 'OFF'}
+            RoleArn: !GetAtt AccountCleanupRole.Arn
+            Input: '{"source":"ttrek.patch","task":"task_prune_accounts"}'
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 300
+              MaximumRetryAttempts: 2
       EventInvokeConfig:
         MaximumEventAgeInSeconds: 3600
         MaximumRetryAttempts: 2

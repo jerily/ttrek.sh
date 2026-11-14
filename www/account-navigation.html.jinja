@@ -1,0 +1,5 @@
+{% if signed_in %}
+<li class="pure-menu-item{% if selected %} pure-menu-selected{% endif %}"><a href="{{ prefix }}" class="pure-menu-link">Account</a></li>
+{% else %}
+<li class="pure-menu-item"><a href="{{ prefix }}/login{{ return_query }}" class="pure-menu-link">Sign in</a></li>
+{% endif %}

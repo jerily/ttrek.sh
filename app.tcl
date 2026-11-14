@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
-# SPDX-FileCopyrightText: 2024 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 if {$argv ne {}} {error "Usage: app.tcl"}
 
@@ -61,6 +63,8 @@ set config_dict [dict create \
     telemetry_best_effort true \
     tratelimit $tratelimit_config \
     treqmon $treqmon_config]
+
+dict set config_dict account [::app_config::account $config [file normalize $dir]]
 
 dict set config_dict content_database [::app_config::telemetry $config [file normalize $dir]]
 

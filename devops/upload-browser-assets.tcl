@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Publish only browser assets, after validating the production artifact and
 # before deployment. Retain previous fingerprinted files for already-open pages.
 package require Tcl 9.1
@@ -9,6 +15,7 @@ source [file join $browserAssetsRoot tcl assets.tcl]
 
 namespace eval ::browser_assets {}
 
+# Collect local files recursively for asset publication.
 proc ::browser_assets::files {directory} {
     set files {}
     foreach path [lsort [glob -nocomplain -directory $directory *]] {
@@ -21,6 +28,7 @@ proc ::browser_assets::files {directory} {
     return $files
 }
 
+# Build the browser-asset inventory from local files.
 proc ::browser_assets::inventory {root} {
     ::assets::load $root
     set public [file join $root public]
@@ -56,6 +64,7 @@ proc ::browser_assets::inventory {root} {
     return $inventory
 }
 
+# Upload the selected artifacts to the configured storage service.
 proc ::browser_assets::upload {root settings} {
     if {![dict get $settings cloudfront_enabled]} {return 0}
     if {[dict get $settings bucket] eq {}} {error "Browser asset uploads require content_images.bucket"}

@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Exercise the packaged site through all three installed mock applications.
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tests support.tcl]
@@ -9,10 +15,12 @@ interp alias {} json {} ::test_support::json
 lassign [::test_support::ports 4] port lambdaPort s3Port cachePort
 set base http://127.0.0.1:$port
 set s3 http://127.0.0.1:$s3Port
+# Provide the request test fixture.
 proc request {path args} {
     if {![string match http:* $path]} {set path $::base$path}
     ::test_support::request $path {*}$args
 }
+# Provide the invoke test fixture.
 proc invoke {event {status 200}} {
     set response [request http://127.0.0.1:$::lambdaPort/2015-03-31/functions/prod-Api-TtrekWebsite-Function/invocations \
         200 POST [encoding convertto utf-8 [::tjson::typed_to_json [list M $event]]] application/json]
@@ -36,15 +44,15 @@ try {
     set extraTarget macos-universal2
     set extraBinary [binary format a*c* {uploaded release bytes} {0 255}]
     set extraChecksum [sha256 $extraBinary]
-    write_file [file join $seed ttrek-local ttrek 1.3.0 $extraTarget ttrek] {old seed bytes}
+    write_file [file join $seed ttrek-local ttrek 1.5.0 $extraTarget ttrek] {old seed bytes}
     set manifest [file join $temporary releases.json]
     set data {}
     foreach {mode checksum} [list local $extraChecksum prod [string repeat a 64]] {
-        dict set data $mode [list M [dict create 1.3.0 [list M [dict create $extraTarget [list S $checksum]]]]]
+        dict set data $mode [list M [dict create 1.5.0 [list M [dict create $extraTarget [list S $checksum]]]]]
     }
     write_file $manifest [::tjson::typed_to_json [list M $data]]
     set config [file join $temporary config.ini]
-    write_file $config "\[releases\]\nversion=1.3.0\nchecksums_file=$manifest\n\n\[redis\]\nport=$cachePort\nssl=false\n"
+    write_file $config "\[releases\]\nversion=1.5.0\nchecksums_file=$manifest\n\n\[redis\]\nport=$cachePort\nssl=false\n"
     # The test owns the cache; application launchers only use its explicit INI settings.
     set server [expr {[info exists ::env(VALKEY_SERVER)] ? $::env(VALKEY_SERVER) : "valkey-server"}]
     set cacheProcess [::test_support::start [list $server --bind 127.0.0.1 --port $cachePort \
@@ -181,7 +189,7 @@ try {
     assert {[dict get [request $s3/ttrek-local/binary.bin] body] eq $binary}
     puts {PASS S3-backed website assets and binary object storage}
 
-    set release [lindex [glob -directory [file join $seedSource ttrek-local ttrek 1.3.0] */ttrek] 0]
+    set release [lindex [glob -directory [file join $seedSource ttrek-local ttrek 1.5.0] */ttrek] 0]
     set target [file tail [file dirname $release]]
     set download [dict get [request /dist/$target/ttrek] body]
     assert {[sha256 $download] eq [sha256 [read_file $release]]}
@@ -189,11 +197,11 @@ try {
     assert {[dict get $metadata sha256] eq [sha256 $download]}
     assert {[string first $s3/ttrek-local/ [dict get $metadata url]] == 0}
     puts {PASS signed release redirect, exact executable bytes and checksum metadata}
-    request $s3/ttrek-local/ttrek/1.3.0/$extraTarget/ttrek 200 PUT $extraBinary
+    request $s3/ttrek-local/ttrek/1.5.0/$extraTarget/ttrek 200 PUT $extraBinary
     set download [dict get [request /dist/$extraTarget/ttrek] body]
     set metadata [json [request /releases/latest/$extraTarget]]
     assert {$download eq $extraBinary && [dict get $metadata sha256] eq $extraChecksum}
-    assert {[dict get $metadata version] eq "1.3.0"}
+    assert {[dict get $metadata version] eq "1.5.0"}
     puts {PASS configured local checksum manifest takes precedence over seed and production hashes}
 
     ::test_support::stop $process

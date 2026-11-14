@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require tcltest 2
 package require tjson
 package require http
@@ -14,11 +20,13 @@ file copy [file join $root tests fixtures registry] [file join $patchRoot regist
 set saved [array get ::env]
 set ::env(ENV) LOCAL
 namespace eval ::site {}
+# Provide the config test fixture.
 proc ::site::config {} {
     dict create rootdir $::patchRoot content_images {}
 }
 set schema {}
 if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
+    set ::env(ENV) PROD
     ::telemetry::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
     set schema patch_[pid]_[clock clicks]
     ::tpersist::_raw $::telemetry::connection "CREATE SCHEMA $schema"
@@ -48,6 +56,7 @@ test patch-initdb {direct invocation initializes all installed website schema pr
 
 test patch-sync {sync updates rows through package APIs and preserves the website connection} -body {
     rename ::telemetry::initdb ::telemetry::real_initdb
+    # Provide the initdb test fixture.
     proc ::telemetry::initdb {} {error "Sync must not create schema"}
     try {
         set connection $::telemetry::connection
@@ -78,6 +87,7 @@ test patch-sync-content {sync publishes body edits and removes deleted docs and 
         try {puts $channel $markdown} finally {close $channel}
     }
     rename ::site::config ::site::original_config
+    # Provide the config test fixture.
     proc ::site::config {} {
         dict replace [original_config] rootdir $::contentRoot
     }
@@ -224,6 +234,7 @@ test patch-reject {task names cannot select arbitrary Tcl commands} -body {
 } -returnCodes error -result {Unknown patch task}
 
 test patch-http {HTTP envelopes and bodies cannot select private tasks} -body {
+    # Provide the dispatch test fixture.
     proc ::site::dispatch {router request context} {dict create statusCode 200 headers {} body http}
     set ::site_lambda::router unused
     set result [::tjson::json_to_simple [::site_lambda::handle {

@@ -1,6 +1,8 @@
+#
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
+#
 
 # Uses a disposable SQLite database, or an isolated PostgreSQL schema selected
 # by the same TTREK_TEST_POSTGRES settings as telemetry.test.
@@ -35,6 +37,7 @@ if {$postgres} {
     set settings [dict create dialect sqlite database [file join $work metadata.sqlite3] timeout 5000]
 }
 
+# Provide the recipe test fixture.
 proc recipe {directory name version metadata} {
     set path [file join $directory $name $version ttrek.json]
     file mkdir [file dirname $path]
@@ -45,6 +48,7 @@ proc recipe {directory name version metadata} {
     } finally {close $channel}
     return $path
 }
+# Provide the metadata rows test fixture.
 proc metadata_rows {} {
     ::telemetry::rows [db_order_by [db_join [db_select packages -expr {
         name, version, pkg_id, description, url, license

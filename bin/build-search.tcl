@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require Tcl 9.1
 set root [file dirname [file dirname [file normalize [info script]]]]
 if {[llength $argv] > 2} {error "Usage: build-search.tcl ?registry_directory? ?output_file?"}

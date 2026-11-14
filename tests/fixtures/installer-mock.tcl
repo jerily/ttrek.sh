@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Launch with the test's interpreter even when its path contains spaces. \
 exec "$TEST_TCLSH" "$0" "$@"
 

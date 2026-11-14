@@ -1,5 +1,12 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 namespace eval ::app_config {}
 
+# Select and validate the deployment environment.
 proc ::app_config::mode {} {
     set mode PROD
     if {[info exists ::env(ENV)]} {set mode $::env(ENV)}
@@ -7,6 +14,7 @@ proc ::app_config::mode {} {
     return $mode
 }
 
+# Load the environment-specific application configuration.
 proc ::app_config::load {root} {
     set mode [mode]
     if {$mode eq "LOCAL"} {
@@ -37,6 +45,7 @@ proc ::app_config::load {root} {
     return $config
 }
 
+# Validate the selected Valkey connection settings.
 proc ::app_config::valkey {config} {
     if {![dict exists $config redis]} {
         error {Application configuration requires a [redis] section}
@@ -99,11 +108,20 @@ proc ::app_config::validate_lambda_config {path} {
     if {[dict exists $config redis password] || [dict exists $config postgres password] || [dict exists $config ssl]} {
         error "Production Lambda configuration must not contain plaintext passwords or TLS private keys"
     }
+    if {[dict exists $config account]} {
+        foreach name {aead_keyset mac_keyset email_hash_salt} {
+            if {![dict exists $config account enc:$name] || [dict get $config account enc:$name] eq {} ||
+                ([dict exists $config account $name] && [dict get $config account $name] ne {})} {
+                error "Production account.$name must be encrypted from SSM"
+            }
+        }
+    }
     if {[dict get $config redis host] in {localhost 127.0.0.1 ::1}} {
         error "Production redis.host must be the ElastiCache endpoint"
     }
 }
 
+# Load Lambda settings without permitting a production fallback.
 proc ::app_config::lambda_config {root} {
     package require tconfig::decrypt
     if {[mode] eq "PROD"} {
@@ -120,6 +138,7 @@ proc ::app_config::lambda_config {root} {
     return {}
 }
 
+# Merge the request-monitor display settings.
 proc ::app_config::request_monitor {config} {
     set settings [dict create master_template request-monitor-master.html.jinja]
     if {[dict exists $config request_monitor]} {
@@ -128,6 +147,7 @@ proc ::app_config::request_monitor {config} {
     return $settings
 }
 
+# Validate and build the request-monitor storage configuration.
 proc ::app_config::monitor_store {config} {
     set settings [dict merge {history_max_events 100000 store valkey} [request_monitor $config]]
     set history [dict get $settings history_max_events]
@@ -141,6 +161,7 @@ proc ::app_config::monitor_store {config} {
         [dict create history_max_events $history]]]
 }
 
+# Configure the environment-specific monitoring and rate-limit stores.
 proc ::app_config::lambda_middleware {config} {
     set limits [dict create window_millis 10000 limit 1000]
     if {[dict exists $config ratelimit]} {set limits [dict merge $limits [dict get $config ratelimit]]}
@@ -159,8 +180,9 @@ proc ::app_config::lambda_middleware {config} {
         treqmon [dict create store $monitorStore]]
 }
 
+# Validate distribution settings and artifact checksums.
 proc ::app_config::releases {config {root {}}} {
-    set settings [dict create bucket {} region {} prefix ttrek/1.3.0 source_prefix ttrek/sources version 1.3.0 url_expiry_seconds 300 source_url_expiry_seconds 300 checksums_file {} checksums {}]
+    set settings [dict create bucket {} region {} prefix ttrek/1.5.0 source_prefix ttrek/sources version 1.5.0 url_expiry_seconds 300 source_url_expiry_seconds 300 checksums_file {} checksums {}]
     if {[dict exists $config releases]} {
         set settings [dict merge $settings [dict get $config releases]]
     }
@@ -212,6 +234,7 @@ proc ::app_config::releases {config {root {}}} {
     return $settings
 }
 
+# Read and validate checksums for the current release environment.
 proc ::app_config::release_checksums {path version} {
     package require tjson
     set channel [open $path r]
@@ -268,6 +291,7 @@ proc ::app_config::releases_from_ini {path root} {
     return [releases [dict create releases $settings]]
 }
 
+# Read public content-image settings from an INI section.
 proc ::app_config::content_images_from_ini {path root} {
     return [content_images [dict create content_images [ini_section $path content_images]] $root]
 }
@@ -311,4 +335,44 @@ proc ::app_config::content_images {config root} {
         dict set settings $key [file join $root [dict get $settings $key]]
     }
     return $settings
+}
+
+# Separate account policy, delivery and persistent worker keys from site settings.
+proc ::app_config::account {config root {localDirectory {}}} {
+    if {![llength [info commands ::accounts::local_keys]]} {source [file join $root tcl accounts.tcl]}
+    set input {}
+    if {[dict exists $config account]} {set input [dict get $config account]}
+    set policy [dict create tenant ttrek.sh collect_names true password_min_length 6 registration_captcha true \
+        email_verification_required true verification_emails_enabled true captcha_length 6 \
+        captcha_letters true login_captcha_after 3 login_captcha_window 900 cleanup_grace_period 3600]
+    set display [dict create prefix /user title {Your account} issuer ttrek.sh origin https://ttrek.sh \
+        email_enabled true email_from noreply@ttrek.sh email_region eu-central-1]
+    if {[mode] eq "LOCAL"} {
+        dict set display origin http://localhost:8080
+        dict set display email_enabled false
+    }
+    set policyKeys {tenant collect_names collect_display_name collect_username registration_captcha captcha_length captcha_letters captcha_ttl \
+        email_verification_required verification_emails_enabled login_captcha_after login_captcha_window \
+        bcrypt_cost password_min_length session_ttl persistent_session_ttl code_ttl challenge_ttl cleanup_grace_period throttle_window \
+        browse_limit post_limit account_limit challenge_limit resend_cooldown totp_digits totp_period totp_algorithm totp_window form_max_bytes}
+    set keys {}
+    dict for {name value} $input {
+        if {$name in {aead_keyset mac_keyset email_hash_salt}} {
+            dict set keys $name $value
+        } elseif {$name in $policyKeys} {
+            dict set policy $name $value
+        } elseif {[dict exists $display $name]} {
+            dict set display $name $value
+        } else {error "Unknown account setting: $name"}
+    }
+    if {[mode] eq "LOCAL"} {
+        if {$localDirectory eq {}} {set localDirectory [file join $root data]}
+        set keys [dict merge [::accounts::local_keys $localDirectory] $keys]
+    }
+    foreach name {aead_keyset mac_keyset email_hash_salt} {
+        if {![dict exists $keys $name] || [string trim [dict get $keys $name]] eq {}} {
+            error "Set account.$name in private configuration (SSM: /ttrek_sh/prod/account/$name)"
+        }
+    }
+    dict create policy $policy display $display keys $keys
 }

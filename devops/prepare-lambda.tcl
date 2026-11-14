@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 package require Tcl 9.1
 source [file join [file dirname [file dirname [info script]]] runtime paths.tcl]
 set siteRoot $::tdevops::runtime::root
@@ -13,6 +19,8 @@ foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js 
     }
 }
 package require http
+package require web-user 0.3.0
+package require awsses 1.0.16
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
 set releases [::app_config::releases {}]
@@ -28,6 +36,10 @@ file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot releases $releases]
 set router [::tpathexp::router]
 set savedEnv [array get ::env ENV]
+set accountProbe [file tempfile accountProbeDirectory]
+close $accountProbe
+file delete $accountProbeDirectory
+file mkdir $accountProbeDirectory
 try {
     # Provision only a disposable in-memory fixture for packaging smoke checks.
     # Runtime startup never initializes or imports a database in either mode.
@@ -42,12 +54,15 @@ try {
         set store [dict get [::content_images::database_stores $::telemetry::connection {}] $kind]
         ::web::static::${kind}::sync $store [file join $siteRoot content $directory]
     }
+    ::web::user::initdb $::telemetry::connection
+    dict set ::site::settings account [::app_config::account {} $siteRoot $accountProbeDirectory]
     ::site::mount $router
-    foreach path {/ /docs /docs/getting-started /blog /packages} {
+    foreach path {/ /docs /docs/getting-started /blog /packages /user/register /user/login /user/forgot} {
         set response [::site::dispatch $router [dict create method GET path $path]]
         if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}
     }
 } finally {
+    file delete -force $accountProbeDirectory
     if {[llength [info commands ::telemetry::close]]} {::telemetry::close}
     $router destroy
     unset ::env(ENV)

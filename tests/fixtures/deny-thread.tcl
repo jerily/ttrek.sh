@@ -1,6 +1,13 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Fail even a transitive attempt to load Thread in the website interpreter.
 namespace eval ::without_thread {}
 rename ::package ::without_thread::package
+# Provide the package test fixture.
 proc ::package {subcommand args} {
     if {$subcommand eq "require" && [string equal -nocase [lindex $args 0] -exact]} {
         set name [lindex $args 1]

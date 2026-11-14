@@ -29,6 +29,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid #58aafa; outline-offs
 .site-main { width: 100%; max-width: 1120px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
 .footer { margin-top: auto; flex-shrink: 0; background: #172b46; color: #bdcadb; padding: 1.3rem; font-size: .8rem; }
 .footer a { color: #d5e9ff; }
+.footer-main { margin: 0; }
 .is-center { text-align: center; }
 .text-normal { text-transform: none; }
 .eyebrow { font-size: .75rem; font-weight: 700; letter-spacing: .16em; color: #2768a7; }

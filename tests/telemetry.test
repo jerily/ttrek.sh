@@ -1,3 +1,9 @@
+#
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+#
+
 # Real SQLite by default; opt into a disposable PostgreSQL database with
 # TTREK_TEST_POSTGRES='database telemetry_test host 127.0.0.1 port ... user postgres password ... sslmode disable'.
 package require tcltest 2
@@ -38,6 +44,7 @@ if {$postgres} {
 }
 ::telemetry::init_local $settings
 set identity [string repeat a 64]
+# Provide the count rows test fixture.
 proc count_rows {table} {
     dict get [lindex [::telemetry::rows [::tpersist::db_select $table -expr {COUNT(*) AS n}]] 0] n
 }
