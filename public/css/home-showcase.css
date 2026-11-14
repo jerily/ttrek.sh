@@ -22,6 +22,17 @@
 .home-showcase.is-enhanced .showcase-slides { display: grid; grid-template-columns: minmax(0, 1fr); }
 .home-showcase.is-enhanced .showcase-slide { grid-area: 1 / 1; border-bottom: 0; }
 .home-showcase.is-enhanced .showcase-slide[aria-hidden="true"] { visibility: hidden; pointer-events: none; }
+/* Reserve the same layout before the module arrives, even on a cold load.
+   Hidden slides still size the grid; hidden controls reserve their own row.
+   Browsers with scripting disabled retain the stacked, readable fallback. */
+@media (scripting: enabled) {
+    .home-showcase:not(.is-enhanced) .showcase-slides { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .home-showcase:not(.is-enhanced) .showcase-slide { grid-area: 1 / 1; border-bottom: 0; }
+    .home-showcase:not(.is-enhanced) .showcase-slide:not(:first-child) { visibility: hidden; pointer-events: none; }
+    /* Override Pure's [hidden] display rule only to reserve space; controls
+       remain invisible and unfocusable until their handlers are attached. */
+    .home-showcase:not(.is-enhanced) .showcase-controls[hidden]:has(.showcase-dot:nth-child(2)) { display: grid !important; visibility: hidden; }
+}
 .showcase-copy { min-width: 0; }
 .showcase-kicker { color: var(--showcase-accent); display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; font-size: .7rem; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; margin: 0 0 .6rem; }
 .showcase-kicker::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
