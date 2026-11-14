@@ -2,6 +2,9 @@
   "name": "ttrek_sh",
   "version": "1.0.0",
   "scripts": {
+    "generate-account-keys": {
+      "file": "bin/generate-account-keys.sh"
+    },
     "build-assets": {
       "file": "bin/build-assets.sh",
       "args": [
