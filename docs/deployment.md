@@ -680,6 +680,14 @@ envelopes cannot select these tasks. IAM
 `lambda:InvokeFunction` authorizes the whole function, including its existing
 backup task; IAM does not restrict individual task names.
 
+Account cleanup uses the same private task dispatcher with
+`{"source":"ttrek.patch","task":"task_prune_accounts"}`. The schedule in
+`devops/sam-template.yaml` invokes `SiteFunction` every five minutes using the
+`${FunctionName}-scheduler` IAM role. `AccountCleanupSchedule` and
+`AccountCleanupState` control its cadence and enabled state; retention grace is
+configured in `account.cleanup_grace_period`. Redeploy `30-deploy-codebuild.sh`
+before the application stack to grant access to the renamed scheduler role.
+
 `devops/infra/31-codebuild-patch.yml` defines the independent
 `Infra-DevOps-TTREK-Patch` CodeBuild project. It needs only Lambda invocation and
 its own log permissions; the Lambda uses its existing VPC/database access.

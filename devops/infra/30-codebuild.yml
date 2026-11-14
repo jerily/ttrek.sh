@@ -145,6 +145,8 @@ Resources:
                 Action: [iam:CreateRole, iam:DeleteRole, iam:GetRole, iam:UpdateAssumeRolePolicy, iam:PutRolePolicy, iam:GetRolePolicy, iam:DeleteRolePolicy, iam:TagRole, iam:UntagRole, iam:ListRolePolicies, iam:ListAttachedRolePolicies]
                 Resource:
                   - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-execution
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-scheduler
+                  # Retain access to remove the former role, or restore it on rollback.
                   - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-cleanup
               - Effect: Allow
                 Action: iam:PassRole
@@ -154,7 +156,10 @@ Resources:
                     iam:PassedToService: lambda.amazonaws.com
               - Effect: Allow
                 Action: iam:PassRole
-                Resource: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-cleanup
+                Resource:
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-scheduler
+                  # A rollback may restore the schedule's former role.
+                  - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${LambdaFunctionName}-cleanup
                 Condition:
                   StringEquals:
                     iam:PassedToService: scheduler.amazonaws.com
