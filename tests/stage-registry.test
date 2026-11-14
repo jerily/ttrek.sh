@@ -25,7 +25,7 @@ test stage-fresh {Packaging checks out the default branch, records its revision 
         [file isfile [file join $work registry openacs 5.10.1 init-local.sh]] \
         [file exists [file join $work registry .git]]
 } -result {{clone --quiet --depth 1 --single-branch --no-tags -- https://github.com/jerily/ttrek-registry.git} 1 1 0}
-test stage-no-reuse {An existing checkout cannot silently replace a fresh fetch} -body {
+test stage-no-reuse {An existing staging directory cannot silently replace the selected snapshot} -body {
     ::registry_build::stage $work
 } -returnCodes error -match glob -result {Registry staging directory already exists:*}
 test stage-failure {Failed checkouts abort packaging and remove partial files} -setup {
@@ -35,6 +35,77 @@ test stage-failure {Failed checkouts abort packaging and remove partial files} -
     set code [catch {::registry_build::stage $work} message]
     list $code $message [file exists [file join $work registry]]
 } -result {1 {GitHub unavailable} 0}
+
+# Exercise the supplied-checkout path with real local Git repositories. No
+# remote is configured, so successful staging cannot depend on another fetch.
+rename ::registry_build::git {}
+rename ::registry_build::real_git ::registry_build::git
+proc stage_write {path text} {
+    set channel [open $path w]
+    try {puts $channel $text} finally {close $channel}
+}
+proc stage_read {path} {
+    set channel [open $path rb]
+    try {read $channel} finally {close $channel}
+}
+set source [file join $work {public checkout}]
+file copy [file join $root tests fixtures registry] $source
+stage_write [file join $source .gitignore] ignored.txt
+exec git -C $source init --quiet
+exec git -C $source add .
+exec git -C $source -c user.name=Test -c user.email=test@example.invalid \
+    -c commit.gpgsign=false commit --quiet -m fixture
+set sourceRevision [string trim [exec git -C $source rev-parse HEAD]]
+stage_write [file join $source ignored.txt] {must not be packaged}
+
+test stage-synced {The dependency checkout is reused with its exact scripts, patches and recorded commit} -body {
+    set result [::registry_build::stage $work $source]
+    set same 1
+    foreach path {openacs/5.10.1/init-local.sh tink-cc/2.1.1/rapidjson-1.1.0.diff} {
+        if {[stage_read [file join $source $path]] ne [stage_read [file join $work registry $path]]} {
+            set same 0
+        }
+    }
+    list [expr {$result eq $sourceRevision}] \
+        [expr {[string trim [stage_read [file join $work etc registry-revision]]] eq $sourceRevision}] \
+        $same [file exists [file join $work registry .git]] \
+        [file exists [file join $work registry ignored.txt]] \
+        [file isdirectory [file join $source .git]]
+} -cleanup {
+    file delete -force [file join $work registry]
+} -result {1 1 1 0 0 1}
+
+test stage-missing-source {A missing supplied checkout fails instead of falling back to GitHub} -body {
+    set code [catch {::registry_build::stage $work [file join $work missing]} message]
+    list $code [string match {Public registry checkout does not exist:*} $message] \
+        [file exists [file join $work registry]]
+} -result {1 1 0}
+
+test stage-dirty-source {Uncommitted recipe edits cannot disagree with the recorded revision} -setup {
+    set recipe [file join $source openacs 5.10.1 ttrek.json]
+    set original [stage_read $recipe]
+    stage_write $recipe changed
+} -body {
+    set code [catch {::registry_build::stage $work $source} message]
+    list $code [string match {Public registry checkout has local changes:*} $message] \
+        [file exists [file join $work registry]]
+} -cleanup {
+    set channel [open $recipe wb]
+    puts -nonewline $channel $original
+    close $channel
+} -result {1 1 0}
+
+test stage-empty-source {A checkout with no recipes fails and removes the partial export} -setup {
+    set empty [file join $work empty]
+    file mkdir $empty
+    exec git -C $empty init --quiet
+    exec git -C $empty -c user.name=Test -c user.email=test@example.invalid \
+        -c commit.gpgsign=false commit --allow-empty --quiet -m empty
+} -body {
+    set code [catch {::registry_build::stage $work $empty} message]
+    list $code $message [file exists [file join $work registry]]
+} -result {1 {The public registry contains no recipes} 0}
+
 removeDirectory registry-stage
 set failed $::tcltest::numTests(Failed)
 cleanupTests
