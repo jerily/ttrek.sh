@@ -2,21 +2,33 @@
 
 [Documentation](readme.md) · [Project overview](../README.md)
 
-The public package catalog lives in the `registry` Git submodule. See
-[setup](install.md#get-the-source) to clone the website with its registry.
-Commands below run from the website checkout.
+The public package catalog lives independently in
+[jerily/ttrek-registry](https://github.com/jerily/ttrek-registry).
+Each Lambda build (including local packaging) makes a fresh shallow checkout of
+its default branch into the staged ZIP's `registry/` directory. Git metadata is
+excluded; `etc/registry-revision` records the exact commit. There is no registry
+submodule in the website repository.
 
 Recipes carry a top-level `description`, optional `tags`, project `url`, and SPDX `license` string.
 The package overview shows the latest version's description, HTTP(S) project link, and license when present.
 
-The explicit `task_sync_website` invocation (`sync-local` for the local Lambda) imports the configured/bundled registry
-into the telemetry `packages` table, storing `description`, `url`, `license`, and JSON `tags` per version. Package names are stored in `package_names`.
+The manual `task_sync_website` invocation (`sync-local` for the local Lambda)
+imports the bundled registry into the telemetry `packages` table. It stores
+`description`, `url`, `license`, JSON `tags`, the complete recipe JSON with resolved
+scripts, and base64 patch bytes per version. Dependencies, conditional USE flags
+and platform-specific build instructions remain in the stored recipe.
+Package names are stored in `package_names`.
 Schema upgrades belong to `task_initdb_website`, independently of synchronization. Repeated imports
 update changed metadata without replacing package IDs or installation history;
 unchanged rows are not rewritten. Missing descriptions/URLs/licenses preserve existing values and
 default to empty strings for new packages. Missing tags become an empty array.
 The `listed` flag separates current recipes from telemetry-only names and withdrawn
-versions without deleting installation history. Old telemetry backups remain restorable;
+versions without deleting installation history. Changes replace a version's recipe,
+dependencies, scripts and patches in place; removed versions disappear from every
+public page and API. Republication reuses the original row and ID. There is no
+per-recipe revision history. The import and search publication commit together;
+failed imports leave the previous database publication intact.
+Old telemetry backups remain restorable;
 run registry sync after restoring an older backup to repopulate the published catalog.
 
 After `::telemetry::connect $settings` and an explicit `::telemetry::initdb`
@@ -32,38 +44,26 @@ imported only when their directory is explicitly supplied.
 ## Update package recipes
 
 Make package changes in `jerily/ttrek-registry` and publish them there first.
-Then update the website's pinned registry commit and commit the change in
-`ttrek.sh`:
+Build and deploy the website Lambda to include the latest registry snapshot,
+then manually invoke `task_sync_website` as described in
+[deployment](deployment.md#explicit-website-patch-tasks). CodeBuild does not invoke
+synchronization. Deploying a new ZIP alone does not change the published catalog.
+Reinvoking sync without rebuilding imports the same bundled snapshot.
 
-```bash
-git -C registry fetch origin
-git -C registry checkout --detach origin/main
-git add registry
-git commit -m "Update registry submodule"
-```
+Both modes connect without provisioning or importing data. On upgrade, invoke
+`task_initdb_website` before `task_sync_website` to add and populate the recipe and
+patch columns. Locally, use `initdb-local` and `sync-local`. All public catalog
+pages and registry APIs read the database. The old `[registry] directory` setting
+is no longer used. The standalone source build keeps its own fixed Tink patch
+inputs under `devops/patches/`.
 
-The website reads package specifications and patches from `[registry] directory`
-in the application configuration:
-
-```ini
-[registry]
-directory = registry
-```
-
-The default is the `registry` submodule. Relative paths resolve against the
-application root, and absolute paths can point to a separate registry checkout.
-Set this in `etc/config.local.ini` for LOCAL mode or the production configuration
-for PROD mode. Both modes connect without provisioning or importing data. Run
-`task_initdb_website` for schema upgrades and `task_sync_website` to import metadata
-and publish search indexes. Locally, use `initdb-local` and `sync-local`. Overviews, package listings,
-and search read the database. Recipe/dependency API routes and version build details
-still read this directory. The build uses the pinned submodule for its patch files.
-
-Recipe scripts can reference files beside their spec, for example
-`"scripts": {"demo": {"file": "demo.sh"}}`. The API reads these UTF-8 files
-and returns their contents as script strings, preserving compatibility with
+Recipe scripts use file references, for example
+`"scripts": {"demo": {"file": "demo.sh"}}`. Synchronization reads these UTF-8 files
+and stores their contents as script strings, preserving compatibility with
 installed-script caching. Only regular files directly in the recipe directory
-are accepted; paths and symbolic links are rejected. Inline scripts also work.
+are accepted; paths and symbolic links are rejected. Optional `args` are resolved
+into literal shell arguments before runtime arguments. Inline scripts remain
+accepted for compatibility. Missing referenced files fail the whole sync.
 
 Registry recipes use `if: "+static"` for optional static build settings.
 Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the project.
@@ -143,7 +143,9 @@ nonempty, single-line strings of at most 255 UTF-8 bytes. Overviews and result c
 omit the tag list when no tags are present.
 
 `ttrek run -script build-search` remains an optional offline snapshot helper for
-registry inspection and regression tests. Its output is not used by the website;
+registry inspection and regression tests. It defaults to the sibling
+`../ttrek-registry` checkout; an explicit directory can be passed as its first
+argument. Its output is not used by the website;
 normal builds and Lambda packaging no longer require it.
 The helper now writes format 3; regenerate older offline artifacts before loading
 them with the new codec.

@@ -2,7 +2,7 @@
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl telemetry.tcl]
 source [file join $root tcl search.tcl]
-::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root registry]]
+::telemetry::init_local {dialect sqlite database :memory:} [list [file join [file dirname $root] ttrek-registry]]
 set rows [::telemetry::registry_catalog]
 set inputs [::recipe_search::snapshot_inputs $rows]
 set snapshot [::telemetry::search_snapshot]

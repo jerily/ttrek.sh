@@ -47,15 +47,19 @@ proc ::site_patch::task_initdb_website {context} {
 proc ::site_patch::task_sync_website {context} {
     set settings [::site::config]
     set root [dict get $settings rootdir]
+    set registry [file join $root registry]
+    if {![file isdirectory $registry] || ![llength [glob -nocomplain -directory $registry -types f */*/ttrek.json]]} {
+        error "The deployed package has no registry snapshot; rebuild the Lambda ZIP before syncing"
+    }
     set stores [::content_images::database_stores $::telemetry::connection [dict get $settings content_images]]
-    # Both collections and registry metadata commit together. Image replacements
+    # Both collections and the complete registry commit together. Image updates
     # in S3 are independent of this transaction and are not rolled back with SQL.
     ::telemetry::transaction {
         ::telemetry::lock_search_snapshot
         foreach {kind directory} {wiki docs blog blog} {
             ::web::static::${kind}::sync [dict get $stores $kind] [file join $root content $directory]
         }
-        ::telemetry::sync_registry_metadata [dict get $settings registry_dir]
+        ::telemetry::sync_registry_metadata $registry
         ::telemetry::publish_search_snapshot
     }
     return {wiki blog registry}
