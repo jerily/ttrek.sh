@@ -9,10 +9,30 @@
 namespace eval ::site_patch {}
 # Execute the selected maintenance operation with validated settings.
 proc ::site_patch::run {task context} {
-    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts}} {error "Unknown patch task"}
-    set completed {}
-    foreach name [::site_patch::$task $context] {lappend completed [list S $name]}
-    ::tjson::typed_to_json [list M [dict create ok {BOOL 1} task [list S $task] completed [list L $completed]]]
+    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_refresh_package_tracker}} {error "Unknown patch task"}
+    set started [clock clicks -milliseconds]
+    set status error
+    log patch_task_start $task
+    try {
+        set completed {}
+        foreach name [::site_patch::$task $context] {lappend completed [list S $name]}
+        set result [::tjson::typed_to_json [list M [dict create ok {BOOL 1} task [list S $task] completed [list L $completed]]]]
+        set status ok
+        return $result
+    } finally {
+        log patch_task_end $task $status [expr {[clock clicks -milliseconds] - $started}]
+    }
+}
+
+# Log lifecycle metadata only; task errors can contain credentials or row data.
+proc ::site_patch::log {event task {status {}} {elapsed 0}} {
+    set fields [dict create event [list S $event] task [list S $task] \
+        timestamp [list S [clock format [clock seconds] -format {%Y-%m-%dT%H:%M:%SZ} -gmt true]]]
+    if {$status ne {}} {
+        dict set fields status [list S $status]
+        dict set fields duration_ms [list N $elapsed]
+    }
+    puts stderr [::tjson::typed_to_json [list M $fields]]
 }
 
 # Schema providers must preserve existing tables and rows on every invocation.
@@ -85,4 +105,9 @@ proc ::site_patch::task_prune_accounts {context} {
     set result {}
     dict for {name count} $counts {lappend result "$name:$count"}
     return $result
+}
+
+# Aggregation is only reachable through the IAM-authorized private task path.
+proc ::site_patch::task_refresh_package_tracker {context} {
+    list [::package_tracker::refresh]
 }

@@ -710,6 +710,15 @@ Account cleanup uses the same private task dispatcher with
 configured in `account.cleanup_grace_period`. Redeploy `30-deploy-codebuild.sh`
 before the application stack to grant access to the renamed scheduler role.
 
+Package Tracker uses `{"source":"ttrek.patch","task":"task_refresh_package_tracker"}`
+through the same dispatcher and scheduler role, every five minutes. The schedule
+is enabled by default. The packages page shows its tracker bar only when Valkey
+returns a valid snapshot with visible entries. Initialize the schema and let the
+next scheduled refresh populate the cache, or invoke refresh immediately. See the
+[tracker rollout instructions](package-tracker.md#deployment). Every patch task
+logs `patch_task_start` and `patch_task_end`; the end record includes status and
+duration even when execution fails.
+
 `devops/infra/31-codebuild-patch.yml` defines the independent
 `Infra-DevOps-TTREK-Patch` CodeBuild project. It needs only Lambda invocation and
 its own log permissions; the Lambda uses its existing VPC/database access.

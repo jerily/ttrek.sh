@@ -164,6 +164,22 @@ Resources:
           MaximumEventAgeInSeconds: 300
           MaximumRetryAttempts: 2
 
+  SiteFunctionPackageTracker:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub ${FunctionName}-package-tracker
+      Description: Refresh Package Tracker rankings and recipe download history.
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      FlexibleTimeWindow: {Mode: 'OFF'}
+      Target:
+        Arn: !GetAtt SiteFunction.Arn
+        RoleArn: !GetAtt SiteSchedulerRole.Arn
+        Input: '{"source":"ttrek.patch","task":"task_refresh_package_tracker"}'
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 300
+          MaximumRetryAttempts: 2
+
   SiteFunction:
     Type: AWS::Serverless::Function
     Properties:

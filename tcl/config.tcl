@@ -72,6 +72,22 @@ proc ::app_config::valkey {config} {
     return $settings
 }
 
+# Reuse the existing cache and permit explicit ranking threshold overrides.
+proc ::app_config::package_tracker {config} {
+    set settings [dict create valkey [valkey $config]]
+    if {[dict exists $config package_tracker]} {
+        set thresholds [dict get $config package_tracker]
+        dict for {key value} $thresholds {
+            if {$key ni {min_current min_previous min_delta min_growth} ||
+                    ![string is integer -strict $value] || $value < 1} {
+                error "Invalid package_tracker.$key"
+            }
+        }
+        dict set settings thresholds $thresholds
+    }
+    return $settings
+}
+
 # Backend selection belongs to the environment, never to an INI override.
 proc ::app_config::telemetry {config root {localDirectory {}}} {
     if {[mode] eq "LOCAL"} {

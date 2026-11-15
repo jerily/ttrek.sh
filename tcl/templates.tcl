@@ -65,6 +65,16 @@ proc ::views::strings {values} {
 }
 
 # Encode platform totals as typed JSON table rows.
+proc ::views::download_stats {rows} {
+    set values {}
+    foreach row $rows {
+        lassign $row platform downloads
+        lappend values [list L [list [list S $platform] [list N $downloads]]]
+    }
+    return [list L $values]
+}
+
+# Encode installation totals as typed JSON table rows.
 proc ::views::platform_stats {rows} {
     set values {}
     foreach row $rows {

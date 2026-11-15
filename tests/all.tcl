@@ -262,7 +262,7 @@ proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
     dict size $::views::templates
-} -result 14
+} -result 16
 
 test templates-2 {Index layout and literal clipboard command} -setup {
     set saved_env [array get ::env ENV]
@@ -345,8 +345,8 @@ test handlers-project-url {Overview shows the latest version's project URL with 
     ::telemetry::publish_search_snapshot
 } -body {
     set html [body [get_package_page_handler {} {pathParameters {package_name demo}}]]
-    list [contains $html {<p>Demo project</p>}] \
-        [contains $html {Project: <a href="https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;">https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;</a>}]
+    list [contains $html {<p class="package-description">Demo project</p>}] \
+        [contains $html {<dt>Project</dt><dd><a href="https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;">https://example.org/project?x=&quot;quoted&quot;&amp;y=&lt;tag&gt;</a>}]
 } -cleanup {
     writeFile $latest $original
     ::telemetry::sync_registry_metadata $registry_fixture
@@ -371,9 +371,9 @@ test handlers-license {Overview shows the latest version's license with HTML esc
 } -body {
     set results {}
     foreach {license expected} {
-        MIT {<p>License: MIT</p>}
-        {MIT OR Apache-2.0} {<p>License: MIT OR Apache-2.0</p>}
-        {<script>"&} {<p>License: &lt;script&gt;&quot;&amp;</p>}
+        MIT {<dt>License</dt><dd>MIT</dd>}
+        {MIT OR Apache-2.0} {<dt>License</dt><dd>MIT OR Apache-2.0</dd>}
+        {<script>"&} {<dt>License</dt><dd>&lt;script&gt;&quot;&amp;</dd>}
     } {
         writeFile $latest [::tjson::typed_to_json [list M [dict create license [list S $license]]]]
         ::telemetry::sync_registry_metadata $registry_fixture
@@ -469,7 +469,7 @@ test handlers-database-catalog {Every package page and API works without recipe 
     set api [::tjson::json_to_simple [body [get_search_handler {} {queryStringParameters {q json}}]]]
     list [dict get $overview status] [contains [body $overview] {Stored overview}] \
         [contains [body $overview] {https://example.org/stored}] \
-        [contains [body $overview] {<p>License: MIT</p>}] \
+        [contains [body $overview] {<dt>License</dt><dd>MIT</dd>}] \
         [dict get $listing status] [contains [body $listing] {href="/search?q=json"}] \
         [dict get $search status] [dict get [lindex $api 0] name] [dict get [lindex $api 0] tags]
 } -cleanup {

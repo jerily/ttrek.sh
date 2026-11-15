@@ -31,6 +31,14 @@
                 </table>
             {% endif %}
 
+            {% if download_platforms %}
+                <p class="content-subhead">Recipe downloads by platform (all time):</p>
+                <p>Recorded recipe requests for this version, including dependencies, repeat downloads, and requests without a machine ID.</p>
+                <table class="pure-table">
+                    <thead><tr><th scope="col">OS / architecture</th><th scope="col">Downloads</th></tr></thead>
+                    <tbody>{% for row in download_platforms %}<tr><td>{{ row[0] }}</td><td>{{ row[1] }}</td></tr>{% endfor %}</tbody>
+                </table>
+            {% endif %}
             {% if stat_platforms %}
                 <p class="content-subhead">Statistics (installations):</p>
                 <table class="pure-table">

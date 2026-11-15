@@ -120,6 +120,34 @@ proc ::telemetry::initdb {} {
         # Defaults preserve legacy IDs and keep unpublished recipes unlisted.
         db_apply_schema $connection [file join $schema_dir telemetry.json] -additive true
         init_search_snapshot
+        lock_search_snapshot
+        # Store the initial legacy publication estimate directly in the dates;
+        # telemetry-only rows must never become public merely through migration.
+        set bootstrap [clock scan 2026-11-15 -format %Y-%m-%d -gmt true]
+        ::tpersist::_raw $connection {
+            UPDATE packages SET published_at = :bootstrap
+            WHERE listed = 1 AND published_at = 0
+        } [dict create bootstrap $bootstrap]
+        ::tpersist::_raw $connection {
+            UPDATE package_names SET first_published_at = (
+                SELECT MIN(published_at) FROM packages p
+                WHERE p.pkg_name_id = package_names.pkg_name_id AND p.published_at > 0
+            )
+            WHERE first_published_at = 0 AND EXISTS (
+                SELECT 1 FROM packages p
+                WHERE p.pkg_name_id = package_names.pkg_name_id AND p.published_at > 0
+            )
+        }
+        # Seed cumulative counters from existing identified recipe requests.
+        # Once a counter exists, initialization must never reset or add to it.
+        ::tpersist::_raw $connection {
+            INSERT INTO package_download_counts (pkg_id, platform_id, downloads)
+            SELECT ev.pkg_id, ev.platform_id, COUNT(*)
+            FROM req_reg_get_pkg_spec ev JOIN packages p ON p.pkg_id = ev.pkg_id
+            WHERE p.published_at > 0
+            GROUP BY ev.pkg_id, ev.platform_id
+            ON CONFLICT (pkg_id, platform_id) DO NOTHING
+        }
     } true
 }
 
@@ -190,8 +218,13 @@ proc ::telemetry::sync_registry_metadata {args} {
     transaction {
         # Avoid rewriting unchanged catalog rows during repeated syncs.
         lock_search_snapshot
+        set published_names {}
+        foreach row [rows [db_select package_names]] {
+            dict set published_names [dict get $row name] [dict get $row first_published_at]
+        }
+        set published_at [clock seconds]
         set existing {}
-        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, license, tags, listed, recipe, patches}] \
+        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, license, tags, listed, recipe, patches, published_at}] \
             package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
         foreach row [rows $query] {
             dict set existing [list [dict get $row name] [dict get $row version]] $row
@@ -202,6 +235,12 @@ proc ::telemetry::sync_registry_metadata {args} {
                 set row [dict get $existing $key]
                 set changes {}
                 if {![dict get $row listed]} {dict set changes listed [db_value 1 -type integer]}
+                if {![dict get $row published_at]} {
+                    dict set changes published_at [db_value $published_at -type bigint]
+                    dict set changes publication_is_update [db_value [expr {
+                        [dict exists $published_names $name] && [dict get $published_names $name] > 0
+                    }] -type integer]
+                }
                 dict for {field value} $metadata {
                     if {[dict get $row $field] ne $value} {
                         dict set changes $field [db_value $value -type text]
@@ -213,12 +252,20 @@ proc ::telemetry::sync_registry_metadata {args} {
                 set name_id [ensure_row package_names pkg_name_id [dict create name [db_value $name -type text]]]
                 set pkg_id [ensure_row packages pkg_id [dict create \
                     pkg_name_id [db_value $name_id -type integer] version [db_value $version -type text]]]
-                set changes [dict create listed [db_value 1 -type integer]]
+                set changes [dict create listed [db_value 1 -type integer] \
+                    published_at [db_value $published_at -type bigint] \
+                    publication_is_update [db_value [expr {
+                        [dict exists $published_names $name] && [dict get $published_names $name] > 0
+                    }] -type integer]]
                 dict for {field value} $metadata {dict set changes $field [db_value $value -type text]}
                 if {![dict size $changes]} continue
             }
             db_execute $connection [db_where [db_values [db_update packages] $changes -expressions] \
                 [db_eq [db_col pkg_id] [db_value $pkg_id -type integer]]]
+            ::tpersist::_raw $connection {
+                UPDATE package_names SET first_published_at = :published_at
+                WHERE name = :name AND first_published_at = 0
+            } [dict create name $name published_at $published_at]
         }
         # Keep telemetry history while removing withdrawn versions from discovery.
         dict for {key row} $existing {
@@ -236,7 +283,8 @@ proc ::telemetry::sync_registry_metadata {args} {
 proc ::telemetry::registry_catalog {args} {
     package require tjson
     if {[llength $args] > 1} {error "Expected an optional list of package names"}
-    set query [db_join [db_select packages -expr {name, version, description, url, license, tags}] \
+    set query [db_join [db_select packages -expr {name, version, description, url, license, tags,
+        published_at, first_published_at, publication_is_update}] \
         package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
     set predicate [db_eq [db_col listed] [db_value 1 -type integer]]
     if {[llength $args]} {
@@ -287,12 +335,75 @@ proc ::telemetry::registry_recipe {name version} {
     return $row
 }
 
+# Validate and normalize the shared OS/architecture dimension.
+proc ::telemetry::platform {os arch} {
+    variable known_arch
+    variable known_os
+    if {$arch ni $known_arch} {error "unknown telemetry architecture: $arch"}
+    dict for {pattern name} $known_os {
+        if {[string match $pattern $os]} {return [list $name $arch]}
+    }
+    error "unknown telemetry OS: $os"
+}
+
+# Count a served recipe, including dependencies and clients without telemetry.
+# Identified clients retain the existing request event for windowed uniqueness.
+proc ::telemetry::recipe_download {name version os arch {environment {}}} {
+    variable connection
+    lassign [platform $os $arch] os arch
+    transaction {
+        set package [lindex [rows [registry_query {pkg_id} $name $version]] 0]
+        if {$package eq {}} {return}
+        set pkg_id [dict get $package pkg_id]
+        set platform_id [ensure_row platforms platform_id [dict create \
+            os [db_value $os -type text] arch [db_value $arch -type text]]]
+        set params [dict create pkg_id $pkg_id platform_id $platform_id]
+        ::tpersist::_raw $connection {
+            INSERT INTO package_download_counts (pkg_id, platform_id, downloads)
+            VALUES (:pkg_id, :platform_id, 1)
+            ON CONFLICT (pkg_id, platform_id)
+            DO UPDATE SET downloads = package_download_counts.downloads + 1
+        } $params
+        if {[regexp -nocase {^[0-9a-f]{64}$} $environment]} {
+            # Registration descriptions can change; the hash identifies a machine.
+            set found [::tpersist::_raw $connection {
+                SELECT env_id FROM environments WHERE hash = :hash
+                ORDER BY last_seen DESC, env_id DESC LIMIT 1
+            } [dict create hash [binary decode hex $environment]]]
+            if {[llength $found]} {
+                dict set params env_id [dict get [lindex $found 0] env_id]
+                dict set params timestamp [clock seconds]
+                ::tpersist::_raw $connection {
+                    INSERT INTO req_reg_get_pkg_spec (timestamp, env_id, pkg_id, platform_id)
+                    VALUES (:timestamp, :env_id, :pkg_id, :platform_id)
+                } $params
+            }
+        }
+    }
+}
+
+# Cumulative recipe downloads, separate from reported installation outcomes.
+proc ::telemetry::download_stats {name {version {}}} {
+    variable connection
+    set predicate {}
+    set params [dict create name $name]
+    if {$version ne {}} {set predicate {AND p.version = :version}; dict set params version $version}
+    set result [::tpersist::_raw $connection "
+        SELECT pl.os, pl.arch, SUM(c.downloads) AS downloads
+        FROM package_download_counts c
+        JOIN packages p ON p.pkg_id = c.pkg_id
+        JOIN package_names n ON n.pkg_name_id = p.pkg_name_id
+        JOIN platforms pl ON pl.platform_id = c.platform_id
+        WHERE n.name = :name $predicate
+        GROUP BY pl.os, pl.arch ORDER BY pl.os, pl.arch
+    " $params]
+    lmap row $result {list "[dict get $row os] [dict get $row arch]" [dict get $row downloads]}
+}
+
 # Persist the normalized telemetry event.
 proc ::telemetry::event {event_type args} {
     variable connection
     variable event_list
-    variable known_arch
-    variable known_os
     if {![dict exists $event_list $event_type]} {error "unknown telemetry event: $event_type"}
     if {[catch {dict size $args}] || [lsort [dict keys $args]] ne [dict get $event_list $event_type]} {
         error "wrong arguments for telemetry event: $event_type"
@@ -303,13 +414,7 @@ proc ::telemetry::event {event_type args} {
     set now [db_value [clock seconds] -type bigint]
     # Validate before writing any dimensions.
     if {[info exists os]} {
-        if {$arch ni $known_arch} {error "unknown telemetry architecture: $arch"}
-        set normalized {}
-        dict for {pattern name} $known_os {
-            if {[string match $pattern $os]} {set normalized $name; break}
-        }
-        if {$normalized eq {}} {error "unknown telemetry OS: $os"}
-        set os $normalized
+        lassign [platform $os $arch] os arch
     }
     foreach key {install_outcome install_is_toplevel} {
         if {[info exists $key] && [set $key] ni {0 1}} {error "$key must be 0 or 1"}

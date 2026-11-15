@@ -229,6 +229,36 @@ test patch-provider-failure {broken installed schema providers fail the task} -s
     rename ::web::wiki::initdb {}
 } -returnCodes error -result {schema failure}
 
+test patch-lifecycle-logs {Start and end records cover success and failure without disclosing the task error} -setup {
+    set lifecycle {}
+    proc ::site_patch::puts {channel message} {
+        if {$channel ne "stderr"} {error "Expected diagnostic output"}
+        lappend ::lifecycle [::tjson::json_to_simple $message]
+    }
+    rename ::site_patch::task_prune_accounts ::site_patch::saved_prune
+    proc ::site_patch::task_prune_accounts {context} {return {accounts}}
+} -body {
+    set success [::tjson::json_to_simple [::site_patch::run task_prune_accounts {}]]
+    proc ::site_patch::task_prune_accounts {context} {
+        return -code error -errorcode {TEST PRIVATE} {private diagnostic}
+    }
+    set failed [catch {::site_patch::run task_prune_accounts {}} message options]
+    set valid 1
+    foreach record $lifecycle {
+        if {[dict get $record task] ne "task_prune_accounts" ||
+            ![regexp {^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$} [dict get $record timestamp]]} {set valid 0}
+    }
+    list [dict get $success ok] $failed [dict get $options -errorcode] $message \
+        [lmap record $lifecycle {dict get $record event}] \
+        [dict get [lindex $lifecycle 1] status] [dict get [lindex $lifecycle 3] status] \
+        [expr {[dict get [lindex $lifecycle 3] duration_ms] >= 0}] \
+        [expr {[string first {private diagnostic} $lifecycle] < 0}] $valid
+} -cleanup {
+    rename ::site_patch::puts {}
+    rename ::site_patch::task_prune_accounts {}
+    rename ::site_patch::saved_prune ::site_patch::task_prune_accounts
+} -result {1 1 {TEST PRIVATE} {private diagnostic} {patch_task_start patch_task_end patch_task_start patch_task_end} ok error 1 1 1}
+
 test patch-reject {task names cannot select arbitrary Tcl commands} -body {
     ::site_lambda::handle {{"source":"ttrek.patch","task":"exec"}} {}
 } -returnCodes error -result {Unknown patch task}

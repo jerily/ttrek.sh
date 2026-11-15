@@ -25,11 +25,12 @@ ttrek run -script start-local
 With the services running, use another terminal to initialize and publish the local data:
 
 ```sh
-ttrek run -script initdb-local
-ttrek run -script sync-local
+ttrek run -script bootstrap-local
 ```
 
-Startup only opens database connections. Repeat these tasks after starting a new
+Bootstrap initializes the schema, publishes the packaged content and registry,
+then refreshes Package Tracker, stopping if any step fails.
+Startup only opens database connections. Repeat bootstrap after starting a new
 disposable local stack; use `sync-local` to publish the packaged content and registry.
 
 Open <http://127.0.0.1:8080/> to try the website. Press Ctrl-C to stop it.
