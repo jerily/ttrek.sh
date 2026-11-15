@@ -75,10 +75,13 @@ proc ::site::mount {router} {
     }
     ::treqmon::mount $router -prefix /request-monitor \
         -middleware [dict exists $settings treqmon] \
-        -include_active_users [expr {![catch {package present tsession}]}] \
+        -include_active_users [dict exists $settings account] \
         -config [dict create master_template [dict get $templates $monitor_master] \
             templates [dict create master.html.jinja [dict get $templates master.html.jinja]] \
             chart_script [::assets::url /js/chart.umd.js]]
+    if {[dict exists $settings treqmon] && [dict exists $settings account]} {
+        $router add_middleware -enter_proc ::accounts::monitor_enter
+    }
     # Monitoring is outermost so rate-limit responses are recorded as well.
     if {[dict exists $settings tratelimit]} {::tratelimit::mount $router}
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {

@@ -22,7 +22,14 @@ foreach kind {wiki blog} directory {docs blog} {
 }
 set account [::app_config::account {} $root $work]
 dict set account policy bcrypt_cost 4
-set settings [dict create rootdir $root content_connection $db content_images {} account $account]
+namespace eval ::treqmon::middleware::accountsteststore {
+    variable history {}
+    proc init {config} {variable history; set history {}}
+    proc register_datapoint {point} {variable history; lappend history $point}
+    proc get_history_events {} {variable history; return $history}
+}
+set settings [dict create rootdir $root content_connection $db content_images {} account $account \
+    treqmon {store {accountsteststore {}}}]
 ::site::init_worker $settings
 namespace eval ::accountstest {
     variable cookie {}; variable csrf {}; variable last {}; variable origin http://localhost:8080
@@ -203,6 +210,68 @@ test accounts-register {real registration uses the shared layout, CAPTCHA and re
     set result
 } -result {200 1 1 1 no-store 200 200 200 1}
 
+test accounts-monitor {Direct and Lambda requests count one account across multiple sessions} -setup {
+    set savedCookie $::accountstest::cookie
+    set uid [dict get [::web::user::current_user $::accounts::mount \
+        [dict create headers [dict create cookie $savedCookie]]] id]
+    set token [::web::user::new_session $::accounts::store auth $uid]
+    set issued [::web::user::set_cookie $::accounts::mount {statusCode 200 headers {} body {}} $token]
+    set secondCookie [lindex [split [dict get $issued headers Set-Cookie] {;}] 0]
+    set ::treqmon::middleware::accountsteststore::history {}
+} -body {
+    set statuses {}
+    foreach version {{} 1.0 2.0} {
+        set ::accountstest::lambdaVersion $version
+        foreach cookie [list $savedCookie $secondCookie] {
+            set ::accountstest::cookie $cookie
+            lappend statuses [::accountstest::request GET /docs]
+        }
+    }
+    set events [::treqmon::get_history_events]
+    set active [dict get [::treqmon::get_active_users $events] minute active_users]
+    set identities [lsort -unique [lmap event $events {lindex $event 2}]]
+    ::accountstest::request GET /request-monitor
+    list [lsort -unique $statuses] [llength $events] [expr {$identities eq [list $uid]}] \
+        [lsort -unique [lmap {bucket values} $active {lindex $values 1}]] \
+        [string match {*Active Users*} [dict get $::accountstest::last body]]
+} -cleanup {
+    ::web::user::consume $::accounts::store [::web::user::session $::accounts::store $token]
+    set ::accountstest::lambdaVersion {}
+    set ::accountstest::cookie $savedCookie
+} -result {200 6 1 1 1}
+
+test accounts-monitor-guests {Anonymous, pending, expired and revoked cookies do not count as active users} -setup {
+    set savedCookie $::accountstest::cookie
+    set uid [dict get [::web::user::current_user $::accounts::mount \
+        [dict create headers [dict create cookie $savedCookie]]] id]
+    set cookies [list {} [dict get $::accounts::mount -cookie]=invalid]
+    foreach kind {anon two-factor auth auth} state {live pending expired revoked} {
+        set token [::web::user::new_session $::accounts::store $kind $uid]
+        set issued [::web::user::set_cookie $::accounts::mount {statusCode 200 headers {} body {}} $token]
+        lappend cookies [lindex [split [dict get $issued headers Set-Cookie] {;}] 0]
+        set row [::web::user::session $::accounts::store $token]
+        if {$state eq "expired"} {
+            ::tsession::sql::update [dict get $::accounts::store -sessions] [dict get $row id] \
+                [dict create expires [expr {[clock seconds] - 1}]]
+        } elseif {$state eq "revoked"} {
+            ::web::user::consume $::accounts::store $row
+        }
+    }
+    set ::treqmon::middleware::accountsteststore::history {}
+} -body {
+    foreach cookie $cookies {
+        set ::accountstest::cookie $cookie
+        ::accountstest::request GET /docs
+    }
+    # An inbound legacy session field must not bypass web-user authentication.
+    ::site::dispatch $::site::router {method GET path /docs session {loggedin true id forged}}
+    set events [::treqmon::get_history_events]
+    list [llength $events] [lsort -unique [lmap event $events {lindex $event 2}]] \
+        [dict get [::treqmon::get_active_users $events] minute active_users]
+} -cleanup {
+    set ::accountstest::cookie $savedCookie
+} -result {7 {{}} {}}
+
 test accounts-members {Signed-in navigation follows the session and changes back immediately on logout} -body {
     set result {}
     foreach path {/ /docs /blog /user} {
@@ -216,6 +285,7 @@ test accounts-members {Signed-in navigation follows the session and changes back
     lappend result [string match {*class="pure-menu-link">Sign in</a>*} [dict get $::accountstest::last body]]
     ::accountstest::request GET /
     lappend result [string match {*class="pure-menu-link">Sign in</a>*} [dict get $::accountstest::last body]]
+    lappend result [expr {[lindex [lindex [::treqmon::get_history_events] end] 2] eq {}}]
     lsort -unique $result
 } -result 1
 
