@@ -22,7 +22,7 @@
                     <tbody>
                         {% for dep in deps %}
                             <tr>
-                                <td>{{ dep.name }}</td>
+                                <td><a href="/package/{{ dep.name|urlencode }}">{{ dep.name }}</a></td>
                                 <td>{{ dep.version }}</td>
                                 <td>{{ dep.condition }}</td>
                             </tr>
