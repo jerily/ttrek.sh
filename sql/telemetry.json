@@ -62,6 +62,11 @@
           "type": "text",
           "unique": true,
           "not_null": true
+        },
+        "first_published_at": {
+          "type": "bigint",
+          "not_null": true,
+          "default": 0
         }
       }
     },
@@ -115,6 +120,16 @@
           "type": "integer",
           "not_null": true,
           "default": 0
+        },
+        "published_at": {
+          "type": "bigint",
+          "not_null": true,
+          "default": 0
+        },
+        "publication_is_update": {
+          "type": "integer",
+          "not_null": true,
+          "default": 0
         }
       },
       "unique": [
@@ -157,6 +172,50 @@
           "os",
           "arch"
         ]
+      ]
+    },
+    {
+      "name": "package_download_counts",
+      "columns": {
+        "pkg_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "platform_id": {
+          "type": "integer",
+          "not_null": true
+        },
+        "downloads": {
+          "type": "bigint",
+          "not_null": true,
+          "default": 0
+        }
+      },
+      "unique": [
+        [
+          "pkg_id",
+          "platform_id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "pkg_id"
+          ],
+          "table": "packages",
+          "referenced_columns": [
+            "pkg_id"
+          ]
+        },
+        {
+          "columns": [
+            "platform_id"
+          ],
+          "table": "platforms",
+          "referenced_columns": [
+            "platform_id"
+          ]
+        }
       ]
     },
     {
@@ -383,6 +442,16 @@
           "table": "platforms",
           "referenced_columns": [
             "platform_id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_recipe_download_time",
+          "columns": [
+            "timestamp",
+            "pkg_id",
+            "env_id"
           ]
         }
       ]

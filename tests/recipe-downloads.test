@@ -1,0 +1,186 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-License-Identifier: MIT.
+# Real counter, request and concurrency checks on SQLite or isolated PostgreSQL.
+package require tcltest 2
+namespace import ::tcltest::test
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl site.tcl]
+source [file join $root tcl telemetry.tcl]
+source [file join $root tests support.tcl]
+
+if {[lindex $argv 0] eq "--worker"} {
+    ::telemetry::connect [lindex $argv 1]
+    for {set i 0} {$i < 20} {incr i} {
+        ::telemetry::recipe_download concurrent 1.0.0 Linux x86_64
+    }
+    ::telemetry::close
+    exit
+}
+
+set work [::test_support::temporary [file join $root build] recipe-download-test-]
+set admin {}
+try {
+    if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
+        package require tdbc::postgres
+        set options {}
+        dict for {key value} $::env(TTREK_TEST_POSTGRES) {lappend options -$key $value}
+        set admin [tdbc::postgres::connection new {*}$options]
+        set schema downloads_[pid]_[clock clicks]
+        $admin allrows "CREATE SCHEMA $schema"
+        set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES) \
+            [dict create options "-c search_path=$schema -c statement_timeout=10000"]]
+    } else {set settings [dict create dialect sqlite database [file join $work db.sqlite3] timeout 5000]}
+    set registry [file join $work registry]
+    foreach {name version} {demo 1.0.0 demo 2.0.0 legacy 1.0.0 concurrent 1.0.0 restricted 1.0.0} {
+        set path [file join $registry $name $version ttrek.json]
+        file mkdir [file dirname $path]
+        if {$name eq "restricted"} {
+            set recipe {{"build":{"linux.x86_64":[]}}}
+        } else {set recipe {{"build":{"default":[]}}}}
+        ::test_support::write_file $path $recipe
+    }
+    ::telemetry::init_local $settings [list $registry]
+    ::views::init [file join $root www]
+    set ::site::settings [dict create rootdir $root]
+    set identity [format %064x 1]
+    ::telemetry::event register_environment -env $identity -description fixture
+    proc sql {query {params {}}} {::tpersist::_raw $::telemetry::connection $query $params}
+    proc total {name} {
+        set result 0
+        foreach row [::telemetry::download_stats $name] {incr result [lindex $row 1]}
+        return $result
+    }
+    proc events {name} {
+        dict get [lindex [sql {
+            SELECT COUNT(*) AS count FROM req_reg_get_pkg_spec ev
+            JOIN packages p ON p.pkg_id = ev.pkg_id JOIN package_names n ON n.pkg_name_id = p.pkg_name_id
+            WHERE n.name = :name
+        } [dict create name $name]] 0] count
+    }
+    proc request {name version {os Linux} {arch x86_64} {environment {}}} {
+        get_package_spec_handler {} [dict create headers [dict create ttrek-environment-id $environment] \
+            pathParameters [dict create package_name $name package_version $version os $os machine $arch]]
+    }
+
+    test downloads-counts {Counters include clients without machine IDs and separate versions and platforms} -body {
+        ::telemetry::recipe_download demo 1.0.0 Linux x86_64
+        ::telemetry::recipe_download demo 1.0.0 Linux x86_64
+        ::telemetry::recipe_download demo 1.0.0 Darwin arm64
+        ::telemetry::recipe_download demo 2.0.0 Linux x86_64
+        list [::telemetry::download_stats demo] [::telemetry::download_stats demo 1.0.0] [events demo]
+    } -result {{{{Linux x86_64} 3} {{MacOS arm64} 1}} {{{Linux x86_64} 2} {{MacOS arm64} 1}} 0}
+
+    test downloads-identities {Only registered IDs retain an existing request event; every response increments totals} -body {
+        set before [total demo]
+        foreach id [list $identity [format %064x 2] invalid] {
+            ::telemetry::recipe_download demo 1.0.0 Linux x86_64 $id
+        }
+        list [expr {[total demo] - $before}] [events demo] \
+            [dict get [lindex [sql {SELECT COUNT(*) AS count FROM environments}] 0] count]
+    } -result {3 1 1}
+
+    test downloads-migrate {Historical request counts seed once; repeated init and later downloads preserve totals} -body {
+        for {set i 0} {$i < 2} {incr i} {
+            ::telemetry::event req_reg_get_pkg_spec -env $identity -pkg_name legacy -pkg_version 1.0.0 -os Linux -arch x86_64
+        }
+        ::telemetry::initdb
+        ::telemetry::initdb
+        set seeded [total legacy]
+        ::telemetry::recipe_download legacy 1.0.0 Linux x86_64
+        ::telemetry::recipe_download legacy 1.0.0 Linux x86_64 $identity
+        ::telemetry::initdb
+        list $seeded [total legacy] [events legacy]
+    } -result {2 4 3}
+
+    test downloads-latest {A successful latest recipe is counted under its resolved version without a placeholder row} -body {
+        set before [total demo]
+        set response [request demo latest Linux x86_64 $identity]
+        set body [::tjson::json_to_simple [dict get $response body]]
+        list [dict get $response statusCode] [dict get $body version] [expr {[total demo] - $before}] \
+            [sql {SELECT version FROM packages WHERE version = 'latest'}]
+    } -result {200 2.0.0 1 {}}
+
+    test downloads-missing {Missing packages, versions and platform builds create neither counts nor events} -body {
+        set before [total demo]
+        set requests [events demo]
+        set statuses {}
+        foreach {name version os arch} {missing 1.0.0 Linux x86_64 demo missing Linux x86_64 restricted 1.0.0 Darwin arm64} {
+            lappend statuses [dict get [request $name $version $os $arch $identity] statusCode]
+        }
+        list $statuses [expr {[total demo] == $before}] [expr {[events demo] == $requests}] \
+            [sql {SELECT name FROM package_names WHERE name = 'missing'}] [total restricted]
+    } -result {{404 404 404} 1 1 {} 0}
+
+    test downloads-validation {Unsupported platform labels and bound unknown names cannot create counters} -body {
+        set before [total demo]
+        list [catch {::telemetry::recipe_download demo 1.0.0 Linux unknown}] \
+            [catch {::telemetry::recipe_download demo 1.0.0 unknown x86_64}] \
+            [::telemetry::recipe_download {x'; DROP TABLE packages; --} 1.0.0 Linux x86_64] \
+            [expr {[total demo] == $before}]
+    } -result {1 1 {} 1}
+
+    test downloads-rollback {Counter updates and the existing identified event share one transaction} -body {
+        set before [total demo]
+        set requests [events demo]
+        catch {::telemetry::transaction {
+            ::telemetry::recipe_download demo 1.0.0 Linux x86_64 $identity
+            error rollback
+        }}
+        list [expr {[total demo] == $before}] [expr {[events demo] == $requests}]
+    } -result {1 1}
+
+    test downloads-best-effort {Statistics failures never prevent a successful recipe response} -setup {
+        rename ::telemetry::recipe_download ::telemetry::saved_recipe_download
+        proc ::telemetry::recipe_download {args} {error "Counter unavailable"}
+    } -body {
+        dict get [request demo 1.0.0] statusCode
+    } -cleanup {
+        rename ::telemetry::recipe_download {}
+        rename ::telemetry::saved_recipe_download ::telemetry::recipe_download
+    } -result 200
+
+    test downloads-render {Dependency-only packages display architecture totals without any installation reports} -body {
+        set overview [dict get [get_package_page_handler {} {headers {} pathParameters {package_name demo}}] body]
+        set version [dict get [get_package_version_page_handler {} {headers {} pathParameters {package_name demo package_version 1.0.0}}] body]
+        list [expr {[string first {Recipe downloads by platform} $overview] >= 0}] \
+            [expr {[string first {MacOS arm64} $overview] >= 0}] \
+            [expr {[string first {Recipe downloads by platform} $version] >= 0}] \
+            [expr {[string first {Installation reports by platform} $overview] < 0}]
+    } -result {1 1 1 1}
+
+    test downloads-withdraw {Withdrawal and republication preserve counter history and package IDs} -body {
+        set before [::telemetry::download_stats demo]
+        file rename [file join $registry demo] [file join $work withdrawn]
+        ::telemetry::sync_registry_metadata $registry
+        set hidden [::telemetry::download_stats demo]
+        file rename [file join $work withdrawn] [file join $registry demo]
+        ::telemetry::sync_registry_metadata $registry
+        expr {$before eq $hidden && $before eq [::telemetry::download_stats demo]}
+    } -result 1
+
+    test downloads-concurrency {Concurrent first inserts and increments do not lose downloads} -body {
+        ::telemetry::close
+        set workers {}
+        for {set i 0} {$i < 4} {incr i} {
+            lappend workers [open [list | [info nameofexecutable] [info script] --worker $settings] r]
+        }
+        set errors {}
+        foreach worker $workers {
+            read $worker
+            if {[catch {close $worker} message]} {lappend errors $message}
+        }
+        ::telemetry::connect $settings
+        if {[llength $errors]} {error $errors}
+        list [total concurrent] [events concurrent]
+    } -result {80 0}
+} finally {
+    ::telemetry::close
+    if {$admin ne {}} {
+        $admin allrows "DROP SCHEMA $schema CASCADE"
+        $admin close
+    }
+    file delete -force $work
+}
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed != 0}]

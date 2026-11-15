@@ -217,7 +217,8 @@ proc get_packages_page_handler {ctx req} {
     }
     set packages [dict values $catalog]
     set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
-        result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}}]
+        result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}} \
+        tracker [::package_tracker::view $catalog]]
     set html [::views::render packages.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
@@ -298,10 +299,6 @@ proc get_package_spec_handler {ctx req} {
     set os [::twebserver::get_path_param $req os]
     set machine [::twebserver::get_path_param $req machine]
 
-    telemetry_event_common req_reg_get_pkg_spec \
-        -pkg_name $package_name -pkg_version $package_version \
-        -os $os -arch $machine
-
     if {[catch {
         if {$package_version eq "latest"} {
             set package_version [lindex [get_package_versions $package_name] 0]
@@ -351,6 +348,13 @@ proc get_package_spec_handler {ctx req} {
     }
 
     set res [::twebserver::build_response 200 application/json [::tjson::to_json $result_handle]]
+    set environment {}
+    if {[dict exists $req headers ttrek-environment-id]} {set environment [dict get $req headers ttrek-environment-id]}
+    # Count only successfully prepared recipes, using the resolved version.
+    # Statistics must not prevent clients from obtaining a working recipe.
+    if {[catch {::telemetry::recipe_download $package_name $package_version $os $machine $environment}]} {
+        puts stderr "Could not record recipe download statistics"
+    }
     return $res
 }
 
@@ -391,6 +395,24 @@ proc get_package_page_handler {ctx req} {
     if {[regexp -nocase {^https?://[^/[:space:]?#]+[^[:space:]]*$} $candidate]} {set project_url $candidate}
 
     set stat_platforms [get_package_stats $package_name]
+    set version_rows {}
+    foreach version $versions {
+        set row [dict get $metadata $version]
+        lappend version_rows [::package_tracker::typed_record [dict create version $version \
+            date [::package_tracker::date [dict get $row published_at]]]]
+    }
+    set activity [::package_tracker::read $package_name]
+    set activity_fields [dict create available 0]
+    set chart_json {}
+    if {$activity ne {}} {
+        set activity_fields [dict get $activity pkg:$package_name]
+        dict set activity_fields available 1
+        dict set activity_fields stale [dict get $activity meta stale]
+        dict set activity_fields updated [clock format [dict get $activity meta as_of] -format {%b %d, %Y at %H:%M UTC} -gmt true]
+        dict set activity_fields window_start [clock format [dict get $activity meta start] -format {%b %d, %Y at %H:%M UTC} -gmt true]
+        dict set activity_fields chart_ready [expr {[dict get $activity_fields total] >= 10 && [dict get $activity_fields active_days] >= 3}]
+        set chart_json [::package_tracker::json [dict create days [dict get $activity_fields days]]]
+    }
 
     set data [dict create \
         title [list S "Package Overview: $package_name"] \
@@ -400,6 +422,12 @@ proc get_package_page_handler {ctx req} {
         project_url [list S $project_url] \
         license [list S [string trim [dict get $latest license]]] \
         versions [::views::strings $versions] \
+        latest_version [list S [lindex $versions 0]] \
+        publication_date [list S [::package_tracker::date [dict get $latest first_published_at]]] \
+        version_rows [list L $version_rows] \
+        activity [::package_tracker::typed_record $activity_fields] \
+        activity_json [list S $chart_json] \
+        download_platforms [::views::download_stats [get_package_download_stats $package_name]] \
         stat_platforms [::views::platform_stats $stat_platforms]]
     set html [::views::render package.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
@@ -443,12 +471,22 @@ proc get_package_version_page_handler {ctx req} {
         package_name [list S $package_name] \
         package_version [list S $package_version] \
         deps [list L $deps] \
+        download_platforms [::views::download_stats [get_package_download_stats $package_name $package_version]] \
         stat_platforms [::views::platform_stats $stat_platforms]]
 
     set html [::views::render package-version.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
 
+}
+
+# Return package stats for the caller.
+proc get_package_download_stats {name {version {}}} {
+    if {[catch {::telemetry::download_stats $name $version} result]} {
+        puts stderr "Could not read recipe download statistics"
+        return {}
+    }
+    return $result
 }
 
 # Return package stats for the caller.

@@ -20,6 +20,7 @@ ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry-dispatch.test"
 ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
+ttrek run tclsh9.1 "$PWD/tests/package-tracker.test"
 ttrek run tclsh9.1 "$PWD/tests/stage-registry.test"
 ttrek run tclsh9.1 "$PWD/tests/build-lambda.test"
 ttrek run tclsh9.1 "$PWD/tests/patch.test"
@@ -202,3 +203,32 @@ selection, destination overrides and refusal to overwrite populated tables.
 `tests/telemetry-maintenance.test` also tests catalog-discovered application
 tables, embedded schemas and PostgreSQL-to-SQLite restoration; enable its
 existing `TTREK_TEST_POSTGRES` disposable-database setting for those cases.
+
+`tests/package-tracker.test` covers estimated publication-date migration,
+resynchronization, withdrawal/republication, rollback, rolling-window boundaries,
+ranking thresholds, machine deduplication across days/versions/registrations, and
+the five-package limit. It uses the
+same `TTREK_TEST_POSTGRES` opt-in as the other SQL tests. When `valkey-server` is
+available, it starts a disposable loopback server to verify atomic publication,
+expired-worker rejection, overlapping runs, stale and corrupt snapshots, and real
+page rendering. It does not use the configured application cache or AWS.
+
+`tests/recipe-downloads.test` checks cumulative architecture counters, anonymous and
+identified clients, historical initialization without double-counting, resolved
+`latest` versions, excluded 404s, atomic rollback, concurrent increments, dependency-only
+package pages, and recipe delivery during statistics failures. It also supports
+the `TTREK_TEST_POSTGRES` disposable-database setting.
+
+For a standalone browser preview, install Playwright in your test environment,
+then render fixtures and run the optional browser check:
+
+```sh
+TRACKER_RENDER_DIR=/tmp/ttrek-tracker-preview ttrek run tclsh9.1 tests/package-tracker.test
+node tests/package-tracker-ui.mjs /tmp/ttrek-tracker-preview
+```
+
+`PLAYWRIGHT_MODULE` may select an installed Playwright module and
+`PLAYWRIGHT_EXECUTABLE` an existing Chromium-family browser. The check serves only
+rendered fixtures and public assets on an ephemeral loopback port. It covers
+mobile/desktop layout, rotation, pause, reduced motion, charts, and the no-JavaScript
+fallback. Browser tooling is not a runtime or build dependency.

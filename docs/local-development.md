@@ -41,11 +41,20 @@ their next homepage request.
 
 ### Publish content edits
 
-Edit Markdown, repackage, and restart the local services. Run `initdb-local`, then
-`sync-local`, against the running local Lambda to publish the packaged files.
+Edit Markdown, repackage, and restart the local services. Run `bootstrap-local`
+against the running local Lambda to initialize schemas, publish the packaged
+files, and refresh Package Tracker. It stops if any step fails; `initdb-local`,
+`sync-local`, and `refresh-package-tracker-local` remain available individually.
 Neither startup nor HTTP requests import Markdown, upload content images, create
 schemas, or build search indexes. Each worker owns its router and loads search
 indexes lazily from the published database snapshot.
+
+After initialization and sync, run `ttrek run -script refresh-package-tracker-local`
+to populate the [Package Tracker](package-tracker.md) from the local database.
+Repeat it after new telemetry or registry changes; local development does not
+start the production scheduler. `ttrek run -script prune-accounts-local` invokes
+account cleanup through the same local Lambda helper (`prune-accounts` remains
+an alias). Both accept `-- --lambda-port PORT`.
 
 Sync imports body edits and removes pages/posts whose files were deleted from
 the packaged content. Running sync on an older package republishes its older
@@ -86,8 +95,7 @@ ttrek run -script start-local
 In another terminal, initialize the database and synchronize the website:
 
 ```sh
-ttrek run -script initdb-local
-ttrek run -script sync-local
+ttrek run -script bootstrap-local
 ```
 
 These call the private `task_initdb_website` and `task_sync_website` tasks through

@@ -19,7 +19,7 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {assets responses templates releases content-images request-validation search handlers homepage accounts} {
+foreach module {assets responses templates releases content-images request-validation search handlers homepage accounts package-tracker} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -39,6 +39,9 @@ proc ::site::configure {config} {
     # Defer database reads until a catalog request, so provisioning tasks can
     # initialize a new deployment before its first public request.
     ::recipe_search::reset
+    set tracker {}
+    if {[dict exists $settings package_tracker]} {set tracker [dict get $settings package_tracker]}
+    ::package_tracker::configure $tracker
     if {[dict exists $settings tratelimit]} {
         ::tratelimit::init_middleware [dict get $settings tratelimit]
     }

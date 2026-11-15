@@ -1,0 +1,344 @@
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-License-Identifier: MIT.
+# Real SQL fixtures; optional isolated PostgreSQL and a disposable local Valkey.
+package require tcltest 2
+namespace import ::tcltest::test
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl site.tcl]
+source [file join $root tcl telemetry.tcl]
+source [file join $root tcl patch.tcl]
+source [file join $root tests support.tcl]
+set work [::test_support::temporary [file join $root build] tracker-test-]
+set registry [file join $work registry]
+file mkdir $registry
+set admin {}
+set valkey_process {}
+try {
+if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
+    package require tdbc::postgres
+    set options {}
+    dict for {key value} $::env(TTREK_TEST_POSTGRES) {lappend options -$key $value}
+    set admin [tdbc::postgres::connection new {*}$options]
+    set schema tracker_[pid]_[clock clicks]
+    $admin allrows "CREATE SCHEMA $schema"
+    set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES) \
+        [dict create options "-c search_path=$schema -c statement_timeout=10000"]]
+} else {set settings [dict create dialect sqlite database [file join $work tracker.sqlite3]]}
+::telemetry::init_local $settings
+set connection $::telemetry::connection
+set now [clock seconds]
+set bootstrap [clock scan 2026-11-15 -format %Y-%m-%d -gmt true]
+proc sql {query {params {}}} {::tpersist::_raw $::connection $query $params}
+proc recipe {name version {description {A useful Tcl package.}}} {
+    set path [file join $::registry $name $version ttrek.json]
+    file mkdir [file dirname $path]
+    ::test_support::write_file $path [::tjson::typed_to_json [list M [dict create \
+        description [list S $description] license {S MIT} url {S https://example.org/project}]]]
+}
+proc sync {} {::telemetry::sync_registry_metadata $::registry}
+proc dates {name} {
+    sql {SELECT n.first_published_at, p.version, p.published_at, p.publication_is_update FROM packages p
+        JOIN package_names n ON n.pkg_name_id = p.pkg_name_id WHERE n.name = :name ORDER BY p.version} [dict create name $name]
+}
+proc download {name when {identity 1} {version 1.0.0}} {
+    set hash [format %064x $identity]
+    ::telemetry::event register_environment -env $hash -description fixture
+    # Insert directly to exercise exact timestamps and the real schema/indexes.
+    set name_id [::telemetry::ensure_row package_names pkg_name_id \
+        [dict create name [::tpersist::db_value $name -type text]]]
+    set pkg_id [::telemetry::ensure_row packages pkg_id [dict create \
+        pkg_name_id [::tpersist::db_value $name_id -type integer] version [::tpersist::db_value $version -type text]]]
+    set platform_id [::telemetry::ensure_row platforms platform_id [dict create \
+        os [::tpersist::db_value Linux -type text] arch [::tpersist::db_value x86_64 -type text]]]
+    sql {INSERT INTO req_reg_get_pkg_spec (timestamp,env_id,pkg_id,platform_id)
+        SELECT :stamp, e.env_id, :pkg_id, :platform_id FROM environments e
+        WHERE e.hash = :hash AND e.description = 'fixture'} \
+        [dict create stamp $when pkg_id $pkg_id platform_id $platform_id hash [binary decode hex $hash]]
+}
+proc names {snapshot category} {lmap row [dict get $snapshot rankings $category] {dict get $row name}}
+
+recipe demo 1.0.0
+recipe demo 2.0.0
+sync
+
+test publication-bootstrap {Missing published dates become November 15, while telemetry-only entries remain unpublished} -body {
+    sql {UPDATE packages SET published_at = 0}
+    sql {UPDATE package_names SET first_published_at = 0}
+    download ghost [expr {$now - 20*86400}]
+    ::telemetry::initdb
+    set d [lindex [dates demo] 0]
+    set g [lindex [dates ghost] 0]
+    list [expr {[dict get $d first_published_at] == $bootstrap}] \
+        [expr {[dict get $d published_at] == $bootstrap}] \
+        [dict get $g published_at] [dict get $g first_published_at]
+} -result {1 1 0 0}
+
+test publication-preserve {Initialization, edits and republication preserve original dates and IDs} -body {
+    set before [dates demo]
+    recipe demo 1.0.0 Edited
+    sync
+    file rename [file join $registry demo] [file join $work withdrawn]
+    sync
+    file rename [file join $work withdrawn] [file join $registry demo]
+    sync
+    ::telemetry::initdb
+    expr {$before eq [dates demo]}
+} -result 1
+
+test publication-update {A new version is an update; all versions of a new package are initial publications} -body {
+    recipe demo 3.0.0
+    recipe brand-new 1.0.0
+    recipe brand-new 2.0.0
+    sync
+    set update [lindex [dates demo] end]
+    list [dict get $update publication_is_update] \
+        [expr {[dict get $update published_at] >= $now}] \
+        [lmap row [dates brand-new] {dict get $row publication_is_update}]
+} -result {1 1 {0 0}}
+
+test publication-rollback {Failed publication rolls back timestamps along with registry metadata} -body {
+    recipe rolled-back 1.0.0
+    catch {::telemetry::transaction {sync; error rollback}}
+    set result [dates rolled-back]
+    file delete -force [file join $registry rolled-back]
+    set result
+} -result {}
+
+# A known 30-day history, repeated machines, and comparable weeks.
+foreach name {rising popular low-baseline single-env repeated-env zero install-only} {recipe $name 1.0.0}
+recipe rising 2.0.0
+for {set i 0} {$i < 12} {incr i} {recipe [format new-%02d $i] 1.0.0}
+sync
+set now [clock seconds]
+download rising [expr {$now - 31*86400}] 99
+for {set i 1} {$i <= 5} {incr i} {download rising [expr {$now - 8*86400 - $i}] $i}
+for {set i 1} {$i <= 10} {incr i} {download rising [expr {$now - (1 + $i % 3)*86400 - $i}] $i}
+# Same machine, different day and version: one machine per full window.
+download rising [expr {$now - 4*86400}] 1
+download rising [expr {$now - 2*86400 - 1}] 1 2.0.0
+foreach {name identity} {single-env 77 repeated-env 88} {
+    for {set i 0} {$i < 5} {incr i} {download $name [expr {$now - 8*86400 - $i}] $identity}
+    for {set i 0} {$i < 10} {incr i} {download $name [expr {$now - 86400 - $i}] $identity}
+}
+# Multiple registrations for one hash must still count as one machine.
+for {set i 0} {$i < 3} {incr i} {
+    ::telemetry::event register_environment -env [format %064x 88] -description variant-$i
+    ::telemetry::event req_reg_get_pkg_spec -env [format %064x 88] -pkg_name repeated-env -pkg_version 1.0.0 \
+        -os Darwin -arch arm64
+}
+sql {UPDATE req_reg_get_pkg_spec SET timestamp = :stamp WHERE timestamp >= :now} [dict create stamp [expr {$now - 100}] now $now]
+for {set i 1} {$i <= 20} {incr i} {download popular [expr {$now - 86400 - $i}] [expr {100+$i}]}
+download low-baseline [expr {$now - 8*86400}] 1
+for {set i 1} {$i <= 10} {incr i} {download low-baseline [expr {$now - 86400 - $i}] $i}
+download rising [expr {$now - 30*86400}] 12
+download rising [expr {$now - 14*86400}] 6
+download rising [expr {$now - 7*86400}] 11
+download rising $now 13
+download rising [expr {$now + 1}] 14
+download rising [expr {$now - 1}] 15 unlisted
+download ghost [expr {$now - 1}] 16
+::telemetry::event req_pkg_install_event -env [format %064x 1] -pkg_name install-only -pkg_version 1.0.0 \
+    -os Linux -arch x86_64 -install_outcome 1 -install_is_toplevel 0
+::telemetry::initdb
+set snapshot [::package_tracker::aggregate $now]
+
+test tracker-windows {Half-open windows deduplicate machines across days and versions; exact boundaries count once} -body {
+    set stats [dict get $snapshot packages rising]
+    list [dict get $stats total] [dict get $stats current] [dict get $stats previous] \
+        [dict get $stats delta] \
+        [expr {abs([dict get $stats growth] - 83.333333333) < .001}]
+} -result {12 11 6 5 1}
+
+test tracker-rankings {Popular and Trending use distinct measures; low baselines and repeated registrations cannot trend} -body {
+    list [lindex [names $snapshot popular] 0] [names $snapshot trending] \
+        [expr {"ghost" ni [names $snapshot popular]}] [dict get $snapshot packages repeated-env current] \
+        [expr {"install-only" ni [names $snapshot popular]}]
+} -result {popular rising 1 1 1}
+
+test tracker-limit {Every section is capped at 5 with stable tie ordering} -body {
+    list [llength [names $snapshot new]] [expr {[names $snapshot new] eq [names [::package_tracker::aggregate $now] new]}] \
+        [names $snapshot updated]
+} -result {5 1 demo}
+
+test tracker-chart {Daily unique counts preserve zeros and partial days; returning machines count only once per full window} -body {
+    set days [dict get $snapshot packages rising days]
+    set total 0
+    foreach day $days {incr total [dict get $day count]}
+    list $total [dict get $snapshot packages rising total] [expr {[llength $days] in {30 31}}] [dict get [lindex $days end] partial] \
+        [expr {[llength [lsearch -all -inline -index 3 $days 0]] > 0}]
+} -result {19 12 1 1 1}
+
+test tracker-short-history {A young recipe-request history suppresses Trending} -body {
+    set early [::package_tracker::aggregate [expr {$now - 25*86400}]]
+    list [dict get $early meta trend_ready] [names $early trending]
+} -result {0 {}}
+
+test tracker-sql-index {Both backends can use the recipe time index for bounded aggregation} -body {
+    set query {SELECT pkg_id FROM req_reg_get_pkg_spec
+        WHERE timestamp >= :start AND timestamp < :finish}
+    set params [dict create start [expr {$now-30*86400}] finish $now]
+    if {$admin eq {}} {set plan [sql "EXPLAIN QUERY PLAN $query" $params]
+    } else {
+        ::telemetry::transaction {
+            sql {SET LOCAL enable_seqscan = off}
+            set plan [sql "EXPLAIN $query" $params]
+        }
+    }
+    expr {[string first idx_recipe_download_time $plan] >= 0}
+} -result 1
+
+set valkey_process {}
+set valkey_available [expr {[auto_execok valkey-server] ne {}}]
+::tcltest::testConstraint valkey $valkey_available
+if {$valkey_available} {
+    lassign [::test_support::ports 1] port
+    set valkey_process [::test_support::start [list valkey-server --bind 127.0.0.1 --port $port \
+        --save {} --appendonly no --dir $work] [file join $work valkey.log]]
+    ::test_support::wait_port $port $valkey_process
+    ::package_tracker::configure [dict create valkey [dict create host 127.0.0.1 port $port ssl false]]
+}
+
+test tracker-cache {One atomically published generation serves rankings and package charts} -constraints valkey -body {
+    ::package_tracker::cache SET ttrek:package-tracker:v2:lock fixture EX 240
+    ::package_tracker::publish $snapshot fixture
+    set cached [::package_tracker::read rising]
+    list [dict get $cached pkg:rising total] [dict get $cached meta as_of] \
+        [llength [dict get [::package_tracker::read] new rows]]
+} -result [list 12 $now 5]
+
+test tracker-metric-format {Installation snapshots cannot be displayed as unique downloads} -constraints valkey -body {
+    set old $snapshot
+    dict set old meta format 1
+    ::package_tracker::publish $old fixture
+    ::package_tracker::read
+} -cleanup {::package_tracker::publish $snapshot fixture} -result {}
+
+test tracker-previous-limit {Existing ten-entry snapshots remain available and are trimmed to five} -constraints valkey -body {
+    set rows {}
+    set row [lindex [dict get $snapshot rankings new] 0]
+    for {set i 0} {$i < 10} {incr i} {
+        dict set row name [format new-%02d $i]
+        lappend rows $row
+    }
+    ::package_tracker::cache HSET ttrek:package-tracker:v2:active new [::package_tracker::json [dict create rows $rows]]
+    lmap row [dict get [::package_tracker::read] new rows] {dict get $row name}
+} -cleanup {
+    ::package_tracker::cache HSET ttrek:package-tracker:v2:active new \
+        [::package_tracker::json [dict create rows [dict get $snapshot rankings new]]]
+} -result {new-00 new-01 new-02 new-03 new-04}
+
+test tracker-fencing {An expired worker cannot replace a newer snapshot} -constraints valkey -body {
+    set old $snapshot
+    dict set old meta as_of [expr {$now - 3600}]
+    set failed [catch {::package_tracker::publish $old expired}]
+    list $failed [expr {[dict get [::package_tracker::read] meta as_of] == $now}] \
+        [::package_tracker::cache EXISTS ttrek:package-tracker:v2:staged:expired]
+} -result {1 1 0}
+
+test tracker-overlap {Refresh skips when another task holds the lease} -constraints valkey -body {
+    ::package_tracker::refresh
+} -result skipped
+
+test tracker-refresh-failure {An aggregation failure retains the previous snapshot and releases its lease} -constraints valkey -setup {
+    ::package_tracker::cache DEL ttrek:package-tracker:v2:lock
+    rename ::package_tracker::aggregate ::package_tracker::saved_aggregate
+    proc ::package_tracker::aggregate {args} {error "Database unavailable"}
+} -body {
+    set failed [catch {::package_tracker::refresh}]
+    list $failed [expr {[dict get [::package_tracker::read] meta as_of] == $now}] \
+        [::package_tracker::cache EXISTS ttrek:package-tracker:v2:lock]
+} -cleanup {
+    rename ::package_tracker::aggregate {}
+    rename ::package_tracker::saved_aggregate ::package_tracker::aggregate
+    ::package_tracker::cache SET ttrek:package-tracker:v2:lock fixture EX 240
+} -result {1 1 0}
+
+test tracker-stale {Old snapshots are visibly delayed and expire after 24 hours} -constraints valkey -body {
+    set old $snapshot
+    dict set old meta as_of [expr {$now-1800}]
+    ::package_tracker::publish $old fixture
+    set stale [dict get [::package_tracker::read] meta stale]
+    dict set old meta as_of [expr {$now-86401}]
+    ::package_tracker::publish $old fixture
+    list $stale [::package_tracker::read]
+} -cleanup {::package_tracker::publish $snapshot fixture} -result {1 {}}
+
+test tracker-render {Tracker, widget and overview render real data and filter withdrawn links without an aggregate query} -constraints valkey -body {
+    ::views::init [file join $root www]
+    set ::site::settings [dict create rootdir $root]
+    rename ::package_tracker::aggregate ::package_tracker::saved_aggregate
+    proc ::package_tracker::aggregate {args} {error {HTTP must not aggregate}}
+    try {
+        set page [dict get [get_package_tracker_page_handler {} {}] body]
+        set bar [dict get [get_packages_page_handler {} {}] body]
+        set overview [dict get [get_package_page_handler {} {headers {} pathParameters {package_name rising}}] body]
+        sql {UPDATE packages SET listed = 0 WHERE pkg_name_id = (SELECT pkg_name_id FROM package_names WHERE name = 'rising')}
+        set withdrawn [dict get [get_package_tracker_page_handler {} {}] body]
+        list [expr {[string first {83%} $page] >= 0}] [expr {[string first data-tracker-bar $bar] >= 0}] \
+            [expr {[string first data-activity-chart $overview] >= 0}] \
+            [expr {[string first {href="/package/rising"} $withdrawn] < 0}] \
+            [expr {[string first {5 packages} $page] >= 0}]
+    } finally {
+        rename ::package_tracker::aggregate {}
+        rename ::package_tracker::saved_aggregate ::package_tracker::aggregate
+        sync
+    }
+} -result {1 1 1 1 1}
+
+test tracker-task {The private task dispatcher exposes manual refresh} -constraints valkey -body {
+    ::package_tracker::cache DEL ttrek:package-tracker:v2:lock
+    set response [::tjson::json_to_simple [::site_patch::run task_refresh_package_tracker {}]]
+    list [dict get $response ok] [dict get $response task] [dict get $response completed]
+} -result {1 task_refresh_package_tracker refreshed}
+
+if {$valkey_available && [info exists ::env(TRACKER_RENDER_DIR)]} {
+    set destination $::env(TRACKER_RENDER_DIR)
+    file mkdir $destination
+    foreach {path handler req} {
+        tracker.html get_package_tracker_page_handler {}
+        packages.html get_packages_page_handler {}
+        package.html get_package_page_handler {headers {} pathParameters {package_name rising}}
+    } {::test_support::write_file [file join $destination $path] [encoding convertto utf-8 [dict get [$handler {} $req] body]]}
+}
+
+test tracker-unavailable {Missing or corrupt caches hide the widget while browsing and the tracker page remain usable} -constraints valkey -body {
+    set results {}
+    foreach state {missing corrupt} {
+        if {$state eq "missing"} {::package_tracker::cache DEL ttrek:package-tracker:v2:active
+        } else {::package_tracker::cache HSET ttrek:package-tracker:v2:active meta broken}
+        set page [dict get [get_packages_page_handler {} {}] body]
+        set tracker [dict get [get_package_tracker_page_handler {} {}] body]
+        lappend results [list [::package_tracker::read] [expr {[string first data-tracker-bar $page] < 0}] \
+            [expr {[string first {All packages} $page] >= 0}] [expr {[string first {temporarily unavailable} $tracker] >= 0}]]
+    }
+    set results
+} -result {{{} 1 1 1} {{} 1 1 1}}
+
+test tracker-empty {A valid snapshot without ranked packages does not show an empty discovery bar} -constraints valkey -body {
+    ::package_tracker::cache SET ttrek:package-tracker:v2:lock fixture EX 240
+    set empty $snapshot
+    foreach category {new updated popular trending} {dict set empty rankings $category {}}
+    ::package_tracker::publish $empty fixture
+    set page [dict get [get_packages_page_handler {} {}] body]
+    list [expr {[::package_tracker::read] ne {}}] [expr {[string first data-tracker-bar $page] < 0}]
+} -result {1 1}
+
+test tracker-corrupt-field {Malformed package statistics cannot break an overview page} -constraints valkey -body {
+    ::package_tracker::cache SET ttrek:package-tracker:v2:lock fixture EX 240
+    ::package_tracker::publish $snapshot fixture
+    ::package_tracker::cache HSET ttrek:package-tracker:v2:active pkg:rising {{"total":3}}
+    set html [dict get [get_package_page_handler {} {headers {} pathParameters {package_name rising}}] body]
+    list [expr {[string first {class="package-surface package-activity"} $html] < 0}] \
+        [expr {[string first {ttrek install rising} $html] >= 0}]
+} -result {1 1}
+
+} finally {
+::package_tracker::configure {}
+if {$valkey_process ne {}} {::test_support::stop $valkey_process}
+::telemetry::close
+if {$admin ne {}} {$admin allrows "DROP SCHEMA $schema CASCADE"; $admin close}
+file delete -force $work
+}
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed != 0}]
