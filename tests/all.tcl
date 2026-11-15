@@ -509,9 +509,9 @@ test handlers-unpublished-search {Missing indexes return 503 for search while li
         [info exists ::recipe_search::revision] [info commands ::recipe_search::index]
 } -cleanup {::telemetry::publish_search_snapshot} -result {503 no-store 503 no-store 503 no-store 200 200 0 {}}
 
-test handlers-3 {Dependency conditions render on version pages} -body {
+test handlers-3 {Dependency links and conditions render on version pages} -body {
     set html [body [get_package_version_page_handler {} {pathParameters {package_name demo package_version 1.0.0}}]]
-    list [contains $html {demo@1.0.0}] [contains $html {<td>tcl</td>}] \
+    list [contains $html {demo@1.0.0}] [contains $html {<td><a href="/package/tcl">tcl</a></td>}] \
         [contains $html {<td>^9.1.0</td>}] [contains $html {<td>+ssl</td>}] \
         [contains $html {Statistics (installations)}]
 } -result {1 1 1 1 0}

@@ -716,7 +716,11 @@ before the application stack to grant access to the renamed scheduler role.
 
 Package Tracker uses `{"source":"ttrek.patch","task":"task_refresh_package_tracker"}`
 through the same dispatcher and scheduler role, every five minutes. The schedule
-is enabled by default. The packages page shows its tracker bar only when Valkey
+is enabled by default. Redeploy `30-deploy-codebuild.sh` before the application
+stack so its deployment role can manage both the `-prune` and `-package-tracker`
+schedule ARNs. `scheduler:GetSchedule` is a deployment permission used to read
+the schedule; executing either patch task only requires Lambda invocation.
+The packages page shows its tracker bar only when Valkey
 returns a valid snapshot with visible entries. Initialize the schema and let the
 next scheduled refresh populate the cache, or invoke refresh immediately. See the
 [tracker rollout instructions](package-tracker.md#deployment). Every patch task
