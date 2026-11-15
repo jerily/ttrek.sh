@@ -22,6 +22,7 @@ return {
     GET /package/:package_name get_package_page_handler get_package
     GET /package/:package_name/:package_version get_package_version_page_handler get_package_version
     GET /registry/:package_name/:package_version/:os/:machine get_package_spec_handler get_package_spec
+    GET /registry/:package_name/:package_version/languages get_package_languages_handler get_package_languages
     GET /registry/search get_search_handler get_search
     GET /registry/autocomplete get_autocomplete_handler get_autocomplete
     GET /registry/:package_name get_package_versions_handler get_package_versions

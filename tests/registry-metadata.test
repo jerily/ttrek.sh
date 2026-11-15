@@ -280,6 +280,31 @@ test metadata-listed {Removed recipes and telemetry-only names stay out of disco
         [expr {[dict get [lindex [metadata_rows] 0] pkg_id] == $legacy_id}]
 } -result {1 {{{Linux x86_64} 1 1 0}} 1}
 
+test metadata-languages {Languages round-trip through SQL, deduplicate, and clear when omitted} -body {
+    recipe $public language-fixture 1.0.0 {languages {L {{S TCL} {S C} {S TCL}}}}
+    ::telemetry::sync_registry_metadata $public $private
+    set first [dict get [lindex [::telemetry::registry_catalog {language-fixture}] 0] languages]
+    recipe $public language-fixture 1.0.0 {}
+    ::telemetry::sync_registry_metadata $public $private
+    list $first [dict get [lindex [::telemetry::registry_catalog {language-fixture}] 0] languages]
+} -result {{C TCL} {}}
+
+test metadata-languages-invalid {Invalid language metadata leaves the published catalog intact} -body {
+    set before [::telemetry::registry_catalog]
+    set results {}
+    foreach value [list null {"C"} {{}} {[42]} {[""]} {["C\nTCL"]} [format {["%s"]} [string repeat x 256]]] {
+        set path [recipe $public language-fixture 1.0.0 {}]
+        set channel [open $path w]
+        puts $channel [format {{"languages":%s}} $value]
+        close $channel
+        lappend results [catch {::telemetry::sync_registry_metadata $public $private} message]
+        if {![string match {languages must*} $message]} {error $message}
+    }
+    list [lsort -unique $results] [expr {$before eq [::telemetry::registry_catalog]}]
+} -cleanup {
+    file delete -force [file join $public language-fixture]
+} -result {1 1}
+
 ::telemetry::close
 if {$postgres} {
     $admin allrows "DROP SCHEMA $schema CASCADE"

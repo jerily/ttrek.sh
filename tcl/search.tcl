@@ -71,17 +71,19 @@ proc ::recipe_search::catalog_entries {rows} {
         }
         dict set catalog $name [dict create name $name description [lindex [lsort -ascii -unique $texts] 0] \
             tags [lsort -ascii -unique $tags] versions [dict get $grouped $name]]
+        set latest [lindex [lsort -command ::registry_metadata::compare_versions -decreasing [dict keys [dict get $grouped $name]]] 0]
+        dict set catalog $name languages [dict get $grouped $name $latest languages]
     }
     return $catalog
 }
 
 # Build the search-results response from matching packages.
-proc ::recipe_search::results {text {limit 0}} {
+proc ::recipe_search::results {text {limit 0} {language {}}} {
     variable revision
     for {set attempt 0} {$attempt < 3} {incr attempt} {
         if {![refresh]} {error "Search snapshot is unavailable"}
         set matches [search $text]
-        if {$limit > 0} {set matches [lrange $matches 0 [expr {$limit - 1}]]}
+        if {$limit > 0 && $language eq {}} {set matches [lrange $matches 0 [expr {$limit - 1}]]}
         set names [lmap match $matches {dict get $match name}]
         try {
             set rows [database search_result_metadata $revision $names]
@@ -94,13 +96,16 @@ proc ::recipe_search::results {text {limit 0}} {
         foreach match $matches {
             set name [dict get $match name]
             set data [dict get $metadata $name]
+            if {$language ne {} && $language ni [dict get $data languages]} continue
             set description [dict get $data description]
             if {[dict get $match tier] in {3 6}} {
                 set description [dict get $data versions [dict get $match version] description]
             }
             dict set match description $description
             dict set match tags [dict get $data tags]
+            dict set match languages [dict get $data languages]
             lappend results [dict remove $match version]
+            if {$limit > 0 && [llength $results] >= $limit} break
         }
         return $results
     }
@@ -160,24 +165,29 @@ proc ::recipe_search::search {text} {
     return $results
 }
 
-# Extract and validate search query parameters.
-proc ::recipe_search::request_query {request} {
-    # Decode raw query text once; preserve repeated values as arrays for validation.
+# Decode raw query text once and preserve repeated values for validation.
+proc ::recipe_search::request_values {request name} {
     set values {}
     if {[dict exists $request queryString]} {
         foreach pair [split [dict get $request queryString] &] {
             set separator [string first = $pair]
             if {$separator < 0} {continue}
             set key [::twebserver::decode_uri_component [string range $pair 0 [expr {$separator - 1}]] utf-8]
-            if {$key eq "q"} {
+            if {$key eq $name} {
                 lappend values [::twebserver::decode_uri_component [string range $pair [expr {$separator + 1}] end] utf-8]
             }
         }
-    } elseif {[dict exists $request multiValueQueryStringParameters q]} {
-        set values [dict get $request multiValueQueryStringParameters q]
-    } elseif {[dict exists $request queryStringParameters q]} {
-        set values [list [dict get $request queryStringParameters q]]
+    } elseif {[dict exists $request multiValueQueryStringParameters $name]} {
+        set values [dict get $request multiValueQueryStringParameters $name]
+    } elseif {[dict exists $request queryStringParameters $name]} {
+        set values [list [dict get $request queryStringParameters $name]]
     }
+    return $values
+}
+
+# Extract and validate search query parameters.
+proc ::recipe_search::request_query {request} {
+    set values [request_values $request q]
     set input [dict create httpMethod GET]
     if {[llength $values] == 1} {
         dict set input queryStringParameters q [lindex $values 0]
@@ -188,21 +198,34 @@ proc ::recipe_search::request_query {request} {
     return [query [lindex $values 0]]
 }
 
+# Optional registry-page filter; reject repeated or unsupported values.
+proc ::recipe_search::request_language {req} {
+    set values [request_values $req language]
+    if {[llength $values] > 1 || [lindex $values 0] ni {{} C C++ TCL}} {
+        error "Choose Any, C, C++ or TCL."
+    }
+    return [lindex $values 0]
+}
+
 # Return search handler for the caller.
 proc get_search_handler {ctx req} {
-    if {[catch {::recipe_search::request_query $req} query]} {
+    if {[catch {
+        set query [::recipe_search::request_query $req]
+        set language [::recipe_search::request_language $req]
+    }]} {
         return [::twebserver::build_response 400 text/plain \
             "q must contain 1 to 255 ASCII letters, digits, spaces, '.', '_', '+' or '-'"]
     }
     set matches {}
-    if {[catch {::recipe_search::results $query} results]} {return [::recipe_search::unavailable]}
+    if {[catch {::recipe_search::results $query 0 $language} results]} {return [::recipe_search::unavailable]}
     foreach match $results {
         set tier [dict get $match tier]
         set kind [lindex {exact prefix substring description description fuzzy description-fuzzy description-fuzzy} $tier]
         set total [dict get $match query_trigrams]
         set fields [dict create name [list S [dict get $match name]] \
             description [list S [dict get $match description]] match [list S $kind] \
-            tags [list L [lmap tag [dict get $match tags] {list S $tag}]]]
+            tags [list L [lmap tag [dict get $match tags] {list S $tag}]] \
+            languages [::views::strings [dict get $match languages]]]
         # Older CLI clients understand description matches; new clients use field to rank tags third.
         if {$tier in {4 7}} {dict set fields field {S tags}}
         if {$tier ni {1 2}} {dict set fields distance [list N [dict get $match distance]]}
@@ -215,10 +238,13 @@ proc get_search_handler {ctx req} {
 
 # JSON suggestions and HTML results share the current database catalog.
 proc get_autocomplete_handler {ctx req} {
-    if {[catch {::recipe_search::request_query $req} query]} {
+    if {[catch {
+        set query [::recipe_search::request_query $req]
+        set language [::recipe_search::request_language $req]
+    }]} {
         return [::twebserver::build_response 400 text/plain "Invalid search query"]
     }
-    if {[catch {::recipe_search::results $query 8} results]} {return [::recipe_search::unavailable]}
+    if {[catch {::recipe_search::results $query 8 $language} results]} {return [::recipe_search::unavailable]}
     set suggestions {}
     foreach match $results {
         lappend suggestions [list M [dict create name [list S [dict get $match name]] \
@@ -252,16 +278,20 @@ proc get_search_page_handler {ctx req} {
     set status 200
     set matches {}
     set message {}
-    if {[catch {::recipe_search::request_query $req} query]} {
+    set language {}
+    if {[catch {
+        set query [::recipe_search::request_query $req]
+        set language [::recipe_search::request_language $req]
+    }]} {
         set status 400
         set query {}
         set message {Use 1–255 letters, numbers, spaces, dots, underscores, plus signs or hyphens.}
     } else {
-        if {[catch {::recipe_search::results $query} matches]} {return [::recipe_search::unavailable]}
+        if {[catch {::recipe_search::results $query 0 $language} matches]} {return [::recipe_search::unavailable]}
     }
     set data [dict create title {S {Search packages}} query [list S $query] \
         is_search {BOOL 1} error [list S $message] result_count [list N [llength $matches]] \
-        packages [::recipe_search::cards $matches]]
+        packages [::recipe_search::cards $matches] language_filter {BOOL 1} language [list S $language]]
     return [::twebserver::build_response $status "text/html; charset=utf-8" \
         [::views::render packages.html.jinja $data]]
 }

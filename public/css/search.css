@@ -64,3 +64,17 @@
     .search-field button span { display: none; }
     .search-examples span { display: block; height: .3rem; font-size: 0; }
 }
+
+.search-controls { display: flex; align-items: stretch; gap: .7rem; }
+.search-controls .search-field { flex: 1; min-width: 0; }
+.language-filter { display: flex; flex-direction: column; justify-content: center; min-width: 10rem; padding: .5rem .8rem; background: #fff; border: 1px solid #cbd5e3; border-radius: 12px; }
+.language-filter label { color: #637c98; font-size: .68rem; margin-bottom: .15rem; }
+.language-filter select { width: 100%; border: 0; background: #fff; color: #203651; font-size: .95rem; padding: .25rem 1rem .25rem 0; cursor: pointer; }
+.language-filter:focus-within { border-color: #3685ce; outline: 3px solid #6dbbff55; }
+@media (max-width: 600px) {
+    .search-controls { flex-wrap: wrap; }
+    .language-filter { min-width: 0; width: 100%; flex-direction: row; justify-content: space-between; align-items: center; gap: 1rem; }
+    .language-filter label { margin: 0; font-size: .8rem; }
+    .language-filter select { width: auto; min-width: 5rem; }
+    .search-controls .search-field { flex-basis: 100%; }
+}
