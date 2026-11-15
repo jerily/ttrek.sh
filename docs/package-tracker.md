@@ -158,6 +158,12 @@ and telemetry rows are not included in lifecycle logs.
 
 ## Deployment
 
+First redeploy `devops/infra/30-deploy-codebuild.sh` to grant the deployment role
+access to the `${LambdaFunctionName}-package-tracker` schedule alongside account
+pruning. CloudFormation needs the schedule-management permissions, including
+`scheduler:GetSchedule`, to deploy it. The patch task itself uses the existing
+Lambda invocation permissions.
+
 1. Deploy the code and scheduler; the five-minute schedule is enabled by default.
 2. Invoke `task_initdb_website` to add fields, indexes and estimated existing dates.
 3. Invoke `task_sync_website` if the packaged registry also needs publication.
