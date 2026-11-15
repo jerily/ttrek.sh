@@ -36,7 +36,7 @@ proc ::site_patch::log {event task {status {}} {elapsed 0}} {
 }
 
 # Schema providers must preserve existing tables and rows on every invocation.
-# Account credential encryption is an explicit, time-limited initialization step.
+# Account data migrations are invoked separately from schema initialization.
 # Importing or replacing website content belongs only to task_sync_website.
 proc ::site_patch::task_initdb_website {context} {
     set initialized {}
@@ -67,10 +67,6 @@ proc ::site_patch::task_initdb_website {context} {
             if {$package eq "tsession::sql"} {lappend args $dialect}
             $command {*}$args
             lappend initialized $command
-        }
-        if {[dict exists [::site::config] account]} {
-            ::accounts::migrate_password_hashes
-            lappend initialized ::accounts::migrate_password_hashes
         }
     }
     return $initialized

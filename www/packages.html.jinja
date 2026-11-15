@@ -10,9 +10,9 @@
         <p>Tools and libraries for whatever you’re building with Tcl.</p>
     </header>
     {% include 'search-form.html.jinja' %}
-    {% if not is_search and tracker.available and tracker.has_entries %}{% include 'package-tracker-bar.html.jinja' %}{% endif %}
+    {% if not is_search and not language and tracker.available and tracker.has_entries %}{% include 'package-tracker-bar.html.jinja' %}{% endif %}
     <div class="results-heading">
-        <h2>{% if is_search %}Results for “{{ query }}”{% else %}All packages{% endif %}</h2>
+        <h2>{% if is_search %}Results for “{{ query }}”{% elif language %}{{ language }} packages{% else %}All packages{% endif %}</h2>
         <span class="result-count">{{ result_count }} packages</span>
     </div>
     {% if error %}

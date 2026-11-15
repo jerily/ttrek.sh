@@ -196,12 +196,14 @@ proc ::telemetry::sync_registry_metadata {args} {
                 ::tjson::parse [read $channel] spec
             } finally {::close $channel}
             if {![::tjson::is_object $spec]} {error "Expected a recipe object in $path"}
-            set tags {}
-            if {[::tjson::has_object_item $spec tags]} {
-                set tags [::registry_metadata::tags [::tjson::to_typed [::tjson::get_object_item $spec tags]] $path]
-            }
             set metadata [::registry_metadata::payload $spec $path]
-            dict set metadata tags [::tjson::typed_to_json [list L [lmap tag $tags {list S $tag}]]]
+            foreach field {tags languages} {
+                set values {}
+                if {[::tjson::has_object_item $spec $field]} {
+                    set values [::registry_metadata::$field [::tjson::to_typed [::tjson::get_object_item $spec $field]] $path]
+                }
+                dict set metadata $field [::tjson::typed_to_json [list L [lmap value $values {list S $value}]]]
+            }
             foreach field {description url license} {
                 if {![::tjson::has_object_item $spec $field]} continue
                 set item [::tjson::get_object_item $spec $field]
@@ -224,7 +226,7 @@ proc ::telemetry::sync_registry_metadata {args} {
         }
         set published_at [clock seconds]
         set existing {}
-        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, license, tags, listed, recipe, patches, published_at}] \
+        set query [db_join [db_select packages -expr {name, version, pkg_id, description, url, license, tags, languages, listed, recipe, patches, published_at}] \
             package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
         foreach row [rows $query] {
             dict set existing [list [dict get $row name] [dict get $row version]] $row
@@ -283,7 +285,7 @@ proc ::telemetry::sync_registry_metadata {args} {
 proc ::telemetry::registry_catalog {args} {
     package require tjson
     if {[llength $args] > 1} {error "Expected an optional list of package names"}
-    set query [db_join [db_select packages -expr {name, version, description, url, license, tags,
+    set query [db_join [db_select packages -expr {name, version, description, url, license, tags, languages,
         published_at, first_published_at, publication_is_update}] \
         package_names -expr {packages.pkg_name_id = package_names.pkg_name_id}]
     set predicate [db_eq [db_col listed] [db_value 1 -type integer]]
@@ -295,6 +297,7 @@ proc ::telemetry::registry_catalog {args} {
     set result {}
     foreach row [rows $query] {
         dict set row tags [::registry_metadata::tags [::tjson::json_to_typed [dict get $row tags]] database]
+        dict set row languages [::registry_metadata::languages [::tjson::json_to_typed [dict get $row languages]] database]
         lappend result $row
     }
     return $result

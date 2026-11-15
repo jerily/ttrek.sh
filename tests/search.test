@@ -68,7 +68,7 @@ test search-5 {Index every version and display the matching description} -body {
     set response [get_search_handler {} {queryStringParameters {q compression}}]
     set matches [::tjson::json_to_simple [dict get $response body]]
     list [dict get $response status] [dict get $response type] $matches
-} -result {200 application/json {{name twebserver description {Compression utilities.} match description tags {} distance 0 coverage 1}}}
+} -result {200 application/json {{name twebserver description {Compression utilities.} match description tags {} languages {} distance 0 coverage 1}}}
 
 test search-6 {Phrase queries and description display for a name substring} -body {
     set response [get_search_handler {} {queryStringParameters {q web}}]

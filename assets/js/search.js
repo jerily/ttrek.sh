@@ -2,6 +2,7 @@ import { throttle } from 'throttle-debounce';
 
 for (const form of document.querySelectorAll('[data-registry-search]')) {
     const input = form.querySelector('input[name="q"]');
+    const language = form.querySelector('select[name="language"]');
     const popup = form.querySelector('.suggestions');
     const list = form.querySelector('[role="listbox"]');
     const status = form.querySelector('[data-search-status]');
@@ -50,7 +51,7 @@ for (const form of document.querySelectorAll('[data-registry-search]')) {
         controller = new AbortController();
         input.setAttribute('aria-busy', 'true');
         try {
-            const response = await fetch(`/registry/autocomplete?q=${encodeURIComponent(query)}`, {
+            const response = await fetch(`/registry/autocomplete?q=${encodeURIComponent(query)}${language?.value ? `&language=${encodeURIComponent(language.value)}` : ''}`, {
                 signal: controller.signal,
                 headers: { Accept: 'application/json' },
             });
@@ -117,6 +118,7 @@ for (const form of document.querySelectorAll('[data-registry-search]')) {
             openPackage(active);
         }
     });
+    language?.addEventListener('change', () => { cancel(); form.requestSubmit(); });
     form.addEventListener('submit', cancel);
     window.addEventListener('pagehide', cancel);
 }

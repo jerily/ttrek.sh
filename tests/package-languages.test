@@ -1,0 +1,72 @@
+# Exercise metadata, exact-version display, filtering, and compatibility together.
+proc language_recipe {name version languages} {
+    set directory [file join $::registry_fixture $name $version]
+    file mkdir $directory
+    writeFile [file join $directory ttrek.json] [::tjson::typed_to_json [list M [dict create \
+        description [list S "Language fixture $version"] license {S MIT} \
+        languages [::views::strings $languages] build {M {default {L {}}}}]]]
+}
+language_recipe language-mixed 1.9.0 {C TCL}
+language_recipe language-mixed 1.10.0 {C++ TCL}
+language_recipe language-mixed 1.10.0-beta.1 {C}
+language_recipe language-native 1.0.0 {C}
+language_recipe language-data 1.0.0 {}
+::telemetry::sync_registry_metadata $registry_fixture
+::telemetry::publish_search_snapshot
+
+test languages-pages {Overview uses the latest release; version pages use their own languages} -body {
+    set overview [body [get_package_page_handler {} {pathParameters {package_name language-mixed}}]]
+    set version [body [get_package_version_page_handler {} {pathParameters {package_name language-mixed package_version 1.9.0}}]]
+    list [contains $overview {Programming Languages}] [contains $overview {<li>C++</li>}] \
+        [contains $version {<li>C</li>}] [contains $version {<li>C++</li>}] \
+        [contains $version {Language fixture 1.9.0}] [contains $version {package-overview-grid}] \
+        [contains $version {This version has no package dependencies.}] [contains $version {aria-current="page"}]
+} -result {1 1 1 0 1 1 1 1}
+
+test languages-api {The CLI receives languages from search and exact-version endpoints} -body {
+    set result [::tjson::json_to_simple [body [get_search_handler {} {queryStringParameters {q language-mixed}}]]]
+    set version [::tjson::json_to_simple [body [get_package_languages_handler {} {pathParameters {package_name language-mixed package_version 1.9.0}}]]]
+    set spec [::tjson::json_to_simple [body [get_package_spec_handler {} {pathParameters {package_name language-mixed package_version 1.10.0 os Linux machine x86_64}}]]]
+    list [dict get [lindex $result 0] languages] $version [dict get $spec languages] \
+        [dict get [get_package_languages_handler {} {pathParameters {package_name language-mixed package_version 0.0.0}}] status]
+} -result {{C++ TCL} {C TCL} {C++ TCL} 404}
+
+test languages-filter {Browsing, searching and autocomplete filter by latest-version languages} -body {
+    set browse [body [get_packages_page_handler {} {queryStringParameters {language C}}]]
+    set search [body [get_packages_page_handler {} {queryStringParameters {q language language C++}}]]
+    set suggestions [::tjson::json_to_simple [body [get_autocomplete_handler {} {queryStringParameters {q language language C++}}]]]
+    list [contains $browse {href="/package/language-native"}] [contains $browse {href="/package/language-mixed"}] \
+        [contains $search {href="/package/language-mixed"}] [contains $search {href="/package/language-native"}] \
+        [contains $search {value="C++" selected}] [lmap item $suggestions {dict get $item name}]
+} -result {1 0 1 0 1 language-mixed}
+
+test languages-filter-raw {Raw query strings preserve C++ and reject repeated filters} -body {
+    set response [get_packages_page_handler {} {queryString {q=language&language=C%2B%2B}}]
+    set invalid [get_packages_page_handler {} {queryString {language=C&language=TCL}}]
+    set repeated [get_packages_page_handler {} {queryString {q=language&q=other}}]
+    list [dict get $response status] [contains [body $response] {value="C++" selected}] \
+        [dict get $invalid status] [dict get $repeated status]
+} -result {200 1 400 400}
+
+test languages-filter-invalid {Invalid and repeated languages are rejected} -body {
+    set results {}
+    foreach handler {get_packages_page_handler get_search_page_handler get_search_handler get_autocomplete_handler} {
+        foreach req {{queryStringParameters {q language language Python}} \
+                     {queryStringParameters {q language} multiValueQueryStringParameters {language {C TCL}}}} {
+            lappend results [dict get [$handler {} $req] status]
+        }
+    }
+    lsort -unique $results
+} -result 400
+
+test languages-optional {Empty language arrays omit badges; Any includes packages without languages} -body {
+    set page [body [get_package_page_handler {} {pathParameters {package_name language-data}}]]
+    set browse [body [get_packages_page_handler {} {}]]
+    set home [body [get_index_page_handler {} {}]]
+    list [contains $page {Programming Languages}] [contains $browse {href="/package/language-data"}] \
+        [contains $browse {value="" selected>Any}] [contains $home {name="language"}]
+} -result {0 1 1 0}
+
+foreach name {language-mixed language-native language-data} {file delete -force [file join $registry_fixture $name]}
+::telemetry::sync_registry_metadata $registry_fixture
+::telemetry::publish_search_snapshot

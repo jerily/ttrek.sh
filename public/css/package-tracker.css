@@ -107,3 +107,9 @@
     .package-hero > .package-icon { display: none; }
     .package-surface { padding: 1.2rem; }
 }
+
+.package-languages { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; padding: 0; margin: .4rem 0 0; }
+.package-languages li { background: #edf3f9; border: 1px solid #dce5ef; border-radius: 6px; color: #375675; padding: .25rem .55rem; font: 600 .75rem monospace; }
+.package-unconditional { color: #657a90; }
+.package-versions a[aria-current="page"] { color: #213851; text-decoration: underline; text-underline-offset: .2em; }
+.package-version-page .package-table-scroll td { overflow-wrap: anywhere; }

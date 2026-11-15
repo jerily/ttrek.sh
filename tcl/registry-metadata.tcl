@@ -8,14 +8,22 @@ namespace eval ::registry_metadata {}
 
 # Tags are optional metadata; callers use an empty list when the field is absent.
 proc ::registry_metadata::tags {typed {path recipe}} {
-    if {[lindex $typed 0] ne "L"} {error "tags must be an array of strings in $path"}
+    string_list tags $typed $path
+}
+
+proc ::registry_metadata::languages {typed {path recipe}} {
+    string_list languages $typed $path
+}
+
+proc ::registry_metadata::string_list {field typed path} {
+    if {[lindex $typed 0] ne "L"} {error "$field must be an array of strings in $path"}
     set result {}
     foreach item [lindex $typed 1] {
         lassign $item type text
-        if {$type ne "S"} {error "tags must be an array of strings in $path"}
+        if {$type ne "S"} {error "$field must be an array of strings in $path"}
         if {$text eq {} || [string length [encoding convertto utf-8 $text]] > 255 ||
             [regexp {[\x00-\x1f\x7f]} $text]} {
-            error "tags must contain nonempty single-line strings of at most 255 bytes in $path"
+            error "$field must contain nonempty single-line strings of at most 255 bytes in $path"
         }
         lappend result $text
     }
@@ -100,4 +108,31 @@ proc ::registry_metadata::payload {spec path} {
     }
     return [dict create recipe [::tjson::typed_to_json [list M $recipe]] \
         patches [::tjson::typed_to_json [list M $patches]]]
+}
+
+# Compare semantic versions numerically; stable releases follow prereleases.
+proc ::registry_metadata::compare_versions {a b} {
+    set pattern {^([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([^+]+))?(?:\+.*)?$}
+    if {![regexp $pattern $a -> ax ay az ap] || ![regexp $pattern $b -> bx by bz bp]} {
+        return [string compare $a $b]
+    }
+    foreach x [list $ax $ay $az] y [list $bx $by $bz] {
+        if {$x != $y} {return [expr {$x < $y ? -1 : 1}]}
+    }
+    if {$ap eq $bp} {return 0}
+    if {$ap eq {}} {return 1}
+    if {$bp eq {}} {return -1}
+    set aa [split $ap .]
+    set bb [split $bp .]
+    foreach x $aa y $bb {
+        if {$x eq $y} continue
+        if {$x eq {}} {return -1}
+        if {$y eq {}} {return 1}
+        set xn [string is digit -strict $x]
+        set yn [string is digit -strict $y]
+        if {$xn && $yn} {return [expr {$x < $y ? -1 : 1}]}
+        if {$xn != $yn} {return [expr {$xn ? -1 : 1}]}
+        return [string compare $x $y]
+    }
+    return 0
 }

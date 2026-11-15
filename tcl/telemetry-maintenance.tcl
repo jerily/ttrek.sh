@@ -137,7 +137,7 @@ proc ::telemetry_maintenance::restore {db path} {
             set row [dict get $record values]
             # Version 1 backups predating registry metadata omitted these fields.
             if {$table eq "packages"} {
-                foreach {field default} {description {} url {} license {} tags {[]} listed 0 recipe {{}} patches {{}}} {
+                foreach {field default} {description {} url {} license {} tags {[]} languages {[]} listed 0 recipe {{}} patches {{}}} {
                     if {![dict exists $row $field]} {dict set row $field $default}
                 }
             }

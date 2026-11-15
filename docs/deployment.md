@@ -712,16 +712,11 @@ browser sessions, MFA and verification/reset codes. It is safe to rerun. Forum
 data is not changed. The task is available in the CodeBuild patch task selector;
 locally use `ttrek run -script migrate-user-ids-local`.
 
-When upgrading to `web-user` 0.4.0, invoke `task_initdb_website` after deployment
-and before reopening account traffic. Through **November 16, 2026, inclusive
-(America/New_York)**, initialization also encrypts existing bcrypt hashes in
-`web_user_users` and pending `web_user_registrations`, one row at a time, using
-the configured tenant's account AEAD key. It preserves passwords, account IDs
-and sessions; already encrypted or non-bcrypt values are left unchanged.
-The upgrade is transactional and safe to repeat, and stops running at midnight
-on November 17. Drain old workers before running it so they cannot write bare
-hashes again. No password reset is needed for migrated accounts; the login path
-accepts only encrypted hashes. Local development uses `ttrek run -script initdb-local`.
+The account password-hash and user-ID migrations have already been deployed.
+`task_initdb_website` initializes schemas without calling either
+`::accounts::migrate_password_hashes` or `::accounts::migrate_user_ids`.
+Their implementations remain available for explicit maintenance; the password
+migration retains its existing November 16, 2026 cutoff (America/New_York).
 
 `{"source":"ttrek.patch","task":"task_publish_search"}` republishes search from
 the stored package tables without importing recipes or content. HTTP request
