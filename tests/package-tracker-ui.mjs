@@ -47,7 +47,7 @@ try {
             if (route === '/packages') {
                 await page.waitForSelector('.tracker-bar.is-enhanced');
                 assert.equal(await page.getByRole('link', { name: 'See top packages →' }).getAttribute('href'), '/packages/tracker');
-                assert.equal(await page.locator('.tracker-panel.is-active .tracker-item:visible').count(), width <= 640 ? 1 : width <= 900 ? 2 : 3);
+                assert.equal(await page.locator('.tracker-panel.is-active .tracker-item:visible').count(), 3);
             }
             if (route === '/package/rising') {
                 await page.waitForFunction(() => window.Chart?.getChart(document.querySelector('canvas'))?.width > 0);
@@ -94,6 +94,31 @@ try {
     assert.equal(await reduced.locator('.tracker-panel.is-active').getAttribute('data-tracker-panel'), 'popular');
     await reduced.close();
 
+    // Swipes switch categories, stop rotation, and leave taps/scroll gestures alone.
+    const touch = await browser.newPage({ viewport: { width: 390, height: 900 }, hasTouch: true });
+    await touch.goto(base + '/packages');
+    const touchCurrent = () => touch.locator('.tracker-panel.is-active').getAttribute('data-tracker-panel');
+    async function swipe(dx, dy = 0, cancel = false) {
+        const surface = touch.locator('.tracker-panels');
+        const pointer = { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: 200, clientY: 100 };
+        await surface.dispatchEvent('pointerdown', pointer);
+        await surface.dispatchEvent(cancel ? 'pointercancel' : 'pointerup', { ...pointer, clientX: 200 + dx, clientY: 100 + dy });
+    }
+    await swipe(-100);
+    assert.equal(await touchCurrent(), 'updated');
+    assert.equal(await touch.locator('[data-tracker-rotation]').textContent(), 'Play');
+    await swipe(100);
+    assert.equal(await touchCurrent(), 'new');
+    await swipe(100);
+    assert.equal(await touchCurrent(), 'trending');
+    for (const gesture of [[-10, 0], [-50, 100], [-100, 0, true]]) {
+        await swipe(...gesture);
+        assert.equal(await touchCurrent(), 'trending');
+    }
+    assert.equal(await touch.locator('.tracker-panel.is-active .tracker-item:visible').count(),
+        await touch.locator('.tracker-panel.is-active .tracker-item').count());
+    await touch.close();
+
     const plain = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 900 } });
     const noJS = await plain.newPage();
     await noJS.goto(base + '/packages');
@@ -127,7 +152,7 @@ try {
     await page.goto(base + '/packages');
     await page.screenshot({ path: path.join(fixtures, 'packages-mobile.png'), fullPage: true });
     assert.deepEqual(errors, []);
-    console.log('PASS tracker layout at 320/390/768/1440px, 5-entry sections, chart, rotation, pause, keyboard, hover, reduced motion, no-JS and stable loading geometry');
+    console.log('PASS tracker layout at 320/390/768/1440px, mobile package list, swipes, 5-entry sections, chart, rotation, pause, keyboard, hover, reduced motion, no-JS and stable loading geometry');
 } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

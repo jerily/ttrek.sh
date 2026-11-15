@@ -141,6 +141,28 @@ def check_homepage(browser, base):
     page.clock.run_for(60000)
     current(0)
 
+    # Swiping is a manual choice; short, vertical and cancelled gestures do not advance.
+    def swipe(dx, dy=0, cancel=False):
+        surface = page.locator('.showcase-slides')
+        pointer = {'pointerId': 1, 'pointerType': 'touch', 'isPrimary': True,
+                   'clientX': 200, 'clientY': 100}
+        surface.dispatch_event('pointerdown', pointer)
+        surface.dispatch_event('pointercancel' if cancel else 'pointerup',
+                               {**pointer, 'clientX': 200 + dx, 'clientY': 100 + dy})
+
+    swipe(-100)
+    current(1)
+    expect(rotation).to_have_text('Play')
+    swipe(100)
+    current(0)
+    swipe(100)
+    current(4)
+    for gesture in ((-10, 0), (-50, 100), (-100, 0, True)):
+        swipe(*gesture)
+        current(4)
+    page.clock.run_for(60000)
+    current(4)
+
     for selector in ('.registry-search input', '.clipboard'):
         start()
         page.locator(selector).focus()

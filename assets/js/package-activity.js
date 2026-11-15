@@ -8,7 +8,7 @@ for (const container of document.querySelectorAll('[data-activity-chart]')) {
             data: {
                 labels: days.map(day => `${day.date}${day.partial ? ' (partial)' : ''}`),
                 datasets: [{
-                    label: 'Unique machines downloading recipes',
+                    label: 'Unique downloads',
                     data: days.map(day => day.available ? day.count : null),
                     backgroundColor: days.map(day => day.partial ? '#a9c6e1' : '#4282ba'),
                     borderRadius: 3,

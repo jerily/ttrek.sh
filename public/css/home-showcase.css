@@ -19,7 +19,7 @@
 .showcase-slide:last-child { border-bottom: 0; }
 /* Overlay all slides in the same grid cell so the tallest reserves its space,
    including enlarged text. Without JS they remain ordinary stacked sections. */
-.home-showcase.is-enhanced .showcase-slides { display: grid; grid-template-columns: minmax(0, 1fr); }
+.home-showcase.is-enhanced .showcase-slides { display: grid; grid-template-columns: minmax(0, 1fr); touch-action: pan-y pinch-zoom; }
 .home-showcase.is-enhanced .showcase-slide { grid-area: 1 / 1; border-bottom: 0; }
 .home-showcase.is-enhanced .showcase-slide[aria-hidden="true"] { visibility: hidden; pointer-events: none; }
 /* Reserve the same layout before the module arrives, even on a cold load.

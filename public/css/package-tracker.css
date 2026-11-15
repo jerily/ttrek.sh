@@ -40,6 +40,7 @@
 .tracker-bar [data-tracker-rotation] { border-color: #ccdbea; min-width: 3.5rem; }
 .tracker-selectors { display: flex; flex-wrap: wrap; gap: .2rem; }
 .tracker-panels { display: grid; }
+.tracker-bar.is-enhanced .tracker-panels { touch-action: pan-y pinch-zoom; }
 .tracker-panel { grid-area: 1 / 1; visibility: hidden; min-width: 0; padding: .8rem 0; }
 .tracker-bar:not(.is-enhanced) .tracker-panel:first-child, .tracker-panel.is-active { visibility: visible; }
 .tracker-panel-label { margin: .4rem 0 .8rem; color: #325878; font-size: .8rem; font-weight: 650; }
@@ -90,8 +91,6 @@
 .tracker-page a:focus-visible, .tracker-bar :focus-visible, .package-page :focus-visible { outline: 3px solid #58aafa; outline-offset: 3px; }
 @media (max-width: 900px) {
     .tracker-bar-heading { align-items: flex-start; }
-    .tracker-highlights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .tracker-item:nth-child(n+3) { display: none; }
     .package-overview-grid { grid-template-columns: minmax(0, 1fr); }
     .package-sidebar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -104,7 +103,6 @@
     .tracker-bar button { font-size: .7rem; }
     .tracker-panel-label span { display: block; margin: .2rem 0 0; }
     .tracker-highlights { grid-template-columns: minmax(0, 1fr); }
-    .tracker-item:nth-child(n+2) { display: none; }
     .package-hero { gap: .7rem; }
     .package-hero > .package-icon { display: none; }
     .package-surface { padding: 1.2rem; }

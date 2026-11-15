@@ -3,19 +3,19 @@
         <div class="tracker-bar-controls" inert>
             <button type="button" data-tracker-rotation>Pause</button>
             <div class="tracker-selectors" role="group" aria-label="Choose a measure">
-                {% for section in tracker.sections %}<button type="button" data-tracker-select="{{ section.id }}" aria-pressed="false">{{ section.title }}</button>{% endfor %}
+                {% for section in tracker.sections if section.rows %}<button type="button" data-tracker-select="{{ section.id }}" aria-pressed="false">{{ section.title }}</button>{% endfor %}
             </div>
         </div>
     </div>
     <div class="tracker-panels">
-        {% for section in tracker.sections %}
-        <div class="tracker-panel" data-tracker-panel="{{ section.id }}" data-has-rows="{% if section.rows %}yes{% else %}no{% endif %}"{% if not loop.first %} aria-hidden="true" inert{% endif %}>
+        {% for section in tracker.sections if section.rows %}
+        <div class="tracker-panel" data-tracker-panel="{{ section.id }}"{% if not loop.first %} aria-hidden="true" inert{% endif %}>
             <p class="tracker-panel-label">{{ section.title }} <span>{{ section.period }}</span></p>
-            {% if section.rows %}<div class="tracker-highlights">
+            <div class="tracker-highlights">
                 {% for package in section.rows %}{% if loop.index <= 3 %}
                 <div class="tracker-item"><a href="/package/{{ package.name|urlencode }}">{{ package.name }}</a><span>{{ package.metric }}</span></div>
                 {% endif %}{% endfor %}
-            </div>{% else %}<p class="tracker-bar-empty">{{ section.empty }}</p>{% endif %}
+            </div>
         </div>
         {% endfor %}
     </div>

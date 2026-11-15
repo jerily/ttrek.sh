@@ -1,3 +1,5 @@
+import { onSwipe } from './swipe.js';
+
 // Server-rendered sections work without JavaScript. Enhance only this component;
 // search and clipboard keep their own event handlers and keyboard behavior.
 for (const carousel of document.querySelectorAll('.home-showcase')) {
@@ -108,6 +110,7 @@ for (const carousel of document.querySelectorAll('.home-showcase')) {
             choose(destinations[event.key], true);
         });
     });
+    if (slides.length > 1) onSwipe(carousel.querySelector('.showcase-slides'), direction => choose(current + direction));
     // Pointer focus stops rotation before click fires. Remember the action the
     // visitor actually pressed so a Pause click cannot accidentally restart it.
     rotation.addEventListener('pointerdown', () => { pendingPointerAction = requested ? 'pause' : 'play'; });
