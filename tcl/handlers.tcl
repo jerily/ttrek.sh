@@ -212,13 +212,23 @@ proc get_index_page_handler {ctx req} {
 
 # Return packages page handler for the caller.
 proc get_packages_page_handler {ctx req} {
+    set queries [::recipe_search::request_values $req q]
+    if {[llength $queries] > 1 || [string trim [lindex $queries 0]] ne {}} {
+        return [get_search_page_handler $ctx $req]
+    }
+    if {[catch {::recipe_search::request_language $req} language]} {
+        return [::twebserver::build_response 400 text/plain "Choose Any, C, C++ or TCL."]
+    }
     if {[catch {::recipe_search::catalog_entries [::recipe_search::database registry_catalog]} catalog]} {
         return [::recipe_search::unavailable]
     }
-    set packages [dict values $catalog]
+    set packages {}
+    dict for {name package} $catalog {
+        if {$language eq {} || $language in [dict get $package languages]} {lappend packages $package}
+    }
     set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
         result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}} \
-        tracker [::package_tracker::view $catalog]]
+        tracker [::package_tracker::view $catalog] language_filter {BOOL 1} language [list S $language]]
     set html [::views::render packages.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]
     return $res
@@ -292,6 +302,17 @@ proc compute_iuse_flags {spec_handle} {
     return $iuse_unique
 }
 
+# Lightweight display metadata, without recording a build-recipe download.
+proc get_package_languages_handler {ctx req} {
+    set name [::twebserver::get_path_param $req package_name]
+    set version [::twebserver::get_path_param $req package_version]
+    if {[catch {
+        set rows [::telemetry::rows [::telemetry::registry_query {languages} $name $version]]
+    }]} {return [::recipe_search::unavailable]}
+    if {![llength $rows]} {return [::twebserver::build_response 404 text/plain "not found"]}
+    return [::twebserver::build_response 200 application/json [dict get [lindex $rows 0] languages]]
+}
+
 # Return package spec handler for the caller.
 proc get_package_spec_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
@@ -311,6 +332,10 @@ proc get_package_spec_handler {ctx req} {
     ::tjson::parse [dict get $stored recipe] spec_handle
     set deps_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle dependencies]]
     set scripts_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle scripts]]
+    set languages {}
+    if {[::tjson::has_object_item $spec_handle languages]} {
+        set languages [::registry_metadata::languages [::tjson::to_typed [::tjson::get_object_item $spec_handle languages]]]
+    }
 
     set spec_build_handle [::tjson::get_object_item $spec_handle build]
     set platform [string tolower "$os.$machine"]
@@ -340,6 +365,7 @@ proc get_package_spec_handler {ctx req} {
                 iuse [list L $iuse_typed] \
                 dependencies $deps_typed \
                 scripts $scripts_typed \
+                languages [::views::strings $languages] \
                 install_script $spec_build_typed]] \
         result_handle
 
@@ -360,19 +386,7 @@ proc get_package_spec_handler {ctx req} {
 
 # Order package versions for registry presentation.
 proc compare_versions {a b} {
-    set a_parts [split $a .]
-    set b_parts [split $b .]
-    set len [expr {[llength $a_parts] < [llength $b_parts] ? [llength $a_parts] : [llength $b_parts]}]
-    for {set i 0} {$i < $len} {incr i} {
-        set a_part [lindex $a_parts $i]
-        set b_part [lindex $b_parts $i]
-        if {$a_part < $b_part} {
-            return -1
-        } elseif {$a_part > $b_part} {
-            return 1
-        }
-    }
-    return 0
+    ::registry_metadata::compare_versions $a $b
 }
 
 # Return package page handler for the caller.
@@ -419,6 +433,7 @@ proc get_package_page_handler {ctx req} {
         package_name [list S $package_name] \
         description [list S $description] \
         tags [::views::strings $tags] \
+        languages [::views::strings [dict get $latest languages]] \
         project_url [list S $project_url] \
         license [list S [string trim [dict get $latest license]]] \
         versions [::views::strings $versions] \
@@ -440,12 +455,21 @@ proc get_package_version_page_handler {ctx req} {
     set package_version [::twebserver::get_path_param $req package_version]
     telemetry_event_common req_pkg_version_get -pkg_name $package_name -pkg_version $package_version
 
-    if {[catch {::telemetry::registry_recipe $package_name $package_version} stored]} {
+    if {[catch {
+        set stored [::telemetry::registry_recipe $package_name $package_version]
+        set catalog [::recipe_search::catalog_entries [::telemetry::registry_catalog [list $package_name]]]
+    }]} {
         return [::recipe_search::unavailable]
     }
     if {$stored eq {}} {
         return [::twebserver::build_response 404 text/plain "not found"]
     }
+    set metadata [dict get $catalog $package_name versions]
+    set row [dict get $metadata $package_version]
+    set versions [lsort -command compare_versions -decreasing [dict keys $metadata]]
+    set project_url {}
+    set candidate [string trim [dict get $row url]]
+    if {[regexp -nocase {^https?://[^/[:space:]?#]+[^[:space:]]*$} $candidate]} {set project_url $candidate}
     ::tjson::parse [dict get $stored recipe] spec_handle
     set deps_handle [::tjson::get_object_item $spec_handle dependencies]
     set deps_size [::tjson::size $deps_handle]
@@ -470,6 +494,14 @@ proc get_package_version_page_handler {ctx req} {
         title [list S "Package Version: $package_name@$package_version"] \
         package_name [list S $package_name] \
         package_version [list S $package_version] \
+        description [list S [dict get $row description]] \
+        tags [::views::strings [dict get $row tags]] \
+        languages [::views::strings [dict get $row languages]] \
+        license [list S [dict get $row license]] \
+        project_url [list S $project_url] \
+        publication_date [list S [::package_tracker::date [dict get $row published_at]]] \
+        versions [::views::strings $versions] \
+        latest_version [list S [lindex $versions 0]] \
         deps [list L $deps] \
         download_platforms [::views::download_stats [get_package_download_stats $package_name $package_version]] \
         stat_platforms [::views::platform_stats $stat_platforms]]

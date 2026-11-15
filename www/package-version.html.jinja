@@ -1,60 +1,63 @@
-
 {% extends 'master.html.jinja' %}
+{% block body_class %}registry-page package-page package-version-page{% endblock %}
 {% block home_selected %}{% endblock %}
 {% block packages_selected %} pure-menu-selected{% endblock %}
 {% block content %}
 {% include 'bashline.html.jinja' %}
-    <main class="site-main">
-        <div class="content">
-            <h2 class="content-head is-center text-normal">{{ package_name }}@{{ package_version }}</h2>
-            <p class="content-subhead">Install:</p>
-            {{ bashline("ttrek install " ~ package_name ~ "@" ~ package_version) }}
-            {% if deps %}
-                <p class="content-subhead">Dependencies:</p>
-                <table class="pure-table" style="border: 1px solid black; border-spacing: 20px 5px;">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Version Range</th>
-                            <th>Condition</th>
-                        </tr>
-                      </thead>
-                    <tbody>
-                        {% for dep in deps %}
-                            <tr>
-                                <td><a href="/package/{{ dep.name|urlencode }}">{{ dep.name }}</a></td>
-                                <td>{{ dep.version }}</td>
-                                <td>{{ dep.condition }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% endif %}
-
+<main class="site-main registry-main">
+    <a class="package-back" href="/package/{{ package_name|urlencode }}">← {{ package_name }} overview</a>
+    <header class="package-hero">
+        <div class="package-icon" aria-hidden="true">{ }</div>
+        <div><p class="eyebrow">PACKAGE VERSION</p>
+            <h1>{{ package_name }} <span class="version-badge">{{ package_version }}</span></h1>
+            {% if description %}<p class="package-description">{{ description }}</p>{% endif %}
+            {% if tags %}<ul class="package-tags" aria-label="Tags">{% for tag in tags %}<li><a href="/search?q={{ tag|urlencode }}">{{ tag }}</a></li>{% endfor %}</ul>{% endif %}
+        </div>
+    </header>
+    <div class="package-overview-grid">
+        <div class="package-primary">
+            <section class="package-surface package-install"><h2>Install this version</h2><p>Add version {{ package_version }} to your project.</p>{{ bashline("ttrek install " ~ package_name ~ "@" ~ package_version) }}</section>
+            <section class="package-surface" aria-labelledby="dependencies-heading">
+                <div class="package-section-heading"><h2 id="dependencies-heading">Dependencies</h2><span class="period-badge">{{ deps|length }} packages</span></div>
+                {% if deps %}
+                <p class="activity-caption">Required packages and their version constraints.</p>
+                <div class="package-table-scroll"><table class="pure-table">
+                    <thead><tr><th scope="col">Package</th><th scope="col">Version range</th><th scope="col">Condition</th></tr></thead>
+                    <tbody>{% for dep in deps %}<tr>
+                        <td><a href="/package/{{ dep.name|urlencode }}">{{ dep.name }}</a></td>
+                        <td>{{ dep.version }}</td><td>{% if dep.condition %}{{ dep.condition }}{% else %}<span class="package-unconditional">Always</span>{% endif %}</td>
+                    </tr>{% endfor %}</tbody>
+                </table></div>
+                {% else %}<p class="activity-caption">This version has no package dependencies.</p>{% endif %}
+            </section>
             {% if download_platforms %}
-                <p class="content-subhead">Recipe downloads by platform (all time):</p>
-                <p>Recorded recipe requests for this version, including dependencies, repeat downloads, and requests without a machine ID.</p>
-                <table class="pure-table">
-                    <thead><tr><th scope="col">OS / architecture</th><th scope="col">Downloads</th></tr></thead>
-                    <tbody>{% for row in download_platforms %}<tr><td>{{ row[0] }}</td><td>{{ row[1] }}</td></tr>{% endfor %}</tbody>
-                </table>
+            <section class="package-surface"><div class="package-section-heading"><h2>Recipe downloads by platform</h2><span class="period-badge">All time</span></div><p class="activity-caption">Recipe downloads for this version, including repeat downloads.</p>
+                <div class="package-table-scroll"><table class="pure-table"><thead><tr><th scope="col">OS / architecture</th><th scope="col">Downloads</th></tr></thead><tbody>
+                {% for row in download_platforms %}<tr><td>{{ row[0] }}</td><td>{{ row[1] }}</td></tr>{% endfor %}
+                </tbody></table></div>
+            </section>
             {% endif %}
             {% if stat_platforms %}
-                <p class="content-subhead">Statistics (installations):</p>
-                <table class="pure-table">
-                    <thead><tr><th>Platform</th><th>Total</th><th>Success</th><th>Failure</th></tr></thead>
-                    <tbody>
-                        {% for stat_platform in stat_platforms %}
-                            <tr>
-                                <td>{{ stat_platform[0] }}</td>
-                                <td>{{ stat_platform[1] }}</td>
-                                <td>{{ stat_platform[2] }}</td>
-                                <td>{{ stat_platform[3] }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <section class="package-surface"><div class="package-section-heading"><h2>Installation reports by platform</h2><span class="period-badge">All time</span></div><p class="activity-caption">Reported installation outcomes for this version.</p>
+                <div class="package-table-scroll"><table class="pure-table"><thead><tr><th scope="col">Platform</th><th scope="col">Total</th><th scope="col">Success</th><th scope="col">Failure</th></tr></thead><tbody>
+                {% for row in stat_platforms %}<tr><td>{{ row[0] }}</td><td>{{ row[1] }}</td><td>{{ row[2] }}</td><td>{{ row[3] }}</td></tr>{% endfor %}
+                </tbody></table></div>
+            </section>
             {% endif %}
         </div>
-    </main>
+        <aside class="package-sidebar">
+            <section class="package-surface"><h2>Version details</h2><dl class="package-details">
+                <dt>Version</dt><dd>{{ package_version }}{% if package_version == latest_version %} <span class="latest-label">Latest</span>{% endif %}</dd>
+                {% if project_url %}<dt>Project</dt><dd><a href="{{ project_url }}">{{ project_url }}</a></dd>{% endif %}
+                {% if license %}<dt>License</dt><dd>{{ license }}</dd>{% endif %}
+                {% if languages %}<dt>Programming Languages</dt><dd><ul class="package-languages">{% for language in languages %}<li>{{ language }}</li>{% endfor %}</ul></dd>{% endif %}
+                {% if publication_date %}<dt>Registry inclusion</dt><dd>{{ publication_date }}</dd>{% endif %}
+            </dl></section>
+            {% if versions %}<section class="package-surface"><h2>Versions</h2><ul class="package-versions">
+                {% for version in versions %}<li><a href="/package/{{ package_name|urlencode }}/{{ version|urlencode }}"{% if version == package_version %} aria-current="page"{% endif %}>{{ version }}</a>{% if version == latest_version %}<span class="latest-label">Latest</span>{% endif %}{% if version == package_version %}<span class="version-date">Viewing</span>{% endif %}</li>{% endfor %}
+            </ul></section>{% endif %}
+        </aside>
+    </div>
+</main>
 {% endblock %}
+{% block scripts %}<script type="module" src="{{ asset_urls['/js/site.js'] }}"></script>{% endblock %}

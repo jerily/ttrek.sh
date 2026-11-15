@@ -448,6 +448,8 @@ test handlers-tags-optional {Missing and empty tags keep overview and listing us
     ::telemetry::publish_search_snapshot
 } -result {200 0 200 0 200 0 200 0}
 
+source [file join $root tests package-languages.test]
+
 test handlers-database-catalog {Every package page and API works without recipe files} -setup {
     ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
         [dict create description {Stored overview} tags {["json"]} url https://example.org/stored license MIT]]

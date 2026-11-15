@@ -30,7 +30,7 @@ and Trending rankings at `/packages/tracker`, with a summary on `/packages`.
 
 The manual `task_sync_website` invocation (`sync-local` for the local Lambda)
 imports the bundled registry into the telemetry `packages` table. It stores
-`description`, `url`, `license`, JSON `tags`, the complete recipe JSON with resolved
+`description`, `url`, `license`, JSON `tags` and `languages`, the complete recipe JSON with resolved
 scripts, and base64 patch bytes per version. Dependencies, conditional USE flags
 and platform-specific build instructions remain in the stored recipe.
 Package names are stored in `package_names`.
@@ -88,7 +88,7 @@ Static Tcl extensions are intended for embedding, not `package require` loading.
 
 ## Recipe search
 
-`GET /registry/search?q=web` returns JSON objects with `name`, `description`, `tags`, and
+`GET /registry/search?q=web` returns JSON objects with `name`, `description`, `tags`, `languages`, and
 `match`. Ranking: exact name, prefix, substring, literal description, literal tag,
 name typo, description typo, tag typo. Ties prefer fewer edits, greater query-trigram coverage, less
 unmatched name text, then name. `distance` is omitted for prefix/substring name
@@ -174,3 +174,13 @@ are represented as an empty object. Script bodies remain JSON strings; the
 website does not execute them. The CLI saves them with the installed package
 for offline `ttrek run -package PACKAGE -script NAME` and
 `ttrek scripts -package PACKAGE ls|describe` commands.
+
+Programming languages use the latest version on package overviews, search results,
+and the `/packages` language filter (`Any`, `C`, `C++`, or `TCL`). Version pages
+show the selected version's metadata. Missing or empty arrays have no label.
+`GET /registry/NAME/VERSION/languages` returns an array without counting a recipe
+download; build recipe responses also include `languages`. Search and autocomplete
+accept an optional `language` filter, for example `language=C%2B%2B`.
+
+After deploying this schema change, run `task_initdb_website` and then
+`task_sync_website` to import the registry language arrays into the catalog.
