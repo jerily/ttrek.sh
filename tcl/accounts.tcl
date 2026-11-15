@@ -46,7 +46,7 @@ proc ::accounts::mount {router settings templates} {
     variable store
     variable mount
     variable handles
-    package require web-user 0.3.0
+    package require web-user 0.4.0
     foreach handle $handles {::tink::unregister_keyset $handle}
     set handles {}
     set config [dict get $settings account]
