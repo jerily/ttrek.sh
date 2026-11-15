@@ -340,9 +340,9 @@ proc ::package_tracker::sections {snapshot catalog} {
                 if {$id in {new updated}} {
                     set metric [date [dict get $row timestamp]]
                 } elseif {$id eq "popular"} {
-                    set metric "[dict get $row count] unique machines"
+                    set metric "[dict get $row count] unique downloads"
                 } else {
-                    set metric [format {+%.0f%% · %s → %s machines} [dict get $row growth] [dict get $row previous] [dict get $row current]]
+                    set metric [format {+%.0f%% · %s → %s unique downloads} [dict get $row growth] [dict get $row previous] [dict get $row current]]
                 }
                 dict set row metric $metric
                 lappend rows $row

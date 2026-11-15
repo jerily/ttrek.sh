@@ -285,6 +285,22 @@ test tracker-render {Tracker, widget and overview render real data and filter wi
     }
 } -result {1 1 1 1 1}
 
+test tracker-populated-tabs {Only populated categories get tabs and the first populated panel is usable without JavaScript} -constraints valkey -body {
+    set partial $snapshot
+    foreach category {new updated} {dict set partial rankings $category {}}
+    ::package_tracker::publish $partial fixture
+    set bar [dict get [get_packages_page_handler {} {}] body]
+    set page [dict get [get_package_tracker_page_handler {} {}] body]
+    regexp {<nav class="tracker-jump"[^>]*>(.*?)</nav>} $page -> navigation
+    list [regexp -all {data-tracker-select=} $bar] [regexp -all {data-tracker-panel=} $bar] \
+        [expr {[string first {data-tracker-select="new"} $bar] < 0}] \
+        [expr {[string first {data-tracker-select="updated"} $bar] < 0}] \
+        [expr {[string first {data-tracker-panel="popular">} $bar] >= 0}] \
+        [expr {[string first {data-tracker-panel="trending" aria-hidden="true" inert} $bar] >= 0}] \
+        [expr {[string first {href="#new"} $navigation] < 0 && [string first {href="#updated"} $navigation] < 0}] \
+        [expr {[string first {href="#popular"} $navigation] >= 0 && [string first {href="#trending"} $navigation] >= 0}]
+} -cleanup {::package_tracker::publish $snapshot fixture} -result {2 2 1 1 1 1 1 1}
+
 test tracker-task {The private task dispatcher exposes manual refresh} -constraints valkey -body {
     ::package_tracker::cache DEL ttrek:package-tracker:v2:lock
     set response [::tjson::json_to_simple [::site_patch::run task_refresh_package_tracker {}]]

@@ -19,22 +19,22 @@
             {% if activity.available %}
             <section class="package-surface package-activity" aria-labelledby="activity-heading">
                 <div class="package-section-heading"><h2 id="activity-heading">Recipe download activity</h2><span class="period-badge">Last 30 days</span></div>
-                    <p class="activity-total"><strong>{{ activity.total }}</strong> unique machines</p>
-                    <p class="activity-caption">Machines that downloaded recipes for currently listed versions, including dependencies. Each machine counts once across versions and repeat downloads. Requests without a machine ID are excluded.</p>
+                    <p class="activity-total"><strong>{{ activity.total }}</strong> unique downloads</p>
+                    <p class="activity-caption">Recipe downloads across currently listed versions.</p>
                     {% if activity.chart_ready %}
-                    <div class="activity-chart" hidden data-activity-chart data-activity="{{ activity_json }}"><canvas role="img" aria-label="Daily unique machines downloading recipes over the last 30 days; exact values are in the table below."></canvas></div>
+                    <div class="activity-chart" hidden data-activity-chart data-activity="{{ activity_json }}"><canvas role="img" aria-label="Daily unique downloads over the last 30 days. Values are in the table below."></canvas></div>
                     <details class="activity-data"><summary>Daily unique recipe downloads</summary>
-                        <div class="package-table-scroll"><table class="pure-table"><caption>UTC days. A machine can appear on multiple days, so daily counts may sum to more than the period total. The first and last days may be partial.</caption><thead><tr><th scope="col">Date</th><th scope="col">Unique machines</th></tr></thead><tbody>
+                        <div class="package-table-scroll"><table class="pure-table"><caption>Daily counts use UTC.</caption><thead><tr><th scope="col">Date</th><th scope="col">Unique downloads</th></tr></thead><tbody>
                         {% for day in activity.days %}<tr><td>{{ day.date }}{% if day.partial %} (partial){% endif %}</td><td>{% if day.available %}{{ day.count }}{% else %}History unavailable{% endif %}</td></tr>{% endfor %}
                         </tbody></table></div>
                     </details>
-                    {% else %}<p class="activity-quiet">A daily chart appears after downloads from at least 10 unique machines across three active days.</p>{% endif %}
+                    {% else %}<p class="activity-quiet">A daily chart will appear as download activity grows.</p>{% endif %}
                     <p class="tracker-freshness{% if activity.stale %} is-delayed{% endif %}">{% if activity.stale %}Refresh delayed. {% endif %}{{ activity.window_start }} – {{ activity.updated }}.</p>
                 <a class="tracker-version-link" href="/packages/tracker">See top packages →</a>
             </section>
             {% endif %}
             {% if download_platforms %}
-            <section class="package-surface"><div class="package-section-heading"><h2>Recipe downloads by platform</h2><span class="period-badge">All time</span></div><p class="activity-caption">Recorded recipe requests across all versions, including dependencies, repeat downloads, and requests without a machine ID. These are not completed installations.</p>
+            <section class="package-surface"><div class="package-section-heading"><h2>Recipe downloads by platform</h2><span class="period-badge">All time</span></div><p class="activity-caption">Recipe downloads across all versions, including repeat downloads.</p>
                 <div class="package-table-scroll"><table class="pure-table"><thead><tr><th scope="col">OS / architecture</th><th scope="col">Downloads</th></tr></thead><tbody>
                 {% for row in download_platforms %}<tr><td>{{ row[0] }}</td><td>{{ row[1] }}</td></tr>{% endfor %}
                 </tbody></table></div>
