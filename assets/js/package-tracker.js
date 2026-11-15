@@ -1,12 +1,14 @@
+import { onSwipe } from './swipe.js';
+
 for (const bar of document.querySelectorAll('[data-tracker-bar]')) {
     const panels = [...bar.querySelectorAll('[data-tracker-panel]')];
     const selectors = [...bar.querySelectorAll('[data-tracker-select]')];
+    if (!panels.length || panels.length !== selectors.length) continue;
     const rotation = bar.querySelector('[data-tracker-rotation]');
     const status = bar.querySelector('[data-tracker-status]');
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const active = panels.map((panel, i) => panel.dataset.hasRows === 'yes' ? i : -1).filter(i => i >= 0);
     let current = 0;
-    let playing = !motion.matches && active.length > 1;
+    let playing = !motion.matches && panels.length > 1;
     let timer;
     let hovered = false;
     let visible = false;
@@ -14,10 +16,9 @@ for (const bar of document.querySelectorAll('[data-tracker-bar]')) {
     function schedule() {
         clearTimeout(timer);
         rotation.textContent = playing ? 'Pause' : 'Play';
-        if (!playing || hovered || !visible || document.hidden || motion.matches || active.length < 2) return;
+        if (!playing || hovered || !visible || document.hidden || motion.matches || panels.length < 2) return;
         timer = setTimeout(() => {
-            const next = active[(active.indexOf(current) + 1) % active.length];
-            show(next);
+            show((current + 1) % panels.length);
             schedule();
         }, 8000);
     }
@@ -42,6 +43,10 @@ for (const bar of document.querySelectorAll('[data-tracker-bar]')) {
             stop(); show(next, true); selectors[next].focus();
         });
     });
+    if (panels.length > 1) onSwipe(bar.querySelector('.tracker-panels'), direction => {
+        stop();
+        show((current + direction + panels.length) % panels.length, true);
+    });
     rotation.addEventListener('pointerdown', () => { pointerAction = playing ? 'pause' : 'play'; });
     rotation.addEventListener('pointercancel', () => { pointerAction = null; });
     rotation.addEventListener('keydown', () => { pointerAction = null; });
@@ -57,7 +62,7 @@ for (const bar of document.querySelectorAll('[data-tracker-bar]')) {
     bar.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') { hovered = true; schedule(); } });
     bar.addEventListener('pointerleave', event => { if (event.pointerType === 'mouse') { hovered = false; schedule(); } });
     motion.addEventListener('change', () => {
-        rotation.hidden = active.length < 2 || motion.matches;
+        rotation.hidden = panels.length < 2 || motion.matches;
         if (motion.matches) stop();
     });
     document.addEventListener('visibilitychange', schedule);
@@ -71,7 +76,7 @@ for (const bar of document.querySelectorAll('[data-tracker-bar]')) {
     } else { playing = false; }
     bar.classList.add('is-enhanced');
     bar.querySelector('.tracker-bar-controls').inert = false;
-    rotation.hidden = active.length < 2 || motion.matches;
+    rotation.hidden = panels.length < 2 || motion.matches;
     show(0);
     schedule();
 }

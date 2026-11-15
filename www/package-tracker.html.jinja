@@ -11,9 +11,9 @@
         <p>New arrivals, fresh releases, and the packages people are downloading.</p>
         {% if tracker.available %}<p class="tracker-freshness{% if tracker.stale %} is-delayed{% endif %}">{% if tracker.stale %}Refresh delayed. {% endif %}Updated {{ tracker.updated }} · Refreshes every 5 minutes.</p>{% endif %}
     </header>
-    <nav class="tracker-jump" aria-label="Tracker measures">
-        {% for section in tracker.sections %}<a href="#{{ section.id }}">{{ section.title }}</a>{% endfor %}
-    </nav>
+    {% if tracker.has_entries %}<nav class="tracker-jump" aria-label="Tracker measures">
+        {% for section in tracker.sections if section.rows %}<a href="#{{ section.id }}">{{ section.title }}</a>{% endfor %}
+    </nav>{% endif %}
     <div class="tracker-grid">
         <div class="tracker-column">
         {% for section in tracker.sections %}
@@ -39,8 +39,8 @@
         <summary>How these measures work</summary>
         <p>New records a package’s first public registry inclusion. Recently Updated records a new version of an existing package; editing a recipe or republishing the same version does not count. Both cover the last 30 days. Each category shows up to 5 packages.</p>
         <p>Missing historical publication dates were initialized to November 15, 2026. Future publications are recorded when registry synchronization makes them available.</p>
-        <p>Popular counts unique machines downloading recipes in the last 30 days, including dependencies. Each machine counts once per package across currently listed versions, architectures, and repeat requests. Requests without a registered machine ID are excluded from unique counts. Downloads do not establish successful installations or unique people.</p>
-        <p>Trending compares unique machines in two consecutive 7-day windows at the same refresh cutoff. It requires at least {{ tracker.thresholds.min_current }} machines in the recent week, {{ tracker.thresholds.min_previous }} in the preceding week, {{ tracker.thresholds.min_delta }} additional machines, and {{ tracker.thresholds.min_growth }}% growth. Each machine counts once in each window, even if its environment registration changes. Rankings sort by percentage growth, then additional machines.</p>
+        <p>Popular ranks packages by unique downloads in the last 30 days across currently listed versions, including dependencies.</p>
+        <p>Trending compares unique downloads in the last 7 days with the preceding 7 days. It requires at least {{ tracker.thresholds.min_current }} downloads in the recent week, {{ tracker.thresholds.min_previous }} in the preceding week, {{ tracker.thresholds.min_delta }} additional downloads, and {{ tracker.thresholds.min_growth }}% growth. Rankings sort by percentage growth, then additional downloads.</p>
         <p>Comparisons begin once stored recipe-request history reaches back at least 14 days. A missing baseline does not produce an infinite growth percentage. Dates and chart days use UTC. {% if tracker.since %}The earliest stored recipe request is {{ tracker.since }}.{% endif %}</p>
     </details>
 </main>
