@@ -84,6 +84,7 @@ test local-patch-maintenance-scripts {The local tracker and pruning scripts invo
     set results {}
     foreach {script task} {
         refresh-package-tracker-local task_refresh_package_tracker
+        sync-access-local task_sync_access
         prune-accounts-local task_prune_accounts
         prune-accounts task_prune_accounts
     } {
@@ -94,9 +95,9 @@ test local-patch-maintenance-scripts {The local tracker and pruning scripts invo
         lappend results [expr {[dict get $definition file] eq "bin/invoke-patch-local.sh" && [dict get $payload task] eq $task}]
     }
     set results
-} -result {1 1 1}
+} -result {1 1 1 1}
 
-test local-patch-bootstrap {Bootstrap runs the three existing tasks in order through the configured local endpoint} -setup {
+test local-patch-bootstrap {Bootstrap runs schema, access, content and tracker tasks in order through the configured local endpoint} -setup {
     reset_response
     set bootstrap_tasks {}
 } -body {
@@ -106,18 +107,18 @@ test local-patch-bootstrap {Bootstrap runs the three existing tasks in order thr
     list [dict get $definition file] $bootstrap_tasks \
         [lmap response [split $result \n] {dict get [::tjson::json_to_simple $response] task}] \
         [lindex $invocation 1] $destroyed
-} -cleanup {unset bootstrap_tasks} -result {bin/invoke-patch-local.sh {task_initdb_website task_sync_website task_refresh_package_tracker} {task_initdb_website task_sync_website task_refresh_package_tracker} http://127.0.0.1:3101/2015-03-31/functions/prod-Api-TtrekWebsite-Function/invocations 3}
+} -cleanup {unset bootstrap_tasks} -result {bin/invoke-patch-local.sh {task_initdb_website task_sync_access task_sync_website task_refresh_package_tracker} {task_initdb_website task_sync_access task_sync_website task_refresh_package_tracker} http://127.0.0.1:3101/2015-03-31/functions/prod-Api-TtrekWebsite-Function/invocations 4}
 
 test local-patch-bootstrap-failure {A failed bootstrap step prevents subsequent tasks from running} -body {
     set results {}
-    foreach bootstrap_failure {task_initdb_website task_sync_website task_refresh_package_tracker} {
+    foreach bootstrap_failure {task_initdb_website task_sync_access task_sync_website task_refresh_package_tracker} {
         reset_response
         set bootstrap_tasks {}
         set failed [catch {::local_patch::main $root {bootstrap-local}} message]
         lappend results [list $failed $bootstrap_tasks $destroyed [string match {Local Lambda task failed:*} $message]]
     }
     set results
-} -cleanup {unset bootstrap_tasks bootstrap_failure} -result {{1 task_initdb_website 1 1} {1 {task_initdb_website task_sync_website} 2 1} {1 {task_initdb_website task_sync_website task_refresh_package_tracker} 3 1}}
+} -cleanup {unset bootstrap_tasks bootstrap_failure} -result {{1 task_initdb_website 1 1} {1 {task_initdb_website task_sync_access} 2 1} {1 {task_initdb_website task_sync_access task_sync_website} 3 1} {1 {task_initdb_website task_sync_access task_sync_website task_refresh_package_tracker} 4 1}}
 
 rename ::trequests::request {}
 rename ::trequests::real_request ::trequests::request

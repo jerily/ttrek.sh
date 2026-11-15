@@ -355,6 +355,7 @@ proc ::app_config::content_images {config root} {
 
 # Separate account policy, delivery and persistent worker keys from site settings.
 proc ::app_config::account {config root {localDirectory {}}} {
+    package require web-user 0.5.0
     if {![llength [info commands ::accounts::local_keys]]} {source [file join $root tcl accounts.tcl]}
     set input {}
     if {[dict exists $config account]} {set input [dict get $config account]}
@@ -390,5 +391,23 @@ proc ::app_config::account {config root {localDirectory {}}} {
             error "Set account.$name in private configuration (SSM: /ttrek_sh/prod/account/$name)"
         }
     }
-    dict create policy $policy display $display keys $keys
+    set groups {admin {} moderator {}}
+    set permissions {admin forum.moderate moderator forum.moderate}
+    if {[dict exists $config groups]} {set groups [dict merge $groups [dict get $config groups]]}
+    if {[dict exists $config permissions]} {set permissions [dict merge $permissions [dict get $config permissions]]}
+    ::web::user::access_config $groups $permissions
+    dict create policy $policy display $display keys $keys access [dict create groups $groups permissions $permissions]
+}
+
+proc ::app_config::forum {config} {
+    set defaults {title {Community discussions} moderation false posting_captcha false page_size 20}
+    if {[dict exists $config forum]} {
+        dict for {name value} [dict get $config forum] {
+            if {$name ni {title moderation posting_captcha page_size body_max_length title_max_length post_limit}} {
+                error "Unknown forum setting: $name"
+            }
+            dict set defaults $name $value
+        }
+    }
+    return $defaults
 }

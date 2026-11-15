@@ -10,15 +10,11 @@
     },
     "build-assets": {
       "file": "bin/build-assets.sh",
-      "args": [
-
-      ]
+      "args": []
     },
     "build-search": {
       "file": "bin/build-search.sh",
-      "args": [
-
-      ]
+      "args": []
     },
     "bootstrap-local": {
       "file": "bin/invoke-patch-local.sh",
@@ -40,33 +36,23 @@
     },
     "start-local": {
       "file": "bin/start-local.sh",
-      "args": [
-
-      ]
+      "args": []
     },
     "start-lambda": {
       "file": "bin/start-lambda.sh",
-      "args": [
-
-      ]
+      "args": []
     },
     "start-proxy": {
       "file": "bin/start-proxy.sh",
-      "args": [
-
-      ]
+      "args": []
     },
     "start-s3": {
       "file": "bin/start-s3.sh",
-      "args": [
-
-      ]
+      "args": []
     },
     "package-lambda": {
       "file": "bin/package-lambda.sh",
-      "args": [
-
-      ]
+      "args": []
     },
     "refresh-package-tracker-local": {
       "file": "bin/invoke-patch-local.sh",
@@ -84,6 +70,12 @@
       "file": "bin/invoke-patch-local.sh",
       "args": [
         "task_prune_accounts"
+      ]
+    },
+    "sync-access-local": {
+      "file": "bin/invoke-patch-local.sh",
+      "args": [
+        "task_sync_access"
       ]
     }
   },
@@ -106,8 +98,9 @@
     "aws-sdk-tcl-s3": "^1.0.18",
     "tpersist": "^0.1.5",
     "tconfig": "^1.0.0",
-    "web-user": "0.4.0",
-    "tcaptcha": "^0.1.0"
+    "web-user": "=0.5.0",
+    "tcaptcha": "^0.1.0",
+    "web-forum": "=0.2.0"
   },
   "devDependencies": {
     "tcllib": "^2.0.0",

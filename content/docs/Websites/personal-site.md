@@ -76,6 +76,7 @@ options passed to the example.
 | --- | --- | --- |
 | `content/wiki/` | Your notebook | About, projects, reading lists, and useful notes |
 | `content/blog/` | Your dated journal | Posts about things you build or learn |
+| `content/images/` | Your picture drawer | Images shared by notebook pages and journal posts |
 | `assets/home.html.jinja` | Your front door | The homepage introduction |
 | `assets/page.html.jinja` | A frame around every page | Your name, monogram, navigation, and footer |
 | `assets/site.css` | The paint and spacing | Colors, fonts, and layout details |
@@ -161,6 +162,24 @@ The same rule applies to deletion. Remove a Markdown file, restart, and its page
 and listing disappear. Keep copies or use version control for writing you might
 want to recover. Back up the project files, not just the generated `ttrek-venv`
 folder: dependencies can be installed again, but your writing is yours to keep.
+
+### Add a picture
+
+Copy a picture into `content/images/`, for example `photo.jpg`. Add this to a
+notebook page or journal post:
+
+```markdown
+![A description of my photo](photo.jpg)
+```
+
+Restart the site and refresh the page. The words in square brackets describe the
+picture for readers who cannot see it. The filename in parentheses chooses the
+file in your image folder. The site supplies its browser address automatically,
+so the same reference works on every page, including pages in subfolders.
+
+For a folder such as `content/images/projects/`, use `projects/photo.jpg`.
+PNG, JPEG, WebP, GIF and SVG work, along with AVIF, ICO and BMP. Keep each image
+under 20 MiB. Images are served by your local website; no cloud setup is needed.
 
 ## 8. Prepare your AWS access key pair
 

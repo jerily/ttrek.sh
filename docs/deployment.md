@@ -698,6 +698,12 @@ and the bundled registry's complete recipes, then publishes both search indexes
 in the same transaction. The sync is invoked manually after deployment;
 CodeBuild never runs it.
 
+Forum and group schemas are included in `task_initdb_website`. After deploying
+the configuration and initializing schema, invoke
+`{"source":"ttrek.patch","task":"task_sync_access"}` to apply configured group
+memberships and permission grants. This task is also available in the CodeBuild
+patch project's `PATCH_TASK` selection. See [forum and access configuration](forum.md).
+
 When upgrading to `web-user` 0.4.0, invoke `task_initdb_website` after deployment
 and before reopening account traffic. Through **November 16, 2026, inclusive
 (America/New_York)**, initialization also encrypts existing bcrypt hashes in

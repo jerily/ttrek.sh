@@ -1,0 +1,61 @@
+package require tcltest
+package require web-user 0.5.0
+package require web-forum 0.2.0
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl site.tcl]
+source [file join $root tcl patch.tcl]
+source [file join $root tcl lambda.tcl]
+set ::env(ENV) LOCAL
+set work [makeDirectory forum-site]
+set db [::tpersist::db_connect -database :memory: -autobegin false]
+foreach package {user forum} {::web::${package}::initdb $db}
+foreach package {wiki blog} {::web::static::${package}::initdb $db}
+set raw {groups {admin mira@example.com} forum {moderation true posting_captcha true page_size 2}}
+set settings [dict create rootdir $root content_connection $db content_images {} \
+    account [::app_config::account $raw $root $work] forum [::app_config::forum $raw]]
+::site::init_worker $settings
+set store $::accounts::store
+set uid [ksuid::generate_ksuid]
+::web::user::insert $store web_user_users [dict create id $uid active 1 verified 1 email_key [::web::user::email_key $store mira@example.com] email [::web::user::seal $store mira@example.com [list email $uid]] password unused mfa_secret {} last_step -1 revision 0 created_at 1]
+set token [::web::user::new_session $store auth $uid]
+set cookie [lindex [split [dict get [::web::user::set_cookie $::accounts::mount {} $token] headers Set-Cookie] {;}] 0]
+set signed [dict create method GET headers [dict create cookie $cookie]]
+set ::site_lambda::router $::site::router
+
+test site-forum-1 {forum uses the host layout and replaces the Home navigation link} -body {
+    set response [::site::dispatch $::site::router {method GET path /forum}]
+    set html [dict get $response body]
+    list [dict get $response statusCode] [string match {*href="/forum" class="pure-menu-link">Forum</a>*} $html] \
+        [string match {*pure-menu-link">Home</a>*} $html] [string match {*forum.css*} $html] \
+        [dict get $response headers Cache-Control]
+} -result {200 1 0 1 no-store}
+
+test site-forum-2 {startup is read-only; explicit patch sync grants and revokes permissions} -body {
+    set before [::web::user::permissions $store $uid]
+    set event {{"source":"ttrek.patch","task":"task_sync_access"}}
+    set result [::tjson::json_to_simple [::site_lambda::handle $event {}]]
+    set granted [::web::user::permissions $store $uid]
+    set queue [$::site::router dispatch [dict merge $signed {path /forum/moderation}]]
+    dict set ::site::settings account access groups admin {}
+    ::site_lambda::handle $event {}
+    list $before [dict get $result ok] $granted [dict get $queue statusCode] \
+        [::web::user::permissions $store $uid] \
+        [dict get [$::site::router dispatch [dict merge $signed {path /forum/moderation}]] statusCode]
+} -result {{} 1 forum.moderate 200 {} 403}
+
+test site-forum-3 {forum settings reach forms and HTTP requests cannot invoke maintenance} -body {
+    set response [$::site::router dispatch [dict merge $signed {path /forum/new}]]
+    set html [dict get $response body]
+    set event {{"source":"ttrek.patch","task":"task_sync_access","httpMethod":"POST","path":"/patch","headers":{},"body":""}}
+    set result [::tjson::json_to_simple [::site_lambda::handle $event {}]]
+    list [string match {*name="captcha_id"*} $html] [string match {*Submit for review*} $html] \
+        [expr {[dict get $result statusCode] in {404 405}}]
+} -result {1 1 1}
+
+$::site::router destroy
+foreach handle $::accounts::handles {::tink::unregister_keyset $handle}
+::tpersist::db_disconnect $db
+removeDirectory $work
+cleanupTests

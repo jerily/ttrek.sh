@@ -42,9 +42,10 @@ their next homepage request.
 ### Publish content edits
 
 Edit Markdown, repackage, and restart the local services. Run `bootstrap-local`
-against the running local Lambda to initialize schemas, publish the packaged
-files, and refresh Package Tracker. It stops if any step fails; `initdb-local`,
-`sync-local`, and `refresh-package-tracker-local` remain available individually.
+against the running local Lambda to initialize schemas, sync configured groups
+and permissions, publish the packaged files, and refresh Package Tracker.
+It stops if any step fails; `initdb-local`, `sync-access-local`, `sync-local`,
+and `refresh-package-tracker-local` remain available individually.
 Neither startup nor HTTP requests import Markdown, upload content images, create
 schemas, or build search indexes. Each worker owns its router and loads search
 indexes lazily from the published database snapshot.
@@ -98,8 +99,10 @@ In another terminal, initialize the database and synchronize the website:
 ttrek run -script bootstrap-local
 ```
 
-These call the private `task_initdb_website` and `task_sync_website` tasks through
-the mock Lambda Invoke API. Sync imports docs, blog posts and registry metadata,
+This runs the private `task_initdb_website`, `task_sync_access`,
+`task_sync_website`, and `task_refresh_package_tracker` tasks in that order through
+the mock Lambda Invoke API. Access sync applies the configured
+[groups and permissions](forum.md). Content sync imports docs, blog posts and registry metadata,
 uploads missing content images, and publishes the search indexes. Initialization
 preserves existing rows. Search returns 503 until a snapshot has been published.
 

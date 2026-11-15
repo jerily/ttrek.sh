@@ -1,0 +1,6 @@
+{% extends 'master.html.jinja' %}
+{% block forum_selected %} pure-menu-selected{% endblock %}
+{% block body_class %}forum-page{% endblock %}
+{% block styles %}{% if editing %}<link rel="stylesheet" href="{{ assets }}/editor.css">{% endif %}{% endblock %}
+{% block content %}<main class="site-main">{% block body %}{% endblock %}</main>{% endblock %}
+{% block scripts %}{% if editing %}<script type="module" src="{{ assets }}/markdown-editor.bundle.js"></script>{% endif %}{% endblock %}

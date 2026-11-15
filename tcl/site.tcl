@@ -19,7 +19,7 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {assets responses templates releases content-images request-validation search handlers homepage accounts package-tracker} {
+foreach module {assets responses templates releases content-images request-validation search handlers homepage accounts forum package-tracker} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -61,7 +61,10 @@ proc ::site::mount {router} {
     if {![dict exists $settings content_connection]} {
         dict set settings content_connection [::content_images::connect [dict get $settings content_database]]
     }
-    if {[dict exists $settings account]} {::accounts::mount $router $settings $templates}
+    if {[dict exists $settings account]} {
+        ::accounts::mount $router $settings $templates
+        ::site_forum::mount $router $settings $templates
+    }
     set stores [::content_images::database_stores [dict get $settings content_connection] $imageSettings]
     foreach {kind directory prefix} {wiki docs /docs blog blog /blog} {
         set store [dict get $stores $kind]

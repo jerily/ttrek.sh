@@ -207,6 +207,70 @@ The packages divide the work: `web-user` handles accounts, `web-forum` handles
 discussions, and `web-wiki` and `web-blog` handle shared writing. Your project
 brings them together under one design.
 
+### Share pictures
+
+Copy images into `content/images/`. For a file named `garden.jpg`, write:
+
+```markdown
+![Our newly planted garden](garden.jpg)
+```
+
+This works in the notebook, journal, homepage and forum. Restart after adding
+image files, then use the filename in your writing. The site turns it into an
+`/images/...` address and serves the picture locally. Image references start
+from the image folder even when the page itself is in a subfolder.
+
+### Choose your moderators
+
+Groups are lists of people. Permissions describe what those people may do.
+Add the following to your configuration, using your own account emails:
+
+```ini
+[groups]
+admin = mira@example.com, rowan@example.com
+moderator = alex@example.com
+
+[permissions]
+admin = forum.moderate
+moderator = forum.moderate
+```
+
+Restart the site. Each listed person receives the group's permissions after
+verifying their email. You can set up the list before they register. To remove
+access, remove their address and restart. The name `admin` does not grant
+anything by itself: the permissions line does.
+
+A moderator sees **Pending moderation**, **Hidden posts**, and **Moderation
+history** in the forum. They can hide and restore posts, or lock a discussion to
+close it to new replies. Every action asks for a reason and records who acted
+and when, so the team can understand the decision later.
+
+To review new posts before anyone else sees them, set:
+
+```ini
+[forum]
+moderation = true
+```
+
+Restart, then submit a topic or reply. Its author can see that it is waiting;
+a moderator can approve or reject it from the pending queue. This applies to
+all new submissions. Hiding and restoring a post is separate from approving it.
+
+You can also turn on a small image challenge before posting:
+
+```ini
+[forum]
+posting_captcha = true
+```
+
+The form asks the person to type the characters shown in the image. It applies
+to both new discussions and replies. Both settings are off in the starting
+example, so you can try ordinary posting first.
+
+The discussion list starts with **Newest topics**. Choose **Latest activity** to
+find conversations with recent visible replies. Use **Next** and **Previous** to
+move between pages, and click an author's name to visit their forum profile.
+
 ## 9. Keep your community's work
 
 Stop the server, start it again, and return to your discussion. Your account,

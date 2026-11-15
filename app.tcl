@@ -65,6 +65,7 @@ set config_dict [dict create \
     treqmon $treqmon_config]
 
 dict set config_dict account [::app_config::account $config [file normalize $dir]]
+dict set config_dict forum [::app_config::forum $config]
 dict set config_dict package_tracker [::app_config::package_tracker $config]
 
 dict set config_dict content_database [::app_config::telemetry $config [file normalize $dir]]
