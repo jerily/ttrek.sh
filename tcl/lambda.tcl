@@ -61,14 +61,6 @@ proc ::site_lambda::handle {payload context} {
     set event [::tjson::json_to_simple [encoding convertfrom utf-8 $payload]]
     # Scheduler invokes Lambda directly under IAM. API Gateway supplies an HTTP
     # envelope; request paths, headers and bodies never select this entry point.
-    if {[lsort [dict keys $event]] eq {action source} &&
-        [dict get $event source] eq "ttrek.telemetry" && [dict get $event action] eq "backup-vacuum"} {
-        variable maintenanceSettings
-        set result [::telemetry_maintenance::run $maintenanceSettings $context]
-        set typed {}
-        dict for {key value} $result {dict set typed $key [list S $value]}
-        return [::tjson::typed_to_json [list M $typed]]
-    }
     if {[lsort [dict keys $event]] eq {source task} && [dict get $event source] eq "ttrek.patch"} {
         return [::site_patch::run [dict get $event task] $context]
     }

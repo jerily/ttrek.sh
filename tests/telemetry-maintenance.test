@@ -11,6 +11,7 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl config.tcl]
 source [file join $root tcl telemetry.tcl]
 source [file join $root tcl telemetry-maintenance.tcl]
+source [file join $root tcl patch.tcl]
 source [file join $root tcl lambda.tcl]
 namespace eval ::legacy_backup {}
 source [file join $root tests fixtures legacy-telemetry-backup.tcl]
@@ -24,27 +25,62 @@ test maintenance-lazy {Loading maintenance does not load database drivers} -body
 
 rename ::telemetry_maintenance::run ::telemetry_maintenance::real_run
 # Provide the run test fixture.
-proc ::telemetry_maintenance::run {settings context} {incr ::calls; return {status completed}}
-set ::site_lambda::maintenanceSettings {}
+proc ::telemetry_maintenance::run {settings context} {
+    incr ::calls
+    set ::received [list $settings $context]
+    return -options $::maintenanceOptions $::maintenanceResult
+}
+set ::site_lambda::maintenanceSettings {dialect postgresql database test}
+set maintenanceResult {status completed key telemetry/backups/test.jsonl.gz}
+set maintenanceOptions {-code 0}
 set calls 0
-test maintenance-invoke {An exact Scheduler event reaches maintenance} -body {
-    set result [::site_lambda::handle {{"source":"ttrek.telemetry","action":"backup-vacuum"}} {}]
-    list [dict get [::tjson::json_to_simple $result] status] $calls
-} -result {completed 1}
+test maintenance-invoke {The configured Scheduler payload runs backup as a patch task with its settings and context} -body {
+    set channel [open [file join $root devops infra 38-infra-rds-postgres.yml] r]
+    try {set template [read $channel]} finally {close $channel}
+    if {![regexp {Input: '([^']+)'} $template -> payload]} {error "Missing scheduler payload"}
+    set context {lambda-runtime-deadline-ms 123456 lambda-runtime-aws-request-id test-invocation}
+    set result [::tjson::json_to_simple [::site_lambda::handle $payload $context]]
+    list [dict get $result ok] [dict get $result task] [dict get $result completed] $calls \
+        [expr {$received eq [list $::site_lambda::maintenanceSettings $context]}]
+} -result {1 task_backup_website {status:completed key:telemetry/backups/test.jsonl.gz} 1 1}
+
+test maintenance-overlap-dispatch {A skipped overlapping backup retains its reason in the patch response} -setup {
+    set maintenanceResult {status skipped reason already-running}
+} -body {
+    set result [::tjson::json_to_simple [::site_lambda::handle {{"source":"ttrek.patch","task":"task_backup_website"}} {}]]
+    list [dict get $result ok] [dict get $result completed]
+} -cleanup {
+    set maintenanceResult {status completed key telemetry/backups/test.jsonl.gz}
+} -result {1 {status:skipped reason:already-running}}
+
+test maintenance-error-dispatch {Backup errors propagate through patch dispatch for Lambda retries} -setup {
+    set maintenanceResult {Telemetry maintenance failed during upload}
+    set maintenanceOptions {-code 1 -errorcode {TELEMETRY MAINTENANCE upload}}
+} -body {
+    catch {::site_lambda::handle {{"source":"ttrek.patch","task":"task_backup_website"}} {}} message options
+    list $message [dict get $options -errorcode]
+} -cleanup {
+    set maintenanceResult {status completed key telemetry/backups/test.jsonl.gz}
+    set maintenanceOptions {-code 0}
+} -result {{Telemetry maintenance failed during upload} {TELEMETRY MAINTENANCE upload}}
+
 test maintenance-http {HTTP envelopes and unrelated events cannot invoke maintenance} -body {
+    set calls 0
     foreach event {
-        {"source":"ttrek.telemetry","action":"backup-vacuum","version":"2.0"}
-        {"source":"ttrek.telemetry","action":"backup-vacuum","httpMethod":"POST","path":"/telemetry/maintenance"}
-        {"body":"{\"source\":\"ttrek.telemetry\",\"action\":\"backup-vacuum\"}"}
-        {"source":"ttrek.telemetry","action":"delete"}
+        {"source":"ttrek.patch","task":"task_backup_website","version":"2.0"}
+        {"source":"ttrek.patch","task":"task_backup_website","httpMethod":"POST","path":"/patch"}
+        {"body":"{\"source\":\"ttrek.patch\",\"task\":\"task_backup_website\"}"}
+        {"source":"ttrek.patch","task":"exec"}
+        {"source":"ttrek.telemetry","action":"backup-vacuum"}
     } {catch {::site_lambda::handle $event {}}}
     set calls
-} -result 1
+} -result 0
 rename ::telemetry_maintenance::run {}
 rename ::telemetry_maintenance::real_run ::telemetry_maintenance::run
 test maintenance-local {LOCAL maintenance is rejected before connecting} -body {
     set ::env(ENV) LOCAL
-    ::telemetry_maintenance::run {dialect sqlite} {}
+    set ::site_lambda::maintenanceSettings {dialect sqlite}
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_backup_website"}} {}
 } -returnCodes error -result {Scheduled telemetry maintenance requires PROD PostgreSQL}
 
 set postgres [info exists ::env(TTREK_TEST_POSTGRES)]
