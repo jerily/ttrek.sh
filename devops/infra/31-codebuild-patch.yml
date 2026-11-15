@@ -9,7 +9,7 @@ Parameters:
   TaskName:
     Type: String
     Default: task_initdb_website
-    AllowedValues: [task_initdb_website, task_publish_search, task_backup_website]
+    AllowedValues: [task_initdb_website, task_sync_website, task_publish_search, task_prune_accounts, task_refresh_package_tracker, task_backup_website]
 
 Resources:
   PatchBuildLogs:
@@ -73,7 +73,7 @@ Resources:
                 - |
                   set -euo pipefail
                   case "$PATCH_TASK" in
-                    task_initdb_website|task_publish_search|task_backup_website) ;;
+                    task_initdb_website|task_sync_website|task_publish_search|task_prune_accounts|task_refresh_package_tracker|task_backup_website) ;;
                     *) echo 'Unknown patch task' >&2; exit 1 ;;
                   esac
                   printf '{"source":"ttrek.patch","task":"%s"}' "$PATCH_TASK" > payload.json
