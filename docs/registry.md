@@ -176,11 +176,14 @@ for offline `ttrek run -package PACKAGE -script NAME` and
 `ttrek scripts -package PACKAGE ls|describe` commands.
 
 Programming languages use the latest version on package overviews, search results,
-and the `/packages` language filter (`Any`, `C`, `C++`, or `TCL`). Version pages
+and the `/packages` language filter. `Any` includes all packages; `Only TCL`
+excludes C/C++ extensions, `TCL and C/C++` requires TCL and either C or C++
+(or both), and `Only C or C++` excludes TCL. Version pages
 show the selected version's metadata. Missing or empty arrays have no label.
 `GET /registry/NAME/VERSION/languages` returns an array without counting a recipe
 download; build recipe responses also include `languages`. Search and autocomplete
-accept an optional `language` filter, for example `language=C%2B%2B`.
+accept the same optional `language` filter: `tcl-only`, `tcl-c-cpp`, or
+`c-cpp-only`. Omit it or leave it empty for `Any`.
 
 After deploying this schema change, run `task_initdb_website` and then
 `task_sync_website` to import the registry language arrays into the catalog.

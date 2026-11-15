@@ -3,7 +3,9 @@
     <div class="search-controls">
     {% if language_filter %}<div class="language-filter"><label for="package-language">Programming language</label><select id="package-language" name="language">
         <option value=""{% if not language %} selected{% endif %}>Any</option>
-        {% for option in ['C', 'C++', 'TCL'] %}<option value="{{ option }}"{% if language == option %} selected{% endif %}>{{ option }}</option>{% endfor %}
+        <option value="tcl-only"{% if language == 'tcl-only' %} selected{% endif %}>Only TCL</option>
+        <option value="tcl-c-cpp"{% if language == 'tcl-c-cpp' %} selected{% endif %}>TCL and C/C++</option>
+        <option value="c-cpp-only"{% if language == 'c-cpp-only' %} selected{% endif %}>Only C or C++</option>
     </select></div>{% endif %}
     <div class="search-field">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
