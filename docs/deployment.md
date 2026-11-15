@@ -385,7 +385,8 @@ same key. S3 replacements are independent of the SQL transaction. Each response
 uses signed S3 URLs or CloudFront paths according to the production setting.
 Production startup and HTTP requests make no S3 listing or upload calls for
 images. Local workers still upload missing images to their configured bucket or
-local S3 mock. `task_initdb_website` initializes schemas only.
+local S3 mock. `task_initdb_website` initializes schemas and runs the temporary
+account password-hash encryption upgrade described below.
 
 Before relying on patch-task uploads, update the S3 gateway endpoint policy with
 `bash devops/infra/38-deploy-infra-rds-postgres.sh`. It allows `s3:ListBucket`, `s3:GetObject` and
@@ -696,6 +697,18 @@ installed packages' schemas; the second synchronizes wiki/blog content, images,
 and the bundled registry's complete recipes, then publishes both search indexes
 in the same transaction. The sync is invoked manually after deployment;
 CodeBuild never runs it.
+
+When upgrading to `web-user` 0.4.0, invoke `task_initdb_website` after deployment
+and before reopening account traffic. Through **November 16, 2026, inclusive
+(America/New_York)**, initialization also encrypts existing bcrypt hashes in
+`web_user_users` and pending `web_user_registrations`, one row at a time, using
+the configured tenant's account AEAD key. It preserves passwords, account IDs
+and sessions; already encrypted or non-bcrypt values are left unchanged.
+The upgrade is transactional and safe to repeat, and stops running at midnight
+on November 17. Drain old workers before running it so they cannot write bare
+hashes again. No password reset is needed for migrated accounts; the login path
+accepts only encrypted hashes. Local development uses `ttrek run -script initdb-local`.
+
 `{"source":"ttrek.patch","task":"task_publish_search"}` republishes search from
 the stored package tables without importing recipes or content. HTTP request
 envelopes cannot select these tasks. IAM

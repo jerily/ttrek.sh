@@ -12,6 +12,7 @@ ttrek run -script build-assets
 npm test
 ttrek run tclsh9.1 "$PWD/tests/homepage.test"
 ttrek run tclsh9.1 "$PWD/tests/accounts.test"
+ttrek run tclsh9.1 "$PWD/tests/account-password-migration.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
@@ -159,6 +160,11 @@ and telemetry without needing another sync, as well as private task dispatch.
 It also reproduces the pre-tags schema upgrade: rows survive initialization,
 the new `listed = 0` default hides them until the first sync, and subsequent
 initialization preserves the published catalog.
+
+`tests/account-password-migration.test` checks the temporary initialization
+upgrade's encryption, tenant scope, repeatability, rollback, concurrent-change
+guard and inclusive November 16, 2026 cutoff in America/New_York. It uses a
+fixed clock and the same optional disposable PostgreSQL configuration.
 
 `tests/search-store.test` runs on SQLite or the same disposable PostgreSQL setup.
 It checks binary round trips, a fresh worker with constructors disabled, warm

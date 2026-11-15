@@ -114,3 +114,32 @@ proc ::accounts::prune {{batch 500}} {
     if {$store eq {}} {error "Accounts are not configured in this worker"}
     ::web::user::prune $store $batch
 }
+
+# Temporary upgrade: encrypt bare bcrypt hashes through November 16, 2026
+# (America/New_York). Repeated initialization never re-encrypts ciphertext.
+proc ::accounts::migrate_password_hashes {} {
+    set deadline [clock scan {2026-11-17 00:00:00} -format {%Y-%m-%d %H:%M:%S} -timezone :America/New_York]
+    if {[clock seconds] >= $deadline} {return {}}
+    variable store
+    if {$store eq {}} {error "Accounts are not configured in this worker"}
+    set connection [dict get $store -connection]
+    set counts {web_user_users 0 web_user_registrations 0}
+    ::tpersist::db_transaction $connection {
+        foreach table [dict keys $counts] {
+            set query [::tpersist::db_where [::tpersist::db_select $table] [::web::user::predicate $store {}]]
+            ::tpersist::db_foreach_row $connection row $query {
+                set hash [dict get $row password]
+                if {![regexp {^\$2[aby]\$(0[4-9]|[12][0-9]|3[01])\$[./A-Za-z0-9]{53}$} $hash]} continue
+                set uid [dict get $row id]
+                set encrypted [::web::user::seal $store $hash [list password-hash $uid]]
+                # Do not overwrite a password changed since this row was read.
+                if {[::web::user::update $store $table [dict create id $uid password $hash] \
+                        [dict create password $encrypted]] != 1} {
+                    error "Account credentials changed during initialization; retry"
+                }
+                dict incr counts $table
+            }
+        }
+    }
+    return $counts
+}
