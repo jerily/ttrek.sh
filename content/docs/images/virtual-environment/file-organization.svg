@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="960" viewBox="0 0 1000 960" role="img" aria-labelledby="title desc">
+  <title id="title">File organization inside a ttrek project</title>
+  <desc id="desc">The my-app project directory contains ttrek.json, ttrek-lock.json, application source, data, and uploads alongside ttrek-venv. The isolated virtual environment contains local for installed executables, libraries, headers, and resources; build for source files, compilation output, and logs; ttrek-manifest.json for installed state; and tmp for temporary files.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0f5fc"/>
+      <stop offset="1" stop-color="#f3f9f7"/>
+    </linearGradient>
+    <linearGradient id="project" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#18354d"/>
+      <stop offset="1" stop-color="#264f66"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#18354d" flood-opacity="0.07"/>
+    </filter>
+    <symbol id="folder" viewBox="0 0 32 28">
+      <path d="M2 7V5a3 3 0 0 1 3-3h7l4 4h11a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z" fill="currentColor" opacity="0.18"/>
+      <path d="M2 9h28M2 7V5a3 3 0 0 1 3-3h7l4 4h11a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+
+  <rect width="1000" height="960" rx="24" fill="url(#background)"/>
+  <g font-family="Arial, Helvetica, sans-serif" fill="#18354d">
+    <text x="40" y="57" font-size="30" font-weight="700">Inside a ttrek project</text>
+    <text x="40" y="89" font-size="19" fill="#50677b">Project files alongside the directory of the isolated virtual environment.</text>
+
+    <rect x="40" y="120" width="920" height="82" rx="16" fill="url(#project)" filter="url(#shadow)"/>
+    <use href="#folder" x="64" y="144" width="36" height="32" color="#c9e6fc"/>
+    <text x="116" y="162" font-family="DejaVu Sans Mono, monospace" font-size="25" font-weight="700" fill="#fff">my-app/</text>
+    <text x="116" y="186" font-size="16" fill="#c9dce9">Project root</text>
+    <text x="934" y="167" text-anchor="end" font-size="18" fill="#d8e8f2">One project · One environment</text>
+
+    <path d="M500 202V231M198 256V231H670V256" fill="none" stroke="#95aebd" stroke-width="2"/>
+    <circle cx="500" cy="231" r="4" fill="#607f93"/>
+
+    <rect x="40" y="258" width="316" height="616" rx="18" fill="#fff" stroke="#d2dfe9" filter="url(#shadow)"/>
+    <rect x="380" y="258" width="580" height="616" rx="18" fill="#eaf6f2" stroke="#9ccbbd" stroke-width="1.5" filter="url(#shadow)"/>
+
+    <text x="64" y="296" font-size="23" font-weight="700">Project files</text>
+    <text x="64" y="323" font-size="17" fill="#607489">Outside ttrek-venv/</text>
+    <path d="M64 344H332" stroke="#e0e8ef"/>
+
+    <g font-family="DejaVu Sans Mono, monospace" font-size="19" font-weight="700">
+      <text x="64" y="383">ttrek.json</text>
+      <text x="64" y="466">ttrek-lock.json</text>
+      <text x="64" y="558">app.tcl · src/</text>
+      <text x="64" y="641">data/ · uploads/</text>
+    </g>
+    <g font-size="17" fill="#50677b">
+      <text x="64" y="409">Requirements and scripts</text>
+      <text x="64" y="492">Resolved package versions</text>
+      <text x="64" y="584">Your application source</text>
+      <text x="64" y="667">Your persistent data</text>
+    </g>
+    <path d="M64 518H332" stroke="#e0e8ef"/>
+    <rect x="60" y="723" width="276" height="127" rx="12" fill="#eff4fb"/>
+    <rect x="60" y="739" width="4" height="94" rx="2" fill="#759bc5"/>
+    <text x="80" y="754" font-size="17" font-weight="700">Keep your work here</text>
+    <g font-size="17" fill="#50677b">
+      <text x="80" y="783">Source and runtime data</text>
+      <text x="80" y="807">stay outside the managed</text>
+      <text x="80" y="831">environment directory.</text>
+    </g>
+
+    <use href="#folder" x="404" y="281" width="30" height="27" color="#237961"/>
+    <text x="448" y="303" font-family="DejaVu Sans Mono, monospace" font-size="25" font-weight="700" fill="#155b49">ttrek-venv/</text>
+    <text x="404" y="332" font-size="18" fill="#3f7062">Isolated virtual environment · Managed by ttrek</text>
+
+    <rect x="404" y="356" width="532" height="148" rx="12" fill="#fff" stroke="#c5ded4"/>
+    <use href="#folder" x="424" y="375" width="25" height="23" color="#237961"/>
+    <text x="462" y="395" font-family="DejaVu Sans Mono, monospace" font-size="22" font-weight="700" fill="#155b49">local/</text>
+    <text x="914" y="394" text-anchor="end" font-size="17" fill="#4c7367">Installed packages</text>
+    <path d="M426 411H914" stroke="#e5eeea"/>
+    <g font-family="DejaVu Sans Mono, monospace" font-size="18" fill="#155b49">
+      <text x="426" y="443">bin/</text>
+      <text x="426" y="479">lib/</text>
+      <text x="668" y="443">include/</text>
+      <text x="668" y="479">share/</text>
+    </g>
+    <g font-size="17" fill="#50677b">
+      <text x="490" y="443">Executables</text>
+      <text x="490" y="479">Libraries</text>
+      <text x="774" y="443">Headers</text>
+      <text x="774" y="479">Resources</text>
+    </g>
+
+    <rect x="404" y="520" width="532" height="150" rx="12" fill="#fff" stroke="#c5ded4"/>
+    <use href="#folder" x="424" y="539" width="25" height="23" color="#237961"/>
+    <text x="462" y="559" font-family="DejaVu Sans Mono, monospace" font-size="22" font-weight="700" fill="#155b49">build/</text>
+    <text x="914" y="558" text-anchor="end" font-size="17" fill="#4c7367">Build files and logs</text>
+    <path d="M426 575H914" stroke="#e5eeea"/>
+    <g font-size="18" fill="#50677b">
+      <text x="426" y="606">Downloads · Sources · Compilation output</text>
+      <text x="426" y="636">Shared source trees · Logs · Install scripts</text>
+    </g>
+
+    <rect x="404" y="686" width="532" height="70" rx="12" fill="#fff" stroke="#c5ded4"/>
+    <text x="426" y="716" font-family="DejaVu Sans Mono, monospace" font-size="20" font-weight="700" fill="#155b49">ttrek-manifest.json</text>
+    <text x="426" y="741" font-size="17" fill="#50677b">Records installed packages and their files</text>
+
+    <rect x="404" y="772" width="532" height="54" rx="12" fill="#fff" stroke="#c5ded4"/>
+    <text x="426" y="806" font-family="DejaVu Sans Mono, monospace" font-size="21" font-weight="700" fill="#155b49">tmp/</text>
+    <text x="514" y="805" font-size="18" fill="#50677b">Temporary files</text>
+    <text x="404" y="853" font-size="16" fill="#3f7062">Other internal metadata omitted for clarity.</text>
+
+    <circle cx="53" cy="915" r="6" fill="#237961"/>
+    <text x="70" y="921" font-size="18" fill="#456477">Installed packages are project-specific. Build inputs may be cleaned after success.</text>
+  </g>
+</svg>
