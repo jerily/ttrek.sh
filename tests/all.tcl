@@ -261,8 +261,8 @@ proc contains {text fragment} {expr {[string first $fragment $text] >= 0}}
 
 test templates-1 {All local templates validate including dependencies} -body {
     ::views::init [file join $root www]
-    dict size $::views::templates
-} -result 16
+    lsort [dict keys $::views::templates]
+} -result [lsort [glob -tails -directory [file join $root www] *.html.jinja]]
 
 test templates-2 {Index layout and literal clipboard command} -setup {
     set saved_env [array get ::env ENV]
