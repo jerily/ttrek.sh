@@ -43,7 +43,7 @@ test site-forum-2 {startup is read-only; explicit patch sync grants and revokes 
     list $before [dict get $result ok] $granted [dict get $queue statusCode] \
         [::web::user::permissions $store $uid] \
         [dict get [$::site::router dispatch [dict merge $signed {path /forum/moderation}]] statusCode]
-} -result {{} 1 forum.moderate 200 {} 403}
+} -result {{} 1 {blog.edit forum.moderate users.manage wiki.edit} 200 {} 403}
 
 test site-forum-3 {forum settings reach forms and HTTP requests cannot invoke maintenance} -body {
     set response [$::site::router dispatch [dict merge $signed {path /forum/new}]]
@@ -53,6 +53,21 @@ test site-forum-3 {forum settings reach forms and HTTP requests cannot invoke ma
     list [string match {*name="captcha_id"*} $html] [string match {*Submit for review*} $html] \
         [expr {[dict get $result statusCode] in {404 405}}]
 } -result {1 1 1}
+
+test site-users-admin {Account links to the protected user list through the shared host layout} -body {
+    dict set ::site::settings account access groups admin mira@example.com
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_access"}} {}
+    set account [::site::dispatch $::site::router [dict merge $signed {path /user}]]
+    set page [::site::dispatch $::site::router [dict merge $signed {path /user/admin/users}]]
+    set html [dict get $page body]
+    dict set ::site::settings account access groups admin {}
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_sync_access"}} {}
+    list [string match {*href="/user/admin/users">Manage users*} [dict get $account body]] \
+        [dict get $page statusCode] [dict get $page headers Cache-Control] \
+        [string match {*mira@example.com*} $html] [string match {*Authenticator / MFA*} $html] \
+        [string match {*pure-menu-link">Forum*} $html] \
+        [dict get [::site::dispatch $::site::router [dict merge $signed {path /user/admin/users}]] statusCode]
+} -result {1 200 no-store 1 1 1 403}
 
 $::site::router destroy
 foreach handle $::accounts::handles {::tink::unregister_keyset $handle}

@@ -245,7 +245,7 @@ admin = mira@example.com, rowan@example.com
 moderator = alex@example.com
 
 [permissions]
-admin = forum.moderate, wiki.edit, blog.edit
+admin = forum.moderate, wiki.edit, blog.edit, users.manage
 moderator = forum.moderate
 ```
 
@@ -256,6 +256,10 @@ anything by itself: the permissions line does.
 
 The moderator group can manage discussions. It needs `wiki.edit` or `blog.edit`
 added to its permission list to edit notebook pages or journal posts as well.
+
+An administrator also sees **Your account → Manage users**. This lists who has
+registered, when they joined, whether they use an authenticator, and which groups
+they belong to. The `users.manage` permission controls access to that page.
 
 A moderator sees **Pending moderation**, **Hidden posts**, and **Moderation
 history** in the forum. They can hide and restore posts, or lock a discussion to

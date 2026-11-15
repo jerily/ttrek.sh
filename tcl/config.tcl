@@ -392,7 +392,7 @@ proc ::app_config::account {config root {localDirectory {}}} {
         }
     }
     set groups {admin {} moderator {}}
-    set permissions {admin forum.moderate moderator forum.moderate}
+    set permissions {admin {forum.moderate, wiki.edit, blog.edit, users.manage} moderator forum.moderate}
     if {[dict exists $config groups]} {set groups [dict merge $groups [dict get $config groups]]}
     if {[dict exists $config permissions]} {set permissions [dict merge $permissions [dict get $config permissions]]}
     ::web::user::access_config $groups $permissions

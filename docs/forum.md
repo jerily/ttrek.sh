@@ -17,7 +17,7 @@ admin = mira@example.com, rowan@example.com
 moderator = alex@example.com
 
 [permissions]
-admin = forum.moderate
+admin = forum.moderate, wiki.edit, blog.edit, users.manage
 moderator = forum.moderate
 ```
 
@@ -59,3 +59,9 @@ reason and stores moderator ID, time, target and before/after state atomically.
 The UI hides controls from ordinary members; the server independently checks
 permission, CSRF, origin and revision. Restoring hidden content preserves its
 approval state. Hidden or unapproved posts are absent from public lists.
+
+Administrators also receive `users.manage` in the default configuration. After
+access sync, **Account → Manage users** shows registered users, registration
+times, authenticator status and group assignments. The directory is checked
+against current permissions on every request and contains only this account
+tenant. Moderator/editor grants alone do not reveal it.
