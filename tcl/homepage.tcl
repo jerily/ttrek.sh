@@ -83,14 +83,10 @@ proc ::homepage::resolve {entries stores} {
     set slides {}
     set seen {}
     set pages {}
+    set listed {}
     set posts {}
     set items {}
     # Either collection may be unavailable independently during provisioning.
-    catch {
-        foreach page [::web::static::wiki::children [dict get $stores wiki] /] {
-            if {[dict get $page item_type] eq "page"} {dict set pages [dict get $page path] $page}
-        }
-    }
     catch {set posts [::web::static::blog::posts [dict get $stores blog]]}
     foreach entry $entries {
         try {
@@ -103,6 +99,16 @@ proc ::homepage::resolve {entries stores} {
             switch -- $type {
                 example - doc {
                     set path [dict get $entry path]
+                    ::web::static::wiki::canonical_path $path
+                    set parent [file dirname $path]
+                    # Articles may live in folders. Query each configured parent
+                    # once, without reading unrelated article bodies or directories.
+                    if {![dict exists $listed $parent]} {
+                        foreach page [::web::static::wiki::children [dict get $stores wiki] $parent] {
+                            if {[dict get $page item_type] eq "page"} {dict set pages [dict get $page path] $page}
+                        }
+                        dict set listed $parent 1
+                    }
                     if {![dict exists $pages $path]} {continue}
                     foreach key {title description} {dict set fields $key [list S [dict get $entry $key]]}
                     dict set fields url [list S /docs$path]

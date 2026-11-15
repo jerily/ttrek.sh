@@ -46,7 +46,7 @@ proc ::accounts::mount {router settings templates} {
     variable store
     variable mount
     variable handles
-    package require web-user 0.4.0
+    package require web-user 0.5.0
     foreach handle $handles {::tink::unregister_keyset $handle}
     set handles {}
     set config [dict get $settings account]
@@ -113,6 +113,22 @@ proc ::accounts::prune {{batch 500}} {
     variable store
     if {$store eq {}} {error "Accounts are not configured in this worker"}
     ::web::user::prune $store $batch
+}
+
+# Called only by the explicit private maintenance task, never by a request or
+# worker startup. Configuration is the source of truth for tenant permissions.
+proc ::accounts::sync_access {} {
+    variable store
+    if {$store eq {}} {error "Accounts are not configured in this worker"}
+    set access [dict get [::site::config] account access]
+    ::web::user::sync_access $store [dict get $access groups] [dict get $access permissions]
+}
+
+# Explicit maintenance uses this tenant's existing encryption and MAC keys.
+proc ::accounts::migrate_user_ids {} {
+    variable store
+    if {$store eq {}} {error "Accounts are not initialized"}
+    ::web::user::migrate_user_ids $store
 }
 
 # Temporary upgrade: encrypt bare bcrypt hashes through November 16, 2026

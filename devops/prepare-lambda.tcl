@@ -19,7 +19,8 @@ foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js 
     }
 }
 package require http
-package require web-user 0.3.0
+package require web-user 0.5.0
+package require web-forum 0.2.0
 package require awsses 1.0.16
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
@@ -55,9 +56,10 @@ try {
         ::web::static::${kind}::sync $store [file join $siteRoot content $directory]
     }
     ::web::user::initdb $::telemetry::connection
+    ::web::forum::initdb $::telemetry::connection
     dict set ::site::settings account [::app_config::account {} $siteRoot $accountProbeDirectory]
     ::site::mount $router
-    foreach path {/ /docs /docs/getting-started /blog /packages /user/register /user/login /user/forgot} {
+    foreach path {/ /docs /docs/getting-started /blog /packages /forum /user/register /user/login /user/forgot} {
         set response [::site::dispatch $router [dict create method GET path $path]]
         if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}
     }

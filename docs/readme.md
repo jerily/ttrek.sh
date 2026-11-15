@@ -11,6 +11,7 @@ website live separately in `content/docs/`; blog posts live in `content/blog/`.
 - [Local development](local-development.md): edit content, run local services and configure the direct server.
 - [Package registry](registry.md): update recipes, configure sources and build search indexes.
 - [Package Tracker](package-tracker.md): publication dates, activity measures, scheduled refresh and local commands.
+- [Forum and access](forum.md): groups, moderator permissions, posting policy and access synchronization.
 - [Binary distributions](releases.md): serve downloads and manage release checksums.
 
 ## Maintain the website

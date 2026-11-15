@@ -2,8 +2,10 @@
 {% block home_selected %}{% endblock %}
 {% block body_class %}account-page{% endblock %}
 {% block content %}
-<main class="site-main account-main">
+<main class="site-main{% if not admin_view %} account-main{% endif %}">
+    {% if not admin_view %}
     <div class="account-intro"><p class="eyebrow">YOUR TTREK ACCOUNT</p><p>{% if signed_in %}Manage your profile and account security.{% else %}Create an account or sign in to continue.{% endif %}</p></div>
+    {% endif %}
     {% block body %}{% endblock %}
 </main>
 {% endblock %}

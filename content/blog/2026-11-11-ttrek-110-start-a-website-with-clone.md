@@ -38,7 +38,7 @@ you to explore. Click **Notebook**, then **New page**, and write something!
 Keep the personal example on localhost: it lets you edit without signing in.
 Press **Ctrl-C** in the terminal when you want to stop it.
 
-Ready to change the homepage or try the community site? Follow
-[Build websites with ttrek](https://ttrek.sh/docs/build-websites-with-ttrek).
-The guide walks through both examples with screenshots, from your first page
-to creating an account and posting a discussion.
+Continue with [the personal-site guide](/docs/websites/personal-site), or try
+[the community example](/docs/websites/community) to create an account and post
+a discussion. Browse [Build websites with ttrek](/docs/build-websites-with-ttrek)
+to choose an example for your next project.
