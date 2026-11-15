@@ -197,7 +197,7 @@ Resources:
       Target:
         Arn: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}
         RoleArn: !GetAtt ScheduleRole.Arn
-        Input: '{"source":"ttrek.telemetry","action":"backup-vacuum"}'
+        Input: '{"source":"ttrek.patch","task":"task_backup_website"}'
         RetryPolicy: {MaximumEventAgeInSeconds: 3600, MaximumRetryAttempts: 2}
 
 Outputs:
