@@ -137,6 +137,21 @@ A discussion is for a conversation. The notebook is for information people will
 want to find again: how to join a meeting, where shared tools live, or how to
 complete a task.
 
+First, give your account permission to edit. In `config.ini`, set `editor` in
+the existing groups and permissions sections, using the email you verified:
+
+```ini
+[groups]
+editor = mira@example.com
+
+[permissions]
+editor = wiki.edit, blog.edit
+```
+
+Restart the site. `wiki.edit` lets you create and edit notebook pages, including
+the homepage. `blog.edit` does the same for journal posts. You can give someone
+just one of these permissions. Signing in alone does not grant editing access.
+
 Click **Our notebook**, then **New page**. Enter `First meetup` as the title and
 add:
 
@@ -153,8 +168,7 @@ Everyone is welcome. Bring one idea and something you would like to learn.
 ```
 
 Click **Publish page**. Here, publishing saves the page on your local community
-site. Other signed-in members can edit notebook pages too. This example treats
-the notebook as shared work.
+site. Other members with `wiki.edit` can help improve notebook pages too.
 
 Open the page again, choose **Edit**, make a small change, and click
 **Publish revision**. The page updates immediately. **Revision history** lets
@@ -167,8 +181,8 @@ click **Publish post**.
 ## 7. Try the site as a visitor
 
 Choose **Your account → Sign out**. The navigation returns to **Come on in**.
-You can still read the discussions, notebook, and journal. Writing and editing
-require signing in.
+You can still read the discussions, notebook, and journal. Posting in the forum
+requires signing in; editing the notebook or journal also requires its permission.
 
 This is an easy way to check your site's two experiences: what a visitor can
 read, and what a member can contribute. Sign back in to continue making changes.
@@ -231,7 +245,7 @@ admin = mira@example.com, rowan@example.com
 moderator = alex@example.com
 
 [permissions]
-admin = forum.moderate
+admin = forum.moderate, wiki.edit, blog.edit
 moderator = forum.moderate
 ```
 
@@ -239,6 +253,9 @@ Restart the site. Each listed person receives the group's permissions after
 verifying their email. You can set up the list before they register. To remove
 access, remove their address and restart. The name `admin` does not grant
 anything by itself: the permissions line does.
+
+The moderator group can manage discussions. It needs `wiki.edit` or `blog.edit`
+added to its permission list to edit notebook pages or journal posts as well.
 
 A moderator sees **Pending moderation**, **Hidden posts**, and **Moderation
 history** in the forum. They can hide and restore posts, or lock a discussion to
