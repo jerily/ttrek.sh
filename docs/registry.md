@@ -23,6 +23,10 @@ TTREK_PUBLIC_REGISTRY="$PWD/build/public-registry" ttrek run -script package-lam
 
 Recipes carry a top-level `description`, optional `tags`, project `url`, and SPDX `license` string.
 The package overview shows the latest version's description, HTTP(S) project link, and license when present.
+It also displays publication dates, download totals by OS/architecture, and cached
+unique recipe-download activity. The
+[Package Tracker](package-tracker.md) provides New, Recently Updated, Popular,
+and Trending rankings at `/packages/tracker`, with a summary on `/packages`.
 
 The manual `task_sync_website` invocation (`sync-local` for the local Lambda)
 imports the bundled registry into the telemetry `packages` table. It stores

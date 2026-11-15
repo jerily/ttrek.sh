@@ -52,6 +52,8 @@ npm test
 "$TCLSH" tests/invoke-patch-local.test
 "$TCLSH" tests/telemetry.test
 "$TCLSH" tests/registry-metadata.test
+"$TCLSH" tests/recipe-downloads.test
+"$TCLSH" tests/package-tracker.test
 "$TCLSH" tests/stage-registry.test
 "$TCLSH" tests/build-lambda.test
 "$TCLSH" tests/search-store.test

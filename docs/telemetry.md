@@ -7,6 +7,21 @@ connection needs them: `tdbc::sqlite3` for `ENV=LOCAL`, `tdbc::postgres` for
 
 ## Storage
 
+The [Package Tracker](package-tracker.md) derives 30-day Popular counts, 7-day
+Trending comparisons and daily chart buckets from unique machines downloading recipes.
+Its five-minute private task stores derived results in Valkey. Publication dates
+live in the package tables and are maintained by registry synchronization.
+
+`package_download_counts` stores cumulative recipe-download totals by package
+version and OS/architecture, including requests without a machine ID. Initialization
+seeds missing counters from existing published-package `req_reg_get_pkg_spec` history;
+repeated initialization preserves existing totals. New counts increment atomically
+only after preparing a successful recipe response, with `latest` resolved to a version.
+Registered machine IDs retain the existing request event for unique counts; anonymous
+requests create no events or environment records. Counter and identified event writes
+share a transaction. Download-statistics failures never block recipe delivery.
+Package and version pages display these totals separately from installation outcomes.
+
 Each direct-server worker and Lambda interpreter owns one connection shared by
 telemetry, search and content. Telemetry writes complete before the request
 returns; their database latency is part of response time. Direct-server event

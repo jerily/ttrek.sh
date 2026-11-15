@@ -11,6 +11,8 @@ return {
     GET /homepage/images/:id get_homepage_image_handler get_homepage_image
     GET /init get_ttrek_init_handler get_ttrek_init
     GET /packages get_packages_page_handler get_packages
+    GET /packages/tracker get_package_tracker_page_handler get_package_tracker
+    GET /package-tracker get_package_tracker_redirect_handler get_package_tracker_redirect
     GET /search get_search_page_handler get_search_page
     GET /favicon.ico get_assets_handler get_assets
     GET /:type(css|js|assets)/:path(.*) get_assets_handler get_assets

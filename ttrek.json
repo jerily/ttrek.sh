@@ -20,6 +20,10 @@
 
       ]
     },
+    "bootstrap-local": {
+      "file": "bin/invoke-patch-local.sh",
+      "args": ["bootstrap-local"]
+    },
     "initdb-local": {
       "file": "bin/invoke-patch-local.sh",
       "args": [
@@ -61,6 +65,14 @@
       "args": [
 
       ]
+    },
+    "refresh-package-tracker-local": {
+      "file": "bin/invoke-patch-local.sh",
+      "args": ["task_refresh_package_tracker"]
+    },
+    "prune-accounts-local": {
+      "file": "bin/invoke-patch-local.sh",
+      "args": ["task_prune_accounts"]
     },
     "prune-accounts": {
       "file": "bin/invoke-patch-local.sh",
