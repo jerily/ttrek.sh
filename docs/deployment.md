@@ -702,6 +702,10 @@ envelopes cannot select these tasks. IAM
 `lambda:InvokeFunction` authorizes the whole function, including its existing
 backup task; IAM does not restrict individual task names.
 
+Database backup and vacuum use `{"source":"ttrek.patch","task":"task_backup_website"}`.
+The existing daily schedule in `devops/infra/38-infra-rds-postgres.yml` invokes this
+task at 05:00 America/New_York. See [backup behavior and rollout](telemetry.md#daily-backups-and-vacuum).
+
 Account cleanup uses the same private task dispatcher with
 `{"source":"ttrek.patch","task":"task_prune_accounts"}`. The schedule in
 `devops/sam-template.yaml` invokes `SiteFunction` every five minutes using the
@@ -722,8 +726,8 @@ duration even when execution fails.
 `devops/infra/31-codebuild-patch.yml` defines the independent
 `Infra-DevOps-TTREK-Patch` CodeBuild project. It needs only Lambda invocation and
 its own log permissions; the Lambda uses its existing VPC/database access.
-This runner accepts only initialization and search publication; synchronization
-is deliberately excluded.
+This runner accepts initialization, search publication and database backup/vacuum;
+synchronization is deliberately excluded.
 The website deployment build does not invoke it. Redeploy the group policies with
 `00-deploy-iam-policy.sh` using an administrator profile to allow management of
 the new project, role and log group. Deploy the patch stack separately with its
@@ -736,6 +740,9 @@ aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
 # Republish directly edited/restored database metadata without importing recipes:
 aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
   --environment-variables-override name=PATCH_TASK,value=task_publish_search,type=PLAINTEXT
+# Run the same backup/vacuum task as the daily schedule:
+aws codebuild start-build --project-name Infra-DevOps-TTREK-Patch \
+  --environment-variables-override name=PATCH_TASK,value=task_backup_website,type=PLAINTEXT
 ```
 
 The script uses the standard AWS profile/region defaults above.

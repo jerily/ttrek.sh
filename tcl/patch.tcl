@@ -9,7 +9,7 @@
 namespace eval ::site_patch {}
 # Execute the selected maintenance operation with validated settings.
 proc ::site_patch::run {task context} {
-    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_refresh_package_tracker}} {error "Unknown patch task"}
+    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_refresh_package_tracker task_backup_website}} {error "Unknown patch task"}
     set started [clock clicks -milliseconds]
     set status error
     log patch_task_start $task
@@ -110,4 +110,12 @@ proc ::site_patch::task_prune_accounts {context} {
 # Aggregation is only reachable through the IAM-authorized private task path.
 proc ::site_patch::task_refresh_package_tracker {context} {
     list [::package_tracker::refresh]
+}
+
+# Reuse the production backup, upload and vacuum with patch lifecycle logging.
+proc ::site_patch::task_backup_website {context} {
+    set result [::telemetry_maintenance::run $::site_lambda::maintenanceSettings $context]
+    set completed {}
+    dict for {name value} $result {lappend completed "$name:$value"}
+    return $completed
 }

@@ -113,12 +113,20 @@ At **05:00 America/New_York**, EventBridge Scheduler invokes the existing
 `prod-Api-TtrekWebsite-Function` directly with this private event:
 
 ```json
-{"source":"ttrek.telemetry","action":"backup-vacuum"}
+{"source":"ttrek.patch","task":"task_backup_website"}
 ```
 
-`tcl/lambda.tcl` accepts this exact event shape separately from HTTP envelopes.
+`tcl/lambda.tcl` routes this exact event shape through the private patch dispatcher
+in `tcl/patch.tcl`, including its `patch_task_start` and `patch_task_end` logs.
 There is no public maintenance URL. IAM authorizes the scheduler to invoke the
-website Lambda; no additional HTTP credential is required.
+website Lambda; no additional HTTP credential is required. The task requires PROD
+PostgreSQL and is also available through the CodeBuild patch runner.
+
+For an existing deployment, deploy the updated website Lambda, then redeploy
+`devops/infra/38-deploy-infra-rds-postgres.sh` to switch the existing schedule's
+payload. Complete both updates before the next daily run: the old
+`ttrek.telemetry` / `backup-vacuum` event is no longer accepted. The schedule keeps
+its name, 05:00 timezone-aware cadence, IAM role and retry policy.
 
 The invocation uses tpersist 0.1.5 to export a consistent repeatable-read snapshot
 of every application table in the PostgreSQL connection's current schema, uploads
