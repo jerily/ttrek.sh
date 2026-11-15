@@ -72,6 +72,17 @@ proc ::accounts::mount {router settings templates} {
     return $mount
 }
 
+# Adapt verified account IDs to treqmon's session field, counting each user once.
+proc ::accounts::monitor_enter {context request} {
+    variable mount
+    dict unset request session
+    set user [::web::user::current_user $mount $request $context]
+    if {$user ne {}} {
+        dict set request session [dict create loggedin true id [dict get $user id]]
+    }
+    return $request
+}
+
 # Fill the shared layout from this request's session, including a newly rotated cookie.
 proc ::accounts::navigation {request response context} {
     variable mount
