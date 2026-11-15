@@ -15,7 +15,7 @@ const server = http.createServer(async (req, res) => {
         const url = new URL(req.url, 'http://localhost');
         let filename;
         if (routes[url.pathname]) {
-            const fixture = url.pathname === '/packages' && url.searchParams.get('language') === 'C++'
+            const fixture = url.pathname === '/packages' && url.searchParams.get('language') === 'tcl-c-cpp'
                 ? 'filtered.html' : routes[url.pathname];
             filename = path.join(fixtures, fixture);
         } else {
@@ -55,12 +55,23 @@ try {
     }
     await page.goto(base + '/packages');
     assert.equal(await page.locator('[name="language"]').inputValue(), '');
+    assert.deepEqual(await page.locator('[name="language"] option').allTextContents(),
+        ['Any', 'Only TCL', 'TCL and C/C++', 'Only C or C++']);
     const all = await page.locator('.package-card').count();
-    await page.selectOption('[name="language"]', 'C++');
-    await page.waitForURL(url => url.searchParams.get('language') === 'C++');
-    assert.equal(await page.locator('[name="language"]').inputValue(), 'C++');
+    await page.selectOption('[name="language"]', 'tcl-c-cpp');
+    await page.waitForURL(url => url.searchParams.get('language') === 'tcl-c-cpp');
+    assert.equal(await page.locator('[name="language"]').inputValue(), 'tcl-c-cpp');
     assert(await page.locator('.package-card').count() < all);
     await page.screenshot({ path: path.join(fixtures, 'filtered-desktop.png'), fullPage: true });
+    await page.route('**/registry/autocomplete?*', route => route.fulfill({ json: [] }));
+    const autocomplete = page.waitForRequest(request => new URL(request.url()).pathname === '/registry/autocomplete');
+    await page.locator('[name="q"]').fill('tjson');
+    const suggestionQuery = new URL((await autocomplete).url()).searchParams;
+    assert.equal(suggestionQuery.get('q'), 'tjson');
+    assert.equal(suggestionQuery.get('language'), 'tcl-c-cpp');
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL(url => url.searchParams.get('q') === 'tjson');
+    assert.equal(new URL(page.url()).searchParams.get('language'), 'tcl-c-cpp');
     assert.deepEqual(errors, []);
     console.log('Package overview, version pages and language dropdown passed at 320, 390, 768 and 1440 px.');
 } finally {

@@ -217,14 +217,14 @@ proc get_packages_page_handler {ctx req} {
         return [get_search_page_handler $ctx $req]
     }
     if {[catch {::recipe_search::request_language $req} language]} {
-        return [::twebserver::build_response 400 text/plain "Choose Any, C, C++ or TCL."]
+        return [::twebserver::build_response 400 text/plain "Choose Any, Only TCL, TCL and C/C++, or Only C or C++."]
     }
     if {[catch {::recipe_search::catalog_entries [::recipe_search::database registry_catalog]} catalog]} {
         return [::recipe_search::unavailable]
     }
     set packages {}
     dict for {name package} $catalog {
-        if {$language eq {} || $language in [dict get $package languages]} {lappend packages $package}
+        if {[::recipe_search::matches_language [dict get $package languages] $language]} {lappend packages $package}
     }
     set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
         result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}} \

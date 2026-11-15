@@ -96,7 +96,7 @@ proc ::recipe_search::results {text {limit 0} {language {}}} {
         foreach match $matches {
             set name [dict get $match name]
             set data [dict get $metadata $name]
-            if {$language ne {} && $language ni [dict get $data languages]} continue
+            if {![matches_language [dict get $data languages] $language]} continue
             set description [dict get $data description]
             if {[dict get $match tier] in {3 6}} {
                 set description [dict get $data versions [dict get $match version] description]
@@ -198,11 +198,24 @@ proc ::recipe_search::request_query {request} {
     return [query [lindex $values 0]]
 }
 
+# Apply the same language groups to browsing, search and autocomplete.
+proc ::recipe_search::matches_language {languages filter} {
+    set tcl [expr {"TCL" in $languages}]
+    set native [expr {"C" in $languages || "C++" in $languages}]
+    switch -- $filter {
+        {} {return 1}
+        tcl-only {return [expr {$tcl && !$native}]}
+        tcl-c-cpp {return [expr {$tcl && $native}]}
+        c-cpp-only {return [expr {!$tcl && $native}]}
+        default {error "Invalid programming language filter"}
+    }
+}
+
 # Optional registry-page filter; reject repeated or unsupported values.
 proc ::recipe_search::request_language {req} {
     set values [request_values $req language]
-    if {[llength $values] > 1 || [lindex $values 0] ni {{} C C++ TCL}} {
-        error "Choose Any, C, C++ or TCL."
+    if {[llength $values] > 1 || [lindex $values 0] ni {{} tcl-only tcl-c-cpp c-cpp-only}} {
+        error "Choose Any, Only TCL, TCL and C/C++, or Only C or C++."
     }
     return [lindex $values 0]
 }
