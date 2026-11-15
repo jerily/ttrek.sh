@@ -10,6 +10,16 @@ curl --proto '=https' --tlsv1.2 -sSf https://ttrek.sh/init | sh
 
 Open a new terminal after installation so your shell picks up the executable.
 
+## Get command help
+
+Run `ttrek help SUBCOMMAND` to see a command's usage and options. For example:
+
+```sh
+ttrek help install
+```
+
+Use `ttrek help` to list commands, or browse the [CLI Reference](/docs/cli-reference).
+
 ## Install build tools
 
 Before installing packages on Ubuntu/Debian:
