@@ -61,7 +61,8 @@ permission, CSRF, origin and revision. Restoring hidden content preserves its
 approval state. Hidden or unapproved posts are absent from public lists.
 
 Administrators also receive `users.manage` in the default configuration. After
-access sync, **Account → Manage users** shows registered users, registration
-times, authenticator status and group assignments. The directory is checked
+access sync, **Account → Manage users** shows registered users, registration, last sign-in and last visit
+times, authenticator status and group assignments. Choose **Recently signed in**,
+**Recently active**, or **Newest registrations** to change the order. The directory is checked
 against current permissions on every request and contains only this account
 tenant. Moderator/editor grants alone do not reveal it.

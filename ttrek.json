@@ -72,6 +72,12 @@
         "task_prune_accounts"
       ]
     },
+    "migrate-user-ids-local": {
+      "file": "bin/invoke-patch-local.sh",
+      "args": [
+        "task_migrate_user_ids"
+      ]
+    },
     "sync-access-local": {
       "file": "bin/invoke-patch-local.sh",
       "args": [
@@ -100,7 +106,7 @@
     "tconfig": "^1.0.0",
     "web-user": "=0.5.0",
     "tcaptcha": "^0.1.0",
-    "web-forum": "=0.2.0"
+    "web-forum": "=0.3.0"
   },
   "devDependencies": {
     "tcllib": "^2.0.0",

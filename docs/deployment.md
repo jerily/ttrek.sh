@@ -704,6 +704,14 @@ the configuration and initializing schema, invoke
 memberships and permission grants. This task is also available in the CodeBuild
 patch project's `PATCH_TASK` selection. See [forum and access configuration](forum.md).
 
+After schema initialization, `{"source":"ttrek.patch","task":"task_migrate_user_ids"}`
+converts existing account identities to `user_<ksuid>` using the site's current
+keys. Run this explicit task while account traffic is paused. It updates encrypted
+account/profile fields and session references in one transaction, preserving
+browser sessions, MFA and verification/reset codes. It is safe to rerun. Forum
+data is not changed. The task is available in the CodeBuild patch task selector;
+locally use `ttrek run -script migrate-user-ids-local`.
+
 When upgrading to `web-user` 0.4.0, invoke `task_initdb_website` after deployment
 and before reopening account traffic. Through **November 16, 2026, inclusive
 (America/New_York)**, initialization also encrypts existing bcrypt hashes in

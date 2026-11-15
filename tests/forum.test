@@ -1,6 +1,6 @@
 package require tcltest
 package require web-user 0.5.0
-package require web-forum 0.2.0
+package require web-forum 0.3.0
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl config.tcl]
@@ -17,7 +17,7 @@ set settings [dict create rootdir $root content_connection $db content_images {}
     account [::app_config::account $raw $root $work] forum [::app_config::forum $raw]]
 ::site::init_worker $settings
 set store $::accounts::store
-set uid [ksuid::generate_ksuid]
+set uid user_[ksuid::generate_ksuid]
 ::web::user::insert $store web_user_users [dict create id $uid active 1 verified 1 email_key [::web::user::email_key $store mira@example.com] email [::web::user::seal $store mira@example.com [list email $uid]] password unused mfa_secret {} last_step -1 revision 0 created_at 1]
 set token [::web::user::new_session $store auth $uid]
 set cookie [lindex [split [dict get [::web::user::set_cookie $::accounts::mount {} $token] headers Set-Cookie] {;}] 0]
@@ -68,6 +68,27 @@ test site-users-admin {Account links to the protected user list through the shar
         [string match {*pure-menu-link">Forum*} $html] \
         [dict get [::site::dispatch $::site::router [dict merge $signed {path /user/admin/users}]] statusCode]
 } -result {1 200 no-store 1 1 1 403}
+
+test site-users-id-migration {private patch migrates user identity and existing sessions idempotently} -body {
+    set old [::ksuid::generate_ksuid]
+    set hash [::web::user::password_hash {a migration password} {bcrypt_cost 4}]
+    ::web::user::insert $store web_user_users [dict create id $old active 1 verified 1 \
+        email_key [::web::user::email_key $store before@example.com] \
+        email [::web::user::seal $store before@example.com [list email $old]] \
+        password [::web::user::seal $store $hash [list password-hash $old]] \
+        mfa_secret {} last_step -1 revision 0 created_at 1]
+    set token [::web::user::new_session $store auth $old]
+    set event {{"source":"ttrek.patch","task":"task_migrate_user_ids"}}
+    set first [::tjson::json_to_simple [::site_lambda::handle $event {}]]
+    set second [::tjson::json_to_simple [::site_lambda::handle $event {}]]
+    set user [::web::user::user_by_id $store user_$old]
+    set public [::site_lambda::handle {{"source":"ttrek.patch","task":"task_migrate_user_ids","httpMethod":"POST","path":"/patch","headers":{},"body":""}} {}]
+    set public [::tjson::json_to_simple $public]
+    list [dict get $first completed] [dict get $second completed] \
+        [dict get [::web::user::public_user $store $user] email] \
+        [expr {[dict get [::web::user::session $store $token] uid] eq "user_$old"}] \
+        [expr {[dict get $public statusCode] in {404 405}}]
+} -result {{users:1 registrations:0 profiles:0 sessions:1} {users:0 registrations:0 profiles:0 sessions:0} before@example.com 1 1}
 
 $::site::router destroy
 foreach handle $::accounts::handles {::tink::unregister_keyset $handle}

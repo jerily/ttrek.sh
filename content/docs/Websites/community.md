@@ -258,8 +258,9 @@ The moderator group can manage discussions. It needs `wiki.edit` or `blog.edit`
 added to its permission list to edit notebook pages or journal posts as well.
 
 An administrator also sees **Your account → Manage users**. This lists who has
-registered, when they joined, whether they use an authenticator, and which groups
-they belong to. The `users.manage` permission controls access to that page.
+registered, when they joined, last signed in and last visited, whether they use
+an authenticator, and which groups they belong to. Choose **Recently signed in**,
+**Recently active**, or **Newest registrations** to change the order. The `users.manage` permission controls access to that page.
 
 A moderator sees **Pending moderation**, **Hidden posts**, and **Moderation
 history** in the forum. They can hide and restore posts, or lock a discussion to

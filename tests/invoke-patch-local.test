@@ -85,6 +85,7 @@ test local-patch-maintenance-scripts {The local tracker and pruning scripts invo
     foreach {script task} {
         refresh-package-tracker-local task_refresh_package_tracker
         sync-access-local task_sync_access
+        migrate-user-ids-local task_migrate_user_ids
         prune-accounts-local task_prune_accounts
         prune-accounts task_prune_accounts
     } {
@@ -95,7 +96,7 @@ test local-patch-maintenance-scripts {The local tracker and pruning scripts invo
         lappend results [expr {[dict get $definition file] eq "bin/invoke-patch-local.sh" && [dict get $payload task] eq $task}]
     }
     set results
-} -result {1 1 1 1}
+} -result {1 1 1 1 1}
 
 test local-patch-bootstrap {Bootstrap runs schema, access, content and tracker tasks in order through the configured local endpoint} -setup {
     reset_response

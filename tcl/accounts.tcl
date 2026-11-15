@@ -124,6 +124,13 @@ proc ::accounts::sync_access {} {
     ::web::user::sync_access $store [dict get $access groups] [dict get $access permissions]
 }
 
+# Explicit maintenance uses this tenant's existing encryption and MAC keys.
+proc ::accounts::migrate_user_ids {} {
+    variable store
+    if {$store eq {}} {error "Accounts are not initialized"}
+    ::web::user::migrate_user_ids $store
+}
+
 # Temporary upgrade: encrypt bare bcrypt hashes through November 16, 2026
 # (America/New_York). Repeated initialization never re-encrypts ciphertext.
 proc ::accounts::migrate_password_hashes {} {
