@@ -22,7 +22,9 @@
     },
     "bootstrap-local": {
       "file": "bin/invoke-patch-local.sh",
-      "args": ["bootstrap-local"]
+      "args": [
+        "bootstrap-local"
+      ]
     },
     "initdb-local": {
       "file": "bin/invoke-patch-local.sh",
@@ -68,11 +70,15 @@
     },
     "refresh-package-tracker-local": {
       "file": "bin/invoke-patch-local.sh",
-      "args": ["task_refresh_package_tracker"]
+      "args": [
+        "task_refresh_package_tracker"
+      ]
     },
     "prune-accounts-local": {
       "file": "bin/invoke-patch-local.sh",
-      "args": ["task_prune_accounts"]
+      "args": [
+        "task_prune_accounts"
+      ]
     },
     "prune-accounts": {
       "file": "bin/invoke-patch-local.sh",
@@ -100,7 +106,7 @@
     "aws-sdk-tcl-s3": "^1.0.18",
     "tpersist": "^0.1.5",
     "tconfig": "^1.0.0",
-    "web-user": "^0.3.0",
+    "web-user": "0.4.0",
     "tcaptcha": "^0.1.0"
   },
   "devDependencies": {
