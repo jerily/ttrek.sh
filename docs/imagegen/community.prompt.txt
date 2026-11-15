@@ -1,0 +1,9 @@
+Generated with the built-in imagegen tool.
+
+Use case: illustration-story
+Asset type: wide opening illustration for a beginner tutorial about cloning and customizing a community website.
+Primary request: a welcoming neighborhood garden and workshop, with a small group of adults tending plants and sharing ideas around a table, and a laptop in the foreground showing a simple community homepage with discussion cards and a shared notebook. Convey a friendly online gathering place connected to a real community.
+Style/medium: refined hand-painted gouache and cut-paper editorial illustration, subtle paper texture, crisp silhouettes, cohesive professional finish. Match the quiet notebook feeling of a personal-site tutorial.
+Composition/framing: landscape 3:2 composition, clear focal point, generous breathing room, uncluttered and warm.
+Color palette: warm ivory paper, forest and sage greens, muted terracotta accents.
+Constraints: no readable text, no letters, no logos, no watermarks, no UI labels, opaque background.

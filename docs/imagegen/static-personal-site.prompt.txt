@@ -1,0 +1,9 @@
+Generated with the built-in imagegen tool.
+
+Use case: illustration-story
+Asset type: wide opening illustration for a tutorial about cloning and personalizing a small Tcl website.
+Primary request: a warm editorial illustration of a personal website growing from local Markdown notes into a home on the web. A laptop displays a tasteful personal homepage with a journal and notebook, surrounded by a few paper notes; a gentle dotted path connects a duplicated page, the laptop, and a small cloud symbol.
+Style/medium: refined hand-painted gouache and cut-paper editorial illustration, subtle paper texture, crisp silhouettes, generous breathing room, cohesive and professional.
+Composition/framing: landscape 3:2 composition suitable for an article header, one clear focal point, uncluttered.
+Color palette: warm ivory paper, forest and sage greens, muted terracotta accents, inspired by a quiet personal notebook.
+Constraints: no text, no letters, no logos, no watermarks, no UI labels, opaque background.

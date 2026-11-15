@@ -47,6 +47,7 @@ proc ::site_lambda::initialize {root} {
         dict set settings assets_endpoint $::env(TTREK_LOCAL_S3_ENDPOINT)
     }
     dict set settings account [::app_config::account $config $root $dataDirectory]
+    dict set settings forum [::app_config::forum $config]
     dict set settings package_tracker [::app_config::package_tracker $config]
     set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]
     ::telemetry::connect $maintenanceSettings

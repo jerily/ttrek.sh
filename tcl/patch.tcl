@@ -9,7 +9,7 @@
 namespace eval ::site_patch {}
 # Execute the selected maintenance operation with validated settings.
 proc ::site_patch::run {task context} {
-    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_refresh_package_tracker task_backup_website}} {error "Unknown patch task"}
+    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_sync_access task_migrate_user_ids task_refresh_package_tracker task_backup_website}} {error "Unknown patch task"}
     set started [clock clicks -milliseconds]
     set status error
     log patch_task_start $task
@@ -109,6 +109,19 @@ proc ::site_patch::task_prune_accounts {context} {
     set counts [::accounts::prune]
     set result {}
     dict for {name count} $counts {lappend result "$name:$count"}
+    return $result
+}
+
+proc ::site_patch::task_sync_access {context} {
+    set counts [::accounts::sync_access]
+    set result {}
+    dict for {name count} $counts {lappend result "$name:$count"}
+    return $result
+}
+
+proc ::site_patch::task_migrate_user_ids {context} {
+    set result {}
+    dict for {name count} [::accounts::migrate_user_ids] {lappend result "$name:$count"}
     return $result
 }
 

@@ -54,8 +54,9 @@ Use `ttrek install -y` to install a project's declared dependencies. See
 [Managing packages](/docs/managing-packages) and
 [Registries](/docs/registries) for version selection and private packages.
 
-For a complete project to try, follow [Build websites with ttrek](/docs/build-websites-with-ttrek)
-to run a personal site and a community site with accounts.
+For a complete first project, follow [Your first personal website](/docs/websites/personal-site)
+to clone a site and write Markdown pages. Try [the community example](/docs/websites/community)
+when you want accounts and discussions.
 
 To learn how an app saves data between runs, try
 [Database Persistence Layer with tpersist](/docs/database-persistence-layer).

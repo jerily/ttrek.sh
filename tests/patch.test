@@ -221,12 +221,14 @@ test patch-sync-invalid-registry {A bad recipe rolls back content, recipes and s
 } -result {1 1}
 
 test patch-provider-failure {broken installed schema providers fail the task} -setup {
-    package ifneeded web-wiki 99.0 {namespace eval ::web::wiki {}; proc ::web::wiki::initdb {db} {error {schema failure}}; package provide web-wiki 99.0}
+    package require web-wiki
+    rename ::web::wiki::initdb ::web::wiki::saved_initdb
+    proc ::web::wiki::initdb {db} {error {schema failure}}
 } -body {
     ::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}
 } -cleanup {
-    package forget web-wiki
     rename ::web::wiki::initdb {}
+    rename ::web::wiki::saved_initdb ::web::wiki::initdb
 } -returnCodes error -result {schema failure}
 
 test patch-lifecycle-logs {Start and end records cover success and failure without disclosing the task error} -setup {

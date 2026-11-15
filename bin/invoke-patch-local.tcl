@@ -10,7 +10,7 @@ namespace eval ::local_patch {}
 
 # Attach the route name and invoke its handler.
 proc ::local_patch::invoke {task port function} {
-    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_refresh_package_tracker}} {error "Unknown patch task"}
+    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_sync_access task_migrate_user_ids task_refresh_package_tracker}} {error "Unknown patch task"}
     if {![string is integer -strict $port] || $port < 1 || $port > 65535} {error "Invalid Lambda port"}
     if {![regexp {^[A-Za-z0-9_-]+$} $function]} {error "Invalid Lambda function name"}
     set payload [::tjson::typed_to_json [list M [dict create source {S ttrek.patch} task [list S $task]]]]
@@ -35,7 +35,7 @@ proc ::local_patch::invoke {task port function} {
 # Run this command-line entry point with validated arguments.
 proc ::local_patch::main {root arguments} {
     if {![llength $arguments] || "--help" in $arguments || "-h" in $arguments} {
-        return "Usage: invoke-patch-local.sh bootstrap-local|task_initdb_website|task_sync_website|task_publish_search|task_prune_accounts|task_refresh_package_tracker ?--lambda-port PORT?"
+        return "Usage: invoke-patch-local.sh bootstrap-local|task_initdb_website|task_sync_website|task_publish_search|task_prune_accounts|task_sync_access|task_migrate_user_ids|task_refresh_package_tracker ?--lambda-port PORT?"
     }
     set task [lindex $arguments 0]
     set options [lrange $arguments 1 end]
@@ -49,7 +49,7 @@ proc ::local_patch::main {root arguments} {
     try {set settings [::tjson::json_to_simple [read $channel]]} finally {close $channel}
     set tasks [list $task]
     if {$task eq "bootstrap-local"} {
-        set tasks {task_initdb_website task_sync_website task_refresh_package_tracker}
+        set tasks {task_initdb_website task_sync_access task_sync_website task_refresh_package_tracker}
     }
     set results {}
     foreach selected $tasks {
