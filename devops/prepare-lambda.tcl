@@ -1,8 +1,8 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
 package require Tcl 9.1
 source [file join [file dirname [file dirname [info script]]] runtime paths.tcl]
@@ -19,11 +19,11 @@ foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js 
     }
 }
 package require http
-package require web-user 0.5.1
+package require web-user 0.5.2
 package require web-forum 0.2.0
-package require awsses 1.0.16
-package require awssqs 1.0.19
-package require awslambda 1.0.18
+package require pure-tcl-aws-ses 0.1.0
+package require pure-tcl-aws-sqs 0.1.0
+package require pure-tcl-aws-lambda 0.1.0
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
 set releases [::app_config::releases {}]

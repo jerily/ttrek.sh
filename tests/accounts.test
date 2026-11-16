@@ -1,8 +1,9 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
+
 package require tcltest
 package require web-user
 namespace import ::tcltest::*
@@ -406,7 +407,7 @@ test accounts-close-account {direct and Lambda account closure confirms the pass
 
 test accounts-ses {production configuration sends verification and recovery through the configured SES sender} -setup {
     package require tconfig::decrypt
-    package require awsses 1.0.16
+    package require pure-tcl-aws-ses 0.1.0
     rename ::aws::ses::create ::accountstest::real_ses_create
     # Capture SES client configuration without contacting AWS.
     proc ::aws::ses::create {options} {
@@ -448,7 +449,7 @@ test accounts-ses {production configuration sends verification and recovery thro
 test accounts-email-queue-config {SSM String and SecureString queue URLs reach mounted web-user delivery} -setup {
     package require tconfig::encrypt
     package require tconfig::decrypt
-    package require awssqs 1.0.19
+    package require pure-tcl-aws-sqs 0.1.0
     set queueKey [::tink::register_keyset [::tink::aead::create_keyset AES256_GCM]]
     set queueRouter [::tpathexp::router]
     rename ::aws::sqs::create ::accountstest::real_sqs_create

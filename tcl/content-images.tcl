@@ -1,8 +1,8 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
 # Share image-store clients across the content collections.
 namespace eval ::content_images {variable clients {}}
@@ -28,7 +28,7 @@ proc ::content_images::options {settings kind {uploadMissing {}}} {
     }
     if {$settings eq {} || [dict get $settings bucket] eq {}} {return {}}
     if {$uploadMissing eq {}} {set uploadMissing [expr {[::app_config::mode] eq "LOCAL"}]}
-    package require awss3 1.0.17
+    package require pure-tcl-aws-s3 0.1.0
     set clientSettings [dict create region [dict get $settings region]]
     set endpoint [dict get $settings endpoint]
     if {$endpoint ne {}} {

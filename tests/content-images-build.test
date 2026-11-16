@@ -1,8 +1,8 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
 # Check image publication and database-backed content initialization.
 package require Tcl 9.1
@@ -11,7 +11,7 @@ namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl config.tcl]
 source [file join $root tcl content-images.tcl]
-package provide awss3 1.0.17
+package provide pure-tcl-aws-s3 0.1.0
 namespace eval ::aws::s3 {}
 # Provide the create test fixture.
 proc ::aws::s3::create {settings} {return ::build_images::client}
