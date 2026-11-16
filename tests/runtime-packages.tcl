@@ -1,8 +1,8 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
 # Load real dependencies in a fresh interpreter, without opening service connections.
 package require Tcl 9.1
@@ -10,8 +10,8 @@ set packages $argv
 if {![llength $packages]} {
     set packages {
         twebserver topenapi sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
-        awss3 awskms awsssm tconfig::decrypt tconfig::encrypt
-        tratelimit treqmon web-user web-forum tcaptcha tclgd awsses awssqs awslambda
+        pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
+        tratelimit treqmon web-user web-forum tcaptcha tclgd pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3 tdbc::postgres
         mock-proxy-app mock-lambda-app mock-s3-app trequests
     }
@@ -29,14 +29,17 @@ foreach name $packages {
             topenapi {package require topenapi 0.2.0}
             ttrie {package require ttrie 0.2.0}
             ttrigrams {package require ttrigrams 0.2.0}
-            trequests {package require trequests 1.1.0}
+            trequests {package require trequests 1.3.0}
+            tdom {package require tdom 0.9.6}
             treqmon {package require treqmon 2.2.0}
             tratelimit {package require tratelimit 1.1.0}
             tpathexp {package require tpathexp 1.2.0}
-            awss3 {package require awss3 1.0.17}
-            awskms - awsssm {package require $name 1.0.12}
-            web-static-wiki {package require $name 0.1.6}
-            web-static-blog {package require $name 0.1.5}
+            pure-tcl-aws-s3 {package require pure-tcl-aws-s3 0.1.0}
+            pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 0.1.0}
+            web-static-wiki {package require $name 0.1.9}
+            web-static-blog {package require $name 0.1.8}
+            web-user {package require $name 0.5.2}
+            tconfig::decrypt - tconfig::encrypt {package require $name 1.0.1}
             default {package require $name}
         }
     } result]} {
@@ -44,6 +47,13 @@ foreach name $packages {
         set failed 1
     } else {
         puts "$name: $result"
+    }
+}
+# Reject native AWS clients accidentally loaded through another dependency.
+foreach library [info loaded] {
+    if {[regexp -nocase {aws[-_]sdk[-_]tcl} $library]} {
+        puts stderr "Native AWS client loaded: $library"
+        set failed 1
     }
 }
 if {!$failed && ![llength $argv]} {

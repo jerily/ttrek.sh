@@ -60,7 +60,7 @@ It checks documentation, HEAD/error behavior,
 S3-backed asset changes, binary objects, signed release downloads and checksums,
 Lambda payload 1.0 query/body handling, an unchanged archive, and shutdown cleanup.
 Package before running this test. `TTREK_TEST_SITE_ZIP` and
-`TTREK_TEST_S3_SEED` can select an isolated archive and seed directory. Package checks include `awss3`; release-handler tests cover target selection, signing
+`TTREK_TEST_S3_SEED` can select an isolated archive and seed directory. Package checks include `pure-tcl-aws-s3`; release-handler tests cover target selection, signing
 arguments, metadata, disabled downloads, invalid requests and signer failures.
 Config tests cover manifest validation, paths, and exact environment/version
 selection. The local stack test checks that uploaded metadata takes precedence
@@ -90,7 +90,7 @@ It first verifies that search is unavailable in a fresh local runtime, then
 explicitly invokes initialization and synchronization through the shared local
 patch helper. Local startup performs neither task automatically.
 
-Integration tests use Tcl 9.1 and the development dependency `trequests` 1.1.0
+Integration tests use Tcl 9.1 and the dependency `trequests` 1.3.0
 for HTTP, binary bodies and verified TLS. They need Linux `setsid` and OpenSSL
 for isolated service processes and native checksums.
 

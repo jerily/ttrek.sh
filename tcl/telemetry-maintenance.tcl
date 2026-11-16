@@ -1,8 +1,8 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
 # Scheduled telemetry export/restore. Uses the existing PostgreSQL driver and
 # AWS SDK; no external executables. HTTP requests cannot enter this handler.
@@ -47,7 +47,7 @@ proc ::telemetry_maintenance::backup {settings path deadline} {
 
 # Upload the selected artifacts to the configured storage service.
 proc ::telemetry_maintenance::upload {path bucket key} {
-    package require awss3
+    package require pure-tcl-aws-s3 0.1.0
     set client [::aws::s3::create [dict create region $::env(AWS_REGION)]]
     try {$client put $bucket $key $path} finally {$client destroy}
 }

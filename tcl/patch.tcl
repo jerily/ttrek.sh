@@ -1,8 +1,8 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
 # Private tasks invoked directly through the Lambda Invoke API. API Gateway
 # requests retain their HTTP envelope and cannot select this dispatch path.
@@ -115,8 +115,8 @@ proc ::site_patch::task_process_email_queue {context} {
     if {[::app_config::mode] ne "PROD" || ![dict exists $settings account display]} {return {}}
     set config [dict get $settings account display]
     if {![dict get $config email_enabled] || ![dict get $config email_queue_enabled]} {return {}}
-    package require awssqs 1.0.19
-    package require awsses 1.0.16
+    package require pure-tcl-aws-sqs 0.1.0
+    package require pure-tcl-aws-ses 0.1.0
     set deadline [expr {[clock milliseconds] + 240000}]
     if {[dict exists $context lambda-runtime-deadline-ms]} {
         set deadline [expr {min($deadline, [dict get $context lambda-runtime-deadline-ms] - 30000)}]

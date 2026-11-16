@@ -1,9 +1,15 @@
+# 
+# Copyright Jerily LTD. All Rights Reserved.
+# SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
+# SPDX-License-Identifier: MIT.
+# 
+
 package require tcltest 2
 package require tjson
-package require web-user 0.5.1
-package require awssqs 1.0.19
-package require awsses 1.0.16
-package require awslambda 1.0.18
+package require web-user 0.5.2
+package require pure-tcl-aws-sqs 0.1.0
+package require pure-tcl-aws-ses 0.1.0
+package require pure-tcl-aws-lambda 0.1.0
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 foreach name {config accounts patch lambda} {source [file join $root tcl $name.tcl]}

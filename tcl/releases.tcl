@@ -1,10 +1,10 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
-package require awss3 1.0.12
+package require pure-tcl-aws-s3 0.1.0
 
 namespace eval ::releases {
     variable client {}
