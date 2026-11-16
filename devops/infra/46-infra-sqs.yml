@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Standard queue for account emails, processed by the website Lambda.
+
+Parameters:
+  QueueName:
+    Type: String
+    Default: sqs_user_emails_queue
+    AllowedPattern: '[A-Za-z0-9_-]{1,80}'
+    Description: Must match account.email_queue_name in the production configuration.
+
+Resources:
+  UserEmailsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref QueueName
+      SqsManagedSseEnabled: true
+      # Longer than the website Lambda's 300-second timeout.
+      VisibilityTimeout: 330
+      ReceiveMessageWaitTimeSeconds: 1
+
+Outputs:
+  QueueUrl:
+    Value: !Ref UserEmailsQueue
+  QueueArn:
+    Value: !GetAtt UserEmailsQueue.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-QueueArn

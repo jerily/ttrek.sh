@@ -9,7 +9,7 @@
 namespace eval ::site_patch {}
 # Execute the selected maintenance operation with validated settings.
 proc ::site_patch::run {task context} {
-    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_sync_access task_migrate_user_ids task_refresh_package_tracker task_backup_website}} {error "Unknown patch task"}
+    if {$task ni {task_initdb_website task_sync_website task_publish_search task_prune_accounts task_sync_access task_migrate_user_ids task_refresh_package_tracker task_backup_website task_process_email_queue}} {error "Unknown patch task"}
     set started [clock clicks -milliseconds]
     set status error
     log patch_task_start $task
@@ -106,6 +106,57 @@ proc ::site_patch::task_prune_accounts {context} {
     set result {}
     dict for {name count} $counts {lappend result "$name:$count"}
     return $result
+}
+
+# Bounded draining also runs on its own schedule, so retries do not depend on
+# another registration. Failed messages stay queued until visibility expires.
+proc ::site_patch::task_process_email_queue {context} {
+    set settings [::site::config]
+    if {[::app_config::mode] ne "PROD" || ![dict exists $settings account display]} {return {}}
+    set config [dict get $settings account display]
+    if {![dict get $config email_enabled] || ![dict get $config email_queue_enabled]} {return {}}
+    package require awssqs 1.0.19
+    package require awsses 1.0.16
+    set deadline [expr {[clock milliseconds] + 240000}]
+    if {[dict exists $context lambda-runtime-deadline-ms]} {
+        set deadline [expr {min($deadline, [dict get $context lambda-runtime-deadline-ms] - 30000)}]
+    }
+    set sqs [::aws::sqs::create [dict create region [dict get $config email_region]]]
+    set ses {}
+    set sent 0
+    set expired 0
+    set failed 0
+    try {
+        set queue [$sqs get_queue_url [dict get $config email_queue_name]]
+        for {set batch 0} {$batch < 10 && [clock milliseconds] < $deadline} {incr batch} {
+            set messages [$sqs receive_messages $queue 10]
+            if {![llength $messages]} {break}
+            foreach message $messages {
+                if {[clock milliseconds] >= $deadline} {break}
+                if {[catch {
+                    set body [::tjson::json_to_simple [dict get $message Body]]
+                    set expires [dict get $body expires_at]
+                    if {[dict get $body version] ne "1" || ![string is entier -strict $expires] || $expires < 0} {
+                        error "Invalid queued email"
+                    }
+                    if {$expires && $expires <= [clock seconds]} {
+                        incr expired
+                    } else {
+                        if {$ses eq {}} {set ses [::aws::ses::create [dict create region [dict get $config email_region]]]}
+                        $ses send_email [dict get $body message]
+                        incr sent
+                    }
+                    # Acknowledge only a successful send or an expired code.
+                    $sqs delete_message $queue [dict get $message ReceiptHandle]
+                }]} {incr failed}
+            }
+        }
+    } finally {
+        try {if {$ses ne {}} {$ses destroy}} finally {$sqs destroy}
+    }
+    # Do not expose message bodies, recipients, codes, or SDK errors in logs.
+    if {$failed} {error "Queued email delivery failed for $failed message(s)"}
+    return [list sent:$sent expired:$expired]
 }
 
 proc ::site_patch::task_sync_access {context} {

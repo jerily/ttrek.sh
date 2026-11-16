@@ -49,6 +49,7 @@ npm test
 "$TCLSH" tests/telemetry-config.test
 "$TCLSH" tests/telemetry-startup.test
 "$TCLSH" tests/patch.test
+"$TCLSH" tests/email-queue.test
 "$TCLSH" tests/invoke-patch-local.test
 "$TCLSH" tests/telemetry.test
 "$TCLSH" tests/registry-metadata.test
