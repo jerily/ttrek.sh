@@ -38,8 +38,8 @@ public subnet, load balancer or Fargate service. A private KMS interface endpoin
 allows tconfig to decrypt the packaged configuration at startup. The website
 Lambda has no
 runtime SSM access: SSM values are resolved by the build outside the VPC. The
-security groups allow Lambda to reach Valkey on 6379, PostgreSQL on 5432 and KMS
-on 443. The website Lambda also reaches a free S3 gateway endpoint for scheduled
+security groups allow Lambda to reach Valkey on 6379, PostgreSQL on 5432, and the
+KMS, SES, SQS and Lambda API endpoints on 443. The website Lambda also reaches a free S3 gateway endpoint for scheduled
 JSONL backups and explicit content-image synchronization. One private scheduled
 event performs backup and vacuum together. Future outbound AWS service calls
 need matching endpoints and policies; calls to public third-party services would
@@ -51,6 +51,40 @@ CloudFormation's `Fn::GetAZs`. The endpoint has one network interface. Valkey is
 one `cache.t4g.micro` node without a replica or automatic failover. An outage of
 that zone interrupts the website. Shared history is bounded and is not a durable
 audit log.
+
+## Queued account emails
+
+The production `[account]` configuration enables `email_queue_enabled=true`
+and sets `email_queue_name=sqs_user_emails_queue` in `email_region`. Set the flag
+false to return to direct SES delivery. LOCAL does not contact either service.
+
+After `web-user` enqueues an email, its `email_queue_callback` invokes the existing
+website Lambda asynchronously with
+`{"source":"ttrek.patch","task":"task_process_email_queue"}`. A separate
+`SiteFunctionEmailQueue` schedule runs the same task every five minutes to recover
+missed callbacks and retry failed sends. Account pruning is unchanged.
+
+The worker processes up to 100 messages per invocation, stops ahead of the Lambda
+deadline, and deletes messages only after SES succeeds (or a verification/reset
+code has expired). The queue's 330-second visibility timeout exceeds the Lambda's
+300-second timeout, preventing ordinary overlap between callback and scheduled
+consumers. Failed messages remain queued for retry, subject to the default
+four-day retention. This favors delivery: [SQS can redeliver messages](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/standard-queues-at-least-once-delivery.html),
+and an accepted SES send followed by a lost response or failed delete can still
+produce a duplicate. No database locks or delivery-tracking tables are used.
+
+Before deploying this change, publish `aws-sdk-tcl` v1.0.19 and `web-user` v0.5.1
+with their new registry recipes. Apply `00-deploy-iam-policy.sh`, redeploy
+`20-deploy-infra-vpc0.sh`, deploy `46-deploy-infra-sqs.sh`, and update
+`30-deploy-codebuild.sh` so CodeBuild can manage the new schedule. Then rebuild
+and deploy the SAM application. If overriding `TTREK_EMAIL_QUEUE_NAME`, update
+both production INI files and the queue ARN in the deployment IAM policy.
+
+The queue uses SQS-managed encryption, with no extra Lambda or customer KMS key.
+The isolated VPC needs SQS and Lambda API interface endpoints; each uses one
+interface in the existing Lambda availability zone. These endpoints add ongoing
+PrivateLink charges even when the queue is idle. Runtime IAM permits only the
+required queue operations and invocation of this same function.
 
 ## Infrastructure and DNS
 
@@ -68,7 +102,8 @@ For a new deployment:
    SecureString and deploy `38-deploy-infra-rds-postgres.sh` before building the website.
 6. Run `15-deploy-infra-certificate.sh` and complete DNS validation, then run
    `45-deploy-infra-ses.sh` to create the SES exports required by the Lambda role.
-   Run `16-deploy-cloudfront-cdn.sh` before the SAM application, which imports its URL.
+   Run `46-deploy-infra-sqs.sh` to create the account email queue, then
+   `16-deploy-cloudfront-cdn.sh` before the SAM application, which imports its URL.
 7. Complete the GitHub connection setup below, run `30-deploy-codebuild.sh`, then
    run the build (or use the manual Lambda steps below).
 8. Once Lambda exists and the certificate is issued, run `40-deploy-api-gateway.sh`.

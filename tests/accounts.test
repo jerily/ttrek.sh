@@ -421,6 +421,8 @@ test accounts-ses {production configuration sends verification and recovery thro
 } -body {
     set ::env(ENV) PROD
     set input [::tconfig::read_config [file join $root devops config.prod.ini]]
+    # Direct SES remains supported when queueing is explicitly disabled.
+    dict set input account email_queue_enabled false
     dict for {key value} [dict get $account keys] {dict set input account $key $value}
     set production [::app_config::account $input $root]
     set mail [dict create -store [dict replace $::accounts::store -env PROD] \

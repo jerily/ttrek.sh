@@ -46,7 +46,7 @@ proc ::accounts::mount {router settings templates} {
     variable store
     variable mount
     variable handles
-    package require web-user 0.5.0
+    package require web-user 0.5.1
     foreach handle $handles {::tink::unregister_keyset $handle}
     set handles {}
     set config [dict get $settings account]
@@ -62,6 +62,7 @@ proc ::accounts::mount {router settings templates} {
         set display [dict merge [dict get $config display] [dict create \
             master_template [dict get $templates account-master.html.jinja] \
             templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]]
+        dict set display email_queue_callback ::accounts::email_queued
         set mount [::web::user::mount $router -store $store -config $display]
     } on error {message options} {
         foreach handle $handles {::tink::unregister_keyset $handle}
@@ -70,6 +71,16 @@ proc ::accounts::mount {router settings templates} {
         return -options $options $message
     }
     return $mount
+}
+
+# Wake the existing Lambda asynchronously after SQS has accepted an email.
+proc ::accounts::email_queued {queueUrl} {
+    package require awslambda 1.0.18
+    set client [::aws::lambda::create [dict create region $::env(AWS_REGION)]]
+    try {
+        $client invoke_function $::env(AWS_LAMBDA_FUNCTION_NAME) \
+            {{"source":"ttrek.patch","task":"task_process_email_queue"}} Event
+    } finally {$client destroy}
 }
 
 # Adapt verified account IDs to treqmon's session field, counting each user once.

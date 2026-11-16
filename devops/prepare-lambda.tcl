@@ -19,9 +19,11 @@ foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js 
     }
 }
 package require http
-package require web-user 0.5.0
+package require web-user 0.5.1
 package require web-forum 0.2.0
 package require awsses 1.0.16
+package require awssqs 1.0.19
+package require awslambda 1.0.18
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
 set releases [::app_config::releases {}]

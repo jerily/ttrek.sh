@@ -363,7 +363,8 @@ proc ::app_config::account {config root {localDirectory {}}} {
         email_verification_required true verification_emails_enabled true captcha_length 6 \
         captcha_letters true login_captcha_after 3 login_captcha_window 900 cleanup_grace_period 3600]
     set display [dict create prefix /user title {Your account} issuer ttrek.sh origin https://ttrek.sh \
-        email_enabled true email_from noreply@ttrek.sh email_region eu-central-1]
+        email_enabled true email_from noreply@ttrek.sh email_region eu-central-1 \
+        email_queue_enabled false email_queue_name {}]
     if {[mode] eq "LOCAL"} {
         dict set display origin http://localhost:8080
         dict set display email_enabled false
