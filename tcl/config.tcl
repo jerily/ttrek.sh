@@ -131,6 +131,16 @@ proc ::app_config::validate_lambda_config {path} {
                 error "Production account.$name must be encrypted from SSM"
             }
         }
+        if {[dict exists $config account email_enabled] && [dict get $config account email_enabled] &&
+            [dict exists $config account email_queue_enabled] && [dict get $config account email_queue_enabled]} {
+            set queueUrl {}
+            foreach name {email_queue_url enc:email_queue_url} {
+                if {[dict exists $config account $name]} {append queueUrl [string trim [dict get $config account $name]]}
+            }
+            if {$queueUrl eq {}} {
+                error "Production account.email_queue_url is required from SSM: /ttrek_sh/prod/account/email_queue_url"
+            }
+        }
     }
     if {[dict get $config redis host] in {localhost 127.0.0.1 ::1}} {
         error "Production redis.host must be the ElastiCache endpoint"
@@ -364,7 +374,7 @@ proc ::app_config::account {config root {localDirectory {}}} {
         captcha_letters true login_captcha_after 3 login_captcha_window 900 cleanup_grace_period 3600]
     set display [dict create prefix /user title {Your account} issuer ttrek.sh origin https://ttrek.sh \
         email_enabled true email_from noreply@ttrek.sh email_region eu-central-1 \
-        email_queue_enabled false email_queue_name {}]
+        email_queue_enabled false email_queue_url {}]
     if {[mode] eq "LOCAL"} {
         dict set display origin http://localhost:8080
         dict set display email_enabled false

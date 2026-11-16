@@ -445,6 +445,58 @@ test accounts-ses {production configuration sends verification and recovery thro
     rename ::accountstest::ses_client {}
 } -result {true true true {eu-central-1 noreply@ttrek.sh member@example.com 1 1} {eu-central-1 noreply@ttrek.sh member@example.com 1 1}}
 
+test accounts-email-queue-config {SSM String and SecureString queue URLs reach mounted web-user delivery} -setup {
+    package require tconfig::encrypt
+    package require tconfig::decrypt
+    package require awssqs 1.0.19
+    set queueKey [::tink::register_keyset [::tink::aead::create_keyset AES256_GCM]]
+    set queueRouter [::tpathexp::router]
+    rename ::aws::sqs::create ::accountstest::real_sqs_create
+    proc ::aws::sqs::create {options} {
+        set ::accountstest::sqs_region [dict get $options region]
+        return ::accountstest::sqs_client
+    }
+    proc ::accountstest::sqs_client {method args} {
+        switch -- $method {
+            send_message {set ::accountstest::sqs_url [lindex $args 0]}
+            destroy {}
+            default {error "Unexpected SQS call: $method"}
+        }
+    }
+    proc ::accountstest::ssm_queue {method path decrypt} {
+        if {$method ne "get_parameter" || $path ne "/ttrek_sh/prod/account/email_queue_url" || !$decrypt} {
+            error "No test parameter"
+        }
+        dict create type $::accountstest::ssm_type value https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails
+    }
+} -body {
+    set ::env(ENV) PROD
+    set result {}
+    foreach type {String SecureString} {
+        set ::accountstest::ssm_type $type
+        set input [::tconfig::read_config [file join $root devops config.prod.ini]]
+        set encrypted [::tconfig::encrypt_dict $input ::accountstest::ssm_queue $queueKey {application ttrek_sh environment prod}]
+        lappend result [dict exists $encrypted account enc:email_queue_url]
+        set input [::tconfig::decrypt_dict $encrypted $queueKey]
+        dict for {key value} [dict get $account keys] {dict set input account $key $value}
+        set production [::app_config::account $input $root]
+        set display [dict get $production display]
+        dict set display prefix /queue-$type
+        set mail [::web::user::mount $queueRouter -store [dict replace $::accounts::store -env PROD] -config $display]
+        ::web::user::deliver $mail verify member@example.com 012345
+        lappend result $::accountstest::sqs_region $::accountstest::sqs_url
+    }
+    set result
+} -cleanup {
+    set ::env(ENV) LOCAL
+    $queueRouter destroy
+    ::tink::unregister_keyset $queueKey
+    rename ::aws::sqs::create {}
+    rename ::accountstest::real_sqs_create ::aws::sqs::create
+    rename ::accountstest::sqs_client {}
+    rename ::accountstest::ssm_queue {}
+} -result {0 eu-central-1 https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails 1 eu-central-1 https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails}
+
 rename ::tcaptcha::image {}
 rename ::tcaptcha::site_test_image ::tcaptcha::image
 $::site::router destroy

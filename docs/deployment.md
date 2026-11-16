@@ -55,8 +55,29 @@ audit log.
 ## Queued account emails
 
 The production `[account]` configuration enables `email_queue_enabled=true`
-and sets `email_queue_name=sqs_user_emails_queue` in `email_region`. Set the flag
-false to return to direct SES delivery. LOCAL does not contact either service.
+and reads `email_queue_url` from SSM parameter
+`/ttrek_sh/prod/account/email_queue_url`. Store the queue stack's `QueueUrl`
+output as a **SecureString** in `email_region` (`eu-central-1` by default):
+
+```bash
+aws ssm put-parameter \
+  --name /ttrek_sh/prod/account/email_queue_url \
+  --type SecureString \
+  --value 'https://sqs.eu-central-1.amazonaws.com/ACCOUNT_ID/sqs_user_emails_queue' \
+  --overwrite --region eu-central-1 --profile ttrek-prod-neo
+```
+
+Replace `ACCOUNT_ID` with the queue owner's AWS account ID. The value is an
+HTTPS URL, not the queue ARN (`arn:aws:sqs:...`) used in IAM policies.
+`String` parameters also work. The build resolves SSM values and encrypts
+SecureStrings into the packaged configuration; Lambda decrypts them at startup
+without runtime SSM access. Set the parameter before rebuilding and deploying.
+An enabled email queue requires a nonempty URL during build validation.
+
+`email_queue_url` replaces `email_queue_name`. Both enqueueing and processing
+use the URL directly, avoiding `GetQueueUrl` on every invocation. Set
+`email_queue_enabled=false` to return to direct SES delivery. LOCAL does not
+contact either service.
 
 After `web-user` enqueues an email, its `email_queue_callback` invokes the existing
 website Lambda asynchronously with
@@ -78,7 +99,7 @@ with their new registry recipes. Apply `00-deploy-iam-policy.sh`, redeploy
 `20-deploy-infra-vpc0.sh`, deploy `46-deploy-infra-sqs.sh`, and update
 `30-deploy-codebuild.sh` so CodeBuild can manage the new schedule. Then rebuild
 and deploy the SAM application. If overriding `TTREK_EMAIL_QUEUE_NAME`, update
-both production INI files and the queue ARN in the deployment IAM policy.
+the SSM queue URL and the queue ARN in the deployment IAM policy, then rebuild.
 
 The queue uses SQS-managed encryption, with no extra Lambda or customer KMS key.
 The isolated VPC needs SQS and Lambda API interface endpoints; each uses one

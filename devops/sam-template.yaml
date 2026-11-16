@@ -118,7 +118,7 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: [sqs:GetQueueUrl, sqs:SendMessage, sqs:ReceiveMessage, sqs:DeleteMessage]
+                Action: [sqs:SendMessage, sqs:ReceiveMessage, sqs:DeleteMessage]
                 Resource: !ImportValue Infra-DevOps-TTREK-SQS-QueueArn
               - Effect: Allow
                 Action: lambda:InvokeFunction
