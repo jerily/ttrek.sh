@@ -1,0 +1,7 @@
+Generated with the built-in imagegen tool.
+
+Use case: illustration-story
+Asset type: wide header illustration for a ttrek.sh blog post about recent website improvements.
+Primary request: a welcoming illustration connecting four ideas: an open documentation book, two overlapping forum speech bubbles, a package box beside a small rising activity chart, and a magnifying glass over a short package list. Arrange them as one balanced horizontal composition with generous breathing room.
+Style/medium: clean flat editorial illustration with bold simple silhouettes and softly rounded edges. Warm cream background, forest green and muted sage with small terracotta accents, matching the website's existing guide illustrations.
+Constraints: no text, no letters, no logos, no watermark. Solid colors, no grain, no paper texture, no gradients, no intricate details; it must remain attractive as a very small compressed web image. Landscape aspect ratio about 3:1.
