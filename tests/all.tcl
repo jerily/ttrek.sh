@@ -450,6 +450,39 @@ test handlers-tags-optional {Missing and empty tags keep overview and listing us
 
 source [file join $root tests package-languages.test]
 
+test registry-external-dependencies {Recipe responses preserve optional host requirements, including an empty object} -setup {
+    set recipe_path [file join $registry_fixture demo 2.0.0 ttrek.json]
+    set original [readFile $recipe_path]
+} -body {
+    set results {}
+    foreach external_json {
+        {"xquartz":{"platforms":["darwin"],"check":{"files":["/opt/X11/include/X11/Xlib.h","/opt/X11/lib/libX11.dylib"]},"installHint":"brew install --cask xquartz","url":"https://www.xquartz.org/"}}
+        {}
+    } {
+        set external [::tjson::json_to_typed "\{$external_json\}"]
+        lassign [::tjson::json_to_typed $original] type fields
+        dict set fields externalDependencies $external
+        writeFile $recipe_path [::tjson::typed_to_json [list $type $fields]]
+        ::telemetry::sync_registry_metadata $registry_fixture
+        set response [get_package_spec_handler {} {pathParameters {
+            package_name demo package_version latest os Darwin machine arm64}}]
+        set served [lindex [::tjson::json_to_typed [body $response]] 1]
+        lappend results [dict get $response status] \
+            [expr {[dict get $served externalDependencies] eq $external}]
+    }
+    set results
+} -cleanup {
+    writeFile $recipe_path $original
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {200 1 200 1}
+
+test registry-external-dependencies-absent {Recipes without host requirements still return a successful response} -body {
+    set response [get_package_spec_handler {} {pathParameters {
+        package_name demo package_version 1.0.0 os Linux machine x86_64}}]
+    set spec [::tjson::json_to_simple [body $response]]
+    list [dict get $response status] [dict exists $spec externalDependencies]
+} -result {200 0}
+
 test handlers-database-catalog {Every package page and API works without recipe files} -setup {
     ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
         [dict create description {Stored overview} tags {["json"]} url https://example.org/stored license MIT]]

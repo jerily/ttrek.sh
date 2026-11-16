@@ -369,6 +369,11 @@ proc get_package_spec_handler {ctx req} {
                 install_script $spec_build_typed]] \
         result_handle
 
+    if {[::tjson::has_object_item $spec_handle externalDependencies]} {
+        ::tjson::add_item_to_object $result_handle externalDependencies \
+            [::tjson::to_typed [::tjson::get_object_item $spec_handle externalDependencies]]
+    }
+
     if { $patches_typed ne {} } {
         ::tjson::add_item_to_object $result_handle patches [list M $patches_typed]
     }
