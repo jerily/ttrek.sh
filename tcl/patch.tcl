@@ -127,7 +127,7 @@ proc ::site_patch::task_process_email_queue {context} {
     set expired 0
     set failed 0
     try {
-        set queue [$sqs get_queue_url [dict get $config email_queue_name]]
+        set queue [dict get $config email_queue_url]
         for {set batch 0} {$batch < 10 && [clock milliseconds] < $deadline} {incr batch} {
             set messages [$sqs receive_messages $queue 10]
             if {![llength $messages]} {break}

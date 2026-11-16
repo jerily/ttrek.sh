@@ -6,7 +6,7 @@ Parameters:
     Type: String
     Default: sqs_user_emails_queue
     AllowedPattern: '[A-Za-z0-9_-]{1,80}'
-    Description: Must match account.email_queue_name in the production configuration.
+    Description: Store the QueueUrl output in the account.email_queue_url SSM parameter.
 
 Resources:
   UserEmailsQueue:
