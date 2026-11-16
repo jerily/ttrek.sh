@@ -11,8 +11,9 @@
     </header>
     {% include 'search-form.html.jinja' %}
     {% if not is_search and not language and tracker.available and tracker.has_entries %}{% include 'package-tracker-bar.html.jinja' %}{% endif %}
+    {% set language_labels = {'tcl-only': 'Only TCL', 'tcl-c-cpp': 'TCL and C/C++', 'c-cpp-only': 'Only C or C++'} %}
     <div class="results-heading">
-        <h2>{% if is_search %}Results for “{{ query }}”{% elif language %}{{ language }} packages{% else %}All packages{% endif %}</h2>
+        <h2>{% if is_search %}Results for “{{ query }}”{% elif language %}{{ language_labels[language] }} packages{% else %}All packages{% endif %}</h2>
         <span class="result-count">{{ result_count }} packages</span>
     </div>
     {% if error %}
