@@ -32,7 +32,7 @@ proc homepage {} {
     dict get [::site::dispatch $::site::router {method GET path / headers {Host ttrek.sh}}] body
 }
 
-test homepage-five {Published configuration renders five slides including the 1.5.0 post} -body {
+test homepage-five {Published configuration renders five slides including the latest website update} -body {
     set data [slides]
     set post [lindex $data 3]
     set html [homepage]
@@ -42,7 +42,7 @@ test homepage-five {Published configuration renders five slides including the 1.
         [regexp -all {class="showcase-dot"} $html] \
         [expr {![regexp {<article[^>]*(aria-hidden="true"|inert)} $html]}] \
         [string match {*Source on GitHub*Registry on GitHub*Request Monitor*} $html]
-} -result {{personal community guide blog packages} 1.5.0 /blog/2026-11-14-bug-fixes-in-ttrek-150 2026-11-14 1 5 1 1}
+} -result {{personal community guide blog packages} {} /blog/2026-11-15-more-ways-to-explore-ttrek 2026-11-15 1 5 1 1}
 
 test homepage-nested-article {The personal showcase links a nested article and preserves its copy} -body {
     set personal [lindex [slides] 0]
