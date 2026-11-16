@@ -61,6 +61,17 @@ Resources:
           ToPort: 1
           CidrIp: 127.0.0.1/32
 
+  TTrekEmailQueueSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private SQS and Lambda API endpoints
+      VpcId: !Ref TTrekVpc0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 1
+          ToPort: 1
+          CidrIp: 127.0.0.1/32
+
   TTrekLambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -81,6 +92,10 @@ Resources:
           FromPort: 443
           ToPort: 443
           DestinationSecurityGroupId: !Ref TTrekSesSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          DestinationSecurityGroupId: !Ref TTrekEmailQueueSecurityGroup
 
   TTrekValkeyIngress:
     Type: AWS::EC2::SecurityGroupIngress
@@ -104,6 +119,15 @@ Resources:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       GroupId: !Ref TTrekSesSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref TTrekLambdaSecurityGroup
+
+  TTrekEmailQueueIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TTrekEmailQueueSecurityGroup
       IpProtocol: tcp
       FromPort: 443
       ToPort: 443
@@ -178,6 +202,27 @@ Resources:
       SecurityGroupIds: [!Ref TTrekSesSecurityGroup]
       # Sending permissions remain scoped by the Lambda execution role. Keep
       # this base stack independent of the SES identity stack's exports.
+
+  # One interface per service in the Lambda's AZ; no NAT gateway is needed.
+  TTrekSqsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.sqs
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref TTrekPrivateSubnet1]
+      SecurityGroupIds: [!Ref TTrekEmailQueueSecurityGroup]
+
+  TTrekLambdaEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.lambda
+      PrivateDnsEnabled: true
+      SubnetIds: [!Ref TTrekPrivateSubnet1]
+      SecurityGroupIds: [!Ref TTrekEmailQueueSecurityGroup]
 
 Outputs:
   TTrekVpc0Id:

@@ -11,7 +11,7 @@ if {![llength $packages]} {
     set packages {
         twebserver topenapi sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
         awss3 awskms awsssm tconfig::decrypt tconfig::encrypt
-        tratelimit treqmon web-user web-forum tcaptcha tclgd awsses
+        tratelimit treqmon web-user web-forum tcaptcha tclgd awsses awssqs awslambda
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3 tdbc::postgres
         mock-proxy-app mock-lambda-app mock-s3-app trequests
     }

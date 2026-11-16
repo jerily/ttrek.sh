@@ -1,0 +1,202 @@
+package require tcltest 2
+package require tjson
+package require web-user 0.5.1
+package require awssqs 1.0.19
+package require awsses 1.0.16
+package require awslambda 1.0.18
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+foreach name {config accounts patch lambda} {source [file join $root tcl $name.tcl]}
+namespace eval ::site {}
+namespace eval ::queuetest {}
+proc ::site::config {} {return $::queuetest::settings}
+proc ::queuetest::setup {} {
+    variable calls {}
+    variable batches {}
+    variable fail {}
+    variable reject_mail true
+    variable saved [array get ::env]
+    set ::env(ENV) PROD
+    set ::env(AWS_REGION) eu-central-1
+    set ::env(AWS_LAMBDA_FUNCTION_NAME) existing-website
+    variable settings {account {display {email_enabled true email_queue_enabled true email_region eu-central-1 email_queue_name user-emails}}}
+    foreach service {sqs ses lambda} {
+        rename ::aws::${service}::create ::queuetest::real_${service}_create
+        interp alias {} ::aws::${service}::create {} ::queuetest::create $service
+    }
+
+}
+proc ::queuetest::cleanup {} {
+    foreach service {sqs ses lambda} {
+        rename ::aws::${service}::create {}
+        rename ::queuetest::real_${service}_create ::aws::${service}::create
+    }
+    array unset ::env
+    array set ::env $::queuetest::saved
+}
+proc ::queuetest::create {service options} {
+    lappend ::queuetest::calls [list $service create $options]
+    return ::queuetest::$service
+}
+proc ::queuetest::sqs {method args} {
+    variable calls
+    variable batches
+    lappend calls [list sqs $method {*}$args]
+    if {$method eq $::queuetest::fail} {error "private SDK error"}
+    switch -- $method {
+        get_queue_url {return https://sqs.test/user-emails}
+        receive_messages {
+            set batch [lindex $batches 0]
+            set batches [lrange $batches 1 end]
+            return $batch
+        }
+    }
+}
+proc ::queuetest::ses {method args} {
+    lappend ::queuetest::calls [list ses $method {*}$args]
+    if {$method eq "send_email" && $::queuetest::reject_mail &&
+        [dict get [lindex $args 0] subject] eq "fail"} {error "private recipient error"}
+    return sent-id
+}
+proc ::queuetest::lambda {method args} {
+    lappend ::queuetest::calls [list lambda $method {*}$args]
+    if {$method eq $::queuetest::fail} {error "invoke failed"}
+}
+proc ::queuetest::message {id {subject hello} {expires 0}} {
+    dict create MessageId $id ReceiptHandle receipt-$id Body \
+        [::tjson::typed_to_json [list M [dict create version {N 1} expires_at [list N $expires] \
+        message [list M [dict create from {S sender@example.com} to {L {{S recipient@example.com}}} \
+        subject [list S $subject] text {S {Hello café}}]]]]]
+}
+
+test email-queue-delivery {private task sends mail through SES then acknowledges it and releases clients} -setup {
+    ::queuetest::setup
+    set ::queuetest::batches [list [list [::queuetest::message one]]]
+} -body {
+    set result [::tjson::json_to_simple [::site_lambda::handle \
+        {{"source":"ttrek.patch","task":"task_process_email_queue"}} {}]]
+    list [dict get $result completed] \
+        [lmap call $::queuetest::calls {lrange $call 0 1}] \
+        [lindex $::queuetest::calls 4 2]
+} -cleanup {::queuetest::cleanup} \
+    -result {{sent:1 expired:0} {{sqs create} {sqs get_queue_url} {sqs receive_messages} {ses create} {ses send_email} {sqs delete_message} {sqs receive_messages} {ses destroy} {sqs destroy}} {from sender@example.com to recipient@example.com subject hello text {Hello café}}}
+
+test email-queue-expiry {expired codes are acknowledged without contacting SES} -setup {
+    ::queuetest::setup
+    set ::queuetest::batches [list [list [::queuetest::message one hello 1]]]
+} -body {
+    list [::site_patch::task_process_email_queue {}] \
+        [lmap call $::queuetest::calls {lrange $call 0 1}]
+} -cleanup {::queuetest::cleanup} \
+    -result {{sent:0 expired:1} {{sqs create} {sqs get_queue_url} {sqs receive_messages} {sqs delete_message} {sqs receive_messages} {sqs destroy}}}
+
+test email-queue-retry {failed mail stays queued while later mail is delivered, with generic errors} -setup {
+    ::queuetest::setup
+    set ::queuetest::batches [list [list [::queuetest::message bad fail] [::queuetest::message good]]]
+} -body {
+    set failed [catch {::site_patch::task_process_email_queue {}} message]
+    list $failed $message [lmap call $::queuetest::calls {
+        if {[lrange $call 0 1] ne {sqs delete_message}} continue
+        lindex $call 3
+    }] [lrange $::queuetest::calls end-1 end]
+} -cleanup {::queuetest::cleanup} \
+    -result {1 {Queued email delivery failed for 1 message(s)} receipt-good {{ses destroy} {sqs destroy}}}
+
+test email-queue-sdk-error {queue lookup failure releases the client} -setup {
+    ::queuetest::setup
+    set ::queuetest::fail get_queue_url
+} -body {
+    list [catch {::site_patch::task_process_email_queue {}}] \
+        [lindex $::queuetest::calls end]
+} -cleanup {::queuetest::cleanup} -result {1 {sqs destroy}}
+
+test email-queue-later-retry {a later scheduled invocation can deliver mail after SES recovers} -setup {
+    ::queuetest::setup
+    set batch [list [::queuetest::message retry fail]]
+    set ::queuetest::batches [list $batch]
+} -body {
+    set failed [catch {::site_patch::task_process_email_queue {}}]
+    set deleted [llength [lsearch -all -index 1 $::queuetest::calls delete_message]]
+    set ::queuetest::reject_mail false
+    set ::queuetest::batches [list $batch]
+    list $failed $deleted [::site_patch::task_process_email_queue {}] \
+        [llength [lsearch -all -index 1 $::queuetest::calls delete_message]]
+} -cleanup {::queuetest::cleanup} -result {1 0 {sent:1 expired:0} 1}
+
+test email-queue-malformed {malformed messages are retained and never evaluated as Tcl} -setup {
+    ::queuetest::setup
+    set ::queuetest::batches [list [list {ReceiptHandle bad Body {not JSON}}]]
+} -body {
+    list [catch {::site_patch::task_process_email_queue {}} message] $message \
+        [lmap call $::queuetest::calls {lrange $call 0 1}]
+} -cleanup {::queuetest::cleanup} \
+    -result {1 {Queued email delivery failed for 1 message(s)} {{sqs create} {sqs get_queue_url} {sqs receive_messages} {sqs receive_messages} {sqs destroy}}}
+
+test email-queue-disabled {LOCAL and either disabled flag avoid all AWS clients} -setup {
+    ::queuetest::setup
+} -body {
+    set ::env(ENV) LOCAL
+    ::site_patch::task_process_email_queue {}
+    set ::env(ENV) PROD
+    foreach key {email_enabled email_queue_enabled} {
+        dict set ::queuetest::settings account display $key false
+        ::site_patch::task_process_email_queue {}
+        dict set ::queuetest::settings account display $key true
+    }
+    set ::queuetest::calls
+} -cleanup {::queuetest::cleanup} -result {}
+
+test email-queue-deadline {stop before the Lambda deadline without fetching messages} -setup {
+    ::queuetest::setup
+} -body {
+    ::site_patch::task_process_email_queue [dict create lambda-runtime-deadline-ms [clock milliseconds]]
+    lmap call $::queuetest::calls {lrange $call 0 1}
+} -cleanup {::queuetest::cleanup} -result {{sqs create} {sqs get_queue_url} {sqs destroy}}
+
+test email-queue-callback {callback uses the existing function, exact private envelope, and asynchronous invocation} -setup {
+    ::queuetest::setup
+} -body {
+    ::accounts::email_queued https://sqs.test/user-emails
+    set call [lindex $::queuetest::calls 1]
+    list [lindex $::queuetest::calls 0] [lindex $call 2] \
+        [::tjson::json_to_simple [lindex $call 3]] [lindex $call 4] [lindex $::queuetest::calls end]
+} -cleanup {::queuetest::cleanup} \
+    -result {{lambda create {region eu-central-1}} existing-website {source ttrek.patch task task_process_email_queue} Event {lambda destroy}}
+
+test email-queue-callback-error {failed invocation releases its client} -setup {
+    ::queuetest::setup
+    set ::queuetest::fail invoke_function
+} -body {
+    list [catch {::accounts::email_queued https://sqs.test/user-emails}] [lindex $::queuetest::calls end]
+} -cleanup {::queuetest::cleanup} -result {1 {lambda destroy}}
+
+test email-queue-http {HTTP envelopes cannot invoke the queue processor} -setup {
+    ::queuetest::setup
+    proc ::site::dispatch {args} {return {statusCode 200 headers {} body http}}
+    set ::site_lambda::router unused
+} -body {
+    ::site_lambda::handle {{"source":"ttrek.patch","task":"task_process_email_queue","httpMethod":"POST","path":"/"}} {}
+    set ::queuetest::calls
+} -cleanup {rename ::site::dispatch {}; ::queuetest::cleanup} -result {}
+
+test email-queue-end-to-end {web-user queue payload is consumed by the worker without changing mail contents} -setup {
+    ::queuetest::setup
+} -body {
+    set config [dict create -prefix /user -deliver {} \
+        -store {-env PROD -config {verification_emails_enabled true code_ttl 900}} \
+        -config [dict merge [dict get $::queuetest::settings account display] \
+            {email_from sender@example.com title Garden origin https://garden.test email_queue_callback ::accounts::email_queued}]]
+    ::web::user::deliver $config verify recipient@example.com 012345
+    set call [lindex $::queuetest::calls 2]
+    set ::queuetest::batches [list [list [dict create ReceiptHandle receipt Body [lindex $call 3]]]]
+    set result [::site_patch::task_process_email_queue {}]
+    set sent [lindex [lsearch -inline -index 1 $::queuetest::calls send_email] 2]
+    set expected [::web::user::email_message $config verify recipient@example.com 012345]
+    set equal 1
+    dict for {key value} $expected {if {[dict get $sent $key] ne $value} {set equal 0}}
+    list $result $equal
+} -cleanup {::queuetest::cleanup} -result {{sent:1 expired:0} 1}
+
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

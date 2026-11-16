@@ -113,6 +113,17 @@ Resources:
                 Resource:
                   - !ImportValue Infra-DevOps-TTREK-SES-IdentityArn
                   - !ImportValue Infra-DevOps-TTREK-SES-ConfigurationSetArn
+        - PolicyName: AccountEmailQueue
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [sqs:GetQueueUrl, sqs:SendMessage, sqs:ReceiveMessage, sqs:DeleteMessage]
+                Resource: !ImportValue Infra-DevOps-TTREK-SQS-QueueArn
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                # Construct the ARN to avoid a Role <-> Function dependency cycle.
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${FunctionName}
         - PolicyName: WriteFunctionLogs
           PolicyDocument:
             Version: '2012-10-17'
@@ -160,6 +171,22 @@ Resources:
         Arn: !GetAtt SiteFunction.Arn
         RoleArn: !GetAtt SiteSchedulerRole.Arn
         Input: '{"source":"ttrek.patch","task":"task_prune_accounts"}'
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 300
+          MaximumRetryAttempts: 2
+
+  SiteFunctionEmailQueue:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub ${FunctionName}-emails
+      Description: Recover queued account emails after missed callbacks or failed sends.
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      FlexibleTimeWindow: {Mode: 'OFF'}
+      Target:
+        Arn: !GetAtt SiteFunction.Arn
+        RoleArn: !GetAtt SiteSchedulerRole.Arn
+        Input: '{"source":"ttrek.patch","task":"task_process_email_queue"}'
         RetryPolicy:
           MaximumEventAgeInSeconds: 300
           MaximumRetryAttempts: 2

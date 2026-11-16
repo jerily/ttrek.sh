@@ -246,7 +246,8 @@ fi
 
 AWS_SDK_CPP_REBUILT=0
 if ! grep -q "^set(PACKAGE_VERSION \"$AWS_SDK_CPP_VERSION\")$" \
-        "$INSTALL_DIR/lib/cmake/AWSSDK/AWSSDKConfigVersion.cmake" 2>/dev/null; then
+        "$INSTALL_DIR/lib/cmake/AWSSDK/AWSSDKConfigVersion.cmake" 2>/dev/null || \
+        [ ! -f "$INSTALL_DIR/lib/cmake/aws-cpp-sdk-email/aws-cpp-sdk-email-config.cmake" ]; then
     echo "Build AWS SDK for C++ ..."
     if [ ! -d "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION/.git" ]; then
         git clone --depth 1 --branch "$AWS_SDK_CPP_VERSION" --single-branch \
@@ -255,16 +256,17 @@ if ! grep -q "^set(PACKAGE_VERSION \"$AWS_SDK_CPP_VERSION\")$" \
     git -C "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION" submodule update --init --recursive --depth 1
     cmake_install "aws-sdk-cpp-$AWS_SDK_CPP_VERSION" \
         -DCMAKE_MODULE_PATH="$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION/crt/aws-crt-cpp/crt/aws-c-common/cmake" \
-        -DBUILD_ONLY='s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm;kms' \
+        -DBUILD_ONLY='s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm;kms;email' \
         -DENABLE_TESTING=OFF -DAUTORUN_UNIT_TESTS=OFF \
         -DOPENSSL_ROOT_DIR="$INSTALL_DIR"
     AWS_SDK_CPP_REBUILT=1
 fi
 
-if [ "$AWS_SDK_CPP_REBUILT" = 1 ] || ! package_installed awss3 awskms awsssm awsdynamodb; then
+if [ "$AWS_SDK_CPP_REBUILT" = 1 ] || ! package_installed awss3 awskms awsssm awsdynamodb awsses awssqs awslambda || \
+        [ ! -f "$INSTALL_DIR/lib/aws-sdk-tcl-sqs1.0.19/pkgIndex.tcl" ]; then
     echo "Build aws-sdk-tcl ..."
-    fetch_source aws-sdk-tcl-1.0.12 https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.12.tar.gz
-    tcl_cmake_install aws-sdk-tcl-1.0.12 -DAWS_SDK_CPP_DIR="$INSTALL_DIR"
+    fetch_source aws-sdk-tcl-1.0.19 https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.19.tar.gz
+    tcl_cmake_install aws-sdk-tcl-1.0.19 -DAWS_SDK_CPP_DIR="$INSTALL_DIR"
 fi
 
 install_tcl_package() (
