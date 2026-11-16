@@ -54,6 +54,27 @@ test lambda-config-postgres-1 {Production rejects missing PostgreSQL credentials
     ::app_config::validate_lambda_config $prod
 } -returnCodes error -match glob -result {*postgres.enc:password*}
 
+test lambda-config-email-queue {Enabled queue requires a URL supplied as String or SecureString} -body {
+    set base {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy} postgres {host db.example database test username test enc:password dummy}
+        account {enc:aead_keyset dummy enc:mac_keyset dummy enc:email_hash_salt dummy email_enabled true email_queue_enabled true}}
+    set result {}
+    foreach values {
+        {}
+        {email_queue_url {}}
+        {enc:email_queue_url {}}
+        {email_queue_url https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails}
+        {enc:email_queue_url ciphertext}
+        {email_queue_enabled false}
+        {email_enabled false}
+    } {
+        set config $base
+        dict for {key value} $values {dict set config account $key $value}
+        ::tconfig::write_config $config $prod
+        lappend result [catch {::app_config::validate_lambda_config $prod}]
+    }
+    set result
+} -result {1 1 1 0 0 0 0}
+
 test lambda-config-postgres-2 {Production rejects plaintext PostgreSQL credentials} -body {
     ::tconfig::write_config {tconfig {tink_keyset dummy} redis {host cache.example enc:password dummy} \
         postgres {host db.example database test username test enc:password dummy password plaintext}} $prod
@@ -169,6 +190,7 @@ foreach {name script} {
 }
 file copy [file join $sourceRoot tests fixtures release-checksums.json] [file join $root etc releases.json]
 set config [::tconfig::read_config [file join $sourceRoot devops config.prod.ini]]
+dict set config account email_queue_url https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails
 dict set config tconfig tink_keyset dummy
 foreach section {redis postgres} {
     dict set config $section host "$section.example"
