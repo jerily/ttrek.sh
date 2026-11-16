@@ -1,8 +1,8 @@
-#
+# 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
 # SPDX-License-Identifier: MIT.
-#
+# 
 
 namespace eval ::accounts {
     variable store {}
@@ -75,7 +75,7 @@ proc ::accounts::mount {router settings templates} {
 
 # Wake the existing Lambda asynchronously after SQS has accepted an email.
 proc ::accounts::email_queued {queueUrl} {
-    package require awslambda 1.0.18
+    package require pure-tcl-aws-lambda 0.1.0
     set client [::aws::lambda::create [dict create region $::env(AWS_REGION)]]
     try {
         $client invoke_function $::env(AWS_LAMBDA_FUNCTION_NAME) \

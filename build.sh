@@ -9,7 +9,6 @@ BUILD_DIR="$SELF_DIR/build/build"
 
 TCL_VERSION=9.1.0
 CJSON_VERSION=1.7.19
-AWS_SDK_CPP_VERSION=1.11.921
 DEBUG=0
 BUILD_JOBS=${TTREK_MAKE_THREADS:-4}
 
@@ -77,19 +76,19 @@ if [ ! -e "$INSTALL_DIR/lib/jinja20.1.0/pkgIndex.tcl" ]; then
     cmake --install "$BUILD_DIR/jinja2-tcl"
 fi
 
-if [ ! -e "$INSTALL_DIR/lib/tjson1.0.26/pkgIndex.tcl" ]; then
-    echo "Build tjson 1.0.26 ..."
-    if [ ! -d "$SOURCE_DIR/tjson-1.0.26" ]; then
-        curl -fLsS https://github.com/jerily/tjson/archive/refs/tags/v1.0.26.tar.gz -o "$SOURCE_DIR/tjson-1.0.26.tar.gz"
-        tar -xzf "$SOURCE_DIR/tjson-1.0.26.tar.gz" -C "$SOURCE_DIR"
+if [ ! -e "$INSTALL_DIR/lib/tjson1.0.27/pkgIndex.tcl" ]; then
+    echo "Build tjson 1.0.27 ..."
+    if [ ! -d "$SOURCE_DIR/tjson-1.0.27" ]; then
+        curl -fLsS https://github.com/jerily/tjson/archive/refs/tags/v1.0.27.tar.gz -o "$SOURCE_DIR/tjson-1.0.27.tar.gz"
+        tar -xzf "$SOURCE_DIR/tjson-1.0.27.tar.gz" -C "$SOURCE_DIR"
     fi
-    cmake -S "$SOURCE_DIR/tjson-1.0.26" -B "$BUILD_DIR/tjson-1.0.26" \
+    cmake -S "$SOURCE_DIR/tjson-1.0.27" -B "$BUILD_DIR/tjson-1.0.27" \
         -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" \
         -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" \
         -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" \
         -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
-    cmake --build "$BUILD_DIR/tjson-1.0.26" --parallel "$BUILD_JOBS"
-    cmake --install "$BUILD_DIR/tjson-1.0.26"
+    cmake --build "$BUILD_DIR/tjson-1.0.27" --parallel "$BUILD_JOBS"
+    cmake --install "$BUILD_DIR/tjson-1.0.27"
 fi
 
 
@@ -230,43 +229,18 @@ if ! package_installed tink; then
     tcl_cmake_install tink-tcl-20240704.0.1 -DTINK_CPP_DIR="$INSTALL_DIR"
 fi
 
-if [ ! -f "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" ]; then
+if ! pkg-config --atleast-version=8.23.0 libcurl; then
     echo "Build curl ..."
-    fetch_source curl-8.7.1 https://curl.se/download/curl-8.7.1.tar.gz
+    fetch_source curl-8.23.0 https://curl.se/download/curl-8.23.0.tar.gz
     (
-        mkdir -p "$BUILD_DIR/curl-8.7.1"
-        cd "$BUILD_DIR/curl-8.7.1"
-        "$SOURCE_DIR/curl-8.7.1/configure" --prefix="$INSTALL_DIR" \
+        mkdir -p "$BUILD_DIR/curl-8.23.0"
+        cd "$BUILD_DIR/curl-8.23.0"
+        "$SOURCE_DIR/curl-8.23.0/configure" --prefix="$INSTALL_DIR" \
             --with-openssl="$INSTALL_DIR" --without-brotli --without-zstd \
             --disable-ldap --without-libidn2
         make -j"$BUILD_JOBS"
         make install
     )
-fi
-
-AWS_SDK_CPP_REBUILT=0
-if ! grep -q "^set(PACKAGE_VERSION \"$AWS_SDK_CPP_VERSION\")$" \
-        "$INSTALL_DIR/lib/cmake/AWSSDK/AWSSDKConfigVersion.cmake" 2>/dev/null || \
-        [ ! -f "$INSTALL_DIR/lib/cmake/aws-cpp-sdk-email/aws-cpp-sdk-email-config.cmake" ]; then
-    echo "Build AWS SDK for C++ ..."
-    if [ ! -d "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION/.git" ]; then
-        git clone --depth 1 --branch "$AWS_SDK_CPP_VERSION" --single-branch \
-            https://github.com/aws/aws-sdk-cpp "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION"
-    fi
-    git -C "$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION" submodule update --init --recursive --depth 1
-    cmake_install "aws-sdk-cpp-$AWS_SDK_CPP_VERSION" \
-        -DCMAKE_MODULE_PATH="$SOURCE_DIR/aws-sdk-cpp-$AWS_SDK_CPP_VERSION/crt/aws-crt-cpp/crt/aws-c-common/cmake" \
-        -DBUILD_ONLY='s3;dynamodb;lambda;sqs;iam;transfer;sts;ssm;kms;email' \
-        -DENABLE_TESTING=OFF -DAUTORUN_UNIT_TESTS=OFF \
-        -DOPENSSL_ROOT_DIR="$INSTALL_DIR"
-    AWS_SDK_CPP_REBUILT=1
-fi
-
-if [ "$AWS_SDK_CPP_REBUILT" = 1 ] || ! package_installed awss3 awskms awsssm awsdynamodb awsses awssqs awslambda || \
-        [ ! -f "$INSTALL_DIR/lib/aws-sdk-tcl-sqs1.0.19/pkgIndex.tcl" ]; then
-    echo "Build aws-sdk-tcl ..."
-    fetch_source aws-sdk-tcl-1.0.19 https://github.com/jerily/aws-sdk-tcl/archive/refs/tags/v1.0.19.tar.gz
-    tcl_cmake_install aws-sdk-tcl-1.0.19 -DAWS_SDK_CPP_DIR="$INSTALL_DIR"
 fi
 
 install_tcl_package() (
@@ -280,11 +254,45 @@ install_tcl_package() (
     fi
 )
 
+if ! package_installed trequests; then
+    echo "Build trequests 1.3.0 ..."
+    fetch_source trequests-1.3.0 https://github.com/jerily/trequests/archive/refs/tags/v1.3.0.tar.gz
+    tcl_cmake_install trequests-1.3.0 -DBUILD_TESTING=OFF
+fi
+
+if ! package_installed sha256 md5; then
+    echo "Install Tcllib 2.0 ..."
+    fetch_source tcllib-2.0 https://downloads.sourceforge.net/project/tcllib/tcllib/2.0/tcllib-2.0.tar.gz
+    (
+        mkdir -p "$BUILD_DIR/tcllib-2.0"
+        cd "$BUILD_DIR/tcllib-2.0"
+        "$SOURCE_DIR/tcllib-2.0/configure" --prefix="$INSTALL_DIR"
+        make install-tcl
+    )
+fi
+
+if ! package_installed tdom; then
+    echo "Build tDOM 0.9.6 ..."
+    fetch_source tdom-0.9.6 https://tdom.org/downloads/tdom-0.9.6-src.tar.gz
+    (
+        mkdir -p "$BUILD_DIR/tdom-0.9.6"
+        cd "$BUILD_DIR/tdom-0.9.6"
+        "$SOURCE_DIR/tdom-0.9.6/configure" --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
+            --with-tcl="$INSTALL_DIR/lib" --disable-tdomalloc
+        make -j"$BUILD_JOBS"
+        make install
+    )
+fi
+
+for service in core s3 sqs ses lambda kms ssm; do
+    install_tcl_package "pure-tcl-aws-$service-0.1.0" "pure-tcl-aws-${service}0.1.0" \
+        "https://github.com/jerily/pure-tcl-aws-$service/archive/refs/tags/v0.1.0.tar.gz"
+done
+
 install_tcl_package tratelimit-1.0.1 tratelimit1.0.1 https://github.com/jerily/tratelimit/archive/refs/tags/v1.0.1.tar.gz
 install_tcl_package treqmon-2.0.0 treqmon2.0.0 https://github.com/jerily/treqmon/archive/refs/tags/v2.0.0.tar.gz
 install_tcl_package tsession-1.0.3 tsession1.0.3 https://github.com/jerily/tsession/archive/refs/tags/v1.0.3.tar.gz
-install_tcl_package tconfig-1.0.0 tconfig1.0.0 https://github.com/jerily/tconfig/archive/refs/tags/v1.0.0.tar.gz
-install_tcl_package tsession-dynamodb-main tsession-dynamodb1.0.0 https://github.com/jerily/tsession-dynamodb/archive/refs/heads/main.tar.gz
+install_tcl_package tconfig-1.0.1 tconfig1.0.1 https://github.com/jerily/tconfig/archive/refs/tags/v1.0.1.tar.gz
 
 "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl"
 
