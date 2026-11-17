@@ -18,7 +18,7 @@ and scheduled telemetry maintenance. Change this value in `devops/sam-template.y
 and redeploy to adjust the cap.
 
 Production uses TLS Valkey for shared request-monitor history and global per-IP
-rate limits (1000 requests per 10 seconds by default). The adapter uses API
+rate limits (100 requests per 10 seconds by default). The adapter uses API
 Gateway's `requestContext.http.sourceIp`, not a caller-supplied forwarded header.
 Telemetry uses tpersist with shared PostgreSQL in PROD and SQLite in LOCAL.
 See [telemetry storage and maintenance](telemetry.md) for the RDS deployment,
@@ -363,7 +363,7 @@ the cache endpoint is missing. No plaintext secret is committed or printed.
 | `/ttrek_sh/prod/redis/username` | String | Optional; must match the cache user, currently `appuser` |
 | `/ttrek_sh/prod/redis/ssl_ca_file` | String | Optional; AL2023 default `/etc/pki/tls/certs/ca-bundle.crt` |
 | `/ttrek_sh/prod/ratelimit/window_millis` | String | Optional; default `10000` |
-| `/ttrek_sh/prod/ratelimit/limit` | String | Optional; default `1000` |
+| `/ttrek_sh/prod/ratelimit/limit` | String | Optional; default `100` |
 | `/ttrek_sh/prod/request_monitor/history_max_events` | String | Optional; default `100000` |
 | `/ttrek_sh/prod/request_monitor/master_template` | String | Optional; default `request-monitor-master.html.jinja` from `www/` |
 | `/ttrek_sh/prod/request_monitor/store` | String | Optional; only `valkey` is supported |
@@ -1014,6 +1014,7 @@ and the CDN stack. Deploy the updated Lambda IAM policy before running the task.
 The same upload implementation is used by the deployment asset uploader.
 
 The package changes required by this update are tratelimit 1.1.1, treqmon 2.3.0, web-user 0.5.6,
-web-forum 0.3.2, and mock-proxy-app 0.1.2. Publish their recipes before resolving
-these versions in a clean build. The proxy release accepts the `cdn_on_prod` flag;
+web-forum 0.3.2, and mock-proxy-app 0.1.2. The first four recipes are in
+`ttrek-registry`; the proxy remains private in `private-ttrek-registry`.
+The proxy release accepts the `cdn_on_prod` flag;
 the account and forum releases accept `assets_url` for their template contexts.
