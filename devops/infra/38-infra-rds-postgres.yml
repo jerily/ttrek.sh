@@ -23,6 +23,11 @@ Parameters:
     Default: ttrek/content/images
     AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
     Description: Must match content_images.prefix in the production configuration and SAM template.
+  BrowserAssetsPrefix:
+    Type: String
+    Default: cdn
+    AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
+    Description: Must match content_images.assets_prefix and BrowserAssetsPrefix in the SAM and CloudFront templates.
   WebsiteFunctionName:
     Type: String
     Default: prod-Api-TtrekWebsite-Function
@@ -127,18 +132,24 @@ Resources:
             Principal: '*'
             Action: s3:PutObject
             Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
-          # Explicit website sync tasks publish images through this endpoint.
+          # Explicit website sync tasks publish images and browser assets.
           - Effect: Allow
             Principal: '*'
             Action: [s3:GetObject, s3:PutObject]
             Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/*
           - Effect: Allow
             Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${BrowserAssetsPrefix}/*
+          - Effect: Allow
+            Principal: '*'
             Action: s3:ListBucket
             Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}
             Condition:
               StringLike:
-                s3:prefix: !Sub ${ContentImagesPrefix}/*
+                s3:prefix:
+                  - !Sub ${ContentImagesPrefix}/*
+                  - !Sub ${BrowserAssetsPrefix}/*
 
   ApplicationS3Egress:
     Type: AWS::EC2::SecurityGroupEgress

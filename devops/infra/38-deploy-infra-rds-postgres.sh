@@ -9,7 +9,8 @@ if [[ ${1:-} == --help ]]; then
     'Requires Python 3 and AWS CLI. Optional environment overrides:' \
     '  TTREK_SCHEDULE_TIMEZONE (default America/New_York)' \
     '  TTREK_MAINTENANCE_SCHEDULE (default cron(0 5 * * ? *))' \
-    '  LAMBDA_FUNCTION_NAME (default prod-Api-TtrekWebsite-Function)'
+    '  LAMBDA_FUNCTION_NAME (default prod-Api-TtrekWebsite-Function)' \
+    '  BROWSER_ASSETS_PREFIX (default cdn; must match SAM, CloudFront and content_images.assets_prefix)'
   exit 0
 fi
 if [[ $# -ne 0 ]]; then printf '%s\n' 'Use --help for usage.' >&2; exit 2; fi
