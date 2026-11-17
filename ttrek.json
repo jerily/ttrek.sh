@@ -107,9 +107,9 @@
     "pure-tcl-aws-lambda": "^1.0.0",
     "tpersist": "^0.1.5",
     "tconfig": "^1.0.2",
-    "web-user": "=0.5.3",
-    "tcaptcha": "^0.1.0",
-    "web-forum": "=0.3.0"
+    "web-user": "=0.5.4",
+    "tcaptcha": "^1.0.0",
+    "web-forum": "=0.3.1"
   },
   "devDependencies": {
     "tcllib": "^2.0.0",
