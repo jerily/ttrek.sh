@@ -115,6 +115,17 @@ test lambda-config-6 {Invalid local limits fail before serving requests} -body {
     ::app_config::lambda_middleware {ratelimit {limit 0}}
 } -returnCodes error -result {ratelimit.limit must be a positive integer}
 
+test rate-policy {Direct and Lambda policies use 100 per 10 seconds and 10 per minute for sensitive routes} -body {
+    set ::env(ENV) LOCAL
+    set policy [::app_config::rate_limits {} {localstore {}}]
+    set lambda [dict get [::app_config::lambda_middleware {redis {port 6379 ssl false}}] tratelimit]
+    set checks {}
+    dict for {name limits} [dict get $policy route_limits] {
+        lappend checks [expr {[dict get $limits by_ip] eq {window_millis 60000 limit 10}}]
+    }
+    list [expr {$policy eq $lambda}] [dict get $policy global_limits by_ip] [lsort -unique $checks]
+} -result {1 {window_millis 10000 limit 100} 1}
+
 test lambda-config-7 {Local store counts simultaneous requests and expires the old window} -body {
     ::tratelimit::middleware::localstore::init {}
     ::tratelimit::middleware::localstore::add_request test 0 100
@@ -188,6 +199,7 @@ foreach {name script} {
     puts $channel $script
     close $channel
 }
+file copy [file join $sourceRoot etc ratelimits.json] [file join $root etc ratelimits.json]
 file copy [file join $sourceRoot tests fixtures release-checksums.json] [file join $root etc releases.json]
 set config [::tconfig::read_config [file join $sourceRoot devops config.prod.ini]]
 dict set config account email_queue_url https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails

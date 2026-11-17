@@ -10,6 +10,22 @@ namespace eval ::assets {
     variable cdn_prefix {}
 }
 
+# Package browser files keep their existing paths under the configured CDN prefix.
+proc ::assets::package_files {} {
+    package require web-user 0.5.4
+    package require web-forum 0.3.0
+    set result {}
+    foreach {path directory name type} [list \
+        /user/_assets/admin.css $::web::user::root admin.css text/css \
+        /forum/_assets/forum.css $::web::forum::root forum.css text/css \
+        /forum/_assets/editor.css $::web::forum::root editor.css text/css \
+        /forum/_assets/markdown-editor.bundle.js $::web::forum::root markdown-editor.bundle.js application/javascript] {
+        set filename [file join $directory assets $name]
+        dict set result $path [dict create filename $filename type $type immutable false]
+    }
+    return $result
+}
+
 # Apply the worker settings and initialize shared site resources.
 proc ::assets::configure {settings} {
     variable cdn_origin [::content_images::cdn_url $settings]
@@ -41,18 +57,23 @@ proc ::assets::load {root} {
     }
 }
 
+# Resolve an asset directory or stable path for the selected environment.
+proc ::assets::base_url {path} {
+    variable cdn_origin
+    variable cdn_prefix
+    if {$cdn_origin ne {}} {return $cdn_origin/$cdn_prefix$path}
+    return $path
+}
+
 # Resolve a public asset to its configured versioned URL.
 proc ::assets::url {path} {
     variable manifest
-    variable cdn_origin
-    variable cdn_prefix
     if {[dict exists $manifest $path]} {
         set path [dict get $manifest $path]
     } elseif {$path ni {/favicon.ico /assets/favicon.svg /request-monitor/_assets/charts.js}} {
         error "Asset missing from manifest: $path"
     }
-    if {$cdn_origin ne {}} {return $cdn_origin/$cdn_prefix$path}
-    return $path
+    return [base_url $path]
 }
 
 # Package layouts carry their own CSP. Add only the configured CDN origin to

@@ -4,7 +4,9 @@
 # SPDX-License-Identifier: MIT.
 #
 
-namespace eval ::app_config {}
+namespace eval ::app_config {
+    variable directory [file dirname [file normalize [info script]]]
+}
 
 # Select and validate the deployment environment.
 proc ::app_config::mode {} {
@@ -187,14 +189,55 @@ proc ::app_config::monitor_store {config} {
         [dict create history_max_events $history]]]
 }
 
-# Configure the environment-specific monitoring and rate-limit stores.
-proc ::app_config::lambda_middleware {config} {
-    set limits [dict create window_millis 10000 limit 1000]
+# Read route policy as data and reject invalid windows before serving traffic.
+proc ::app_config::route_limits {{path {}}} {
+    variable directory
+    if {$path eq {}} {set path [file join $directory .. etc ratelimits.json]}
+    package require tjson
+    set channel [open $path r]
+    try {
+        chan configure $channel -encoding utf-8
+        lassign [::tjson::json_to_typed [read $channel]] type routes
+    } finally {close $channel}
+    if {$type ne "M"} {error "ratelimits.json must contain an object"}
+    set result {}
+    dict for {name typedScopes} $routes {
+        lassign $typedScopes type scopes
+        if {$type ne "M"} {error "rate limits for $name must be an object"}
+        dict for {scope typedSettings} $scopes {
+            lassign $typedSettings type settings
+            if {$scope ni {by_ip by_session} || $type ne "M"} {error "invalid rate-limit scope for $name: $scope"}
+            if {[lsort [dict keys $settings]] ne {limit window_millis}} {
+                error "rate limit $name.$scope requires window_millis and limit"
+            }
+            foreach key {window_millis limit} {
+                lassign [dict get $settings $key] type value
+                if {$type ne "N" || ![string is entier -strict $value] || $value < 1} {
+                    error "rate limit $name.$scope.$key must be a positive integer"
+                }
+                dict set result $name $scope $key $value
+            }
+        }
+    }
+    return $result
+}
+
+# Shared policy for both the direct server and Lambda.
+proc ::app_config::rate_limits {config store} {
+    set limits [dict create window_millis 10000 limit 100]
     if {[dict exists $config ratelimit]} {set limits [dict merge $limits [dict get $config ratelimit]]}
     foreach key {window_millis limit} {
         set value [dict get $limits $key]
         if {![string is integer -strict $value] || $value < 1} {error "ratelimit.$key must be a positive integer"}
     }
+    set routes [route_limits]
+    return [dict create store $store global_limits [dict create by_ip $limits] route_limits $routes]
+}
+
+# Configure the environment-specific monitoring and rate-limit stores.
+proc ::app_config::lambda_middleware {config} {
+    # Validate limits before opening or validating backing services.
+    rate_limits $config {}
     set monitorStore [monitor_store $config]
     if {[mode] eq "LOCAL"} {
         set rateStore {localstore {}}
@@ -202,7 +245,7 @@ proc ::app_config::lambda_middleware {config} {
         set rateStore [dict create valkeystore [valkey $config]]
     }
     return [dict create \
-        tratelimit [dict create store $rateStore global_limits [dict create by_ip $limits] route_limits {}] \
+        tratelimit [rate_limits $config $rateStore] \
         treqmon [dict create store $monitorStore]]
 }
 
@@ -403,7 +446,7 @@ proc ::app_config::account {config root {localDirectory {}}} {
         }
     }
     set groups {admin {} moderator {}}
-    set permissions {admin {forum.moderate, wiki.edit, blog.edit, users.manage} moderator forum.moderate}
+    set permissions {admin {forum.moderate, wiki.edit, blog.edit, users.manage, request_monitor.view} moderator forum.moderate}
     if {[dict exists $config groups]} {set groups [dict merge $groups [dict get $config groups]]}
     if {[dict exists $config permissions]} {set permissions [dict merge $permissions [dict get $config permissions]]}
     ::web::user::access_config $groups $permissions

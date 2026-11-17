@@ -6,7 +6,7 @@ ssl=false
 
 [ratelimit]
 window_millis=10000
-limit=1000
+limit=100
 
 [request_monitor]
 store=valkey

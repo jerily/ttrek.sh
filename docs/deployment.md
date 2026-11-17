@@ -10,8 +10,7 @@ and [binary distributions](releases.md) for release download configuration.
 
 `devops/sam-template.yaml` deploys `prod-Api-TtrekWebsite-Function` on
 `provided.al2023`, with private VPC access, a scoped execution role, and 14-day
-log retention. `devops/infra/40-api-gateway.json` owns the HTTP API for `/` and
-`/{proxy+}` and its `https://ttrek.sh/` custom domain. SAM does not create a second
+log retention. `devops/infra/40-api-gateway.json` owns the HTTP API for the explicit application routes and its `https://ttrek.sh/` custom domain. SAM does not create a second
 API. `Architecture` must match the native libraries in the ZIP (x86_64 by default).
 
 The website Lambda has `ReservedConcurrentExecutions: 50`, shared by HTTP requests
@@ -775,8 +774,10 @@ ttrek install -force -registry ../private-ttrek-registry -add-pubreg tdevops moc
 python3 devops/generate-api-gateway.py
 ```
 
-The site generator calls tdevops with `etc/routes.json`, selected by `routes` in
-`etc/tdevops.tcl`. It removes the shared generator's optional authorizer and sets
+The site generator reads `etc/routes.json`, omits routes marked
+`cdn_on_prod: true`, and passes the remaining routes to tdevops. Local proxies use
+the complete manifest selected by `routes` in `etc/tdevops.tcl`. Generated route
+logical IDs describe the method and path, such as `GetUserLoginRoute`. It removes the shared generator's optional authorizer and sets
 every route to `AuthorizationType: NONE`. The website has no authorizer parameter,
 resource or permission. Deployment defaults live under `apiGateway`; the template
 exposes API name, stage, timeout and backend function parameters.
@@ -985,3 +986,34 @@ terminal. The local stack is disposable, so repeat these after restarting it.
 The website requires `web-static-wiki` 0.1.6 and `web-static-blog` 0.1.5.
 Both use filename-based URLs. Existing content filenames match their prior URLs
 so this upgrade preserves incoming links.
+
+
+## Request limits and monitor access
+
+The global per-IP rate limit is configured in `[ratelimit]`: `window_millis=10000`
+and `limit=100`. `etc/ratelimits.json` supplies the named per-route policies,
+including 10 requests per 60 seconds for account forms, search, and forum writes.
+Both the direct server and Lambda load this JSON. Invalid budgets fail startup.
+The reviewed Valkey implementation requires tratelimit 1.1.1; it performs an
+atomic check-and-record, preserves simultaneous requests, and expires idle keys.
+
+Request Monitor and its navigation link require the live `request_monitor.view`
+group permission. The default admin grant includes it.
+`/request-monitor/recent` uses the same permission and shows the latest 100
+completed requests, with time, trusted source IP, method, path, status, and user
+agent. treqmon 2.3.0 keeps this bounded log separately from chart history; details
+are collected for new requests after upgrading. After deployment, run
+`task_sync_access` to apply configured groups and grants to the account store.
+
+Forum/editor assets and the admin stylesheet use stable paths under the configured
+CloudFront asset prefix. `task_sync_website` uploads all browser assets to S3 before
+committing its SQL content sync; upload failures fail the task. These files share
+the existing CloudFront caching behavior used for stable browser assets.
+The Lambda `BrowserAssetsPrefix` parameter must match `content_images.assets_prefix`
+and the CDN stack. Deploy the updated Lambda IAM policy before running the task.
+The same upload implementation is used by the deployment asset uploader.
+
+The package changes required by this update are tratelimit 1.1.1, treqmon 2.3.0, web-user 0.5.6,
+web-forum 0.3.2, and mock-proxy-app 0.1.2. Publish their recipes before resolving
+these versions in a clean build. The proxy release accepts the `cdn_on_prod` flag;
+the account and forum releases accept `assets_url` for their template contexts.

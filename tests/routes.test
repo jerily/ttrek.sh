@@ -1,0 +1,45 @@
+package require tcltest 2
+package require mock-proxy-app 0.1.2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+set manifest [::mock::proxy::load_config [file join $root etc routes.json]]
+set router [::mock::proxy::router $manifest]
+
+test routes-covered {The explicit manifest covers main, account, forum, nested content and local asset routes} -body {
+    set checks {}
+    foreach {method path} {
+        GET / HEAD / GET /debug GET /init GET /packages GET /packages/tracker GET /package-tracker
+        GET /search GET /download/example.archive GET /dist/linux-amd64-glibc/ttrek.sha256
+        GET /releases/latest/linux-amd64-glibc GET /package/tcl GET /package/tcl/9.1.0
+        GET /registry/tcl GET /registry/tcl/9.1.0/languages GET /registry/tcl/9.1.0/Linux/x86_64
+        GET /registry/search GET /registry/autocomplete POST /telemetry/register/example
+        POST /telemetry/collect/tcl/9.1.0 GET /docs GET /docs/ GET /docs/nested/path GET /blog GET /blog/post
+        GET /user GET /user/ GET /user/admin/users GET /user/profile POST /user/profile
+        GET /user/login POST /user/login GET /user/register POST /user/register
+        POST /user/verify POST /user/resend-verification POST /user/forgot POST /user/reset
+        POST /user/change-password POST /user/close-account POST /user/two-factor
+        POST /user/two-factor/setup POST /user/two-factor/disable POST /user/logout
+        GET /forum GET /forum/ GET /forum/new POST /forum/new GET /forum/topic/1 POST /forum/topic/1
+        GET /forum/member/1 GET /forum/moderation GET /forum/moderation/history
+        GET /forum/moderate/post/1/delete POST /forum/moderate/post/1/delete
+        GET /request-monitor HEAD /request-monitor GET /request-monitor/ GET /request-monitor/recent HEAD /request-monitor/recent
+        GET /favicon.ico GET /css/styles.css GET /js/site.js GET /assets/versioned/js/site.hash.js
+        GET /homepage/images/personal GET /forum/_assets/editor.css GET /user/_assets/admin.css
+        GET /request-monitor/_assets/charts.js
+    } {
+        set match [$router match $method $path]
+        if {[dict get $match statusCode] != 200} {error "Missing route: $method $path"}
+        lappend checks [dict get $match statusCode]
+    }
+    lsort -unique $checks
+} -result 200
+
+test routes-no-catchall {Unknown root paths and methods no longer reach Lambda} -body {
+    list [dict get [$router match GET /not-a-site-route] statusCode] \
+        [dict get [$router match POST /packages] statusCode]
+} -result {404 405}
+
+$router destroy
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

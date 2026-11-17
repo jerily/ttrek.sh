@@ -1,0 +1,22 @@
+{
+  "get_search_page": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "get_search": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "get_autocomplete": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_admin_users": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_register": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_verify": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_resend_verification": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_login": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_forgot": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_reset": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_change_password": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_close_account": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_two_factor": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_two_factor_setup": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_two_factor_disable": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_profile": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "account_logout": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "forum_new": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "forum_topic": {"by_ip": {"window_millis": 60000, "limit": 10}},
+  "forum_moderate": {"by_ip": {"window_millis": 60000, "limit": 10}}
+}

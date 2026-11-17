@@ -103,7 +103,6 @@ try {
         /package/web-static-blog 0.1.0 /registry/web-static-wiki 0.1.0
         /package/treqmon 2.2.0 /registry/treqmon 2.2.0
         /registry/tcl 9.1.0 /registry/search?q=web twebserver
-        /request-monitor data-chart-config /request-monitor/_assets/charts.js treqmon-chart-color
         /init TTREK_UPDATE_ROOT
     } {
         assert {[::test_support::contains [request $path] $expected]} "unexpected response for $path"

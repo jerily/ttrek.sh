@@ -71,6 +71,8 @@ try {
     file delete -force [file join $app $registryDir .git]
     write_file [file join $app $registryDir tclx 1.0.0 ttrek.json] {{}}
     file mkdir [file join $app build] [file join $app etc]
+    # Exact budgets are covered in rate-limits.test; these probes test HTTP contracts.
+    write_file [file join $app etc ratelimits.json] {{}}
     file link -symbolic [file join $app build install] $prefix
     exec {*}$envCommand [file join $prefix bin openssl] req -x509 -newkey rsa:2048 -config /dev/null \
         -nodes -keyout [file join $app key.pem] -out [file join $app cert.pem] -days 1 -subj /CN=localhost \
@@ -118,7 +120,7 @@ try {
     set checks [dict create / [expr {$mode eq "LOCAL" ? "http://localhost:8080/init | ENV=LOCAL sh" : "https://ttrek.sh/init"}] \
         /packages jinja2-tcl /docs {Getting started} /blog {ttrek 1.0.0 is now public} \
         /docs/getting-started {ttrek init -y} /package/tcl 9.1.0 /package/tcl/9.1.0 tcl@9.1.0 \
-        /package/tjson/1.0.26 tjson@1.0.26 /request-monitor data-chart-config \
+        /package/tjson/1.0.26 tjson@1.0.26 \
         /js/chart.umd.js Chart.js /css/typebase.css Typebase /registry/tcl 9.1.0]
     dict for {path expected} $checks {
         assert {[::test_support::contains [request $path] $expected]} "unexpected response for $path"
@@ -216,7 +218,7 @@ try {
     foreach action {verify disconnect} {
         exec {*}$envCommand $tclsh [file join $root tests cache-smoke.tcl] $app $action >@stdout 2>@stderr
     }
-    assert {[::test_support::contains [request /request-monitor] data-chart-config]}
+    assert {[dict get [request /request-monitor 403] status] == 403}
     exec {*}$envCommand $tclsh [file join $root tests cache-smoke.tcl] $app verify >@stdout 2>@stderr
     update
     assert {[string first {Error while accessing telemetry db} [read_file [file join $app app.log]]] < 0} {Telemetry SQL failed}

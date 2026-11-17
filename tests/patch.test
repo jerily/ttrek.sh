@@ -71,6 +71,40 @@ test patch-sync {sync updates rows through package APIs and preserves the websit
     }
 } -result {{wiki blog registry} {Getting started} 1 1}
 
+test patch-sync-assets {The sync task publishes browser assets first and S3 failures stop the SQL sync} -setup {
+    source [file join $root tcl browser-assets.tcl]
+    rename ::browser_assets::upload ::browser_assets::real_upload
+    rename ::site::config ::site::original_config
+    set ::patchImages [::app_config::content_images {content_images {cloudfront_enabled true}} $patchRoot]
+    proc ::site::config {} {dict create rootdir $::patchRoot content_images $::patchImages}
+    proc ::browser_assets::upload {root settings} {
+        set ::assetUpload [list $root $settings]
+        if {$::assetFail} {error {S3 upload failed}}
+        return 11
+    }
+} -body {
+    set ::assetFail 0
+    set completed [::site_patch::task_sync_website {}]
+    set uploaded [expr {$::assetUpload eq [list $patchRoot $::patchImages]}]
+    set ::assetFail 1
+    # An upload error must occur before entering the database transaction.
+    rename ::telemetry::transaction ::telemetry::original_transaction
+    proc ::telemetry::transaction {args} {error {SQL must not run after upload failure}}
+    try {
+        set code [catch {::site_patch::task_sync_website {}} message]
+    } finally {
+        rename ::telemetry::transaction {}
+        rename ::telemetry::original_transaction ::telemetry::transaction
+    }
+    list $completed $uploaded $code $message
+} -cleanup {
+    rename ::browser_assets::upload {}
+    rename ::browser_assets::real_upload ::browser_assets::upload
+    rename ::site::config {}
+    rename ::site::original_config ::site::config
+    unset ::patchImages ::assetUpload ::assetFail
+} -result {{wiki blog registry assets} 1 1 {S3 upload failed}}
+
 test patch-sync-content {sync publishes body edits and removes deleted docs and posts} -setup {
     set contentRoot [makeDirectory patch-content]
     file copy [file join $root tests fixtures registry] [file join $contentRoot registry]

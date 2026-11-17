@@ -3,7 +3,25 @@
 
 import json
 from pathlib import Path
+import re
 import subprocess
+import tempfile
+
+
+def route_logical_id(route_key):
+    method, path = route_key.split(' ', 1)
+    if route_key == 'GET /':
+        return 'RootRoute'
+    parts = [method.title()]
+    for segment in path.strip('/').split('/'):
+        if segment.startswith('{'):
+            parts.append('By')
+        parts.extend(word[0].upper() + word[1:] for word in re.findall(r'[A-Za-z0-9]+', segment))
+    if path == '/':
+        parts.append('Root')
+    elif path.endswith('/'):
+        parts.append('TrailingSlash')
+    return ''.join(parts) + 'Route'
 
 
 def main():
@@ -14,10 +32,19 @@ def main():
     if 'authorizer' in routes.get('apiGateway', {}):
         raise ValueError('The website is public; remove apiGateway.authorizer')
 
-    subprocess.run(
-        ['ttrek', 'run', '-package', 'tdevops', '-script', 'generate-api-gateway'],
-        cwd=root, check=True,
-    )
+    # Keep local CDN routes in the shared manifest, but omit them from production.
+    for route in routes['routes']:
+        if type(route.get('cdn_on_prod', False)) is not bool:
+            raise ValueError('cdn_on_prod must be a boolean')
+    routes['routes'] = [route for route in routes['routes'] if not route.pop('cdn_on_prod', False)]
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json') as filtered:
+        json.dump(routes, filtered)
+        filtered.flush()
+        subprocess.run(
+            ['ttrek', 'run', '-package', 'tdevops', '-script', 'generate-api-gateway',
+             '--', '--routes', filtered.name],
+            cwd=root, check=True,
+        )
     generated = root / 'dist/api-gateway.json'
     template = json.loads(generated.read_text())
     del template['Parameters']['AuthorizerFunction']
@@ -35,7 +62,7 @@ def main():
         function: 'LambdaFunctionName',
         function + 'IsArn': 'LambdaFunctionIsArn',
     }
-    route_names = {'ANY /': 'RootRoute', 'ANY /{proxy+}': 'ProxyRoute'}
+    route_names = set()
     for name, resource in template['Resources'].items():
         if resource['Type'] == 'AWS::ApiGatewayV2::Integration':
             names[name] = 'SiteIntegration'
@@ -45,8 +72,11 @@ def main():
             properties = resource['Properties']
             properties['AuthorizationType'] = 'NONE'
             properties.pop('AuthorizerId', None)
-            if properties['RouteKey'] in route_names:
-                names[name] = route_names[properties['RouteKey']]
+            logical_id = route_logical_id(properties['RouteKey'])
+            if logical_id in route_names:
+                raise ValueError(f'Duplicate route logical ID: {logical_id}')
+            route_names.add(logical_id)
+            names[name] = logical_id
 
     def rename(value):
         if isinstance(value, dict):

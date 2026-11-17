@@ -18,6 +18,8 @@ set settings [dict create rootdir $root releases [::app_config::releases {}] \
     content_connection $::telemetry::connection content_images {} treqmon {store {valkeystore {}}}]
 # Rendering tests stub only the store I/O; integration tests exercise real Valkey.
 proc ::treqmon::middleware::valkeystore::init {config} {}
+proc ::treqmon::middleware::valkeystore::register_recent_request {request} {}
+proc ::treqmon::middleware::valkeystore::get_recent_requests {} {return {}}
 # Provide the get history events test fixture.
 proc ::treqmon::middleware::valkeystore::get_history_events {} {return {}}
 # Provide the register datapoint test fixture.
@@ -32,6 +34,15 @@ foreach {kind directory} {wiki docs blog blog} {
 proc request {path {method GET} {headers {}}} {
     ::site::dispatch $::site::router [dict create method $method path $path headers $headers]
 }
+test monitor-no-accounts {The monitor fails closed when accounts are not configured} -body {
+    list [dict get [request /request-monitor] statusCode] \
+        [dict get [request /request-monitor/ HEAD] statusCode] \
+        [string match {*href="/request-monitor"*} [dict get [request /] body]]
+} -result {403 403 0}
+# Authorization is exercised with real sessions and grants in accounts.test.
+# The remaining monitor tests focus on rendering and asset policies.
+rename ::accounts::can_view_monitor ::accounts::real_can_view_monitor
+proc ::accounts::can_view_monitor {request context} {return 1}
 test static-1 {documentation and blog mount with the host layout} -body {
     set docs [request /docs/getting-started]
     set blog [request /blog]

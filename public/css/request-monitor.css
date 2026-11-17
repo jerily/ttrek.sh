@@ -45,3 +45,11 @@
     --treqmon-chart-color: #225d98;
     --treqmon-chart-fill: rgba(34, 93, 152, 0.12);
 }
+
+.request-monitor .recent-requests { overflow-x: auto; margin: 1.5rem 0; }
+.request-monitor .recent-requests table { width: 100%; min-width: 850px; }
+.request-monitor .recent-requests th { text-align: left; }
+.request-monitor .recent-requests td { vertical-align: top; }
+.request-monitor .recent-requests td:first-child { white-space: nowrap; }
+.request-monitor .recent-requests td:nth-child(4),
+.request-monitor .recent-requests td:last-child { overflow-wrap: anywhere; min-width: 12rem; max-width: 32rem; }

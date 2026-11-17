@@ -10,13 +10,15 @@ additional requirements described below.
 ```bash
 ttrek run -script build-assets
 npm test
-python3 -m unittest discover -s tests -p 'test_lambda_versions.py'
+python3 -m unittest discover -s tests -p 'test_*.py'
 ttrek run tclsh9.1 "$PWD/tests/homepage.test"
 ttrek run tclsh9.1 "$PWD/tests/accounts.test"
 ttrek run tclsh9.1 "$PWD/tests/account-password-migration.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
+ttrek run tclsh9.1 "$PWD/tests/rate-limits.test"
+ttrek run tclsh9.1 "$PWD/tests/routes.test"
 ttrek run tclsh9.1 "$PWD/tests/lambda-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry-config.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
@@ -244,3 +246,17 @@ node tests/package-tracker-ui.mjs /tmp/ttrek-tracker-preview
 rendered fixtures and public assets on an ephemeral loopback port. It covers
 mobile/desktop layout, rotation, pause, reduced motion, charts, and the no-JavaScript
 fallback. Browser tooling is not a runtime or build dependency.
+
+`tests/rate-limits.test` checks the JSON policy validation, the 100-request global
+boundary, per-IP sensitive-route budgets, shared GET/POST/HEAD form budgets, and
+forum write limits across topic IDs. `tests/routes.test` exercises the explicit
+local route manifest; `tests/test_api_gateway_routes.py` verifies that production
+omits CDN routes and uses meaningful, unique logical IDs. Account tests verify
+monitor grants and immediate revocation for direct and Lambda requests. Forum and
+browser-asset tests cover CDN template context, stable paths, uploaded bytes, and
+MIME types; patch tests ensure upload failures stop content synchronization.
+
+The recent-request tests check the 100-entry bound, newest-first order, missing
+user agents, trusted IPs, omission of other headers/query strings, HTML escaping,
+and the same permission gate for the dashboard and recent-request page.
+`tests/lambda-valkey.tcl` verifies the recent list is shared between processes.

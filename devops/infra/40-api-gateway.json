@@ -120,7 +120,119 @@
       "DependsOn": [
         "SitePermission",
         "RootRoute",
-        "ProxyRoute"
+        "GetBlogRoute",
+        "GetBlogTrailingSlashRoute",
+        "GetBlogByPathRoute",
+        "GetDebugRoute",
+        "GetDistByArchByArtifactRoute",
+        "GetDocsRoute",
+        "GetDocsTrailingSlashRoute",
+        "GetDocsByPathRoute",
+        "GetDownloadByArtifactRoute",
+        "GetForumRoute",
+        "GetForumTrailingSlashRoute",
+        "GetForumMemberByIdRoute",
+        "GetForumModerateByKindByIdByActionRoute",
+        "GetForumModerationRoute",
+        "GetForumModerationHistoryRoute",
+        "GetForumNewRoute",
+        "GetForumTopicByIdRoute",
+        "GetInitRoute",
+        "GetPackageTrackerRoute",
+        "GetPackageByPackageNameRoute",
+        "GetPackageByPackageNameByPackageVersionRoute",
+        "GetPackagesRoute",
+        "GetPackagesTrackerRoute",
+        "GetRegistryAutocompleteRoute",
+        "GetRegistrySearchRoute",
+        "GetRegistryByPackageNameRoute",
+        "GetRegistryByPackageNameByPackageVersionLanguagesRoute",
+        "GetRegistryByPackageNameByPackageVersionByOsByMachineRoute",
+        "GetReleasesLatestByTargetRoute",
+        "GetRequestMonitorRoute",
+        "GetRequestMonitorTrailingSlashRoute",
+        "GetRequestMonitorRecentRoute",
+        "GetSearchRoute",
+        "GetUserRoute",
+        "GetUserTrailingSlashRoute",
+        "GetUserAdminUsersRoute",
+        "GetUserChangePasswordRoute",
+        "GetUserCloseAccountRoute",
+        "GetUserForgotRoute",
+        "GetUserLoginRoute",
+        "GetUserProfileRoute",
+        "GetUserRegisterRoute",
+        "GetUserResetRoute",
+        "GetUserTwoFactorRoute",
+        "GetUserTwoFactorDisableRoute",
+        "GetUserTwoFactorSetupRoute",
+        "GetUserVerifyRoute",
+        "HeadRootRoute",
+        "HeadBlogRoute",
+        "HeadBlogTrailingSlashRoute",
+        "HeadBlogByPathRoute",
+        "HeadDebugRoute",
+        "HeadDistByArchByArtifactRoute",
+        "HeadDocsRoute",
+        "HeadDocsTrailingSlashRoute",
+        "HeadDocsByPathRoute",
+        "HeadDownloadByArtifactRoute",
+        "HeadForumRoute",
+        "HeadForumTrailingSlashRoute",
+        "HeadForumMemberByIdRoute",
+        "HeadForumModerateByKindByIdByActionRoute",
+        "HeadForumModerationRoute",
+        "HeadForumModerationHistoryRoute",
+        "HeadForumNewRoute",
+        "HeadForumTopicByIdRoute",
+        "HeadInitRoute",
+        "HeadPackageTrackerRoute",
+        "HeadPackageByPackageNameRoute",
+        "HeadPackageByPackageNameByPackageVersionRoute",
+        "HeadPackagesRoute",
+        "HeadPackagesTrackerRoute",
+        "HeadRegistryAutocompleteRoute",
+        "HeadRegistrySearchRoute",
+        "HeadRegistryByPackageNameRoute",
+        "HeadRegistryByPackageNameByPackageVersionLanguagesRoute",
+        "HeadRegistryByPackageNameByPackageVersionByOsByMachineRoute",
+        "HeadReleasesLatestByTargetRoute",
+        "HeadRequestMonitorRoute",
+        "HeadRequestMonitorTrailingSlashRoute",
+        "HeadRequestMonitorRecentRoute",
+        "HeadSearchRoute",
+        "HeadUserRoute",
+        "HeadUserTrailingSlashRoute",
+        "HeadUserAdminUsersRoute",
+        "HeadUserChangePasswordRoute",
+        "HeadUserCloseAccountRoute",
+        "HeadUserForgotRoute",
+        "HeadUserLoginRoute",
+        "HeadUserProfileRoute",
+        "HeadUserRegisterRoute",
+        "HeadUserResetRoute",
+        "HeadUserTwoFactorRoute",
+        "HeadUserTwoFactorDisableRoute",
+        "HeadUserTwoFactorSetupRoute",
+        "HeadUserVerifyRoute",
+        "PostForumModerateByKindByIdByActionRoute",
+        "PostForumNewRoute",
+        "PostForumTopicByIdRoute",
+        "PostTelemetryCollectByPackageNameByPackageVersionRoute",
+        "PostTelemetryRegisterByEnvironmentIdRoute",
+        "PostUserChangePasswordRoute",
+        "PostUserCloseAccountRoute",
+        "PostUserForgotRoute",
+        "PostUserLoginRoute",
+        "PostUserLogoutRoute",
+        "PostUserProfileRoute",
+        "PostUserRegisterRoute",
+        "PostUserResendVerificationRoute",
+        "PostUserResetRoute",
+        "PostUserTwoFactorRoute",
+        "PostUserTwoFactorDisableRoute",
+        "PostUserTwoFactorSetupRoute",
+        "PostUserVerifyRoute"
       ]
     },
     "SiteIntegration": {
@@ -193,7 +305,7 @@
         "ApiId": {
           "Ref": "HttpApi"
         },
-        "RouteKey": "ANY /",
+        "RouteKey": "GET /",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -208,13 +320,2365 @@
         }
       }
     },
-    "ProxyRoute": {
+    "GetBlogRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
         "ApiId": {
           "Ref": "HttpApi"
         },
-        "RouteKey": "ANY /{proxy+}",
+        "RouteKey": "GET /blog",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetBlogTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /blog/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetBlogByPathRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /blog/{path+}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetDebugRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /debug",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetDistByArchByArtifactRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /dist/{arch}/{artifact}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetDocsRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /docs",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetDocsTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /docs/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetDocsByPathRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /docs/{path+}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetDownloadByArtifactRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /download/{artifact}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumMemberByIdRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum/member/{id}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumModerateByKindByIdByActionRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum/moderate/{kind}/{id}/{action}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumModerationRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum/moderation",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumModerationHistoryRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum/moderation/history",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumNewRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum/new",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetForumTopicByIdRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /forum/topic/{id}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetInitRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /init",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetPackageTrackerRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /package-tracker",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetPackageByPackageNameRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /package/{package_name}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetPackageByPackageNameByPackageVersionRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /package/{package_name}/{package_version}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetPackagesRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /packages",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetPackagesTrackerRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /packages/tracker",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRegistryAutocompleteRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /registry/autocomplete",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRegistrySearchRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /registry/search",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRegistryByPackageNameRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /registry/{package_name}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRegistryByPackageNameByPackageVersionLanguagesRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /registry/{package_name}/{package_version}/languages",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRegistryByPackageNameByPackageVersionByOsByMachineRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /registry/{package_name}/{package_version}/{os}/{machine}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetReleasesLatestByTargetRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /releases/latest/{target}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRequestMonitorRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /request-monitor",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRequestMonitorTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /request-monitor/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRequestMonitorRecentRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /request-monitor/recent",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetSearchRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /search",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserAdminUsersRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/admin/users",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserChangePasswordRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/change-password",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserCloseAccountRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/close-account",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserForgotRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/forgot",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserLoginRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/login",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserProfileRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/profile",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserRegisterRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/register",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserResetRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/reset",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserTwoFactorRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/two-factor",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserTwoFactorDisableRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/two-factor/disable",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserTwoFactorSetupRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/two-factor/setup",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserVerifyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/verify",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRootRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadBlogRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /blog",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadBlogTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /blog/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadBlogByPathRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /blog/{path+}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadDebugRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /debug",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadDistByArchByArtifactRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /dist/{arch}/{artifact}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadDocsRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /docs",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadDocsTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /docs/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadDocsByPathRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /docs/{path+}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadDownloadByArtifactRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /download/{artifact}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumMemberByIdRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum/member/{id}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumModerateByKindByIdByActionRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum/moderate/{kind}/{id}/{action}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumModerationRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum/moderation",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumModerationHistoryRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum/moderation/history",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumNewRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum/new",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadForumTopicByIdRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /forum/topic/{id}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadInitRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /init",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadPackageTrackerRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /package-tracker",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadPackageByPackageNameRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /package/{package_name}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadPackageByPackageNameByPackageVersionRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /package/{package_name}/{package_version}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadPackagesRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /packages",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadPackagesTrackerRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /packages/tracker",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRegistryAutocompleteRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /registry/autocomplete",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRegistrySearchRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /registry/search",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRegistryByPackageNameRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /registry/{package_name}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRegistryByPackageNameByPackageVersionLanguagesRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /registry/{package_name}/{package_version}/languages",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRegistryByPackageNameByPackageVersionByOsByMachineRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /registry/{package_name}/{package_version}/{os}/{machine}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadReleasesLatestByTargetRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /releases/latest/{target}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRequestMonitorRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /request-monitor",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRequestMonitorTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /request-monitor/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadRequestMonitorRecentRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /request-monitor/recent",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadSearchRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /search",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserTrailingSlashRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserAdminUsersRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/admin/users",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserChangePasswordRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/change-password",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserCloseAccountRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/close-account",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserForgotRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/forgot",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserLoginRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/login",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserProfileRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/profile",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserRegisterRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/register",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserResetRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/reset",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserTwoFactorRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/two-factor",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserTwoFactorDisableRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/two-factor/disable",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserTwoFactorSetupRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/two-factor/setup",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserVerifyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/verify",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostForumModerateByKindByIdByActionRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /forum/moderate/{kind}/{id}/{action}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostForumNewRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /forum/new",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostForumTopicByIdRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /forum/topic/{id}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostTelemetryCollectByPackageNameByPackageVersionRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /telemetry/collect/{package_name}/{package_version}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostTelemetryRegisterByEnvironmentIdRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /telemetry/register/{environment_id}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserChangePasswordRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/change-password",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserCloseAccountRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/close-account",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserForgotRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/forgot",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserLoginRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/login",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserLogoutRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/logout",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserProfileRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/profile",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserRegisterRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/register",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserResendVerificationRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/resend-verification",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserResetRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/reset",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserTwoFactorRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/two-factor",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserTwoFactorDisableRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/two-factor/disable",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserTwoFactorSetupRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/two-factor/setup",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserVerifyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/verify",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [

@@ -19,36 +19,7 @@ set config [::app_config::load $dir]
 set valkey_config [::app_config::valkey $config]
 set releases_config [::app_config::releases $config]
 
-# tratelimit
-
-set tratelimit_config {
-    global_limits {
-        by_ip {
-            window_millis 10000
-            limit 1000
-        }
-        by_session {
-            window_millis 60000
-            limit 5
-        }
-    }
-    route_limits {
-        get_index {
-            by_ip {
-                window_millis 10000
-                limit 100
-            }
-        }
-        get_catchall {
-            by_ip {
-                window_millis 10000
-                limit 15
-            }
-        }
-    }
-}
-
-dict set tratelimit_config store valkeystore $valkey_config
+set tratelimit_config [::app_config::rate_limits $config [dict create valkeystore $valkey_config]]
 
 set treqmon_config [dict create store [::app_config::monitor_store $config]]
 

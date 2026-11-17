@@ -141,7 +141,9 @@ Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor st
 local INI has no `[redis]` section. They use your configured Valkey service and
 never start or stop it, generate connection settings, or delete its data.
 
-`etc/routes.json` maps `/` and `/{proxy+}` to the function. The Lambda adapter supports
+`etc/routes.json` explicitly lists application routes and has no root catch-all.
+Routes marked `cdn_on_prod: true` remain available through the local proxy; the
+production API Gateway generator omits them. The Lambda adapter supports
 payloads 1.0 and 2.0, preserves query/body data and returns base64-encoded response
 bytes. Static website assets are fetched from S3 through Lambda, retaining the
 browser's origin and content security policy. Package CSS is served by each

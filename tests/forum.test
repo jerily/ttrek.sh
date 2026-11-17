@@ -43,7 +43,7 @@ test site-forum-2 {startup is read-only; explicit patch sync grants and revokes 
     list $before [dict get $result ok] $granted [dict get $queue statusCode] \
         [::web::user::permissions $store $uid] \
         [dict get [$::site::router dispatch [dict merge $signed {path /forum/moderation}]] statusCode]
-} -result {{} 1 {blog.edit forum.moderate users.manage wiki.edit} 200 {} 403}
+} -result {{} 1 {blog.edit forum.moderate request_monitor.view users.manage wiki.edit} 200 {} 403}
 
 test site-forum-3 {forum settings reach forms and HTTP requests cannot invoke maintenance} -body {
     set response [$::site::router dispatch [dict merge $signed {path /forum/new}]]
@@ -68,6 +68,50 @@ test site-users-admin {Account links to the protected user list through the shar
         [string match {*pure-menu-link">Forum*} $html] \
         [dict get [::site::dispatch $::site::router [dict merge $signed {path /user/admin/users}]] statusCode]
 } -result {1 200 no-store 1 1 1 403}
+
+test site-package-cdn {Forum, editor and admin pages use stable CloudFront assets with an allowed CSP origin} -setup {
+    set originalSettings $::site::settings
+    set originalRouter $::site::router
+    dict set ::site::settings account access groups admin mira@example.com
+    ::accounts::sync_access
+    set ::env(ENV) PROD
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
+    set cdnSettings $originalSettings
+    dict set cdnSettings content_images [::app_config::content_images {content_images {cloudfront_enabled true}} $root]
+    ::site::configure $cdnSettings
+    # Keep the existing local account fixture while using production CDN URLs.
+    set ::env(ENV) LOCAL
+    set ::site::router [::tpathexp::router]
+    ::site::mount $::site::router
+} -body {
+    set checks {}
+    foreach {path assets} {
+        /forum {/forum/_assets/forum.css}
+        /forum/new {/forum/_assets/forum.css /forum/_assets/editor.css /forum/_assets/markdown-editor.bundle.js}
+        /user/admin/users {/user/_assets/admin.css}
+    } {
+        set response [::site::dispatch $::site::router [dict merge $signed [dict create path $path]]]
+        set html [dict get $response body]
+        lappend checks [expr {[dict get $response statusCode] == 200}]
+        foreach asset $assets {
+            lappend checks [expr {[string first "https://cdn.example/cdn$asset" $html] >= 0}] \
+                [expr {[string first "=\"$asset\"" $html] < 0}]
+        }
+        lappend checks [expr {[string first https://cdn.example [::responses::header $response Content-Security-Policy]] >= 0}]
+    }
+    lsort -unique $checks
+} -cleanup {
+    $::site::router destroy
+    set ::env(ENV) LOCAL
+    unset ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    ::site::configure $originalSettings
+    set ::site::router $originalRouter
+    # Restore the mount's registered key handles for subsequent requests.
+    $originalRouter destroy
+    ::site::init_worker $originalSettings
+    set store $::accounts::store
+    set ::site_lambda::router $::site::router
+} -result 1
 
 test site-users-id-migration {private patch migrates user identity and existing sessions idempotently} -body {
     set old [::ksuid::generate_ksuid]
