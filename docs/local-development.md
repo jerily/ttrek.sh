@@ -3,6 +3,15 @@
 [Documentation](readme.md) · [Project overview](../README.md)
 
 Complete [setup](install.md) first. Run these commands from the website checkout.
+Enable this installation's local dependencies before installing or updating:
+
+```sh
+ttrek use-flags add +local
+ttrek install -y -registry ../private-ttrek-registry -add-pubreg
+```
+
+This selects the mocks and SQLite instead of PostgreSQL. `iuse: ["local"]` only
+declares the flag; its value is stored in `ttrek-venv/ttrek-manifest.json`.
 
 ## Edit website content
 

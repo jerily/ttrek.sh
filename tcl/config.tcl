@@ -208,7 +208,7 @@ proc ::app_config::lambda_middleware {config} {
 
 # Validate distribution settings and artifact checksums.
 proc ::app_config::releases {config {root {}}} {
-    set settings [dict create bucket {} region {} prefix ttrek/1.5.0 source_prefix ttrek/sources version 1.5.0 url_expiry_seconds 300 source_url_expiry_seconds 300 checksums_file {} checksums {}]
+    set settings [dict create bucket {} region {} prefix ttrek/1.6.0 source_prefix ttrek/sources version 1.6.0 url_expiry_seconds 300 source_url_expiry_seconds 300 checksums_file {} checksums {}]
     if {[dict exists $config releases]} {
         set settings [dict merge $settings [dict get $config releases]]
     }

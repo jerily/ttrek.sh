@@ -22,15 +22,20 @@ proc build_read {path} {
     set channel [open $path]
     try {string trim [read $channel]} finally {close $channel}
 }
+build_write [file join $work ttrek.json] {{"dependencies":{}}}
 build_write [file join $work bin aws] {#!/bin/sh
 set -eu
 [ "$1 $2" = "s3 cp" ] || exit 91
-[ "$3" = s3://jerily-ttrek-app/ttrek/1.5.0/linux-amd64-glibc/ttrek ] || exit 98
+[ "$3" = s3://fixture/updated-ttrek ] || exit 98
 cp "$TTREK_TEST_BINARY" "$4"
 }
 build_write [file join $work ttrek-fixture] {#!/bin/sh
 set -eu
-printf '%s\n' "$1" >> "$TTREK_TEST_LOG"
+if [ "$1" = use-flags ]; then
+    printf '%s\n' "$1 $2 $3" >> "$TTREK_TEST_LOG"
+else
+    printf '%s\n' "$1" >> "$TTREK_TEST_LOG"
+fi
 case "$1" in
     self-update) exit 0 ;;
     sync)
@@ -39,13 +44,25 @@ case "$1" in
         mkdir -p "$2"
         touch "$2/synced"
         ;;
+    use-flags)
+        [ "$2" = add ] || exit 90
+        case "$PWD" in
+            */build/test-deps) [ "$3" = +local ] || exit 89 ;;
+            *) [ "$3" = -local ] || exit 88 ;;
+        esac
+        ;;
     install)
         [ -f "$TTREK_PUBLIC_REGISTRY/synced" ] || exit 93
         [ "$#" = 7 ] && [ "$2" = -y ] && [ "$3" = -fail-verbose ] || exit 94
         [ "$4" = -registry ] && [ "$5" = "$CODEBUILD_SRC_DIR_PrivateRegistry" ] || exit 95
         [ "$6" = -registry ] && [ "$7" = "$TTREK_PUBLIC_REGISTRY" ] || exit 96
-        # Stop here: the test must not install packages, upload or deploy.
-        exit 73
+        case "$PWD" in
+            */build/test-deps)
+                [ -f ttrek.json ] && [ -f ttrek-lock.json ] || exit 87
+                # Stop before tests/packaging; never install, upload or deploy.
+                exit 73 ;;
+            *) printf '{"packages":{}}\n' > ttrek-lock.json ;;
+        esac
         ;;
     *) exit 97 ;;
 esac
@@ -56,6 +73,7 @@ proc run_build {syncStatus} {
     file delete -force [file join $work build] [file join $work commands.log]
     set failed [catch {exec env PATH=[file join $work bin]:$env(PATH) \
         CODEBUILD_SRC_DIR_PrivateRegistry=[file join $work {private registry}] \
+        TTREK_BINARY_S3_URI=s3://fixture/updated-ttrek \
         TTREK_TEST_BINARY=[file join $work ttrek-fixture] \
         TTREK_TEST_LOG=[file join $work commands.log] \
         TTREK_TEST_SYNC_STATUS=$syncStatus \
@@ -66,7 +84,7 @@ proc run_build {syncStatus} {
 
 test build-registry-order {The build syncs before installing and passes the same checkout after the private registry} -body {
     run_build 0
-} -result {1 73 {self-update sync install}}
+} -result {1 73 {self-update sync {use-flags add -local} install {use-flags add +local} install}}
 
 test build-registry-sync-failure {A failed sync stops the build before dependency installation} -body {
     run_build 42

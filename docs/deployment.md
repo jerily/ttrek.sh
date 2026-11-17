@@ -408,14 +408,19 @@ and SAM with pip, then checks the CMake and compiler versions. These tools are
 needed to build the site's dependencies even though ttrek itself is downloaded.
 The build:
 
-1. Downloads the ttrek 1.5.0 Linux AMD64 glibc binary from
-   `s3://jerily-ttrek-app/ttrek/1.5.0/linux-amd64-glibc/ttrek`, makes it executable,
-   and checks that it starts with `ttrek self-update -version`.
+1. Downloads the CLI selected by `TTREK_BINARY_S3_URI`, makes it executable,
+   and checks it with `ttrek self-update -version`. Before using these recipes,
+   upload a tested 1.6.0 binary at the configured S3 URI (or override the URI).
+   The 1.6.0 default supports unsigned `iuse`, default-disabled flags and
+   conditional project dependencies; configuring this URI does not publish it.
 2. Runs `ttrek sync` into `build/public-registry`, then installs from the private
-   registry (build tools) followed by that public checkout (runtime dependencies).
-   A failed sync stops the build before installation.
-3. Restores retained browser assets, builds browser assets, then the
-   application and asset checks.
+   registry followed by that public checkout. A fresh production `ttrek-venv`
+   is required and `-local` is explicitly set. SQLite-backed test dependencies
+   are installed separately under `build/test-deps` with `+local`.
+3. Restores and builds browser assets, checks production package loading, then
+   runs application tests using the separate local prefix. Only the production
+   prefix is packaged. The staged smoke checks can load SQLite test libraries
+   from `TTREK_PREPARE_TEST_PREFIX`; those libraries are never copied into the ZIP.
 4. Generates encrypted production config from SSM and packages with tdevops using
    `--local-only`. `TTREK_PUBLIC_REGISTRY` tells packaging to reuse the synced
    dependency checkout. It exports that commit into the ZIP, excludes Git metadata
