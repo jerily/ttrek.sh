@@ -449,9 +449,11 @@ local S3 mock. `task_initdb_website` initializes schemas and runs the temporary
 account password-hash encryption upgrade described below.
 
 Before relying on patch-task uploads, update the S3 gateway endpoint policy with
-`bash devops/infra/38-deploy-infra-rds-postgres.sh`. It allows `s3:ListBucket`, `s3:GetObject` and
-`s3:PutObject` only for the configured image prefix, alongside existing backup
-writes. The SAM Lambda role already grants the corresponding image permissions;
+`bash devops/infra/38-deploy-infra-rds-postgres.sh`. It allows `s3:GetObject` and
+`s3:PutObject` for the configured image prefix, `s3:PutObject` for the browser asset
+prefix, and `s3:ListBucket` restricted to those two prefixes, alongside existing
+backup writes. Set `BROWSER_ASSETS_PREFIX` when using a prefix other than `cdn`.
+The SAM Lambda role already grants the corresponding permissions;
 the [endpoint policy](https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html#edit-vpc-endpoint-policy-s3)
 must also allow these calls.
 Deploying the website does not run the sync task automatically.
@@ -1009,8 +1011,9 @@ Forum/editor assets and the admin stylesheet use stable paths under the configur
 CloudFront asset prefix. `task_sync_website` uploads all browser assets to S3 before
 committing its SQL content sync; upload failures fail the task. These files share
 the existing CloudFront caching behavior used for stable browser assets.
-The Lambda `BrowserAssetsPrefix` parameter must match `content_images.assets_prefix`
-and the CDN stack. Deploy the updated Lambda IAM policy before running the task.
+The Lambda and PostgreSQL stacks' `BrowserAssetsPrefix` parameters must match
+`content_images.assets_prefix` and the CDN stack. Deploy both the Lambda IAM policy
+and the PostgreSQL stack's S3 endpoint policy before running the task.
 The same upload implementation is used by the deployment asset uploader.
 
 The package changes required by this update are tratelimit 1.1.1, treqmon 2.3.0, web-user 0.5.6,

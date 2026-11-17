@@ -22,6 +22,7 @@ def main():
         "WebsiteFunctionName": os.environ.get("LAMBDA_FUNCTION_NAME", "prod-Api-TtrekWebsite-Function"),
         "ScheduleTimezone": os.environ.get("TTREK_SCHEDULE_TIMEZONE", "America/New_York"),
         "MaintenanceSchedule": os.environ.get("TTREK_MAINTENANCE_SCHEDULE", "cron(0 5 * * ? *)"),
+        "BrowserAssetsPrefix": os.environ.get("BROWSER_ASSETS_PREFIX", "cdn"),
     }
     parameters = json.dumps([{"ParameterKey": k, "ParameterValue": v} for k, v in values.items()])
     with subprocess.Popen([
