@@ -81,10 +81,7 @@ removes the setting and returns to the default. Run `ttrek help use-flags` for
 the complete command reference.
 
 Settings now live in **`ttrek-venv/ttrek-manifest.json`**, keeping each
-installation's choices separate from the shared project definition. If you
-previously put `useFlags` in `ttrek.json`, **reapply those settings with
-`ttrek use-flags` after upgrading**: they are not migrated or read from the
-project file.
+installation's choices separate from the shared project definition.
 
 Disabling a dependency removes it from the selected dependency graph, but
 does not uninstall files already present. Start with a fresh installation
