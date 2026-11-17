@@ -19,7 +19,7 @@ function highlightShell(code) {
 }
 
 const labels = { sh: 'Shell', bash: 'Bash', tcl: 'Tcl', json: 'JSON', ini: 'INI', markdown: 'Markdown', gitignore: 'Git ignore', text: 'Text' };
-for (const code of document.querySelectorAll('.docs-content article pre > code')) {
+for (const code of document.querySelectorAll(':is(.docs-content, .blog-content) article pre > code')) {
     const languageClass = [...code.classList].find(name => name.startsWith('language-'));
     if (!languageClass) continue;
     const language = languageClass.slice('language-'.length).toLowerCase();

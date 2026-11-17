@@ -81,7 +81,7 @@ test static-6 {The configured monitor master is passed to the package mount} -se
     ::site::configure [dict replace $settings request_monitor {master_template blog-master.html.jinja}]
     ::site::mount $router
     set html [dict get [::site::dispatch $router {method GET path /request-monitor}] body]
-    list [string match {*class="site-main documentation"*} $html] [regexp -all {<canvas } $html]
+    list [string match {*class="site-main documentation blog-content"*} $html] [regexp -all {<canvas } $html]
 } -cleanup {
     $router destroy
     ::site::configure $settings
@@ -208,13 +208,16 @@ test assets-bytes {Manifest ETags stay fixed until a rebuild while requests serv
 
 test assets-layouts {Site and package-rendered layouts resolve the manifest} -body {
     set results {}
-    foreach path {/ /packages /docs /docs/getting-started /blog /request-monitor} {
+    foreach path {/ /packages /docs /docs/getting-started /blog /blog/2026-11-17-ttrek-160-see-your-build-before-it-starts /request-monitor} {
         set response [request $path]
         set html [dict get $response body]
         lappend results [expr {[string first [::assets::url /css/site.css] $html] >= 0}]
         lappend results [string match {*rel="icon" href="/assets/favicon.svg"*} $html]
         lappend results [string match {*rel="icon" href="/favicon.ico"*} $html]
         lappend results [expr {![regexp {(href|src)="/(css|js)/} $html]}]
+        if {[string match /docs* $path] || [string match /blog* $path]} {
+            lappend results [expr {[string first [::assets::url /js/docs.js] $html] >= 0}]
+        }
         foreach {match url} [regexp -all -inline {(?:href|src)="(/assets/versioned/[^"]+)"} $html] {
             lappend results [expr {[dict get [request $url] statusCode] == 200}]
         }
