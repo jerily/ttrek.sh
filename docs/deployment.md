@@ -770,7 +770,7 @@ replacement and preserve needed cache data before updating an existing cache.
 ## API Gateway template
 
 ```sh
-ttrek install -force -registry ../private-ttrek-registry -add-pubreg tdevops mock-proxy-app
+ttrek install -D -force -registry ../private-ttrek-registry -add-pubreg tdevops
 python3 devops/generate-api-gateway.py
 ```
 
@@ -1014,7 +1014,8 @@ and the CDN stack. Deploy the updated Lambda IAM policy before running the task.
 The same upload implementation is used by the deployment asset uploader.
 
 The package changes required by this update are tratelimit 1.1.1, treqmon 2.3.0, web-user 0.5.6,
-web-forum 0.3.2, and mock-proxy-app 0.1.2. The first four recipes are in
-`ttrek-registry`; the proxy remains private in `private-ttrek-registry`.
+web-forum 0.3.2, and tdevops 0.2.2. The first four recipes are in
+`ttrek-registry`; tdevops remains private in `private-ttrek-registry` and requires
+mock-proxy-app 0.1.2 or newer only with `+local`.
 The proxy release accepts the `cdn_on_prod` flag;
 the account and forum releases accept `assets_url` for their template contexts.
