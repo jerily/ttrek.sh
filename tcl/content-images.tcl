@@ -28,7 +28,7 @@ proc ::content_images::options {settings kind {uploadMissing {}}} {
     }
     if {$settings eq {} || [dict get $settings bucket] eq {}} {return {}}
     if {$uploadMissing eq {}} {set uploadMissing [expr {[::app_config::mode] eq "LOCAL"}]}
-    package require pure-tcl-aws-s3 0.1.0
+    package require pure-tcl-aws-s3 1.0.0
     set clientSettings [dict create region [dict get $settings region]]
     set endpoint [dict get $settings endpoint]
     if {$endpoint ne {}} {

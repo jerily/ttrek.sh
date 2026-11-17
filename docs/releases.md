@@ -190,8 +190,8 @@ require a signed URL, use `Cache-Control: no-store`, and return 503 if disabled
 or signing fails. The endpoint neither fetches upstream URLs nor populates S3;
 missing mirrored objects return S3's error after the redirect.
 
-`pure-tcl-aws-s3` ^0.1.0 supplies release signing. KMS/SSM are supplied by
-`tconfig` 1.0.1, and account email uses the pure Tcl SES/SQS clients. The
+`pure-tcl-aws-s3` 1.0.0 supplies release signing. KMS/SSM are supplied by
+`tconfig` 1.0.2, and account email uses the pure Tcl SES/SQS clients. The
 registry dependency graph and public bootstrap no longer include the AWS C++
 SDK. Each worker lazily creates an S3 client using the configured region and
 the core package's credential provider. Configure

@@ -231,7 +231,7 @@ require a bucket. Each worker shares one `awss3` client between the packages.
 Both modes query stored content when requested and generate URLs using the stored image
 paths. LOCAL uses SQLite and PROD uses PostgreSQL. It does not scan directories, render Markdown, or hash images at startup.
 `task_sync_website` performs those operations through each package's `sync` proc.
-The SDK requires `pure-tcl-aws-s3` 0.1.0+; maintenance image hashes use `::twebserver::sha256`.
+The SDK requires `pure-tcl-aws-s3` 1.0.0+; maintenance image hashes use `::twebserver::sha256`.
 
 The local Lambda stack overrides the bucket to `ttrek-local` and uses its loopback
 S3 mock, with dummy credentials. Direct LOCAL runs may set `endpoint` to a loopback

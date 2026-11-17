@@ -260,15 +260,10 @@ if ! package_installed trequests; then
     tcl_cmake_install trequests-1.3.0 -DBUILD_TESTING=OFF
 fi
 
-if ! package_installed sha256 md5; then
-    echo "Install Tcllib 2.0 ..."
-    fetch_source tcllib-2.0 https://downloads.sourceforge.net/project/tcllib/tcllib/2.0/tcllib-2.0.tar.gz
-    (
-        mkdir -p "$BUILD_DIR/tcllib-2.0"
-        cd "$BUILD_DIR/tcllib-2.0"
-        "$SOURCE_DIR/tcllib-2.0/configure" --prefix="$INSTALL_DIR"
-        make install-tcl
-    )
+if ! package_installed thashlib; then
+    echo "Build thashlib 0.1.0 ..."
+    fetch_source thashlib-0.1.0 https://github.com/jerily/thashlib/archive/refs/tags/v0.1.0.tar.gz
+    tcl_cmake_install thashlib-0.1.0 -DBUILD_TESTING=OFF -DOPENSSL_ROOT_DIR="$INSTALL_DIR"
 fi
 
 if ! package_installed tdom; then
@@ -285,14 +280,14 @@ if ! package_installed tdom; then
 fi
 
 for service in core s3 sqs ses lambda kms ssm; do
-    install_tcl_package "pure-tcl-aws-$service-0.1.0" "pure-tcl-aws-${service}0.1.0" \
-        "https://github.com/jerily/pure-tcl-aws-$service/archive/refs/tags/v0.1.0.tar.gz"
+    install_tcl_package "pure-tcl-aws-$service-1.0.0" "pure-tcl-aws-${service}1.0.0" \
+        "https://github.com/jerily/pure-tcl-aws-$service/archive/refs/tags/v1.0.0.tar.gz"
 done
 
 install_tcl_package tratelimit-1.0.1 tratelimit1.0.1 https://github.com/jerily/tratelimit/archive/refs/tags/v1.0.1.tar.gz
 install_tcl_package treqmon-2.0.0 treqmon2.0.0 https://github.com/jerily/treqmon/archive/refs/tags/v2.0.0.tar.gz
 install_tcl_package tsession-1.0.3 tsession1.0.3 https://github.com/jerily/tsession/archive/refs/tags/v1.0.3.tar.gz
-install_tcl_package tconfig-1.0.1 tconfig1.0.1 https://github.com/jerily/tconfig/archive/refs/tags/v1.0.1.tar.gz
+install_tcl_package tconfig-1.0.2 tconfig1.0.2 https://github.com/jerily/tconfig/archive/refs/tags/v1.0.2.tar.gz
 
 "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl"
 

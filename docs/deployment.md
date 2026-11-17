@@ -95,7 +95,7 @@ and an accepted SES send followed by a lost response or failed delete can still
 produce a duplicate. No database locks or delivery-tracking tables are used.
 
 The email worker uses `pure-tcl-aws-sqs`, `pure-tcl-aws-ses`, and
-`pure-tcl-aws-lambda` 0.1.0 with `web-user` 0.5.2. Apply `00-deploy-iam-policy.sh`, redeploy
+`pure-tcl-aws-lambda` 1.0.0 with `web-user` 0.5.3. Apply `00-deploy-iam-policy.sh`, redeploy
 `20-deploy-infra-vpc0.sh`, deploy `46-deploy-infra-sqs.sh`, and update
 `30-deploy-codebuild.sh` so CodeBuild can manage the new schedule. Then rebuild
 and deploy the SAM application. If overriding `TTREK_EMAIL_QUEUE_NAME`, update
@@ -243,7 +243,7 @@ The template exports `IdentityArn`, `ConfigurationSetName`, and
 `ConfigurationSetArn` under `Infra-DevOps-TTREK-SES-*`. The new Tcl extension can
 use the verified identity with `region eu-central-1`, a `from` address at
 `ttrek.sh`, and `configuration_set ttrek-transactional`. Install
-`pure-tcl-aws-ses` and use `package require pure-tcl-aws-ses 0.1.0` in the sending application.
+`pure-tcl-aws-ses` and use `package require pure-tcl-aws-ses 1.0.0` in the sending application.
 Feedback forwarding remains enabled; use a monitored From or `return_path`
 mailbox for bounce/complaint notifications. Reputation metrics incur CloudWatch
 charges; application event destinations can be added separately.
