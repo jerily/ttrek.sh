@@ -34,24 +34,25 @@ configured bucket, using these target names:
 | `linux-amd64-musl` | `x86_64-unknown-linux-musl` |
 | `linux-arm64-musl` | `aarch64-unknown-linux-musl` |
 | `macos-arm64` | `aarch64-apple-darwin` |
-| `macos-x86_64` | `x86_64-apple-darwin` |
-| `macos-universal2` (optional) | `universal2-apple-darwin` |
 
 For example, `/dist/linux-arm64-musl/ttrek` and
 `/dist/aarch64-unknown-linux-musl/ttrek` select the same object. The existing
 installer follows the redirect. Unknown targets and extensions return 404.
 `public/ttrek-init` defaults to `https://ttrek.sh`, detects Linux libc and CPU,
-and selects native ARM64 on Apple Silicon even under Rosetta. Intel Macs retain
-the Intel target. Curl and wget verify certificates and follow the S3 redirect.
+and selects native ARM64 on Apple Silicon even under Rosetta. Intel macOS and
+universal2 releases are no longer produced; their download and metadata routes
+return 404. Historical checksum entries remain valid in the manifest.
+Curl and wget verify certificates and follow the S3 redirect.
 With `ENV=LOCAL`, it defaults to `http://localhost:8080`; the LOCAL homepage's
 install command passes that environment setting into the script. To use local
 HTTPS, set `TTREK_UPDATE_ROOT=https://localhost:4433` and trust the local certificate
 through the downloader's CA configuration.
 
-The detector also retains Rustup targets for which this project has no binary:
+The detector also retains targets for which this project provides no binary:
 
 | Detected platform | Example request target (unsupported) |
 | --- | --- |
+| Intel macOS | `x86_64-apple-darwin` |
 | 32-bit Linux x86 | `i686-unknown-linux-gnu`, `i686-unknown-linux-musl` |
 | 32-bit Linux ARM | `arm-unknown-linux-gnueabihf`, `armv7-unknown-linux-musleabihf` |
 | Other Linux CPUs | `mips-unknown-linux-gnu`, `mipsel-unknown-linux-gnu`, `mips64el-unknown-linux-gnuabi64`, `powerpc64le-unknown-linux-gnu`, `s390x-unknown-linux-gnu`, `riscv64gc-unknown-linux-gnu`, `loongarch64-unknown-linux-gnu` |
