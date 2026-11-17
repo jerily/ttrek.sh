@@ -94,7 +94,8 @@ test releases-1 {Every installer triple and release directory signs the matching
     foreach {triple target} {
         x86_64-unknown-linux-gnu linux-amd64-glibc aarch64-unknown-linux-gnu linux-arm64-glibc
         x86_64-unknown-linux-musl linux-amd64-musl aarch64-unknown-linux-musl linux-arm64-musl
-        aarch64-apple-darwin macos-arm64
+        aarch64-apple-darwin macos-arm64 x86_64-apple-darwin macos-x86_64
+        universal2-apple-darwin macos-universal2
     } {
         foreach arch [list $triple $target] {
             set response [get_dist_handler {} [dict create pathParameters [dict create arch $arch ext {}]]]
@@ -116,7 +117,7 @@ test releases-2 {Unknown targets, path traversal and extensions cannot sign arbi
     list $result $s3_calls
 } -result {{404 404 404 404} {}}
 
-test releases-unsupported {Unsupported and retired targets cannot select a binary} -body {
+test releases-unsupported {Other targets emitted by the installer cannot select an incompatible binary} -body {
     set s3_calls {}
     set statuses {}
     foreach arch {
@@ -128,11 +129,9 @@ test releases-unsupported {Unsupported and retired targets cannot select a binar
         aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
         x86_64-unknown-freebsd x86_64-unknown-netbsd x86_64-unknown-dragonfly x86_64-unknown-illumos
         x86_64-pc-windows-gnu
-        x86_64-apple-darwin macos-x86_64 universal2-apple-darwin macos-universal2
     } {
         set ext [expr {[string match *windows* $arch] ? ".exe" : ""}]
         lappend statuses [dict get [get_dist_handler {} [dict create pathParameters [dict create arch $arch ext $ext]]] status]
-        lappend statuses [dict get [get_release_handler {} [dict create pathParameters [dict create target $arch]]] status]
     }
     list [lsort -unique $statuses] $s3_calls
 } -result {404 {}}

@@ -18,6 +18,8 @@ proc ::releases::artifact {target} {
         x86_64-unknown-linux-musl - linux-amd64-musl {return linux-amd64-musl}
         aarch64-unknown-linux-musl - linux-arm64-musl {return linux-arm64-musl}
         aarch64-apple-darwin - macos-arm64 {return macos-arm64}
+        x86_64-apple-darwin - macos-x86_64 {return macos-x86_64}
+        universal2-apple-darwin - macos-universal2 {return macos-universal2}
         default {return {}}
     }
 }

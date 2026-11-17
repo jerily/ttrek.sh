@@ -41,9 +41,7 @@ set process {}
 set cacheProcess {}
 try {
     file copy $seedSource $seed
-    set release [lindex [glob -directory [file join $seedSource ttrek-local ttrek 1.6.0] */ttrek] 0]
-    set target [file tail [file dirname $release]]
-    set extraTarget [expr {$target eq "macos-arm64" ? "linux-arm64-musl" : "macos-arm64"}]
+    set extraTarget macos-universal2
     set extraBinary [binary format a*c* {uploaded release bytes} {0 255}]
     set extraChecksum [sha256 $extraBinary]
     write_file [file join $seed ttrek-local ttrek 1.6.0 $extraTarget ttrek] {old seed bytes}
@@ -191,6 +189,8 @@ try {
     assert {[dict get [request $s3/ttrek-local/binary.bin] body] eq $binary}
     puts {PASS S3-backed website assets and binary object storage}
 
+    set release [lindex [glob -directory [file join $seedSource ttrek-local ttrek 1.6.0] */ttrek] 0]
+    set target [file tail [file dirname $release]]
     set download [dict get [request /dist/$target/ttrek] body]
     assert {[sha256 $download] eq [sha256 [read_file $release]]}
     set metadata [json [request /releases/latest/$target]]
