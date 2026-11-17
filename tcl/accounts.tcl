@@ -73,12 +73,12 @@ proc ::accounts::mount {router settings templates} {
     return $mount
 }
 
-# Wake the existing Lambda asynchronously after SQS has accepted an email.
+# Wake the deployed Lambda alias asynchronously after SQS has accepted an email.
 proc ::accounts::email_queued {queueUrl} {
     package require pure-tcl-aws-lambda 1.0.0
     set client [::aws::lambda::create [dict create region $::env(AWS_REGION)]]
     try {
-        $client invoke_function $::env(AWS_LAMBDA_FUNCTION_NAME) \
+        $client invoke_function "$::env(AWS_LAMBDA_FUNCTION_NAME):DEFAULT" \
             {{"source":"ttrek.patch","task":"task_process_email_queue"}} Event
     } finally {$client destroy}
 }

@@ -630,10 +630,11 @@ ARN, covering deployment, inspection and rollback of the concurrency setting.
 Apply `devops/infra/30-deploy-codebuild.sh` before deploying the Lambda concurrency
 cap so CloudFormation can manage it using the updated build role.
 
-The build role's Put/Get/DeleteFunctionEventInvokeConfig permissions cover both
-the function ARN and its `:$LATEST` qualifier, which SAM uses for asynchronous
-invocation settings. Apply the CodeBuild stack update before retrying a Lambda
-deployment or rollback that failed on these actions.
+The build role can publish versions, manage `DEFAULT`, and prune old versions of
+the website function. Its Put/Get/DeleteFunctionEventInvokeConfig permissions
+cover `:DEFAULT`, which SAM uses for asynchronous invocation settings, and retain
+`:$LATEST` access to remove the old configuration or restore it during rollback.
+Apply the CodeBuild stack update before deploying these SAM changes.
 
 For a manual deployment from an AL2023 build host with dependencies installed:
 
@@ -655,6 +656,10 @@ sam deploy --template-file devops/sam-template.yaml \
   --stack-name Infra-DevOps-TTREK-Lambda \
   --s3-bucket jerily-ttrek-app --s3-prefix lambda/ttrek-sh \
   --capabilities CAPABILITY_NAMED_IAM \
+  --region eu-central-1 --profile ttrek-prod-neo && \
+python3 devops/prune-lambda-versions.py \
+  --function-name prod-Api-TtrekWebsite-Function \
+  --stack-name Infra-DevOps-TTREK-Lambda --keep 5 \
   --region eu-central-1 --profile ttrek-prod-neo
 ```
 
@@ -667,6 +672,74 @@ and sets the executable ZIP attributes for `bootstrap` and `local/bin/tclsh`.
 CodeBuild then checks that the packaged configuration loads the exact checkout
 manifest before deploying. The packaging file list explicitly includes
 `etc/releases.json`; staged validation catches missing or invalid checksum files.
+
+## Lambda versions and DEFAULT alias
+
+`SiteFunction` uses `AutoPublishAlias: DEFAULT` and
+`AutoPublishAliasAllProperties: true`. SAM publishes numbered versions and moves
+`DEFAULT` when the packaged code or function properties change. API Gateway,
+account cleanup, email processing, Package Tracker, telemetry backups and the
+patch runner invoke this alias. The SAM stack exposes `FunctionAliasArn` as well
+as the existing unqualified `FunctionArn` output.
+
+SAM retains old published versions. After a successful `sam deploy`, CodeBuild
+runs `devops/prune-lambda-versions.py` to keep the newest five numbered versions.
+Cleanup additionally preserves every version referenced by any alias (including
+weighted routing) or still owned by the SAM stack, so those references can keep
+more than five versions. It never deletes the function or `$LATEST`. The AWS CLI
+paginates the inventory, and every deletion specifies a numeric qualifier.
+Cleanup refuses an unfinished/failed deployment, a mismatched stack, or a missing
+`DEFAULT` alias. AWS also refuses deletion of a version referenced by an alias.
+See [Lambda version deletion](https://docs.aws.amazon.com/lambda/latest/api/API_DeleteFunction.html).
+
+For an existing deployment, make these changes available on CodeBuild's configured
+source branch, then apply the updates in this order:
+
+1. Run `devops/infra/00-deploy-iam-policy.sh` using an administrator profile to
+   update `Infra-DevOps-TTREK-Permissions`. The resources policy now permits
+   CloudFormation to manage API Gateway's invoke permission on `:DEFAULT`.
+2. Run `devops/infra/30-deploy-codebuild.sh` to update `30-codebuild.yml`
+   (`Infra-DevOps-TTREK-Builds`). Supply the existing
+   `TTREK_GITHUB_CONNECTION_ARN` as described above. This grants version, alias and
+   cleanup permissions before the application deploys.
+3. Start a build of `Infra-DevOps-TTREK-Builds` and wait for it to succeed. It
+   deploys `devops/sam-template.yaml` to `Infra-DevOps-TTREK-Lambda`, creates
+   `DEFAULT`, switches the SAM schedules and email self-invocation, and then
+   prunes old versions. The manual deployment commands above are an alternative.
+4. Run `devops/infra/40-deploy-api-gateway.sh` to apply `40-api-gateway.json`
+   (`Infra-DevOps-TTREK-Api`). This changes both the integration and invoke
+   permission to `DEFAULT`. Verify the homepage and a nested route respond.
+5. Run `devops/infra/31-deploy-codebuild-patch.sh` to apply `31-codebuild-patch.yml`
+   (`Infra-DevOps-TTREK-Patch`), updating the patch runner's target and permission.
+6. Run `devops/infra/38-deploy-infra-rds-postgres.sh` to apply
+   `38-infra-rds-postgres.yml` (`Infra-DevOps-TTREK-Postgres`), updating the existing
+   telemetry backup schedule's target and permission. Keep your existing
+   function, timezone and schedule overrides. The database definition is unchanged.
+
+Steps 4–6 can run in any order after step 3. The other infrastructure templates
+do not need redeployment for this change. For subsequent application releases,
+CodeBuild updates the version behind `DEFAULT` and performs cleanup automatically;
+the API and scheduler stacks do not need an update just to select that version.
+
+To preview cleanup manually, use the same AWS region/profile as the deployment:
+
+```bash
+python3 devops/prune-lambda-versions.py \
+  --function-name prod-Api-TtrekWebsite-Function \
+  --stack-name Infra-DevOps-TTREK-Lambda --keep 5 --dry-run \
+  --region eu-central-1 --profile ttrek-prod-neo
+```
+
+Remove `--dry-run` to delete eligible old versions after a successful deployment.
+The caller needs the corresponding Lambda and CloudFormation read/delete permissions;
+the CodeBuild role includes them. Avoid overlapping manual deployments and cleanup.
+If cleanup fails after SAM succeeds, the application is already deployed; correct
+the cleanup error and rerun the command.
+
+Parameter-only or imported-value changes may not trigger SAM's version hash even
+with `AutoPublishAliasAllProperties`. When making those changes without a new
+package, also make a versioned function property change in the template and verify
+the alias advances. See [SAM version publishing](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-autopublishaliasallproperties).
 
 ## Updating an existing deployment
 
@@ -708,6 +781,14 @@ mapping, DNS and related outputs maintained in `devops/infra/40-api-gateway.json
 It writes the complete result to `dist/api-gateway.json` and copies it to that
 tracked template. Review the diff before deploying with `40-deploy-api-gateway.sh`.
 The local mock ignores deployment settings. Generation does not deploy AWS resources.
+
+Both website routes specify `prod-Api-TtrekWebsite-Function:DEFAULT`. The generator
+already accepts qualified names and uses the same target for integration and
+permission, so regeneration preserves the alias. The deployment script appends
+`:DEFAULT` to an unqualified `LAMBDA_FUNCTION_NAME` override (name or full ARN),
+and preserves an explicitly qualified target. Keep the API's `$default` stage;
+it is independent of the Lambda alias named `DEFAULT`. The integration depends
+on its invoke permission so CloudFormation grants access before switching targets.
 
 ## Existing apex A record blocks API deployment
 

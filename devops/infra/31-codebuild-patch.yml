@@ -34,7 +34,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: lambda:InvokeFunction
-                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}:DEFAULT
               - Effect: Allow
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
                 Resource: !GetAtt PatchBuildLogs.Arn
@@ -77,7 +77,7 @@ Resources:
                     *) echo 'Unknown patch task' >&2; exit 1 ;;
                   esac
                   printf '{"source":"ttrek.patch","task":"%s"}' "$PATCH_TASK" > payload.json
-                  aws lambda invoke --function-name "$WEBSITE_FUNCTION_NAME" \
+                  aws lambda invoke --function-name "$WEBSITE_FUNCTION_NAME" --qualifier DEFAULT \
                     --invocation-type RequestResponse --cli-read-timeout 320 \
                     --payload fileb://payload.json response.json > invocation.json
                   python3 - <<'PY'

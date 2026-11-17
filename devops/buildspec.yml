@@ -36,3 +36,8 @@ phases:
         --capabilities CAPABILITY_NAMED_IAM
         --parameter-overrides "FunctionName=$LAMBDA_FUNCTION_NAME" Architecture=x86_64
         --no-confirm-changeset --no-fail-on-empty-changeset
+      # Run only after sam deploy succeeds, never during an update or rollback.
+      - >-
+        python3 devops/prune-lambda-versions.py
+        --function-name "$LAMBDA_FUNCTION_NAME" --stack-name "$SAM_STACK_NAME"
+        --region "$AWS_DEFAULT_REGION" --keep 5

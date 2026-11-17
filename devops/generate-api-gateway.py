@@ -60,6 +60,8 @@ def main():
         return value
 
     template = rename(template)
+    # Create the alias invocation permission before switching the live integration.
+    template['Resources']['SiteIntegration']['DependsOn'] = 'SitePermission'
     template['Description'] = maintained['Description']
     template['Parameters']['LambdaFunctionName']['Description'] = 'Existing website Lambda name or ARN'
     # These deployment settings are maintained in the tracked template, not tdevops.

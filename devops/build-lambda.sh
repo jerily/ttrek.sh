@@ -37,6 +37,7 @@ mkdir -p public/assets/versioned
 aws s3 sync "$ASSET_HISTORY" public/assets/versioned/ --only-show-errors
 ttrek run -script build-assets
 npm test
+python3 -m unittest discover -s tests -p 'test_lambda_versions.py'
 "$TCLSH" tests/all.tcl
 "$TCLSH" tests/homepage.test
 "$TCLSH" tests/accounts.test

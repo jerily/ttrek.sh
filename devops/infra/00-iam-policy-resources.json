@@ -96,6 +96,8 @@
         "s3:PutEncryptionConfiguration",
         "s3:PutBucketPublicAccessBlock",
         "s3:PutLifecycleConfiguration",
+        "s3:PutBucketPolicy",
+        "s3:DeleteBucketPolicy",
         "codebuild:CreateProject",
         "codebuild:UpdateProject",
         "codebuild:DeleteProject",
@@ -141,6 +143,7 @@
         "arn:aws:apigateway:__REGION__::/domainnames/ttrek.sh/*",
         "arn:aws:apigateway:__REGION__::/tags/*",
         "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:function:prod-Api-TtrekWebsite-Function",
+        "arn:aws:lambda:__REGION__:__ACCOUNT_ID__:function:prod-Api-TtrekWebsite-Function:DEFAULT",
         "arn:aws:iam::__ACCOUNT_ID__:role/ttrek-telemetry-*"
       ],
       "Condition": {
@@ -225,19 +228,6 @@
         "cloudfront:DeleteResponseHeadersPolicy"
       ],
       "Resource": "*",
-      "Condition": {
-        "ForAnyValue:StringEquals": {
-          "aws:CalledVia": "cloudformation.amazonaws.com"
-        }
-      }
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:PutBucketPolicy",
-        "s3:DeleteBucketPolicy"
-      ],
-      "Resource": "arn:aws:s3:::jerily-ttrek-app",
       "Condition": {
         "ForAnyValue:StringEquals": {
           "aws:CalledVia": "cloudformation.amazonaws.com"

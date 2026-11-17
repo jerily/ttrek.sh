@@ -186,7 +186,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: lambda:InvokeFunction
-                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}:DEFAULT
   DailyMaintenance:
     Type: AWS::Scheduler::Schedule
     Properties:
@@ -195,7 +195,7 @@ Resources:
       ScheduleExpressionTimezone: !Ref ScheduleTimezone
       FlexibleTimeWindow: {Mode: 'OFF'}
       Target:
-        Arn: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}
+        Arn: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${WebsiteFunctionName}:DEFAULT
         RoleArn: !GetAtt ScheduleRole.Arn
         Input: '{"source":"ttrek.patch","task":"task_backup_website"}'
         RetryPolicy: {MaximumEventAgeInSeconds: 3600, MaximumRetryAttempts: 2}

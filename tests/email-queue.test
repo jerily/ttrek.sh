@@ -159,7 +159,7 @@ test email-queue-deadline {stop before the Lambda deadline without fetching mess
     lmap call $::queuetest::calls {lrange $call 0 1}
 } -cleanup {::queuetest::cleanup} -result {{sqs create} {sqs destroy}}
 
-test email-queue-callback {callback uses the existing function, exact private envelope, and asynchronous invocation} -setup {
+test email-queue-callback {callback uses the deployed alias, exact private envelope, and asynchronous invocation} -setup {
     ::queuetest::setup
 } -body {
     ::accounts::email_queued https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails
@@ -167,7 +167,7 @@ test email-queue-callback {callback uses the existing function, exact private en
     list [lindex $::queuetest::calls 0] [lindex $call 2] \
         [::tjson::json_to_simple [lindex $call 3]] [lindex $call 4] [lindex $::queuetest::calls end]
 } -cleanup {::queuetest::cleanup} \
-    -result {{lambda create {region eu-central-1}} existing-website {source ttrek.patch task task_process_email_queue} Event {lambda destroy}}
+    -result {{lambda create {region eu-central-1}} existing-website:DEFAULT {source ttrek.patch task task_process_email_queue} Event {lambda destroy}}
 
 test email-queue-callback-error {failed invocation releases its client} -setup {
     ::queuetest::setup
