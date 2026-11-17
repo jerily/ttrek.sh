@@ -269,7 +269,7 @@ test templates-2 {Index layout and literal clipboard command} -setup {
     unset -nocomplain ::env(ENV)
 } -body {
     set html [body [get_index_page_handler {} {}]]
-    list [contains $html {<h1 class="splash-head">Your next Tcl project starts here.</h1>}] \
+    list [contains $html {<h1 class="splash-head">Your Tcl project starts here.</h1>}] \
         [contains $html {data-clipboard-text="curl --proto &#39;=https&#39; --tlsv1.2 -sSf https://ttrek.sh/init | sh"}] \
         [contains $html {<title>ttrek: registry, website, and command-line interface</title>}]
 } -cleanup {
