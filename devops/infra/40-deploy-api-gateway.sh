@@ -10,6 +10,7 @@ HOSTED_ZONE_ID=$("${TCLSH:-tclsh}" "$SCRIPT_DIR/resolve-hosted-zone.tcl")
 aws cloudformation deploy \
   --template-file "$SCRIPT_DIR/40-api-gateway.json" \
   --stack-name Infra-DevOps-TTREK-Api \
+  --s3-bucket "${SAM_ARTIFACT_BUCKET:-jerily-ttrek-app}" \
   --parameter-overrides \
     "LambdaFunctionName=$API_FUNCTION" \
     "DomainName=${TTREK_DOMAIN_NAME:-ttrek.sh}" \
