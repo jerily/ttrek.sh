@@ -6,14 +6,20 @@
 
 # Load real dependencies in a fresh interpreter, without opening service connections.
 package require Tcl 9.1
-set packages $argv
+set production [expr {$argv eq {--production}}]
+set packages [expr {$production ? {} : $argv}]
 if {![llength $packages]} {
     set packages {
-        twebserver topenapi sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
+        twebserver topenapi jinja2 tjson ttrie ttrigrams valkey tink
         thashlib pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
         tratelimit treqmon web-user web-forum tcaptcha tclgd pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda
-        web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3 tdbc::postgres
-        mock-proxy-app mock-lambda-app mock-s3-app trequests
+        web-static-wiki web-static-blog tpersist tpathexp cmark_gfm
+        trequests
+    }
+    if {$production} {
+        lappend packages tdbc::postgres tsession-postgres
+    } else {
+        lappend packages sqlite3 tdbc::sqlite3 tsession-sqlite mock-proxy-app mock-lambda-app mock-s3-app
     }
 }
 set failed 0
@@ -38,7 +44,7 @@ foreach name $packages {
             pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 1.0.0}
             web-static-wiki {package require $name 0.1.10}
             web-static-blog {package require $name 0.1.9}
-            web-user {package require $name 0.5.4}
+            web-user {package require $name 0.5.5}
             web-forum {package require $name 0.3.1}
             tcaptcha {package require $name 1.0.0}
             tconfig::decrypt - tconfig::encrypt {package require $name 1.0.2}
@@ -58,7 +64,7 @@ foreach library [info loaded] {
         set failed 1
     }
 }
-if {!$failed && ![llength $argv]} {
+if {!$failed && (![llength $argv] || $production)} {
     set keyset [::tink::register_keyset [::tink::aead::create_keyset AES256_GCM]]
     try {
         set encrypted [::tink::aead::encrypt $keyset {runtime check}]

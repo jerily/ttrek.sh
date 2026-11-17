@@ -47,6 +47,23 @@ try {
     # Provision only a disposable in-memory fixture for packaging smoke checks.
     # Runtime startup never initializes or imports a database in either mode.
     set ::env(ENV) LOCAL
+    # Production archives omit SQLite. The build's separate local installation
+    # supplies only the SQLite test libraries to this process, never to the ZIP.
+    if {[info exists ::env(TTREK_PREPARE_TEST_PREFIX)] && $::env(TTREK_PREPARE_TEST_PREFIX) ne {}} {
+        set testLibrary [file join $::env(TTREK_PREPARE_TEST_PREFIX) lib]
+        foreach pattern {sqlite* tsession-sqlite*} {
+            set directories [glob -nocomplain -types d -directory $testLibrary $pattern]
+            if {![llength $directories]} {error "Missing packaging test dependency: $pattern in $testLibrary"}
+            lappend ::auto_path {*}$directories
+        }
+        set modules [glob -nocomplain -types f -directory $testLibrary \
+            tcl8/*/tdbc/sqlite3-*.tm tcl9/*/tdbc/sqlite3-*.tm]
+        if {![llength $modules]} {error "Missing packaging test module: tdbc::sqlite3"}
+        foreach module $modules {
+            set version [string range [file rootname [file tail $module]] 8 end]
+            package ifneeded tdbc::sqlite3 $version [list source $module]
+        }
+    }
     # Validate every staged recipe in a disposable catalog without contacting
     # the production database. The deployed database changes only on manual sync.
     source [file join $siteRoot tcl telemetry.tcl]

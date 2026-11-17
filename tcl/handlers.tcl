@@ -292,14 +292,31 @@ proc get_package_versions_handler {ctx req} {
 
 # Collect the feature flags exposed by a recipe.
 proc compute_iuse_flags {spec_handle} {
-    set if_use_nodes [::tjson::query $spec_handle {$..if}]
-
-    set iuse_list [list]
-    foreach if_use_node $if_use_nodes {
-        lappend iuse_list [::tjson::get_valuestring $if_use_node]
+    set names {}
+    if {[::tjson::has_object_item $spec_handle iuse]} {
+        lassign [::tjson::to_typed [::tjson::get_object_item $spec_handle iuse]] type declared
+        if {$type ne "L"} {error "iuse must be an array of unsigned USE flag names"}
+        foreach entry $declared {
+            lassign $entry type name
+            if {$type ne "S" || ![regexp {^[A-Za-z0-9_.][A-Za-z0-9_.-]*$} $name]} {
+                error "Invalid unsigned USE flag name in iuse"
+            }
+            lappend names $name
+        }
     }
-    set iuse_unique [lsort -unique $iuse_list]
-    return $iuse_unique
+    foreach node [::tjson::query $spec_handle {$..if}] {
+        lassign [::tjson::to_typed $node] type condition
+        if {$type ne "S"} {error "Recipe 'if' must be a USE flag string"}
+        set tokens [regexp -all -inline {[^\t\n\v\f\r ]+} $condition]
+        if {![llength $tokens]} {error "Recipe 'if' must contain a USE flag"}
+        foreach flag $tokens {
+            if {![regexp {^[+-][A-Za-z0-9_.][A-Za-z0-9_.-]*$} $flag]} {
+                error "Invalid USE flag in recipe 'if': $flag"
+            }
+            lappend names [string range $flag 1 end]
+        }
+    }
+    return [lsort -unique $names]
 }
 
 # Lightweight display metadata, without recording a build-recipe download.

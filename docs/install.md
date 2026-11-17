@@ -39,8 +39,17 @@ Install dependencies from this directory:
 
 ```sh
 ttrek sync
+ttrek use-flags add +local
 ttrek install -y -registry ../private-ttrek-registry -add-pubreg
 ```
+
+Use the updated ttrek CLI with unsigned `iuse` arrays and installation USE flags.
+`+local` selects SQLite, its session adapter and the three AWS mocks. Without
+`+local` (or with `-local`), PostgreSQL and its session adapter are selected.
+Settings live in this installation's `ttrek-venv/ttrek-manifest.json`; they do not
+change runtime `ENV=LOCAL`/`ENV=PROD` configuration. Clearing `+local` changes the
+next resolution but does not remove existing files. Use a fresh production
+installation to avoid packaging development dependencies.
 
 To refresh the private development dependency:
 
@@ -100,8 +109,8 @@ tjson's private cJSON implementation is not used by jinja2-tcl. The interpreter
 is `build/install/bin/tclsh9.1`; no sibling repository is needed. The build and
 registry use the published tjson 1.0.27 and twebserver 1.47.54 release tags.
 
-The site does not create or persist user sessions, so `tsession` and its storage
-adapters are not dependencies. The AWS clients use `pure-tcl-aws-*` 1.0.0 with `trequests` 1.3.0, `thashlib` 0.1.0
+`web-user` selects `tsession-sqlite` for local development and `tsession-postgres`
+for production. The AWS clients use `pure-tcl-aws-*` 1.0.0 with `trequests` 1.3.0, `thashlib` 0.1.0
 and tDOM; the AWS C++ SDK is no longer built. Other native libraries remain
 transitive registry dependencies. Tcl's bundled SQLite package comes with the Tcl runtime.
 

@@ -36,6 +36,25 @@ proc image_objects {directory {relative {}}} {
 
 set mount [zipfs mount $archive /ttrek-lambda-package-test]
 try {
+    # These belong to the separate +local test prefix, never the production ZIP.
+    foreach library {lib lib64} {
+        foreach pattern {sqlite* libsqlite* tdbcsqlite* tsession-sqlite* mock-*-app*} {
+            if {[llength [glob -nocomplain -directory [file join $mount local $library] $pattern]]} {
+                error "Local dependency in production ZIP: $library/$pattern"
+            }
+        }
+    }
+    foreach library {lib lib64} {
+        if {[llength [glob -nocomplain -types f -directory [file join $mount local $library] \
+                tcl8/*/tdbc/sqlite3-* tcl9/*/tdbc/sqlite3-*]]} {
+            error "SQLite Tcl module in production ZIP"
+        }
+    }
+    foreach executable {mock-lambda-app mock-proxy-app mock-s3-app sqlite3} {
+        if {[file exists [file join $mount local bin $executable]]} {
+            error "Local executable in production ZIP: $executable"
+        }
+    }
     if {![llength [glob -nocomplain -directory [file join $mount registry] -types f */*/ttrek.json]]} {
         error "Lambda ZIP must include a registry snapshot"
     }

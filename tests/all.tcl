@@ -233,7 +233,7 @@ test releases-7 {The real SDK generates a signed URL without an AWS request} -se
     set ::releases::client [::aws::s3::create {region eu-west-1 aws_access_key_id test aws_secret_access_key test}]
 } -body {
     set url [::releases::signed_url linux-amd64-glibc]
-    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.5.0/linux-amd64-glibc/ttrek?*} $url] \
+    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.6.0/linux-amd64-glibc/ttrek?*} $url] \
         [regexp {[?&]X-Amz-Expires=300(&|$)} $url] \
         [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
 } -cleanup {
@@ -588,10 +588,24 @@ test registry-1 {Static options are conditional USE flags} -setup {
             }
         }
     }
-    list [dict get $response status] [expr {"+static" in [dict get $spec iuse]}] $static_option
+    list [dict get $response status] [expr {"static" in [dict get $spec iuse]}] $static_option
 } -cleanup {
     ::telemetry::sync_registry_metadata $registry_fixture
 } -result {200 1 1}
+
+test registry-iuse {Declarations and compound conditions expose unsigned names once} -body {
+    ::tjson::parse {{"iuse":["local","unused"],"dependencies":{"demo":{"version":"1.0.0","if":"+local  -debug\t+static"}},"build":{"default":[{"if":"-local"}]}}} iuse_spec
+    try {compute_iuse_flags $iuse_spec} finally {unset iuse_spec}
+} -result {debug local static unused}
+
+test registry-iuse-invalid {Signed declarations and malformed conditions are rejected} -body {
+    set results {}
+    foreach json {{{"iuse":["+local"]}} {{"iuse":"local"}} {{"iuse":[42]}} {{"if":" "}} {{"if":"local"}} {{"if":42}}} {
+        ::tjson::parse $json iuse_spec
+        try {lappend results [catch {compute_iuse_flags $iuse_spec}]} finally {unset iuse_spec}
+    }
+    set results
+} -result {1 1 1 1 1 1}
 
 test registry-2 {Shared defaults remain unconditional before static overrides} -body {
     set result {}
