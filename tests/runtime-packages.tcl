@@ -10,7 +10,7 @@ set packages $argv
 if {![llength $packages]} {
     set packages {
         twebserver topenapi sqlite3 jinja2 tjson ttrie ttrigrams valkey tink
-        pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
+        thashlib pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
         tratelimit treqmon web-user web-forum tcaptcha tclgd pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm tdbc::sqlite3 tdbc::postgres
         mock-proxy-app mock-lambda-app mock-s3-app trequests
@@ -34,12 +34,12 @@ foreach name $packages {
             treqmon {package require treqmon 2.2.0}
             tratelimit {package require tratelimit 1.1.0}
             tpathexp {package require tpathexp 1.2.0}
-            pure-tcl-aws-s3 {package require pure-tcl-aws-s3 0.1.0}
-            pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 0.1.0}
-            web-static-wiki {package require $name 0.1.9}
-            web-static-blog {package require $name 0.1.8}
-            web-user {package require $name 0.5.2}
-            tconfig::decrypt - tconfig::encrypt {package require $name 1.0.1}
+            pure-tcl-aws-s3 {package require pure-tcl-aws-s3 1.0.0}
+            pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 1.0.0}
+            web-static-wiki {package require $name 0.1.10}
+            web-static-blog {package require $name 0.1.9}
+            web-user {package require $name 0.5.3}
+            tconfig::decrypt - tconfig::encrypt {package require $name 1.0.2}
             default {package require $name}
         }
     } result]} {

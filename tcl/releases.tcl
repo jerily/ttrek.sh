@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT.
 # 
 
-package require pure-tcl-aws-s3 0.1.0
+package require pure-tcl-aws-s3 1.0.0
 
 namespace eval ::releases {
     variable client {}

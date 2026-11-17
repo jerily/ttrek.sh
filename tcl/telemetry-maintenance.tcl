@@ -47,7 +47,7 @@ proc ::telemetry_maintenance::backup {settings path deadline} {
 
 # Upload the selected artifacts to the configured storage service.
 proc ::telemetry_maintenance::upload {path bucket key} {
-    package require pure-tcl-aws-s3 0.1.0
+    package require pure-tcl-aws-s3 1.0.0
     set client [::aws::s3::create [dict create region $::env(AWS_REGION)]]
     try {$client put $bucket $key $path} finally {$client destroy}
 }

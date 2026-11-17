@@ -101,7 +101,7 @@ is `build/install/bin/tclsh9.1`; no sibling repository is needed. The build and
 registry use the published tjson 1.0.27 and twebserver 1.47.54 release tags.
 
 The site does not create or persist user sessions, so `tsession` and its storage
-adapters are not dependencies. The AWS clients use `pure-tcl-aws-*` 0.1.0 with `trequests` 1.3.0, Tcllib
+adapters are not dependencies. The AWS clients use `pure-tcl-aws-*` 1.0.0 with `trequests` 1.3.0, `thashlib` 0.1.0
 and tDOM; the AWS C++ SDK is no longer built. Other native libraries remain
 transitive registry dependencies. Tcl's bundled SQLite package comes with the Tcl runtime.
 
