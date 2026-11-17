@@ -6,7 +6,7 @@
     "stage": "$default"
   },
   "routes": [
-    {"method": "ANY", "path": "/", "function": "prod-Api-TtrekWebsite-Function"},
-    {"method": "ANY", "path": "/{proxy+}", "function": "prod-Api-TtrekWebsite-Function"}
+    {"method": "ANY", "path": "/", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},
+    {"method": "ANY", "path": "/{proxy+}", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"}
   ]
 }

@@ -10,6 +10,7 @@ additional requirements described below.
 ```bash
 ttrek run -script build-assets
 npm test
+python3 -m unittest discover -s tests -p 'test_lambda_versions.py'
 ttrek run tclsh9.1 "$PWD/tests/homepage.test"
 ttrek run tclsh9.1 "$PWD/tests/accounts.test"
 ttrek run tclsh9.1 "$PWD/tests/account-password-migration.test"
@@ -39,6 +40,11 @@ ttrek run tclsh9.1 "$PWD/tests/local-stack.tcl"
 ```
 
 `tests/runtime-packages.tcl` loads runtime and development packages without starting services.
+`tests/test_lambda_versions.py` uses fake AWS responses to verify version retention,
+alias/weighted-target protection, stack ownership, failure handling, dry runs and
+qualified deletion. It also exercises the API deployment script with fake AWS/Tcl
+commands to check name/ARN overrides without deploying. CodeBuild runs this suite
+before deploying.
 `ttrek run tclsh9.1 tests/lambda-package.tcl dist/ttrek-sh.zip` checks a production
 ZIP's release settings, bundled checksum manifest, image settings and bytes, and
 exclusion of host config.

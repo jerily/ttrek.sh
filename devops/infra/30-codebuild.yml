@@ -133,14 +133,27 @@ Resources:
                   - lambda:UntagResource
                 Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}
               - Effect: Allow
+                Action: [lambda:PublishVersion, lambda:ListVersionsByFunction, lambda:ListAliases]
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}
+              - Effect: Allow
+                Action: [lambda:CreateAlias, lambda:GetAlias, lambda:UpdateAlias, lambda:DeleteAlias]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}
+                  - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}:DEFAULT
+              - Effect: Allow
+                # CloudFormation reads published versions; cleanup deletes old versions.
+                Action: [lambda:GetFunction, lambda:GetFunctionConfiguration, lambda:DeleteFunction]
+                Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}:*
+              - Effect: Allow
                 Action:
                   - lambda:PutFunctionEventInvokeConfig
                   - lambda:GetFunctionEventInvokeConfig
                   - lambda:DeleteFunctionEventInvokeConfig
-                # SAM manages async invocation settings on the $LATEST qualifier.
+                # SAM now uses DEFAULT; retain $LATEST access for migration/rollback.
                 Resource:
                   - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}
                   - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}:$LATEST
+                  - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaFunctionName}:DEFAULT
               - Effect: Allow
                 Action: [iam:CreateRole, iam:DeleteRole, iam:GetRole, iam:UpdateAssumeRolePolicy, iam:PutRolePolicy, iam:GetRolePolicy, iam:DeleteRolePolicy, iam:TagRole, iam:UntagRole, iam:ListRolePolicies, iam:ListAttachedRolePolicies]
                 Resource:
