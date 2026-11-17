@@ -46,7 +46,7 @@ proc ::accounts::mount {router settings templates} {
     variable store
     variable mount
     variable handles
-    package require web-user 0.5.1
+    package require web-user 0.5.6
     foreach handle $handles {::tink::unregister_keyset $handle}
     set handles {}
     set config [dict get $settings account]
@@ -62,6 +62,7 @@ proc ::accounts::mount {router settings templates} {
         set display [dict merge [dict get $config display] [dict create \
             master_template [dict get $templates account-master.html.jinja] \
             templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]]
+        dict set display assets_url [::assets::base_url /user/_assets]
         dict set display email_queue_callback ::accounts::email_queued
         set mount [::web::user::mount $router -store $store -config $display]
     } on error {message options} {
@@ -94,12 +95,32 @@ proc ::accounts::monitor_enter {context request} {
     return $request
 }
 
+# Use live group grants for both the dashboard and its navigation link.
+proc ::accounts::can_view_monitor {request context} {
+    variable mount
+    if {![dict exists [::site::config] account]} {return 0}
+    ::web::user::authorize_permission $mount request_monitor.view $request $context view /request-monitor
+}
+
+proc ::accounts::monitor_authorize {context request} {
+    set path [dict get $request path]
+    if {($path eq "/request-monitor" || [string match /request-monitor/* $path]) &&
+        ![can_view_monitor $request $context]} {
+        return -code error -options [dict create statusCode 403 body Forbidden \
+            headers {Content-Type text/plain Cache-Control no-store}]
+    }
+    return $request
+}
+
 # Fill the shared layout from this request's session, including a newly rotated cookie.
 proc ::accounts::navigation {request response context} {
     variable mount
     set marker {<!-- ttrek-account-navigation -->}
-    if {[string first $marker [dict get $response body]] < 0} {return $response}
+    set monitorMarker {<!-- ttrek-request-monitor-navigation -->}
+    if {[string first $marker [dict get $response body]] < 0 &&
+        [string first $monitorMarker [dict get $response body]] < 0} {return $response}
     set html {}
+    set monitorHtml {}
     if {[dict exists [::site::config] account]} {
         set prefix [dict get $mount -prefix]
         set cookie [::responses::header $response Set-Cookie]
@@ -107,6 +128,9 @@ proc ::accounts::navigation {request response context} {
             ::responses::set_header request Cookie [lindex [split $cookie {;}] 0]
         }
         set signedIn [expr {[::web::user::current_user $mount $request $context] ne {}}]
+        if {$signedIn && [can_view_monitor $request $context]} {
+            set monitorHtml { · <a href="/request-monitor">Request Monitor</a>}
+        }
         set selected [expr {[dict get $request path] eq $prefix || [string match $prefix/* [dict get $request path]]}]
         set target [expr {$selected ? [::web::user::requested_return_to $request] : [::web::user::request_target $request]}]
         set html [::views::render account-navigation.html.jinja [dict create \
@@ -115,7 +139,7 @@ proc ::accounts::navigation {request response context} {
         ::responses::set_header response Cache-Control no-store
         ::responses::set_header response ETag {}
     }
-    dict set response body [string map [list $marker $html] [dict get $response body]]
+    dict set response body [string map [list $marker $html $monitorMarker $monitorHtml] [dict get $response body]]
     return $response
 }
 

@@ -27,7 +27,7 @@ if {[llength $argv] == 3 && [lindex $argv 0] eq "--worker"} {
     $::site_lambda::router add GET / {apply {{request context params} {
         ::twebserver::build_response 200 text/plain ok
     }}} -strict true
-    set event {{"version":"2.0","rawPath":"/","headers":{"x-forwarded-for":"198.51.100.99"},"requestContext":{"http":{"method":"GET","sourceIp":"203.0.113.17"}}}}
+    set event {{"version":"2.0","rawPath":"/","headers":{"x-forwarded-for":"198.51.100.99","user-agent":"ttrek-test/1.0"},"requestContext":{"http":{"method":"GET","sourceIp":"203.0.113.17"}}}}
     set response [::tjson::json_to_simple [::site_lambda::handle $event {}]]
     if {$phase eq "first"} {
         assert {[dict get $response statusCode] == 200}
@@ -35,6 +35,11 @@ if {[llength $argv] == 3 && [lindex $argv 0] eq "--worker"} {
     } else {
         assert {[dict get $response statusCode] == 429} {limit was not shared between processes}
         assert {[llength [::treqmon::get_history_events]] == 2} {history was not shared between processes}
+        set recent [::treqmon::get_recent_requests]
+        assert {[llength $recent] == 2} {recent requests were not shared between processes}
+        assert {[dict get [lindex $recent 1] ip] eq "203.0.113.17"}
+        assert {[dict get [lindex $recent 1] user_agent] eq "ttrek-test/1.0"}
+        assert {[dict get [lindex $recent 0] status] == 429}
         # Changing a forwarded header cannot evade the gateway's source-IP limit.
         set event [string map {198.51.100.99 198.51.100.100} $event]
         set response [::tjson::json_to_simple [::site_lambda::handle $event {}]]
@@ -43,6 +48,13 @@ if {[llength $argv] == 3 && [lindex $argv 0] eq "--worker"} {
         set response [::tjson::json_to_simple [::site_lambda::handle $event {}]]
         assert {[dict get $response statusCode] == 200}
         assert {[llength [::treqmon::get_history_events]] == 4}
+        for {set i 0} {$i < 105} {incr i} {
+            ::treqmon::middleware::valkeystore::register_recent_request [dict create path /retained/$i]
+        }
+        set recent [::treqmon::get_recent_requests]
+        assert {[llength $recent] == 100}
+        assert {[dict get [lindex $recent 0] path] eq "/retained/104"}
+        assert {[dict get [lindex $recent end] path] eq "/retained/5"}
     }
     exit
 }
@@ -71,7 +83,7 @@ try {
     foreach phase {first second} {
         exec [info nameofexecutable] [info script] --worker $config $phase >@stdout 2>@stderr
     }
-    puts {PASS shared production limits and request history across two processes, TLS and trusted gateway source IP}
+    puts {PASS shared production limits, chart history and bounded recent requests across two processes, TLS and trusted gateway source IP}
 } finally {
     try {::test_support::stop $process} finally {file delete -force $temporary}
 }

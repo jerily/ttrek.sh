@@ -1,0 +1,93 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl site.tcl]
+source [file join $root tcl local-ratelimit.tcl]
+set policy [::app_config::rate_limits {} {localstore {}}]
+test rate-json-invalid {Invalid route budgets fail before serving requests} -body {
+    set results {}
+    foreach json {
+        {[]}
+        {{"login": {"by_ip": {"window_millis": 60000, "limit": 0}}}}
+        {{"login": {"by_ip": {"window_millis": "60000", "limit": 10}}}}
+        {{"login": {"by_ip": {"limit": 10}}}}
+        {{"login": {"by_cookie": {"window_millis": 60000, "limit": 10}}}}
+    } {
+        set file [makeFile $json invalid-ratelimits.json]
+        lappend results [catch {::app_config::route_limits $file}]
+        removeFile invalid-ratelimits.json
+    }
+    set results
+} -result {1 1 1 1 1}
+
+proc ok {request context params} {dict create statusCode 200 headers {} body ok}
+proc send {router method path {ip 127.0.0.1}} {
+    $router dispatch [dict create method $method path $path] [dict create addr $ip]
+}
+
+# Exercise package handler classification with representative mounted routes.
+# The handlers avoid database work. Matching and all rate-limit hooks run normally.
+namespace eval ::web::user {}
+namespace eval ::web::forum {}
+foreach command {::web::user::login ::web::user::register ::web::user::verify ::web::user::reset ::web::user::two_factor ::web::forum::new ::web::forum::topic ::web::forum::moderate} {
+    proc $command {args} {dict create statusCode 200 headers {} body ok}
+}
+set router [::tpathexp::router]
+::tratelimit::mount $router
+$router add_middleware -enter_proc [list ::site::sensitive_enter $router]
+foreach action {login register verify reset} {
+    $router add {GET POST} /user/$action ::web::user::$action -strict true
+}
+$router add {GET POST} /user/two-factor ::web::user::two_factor -strict true
+$router add {GET POST} /forum/new ::web::forum::new -strict true
+$router add {GET POST} /forum/topic/:id ::web::forum::topic -strict true
+$router add {GET POST} /forum/moderate/:kind/:id/:action ::web::forum::moderate -strict true
+foreach {path name} {/search get_search_page /registry/search get_search /registry/autocomplete get_autocomplete} {
+    $router add GET $path ok -strict true -enter_proc [list ::tratelimit::middleware::enter_route $name]
+}
+$router add GET / ok -strict true
+
+test sensitive-limits {Login, account forms, search and forum writes reject request eleven independently for each IP} -body {
+    set checks {}
+    foreach {method path} {
+        POST /user/login POST /user/register POST /user/verify POST /user/reset POST /user/two-factor
+        GET /search GET /registry/search GET /registry/autocomplete POST /forum/new
+        POST /forum/topic/1 POST /forum/moderate/post/1/delete
+    } {
+        ::tratelimit::init_middleware $policy
+        for {set i 0} {$i < 10} {incr i} {
+            lappend checks [expr {[dict get [send $router $method $path] statusCode] == 200}]
+        }
+        set rejected [send $router $method $path]
+        lappend checks [expr {[dict get $rejected statusCode] == 429 && [dict get $rejected headers Retry-After] == 60}]
+        lappend checks [expr {[dict get [send $router $method $path 127.0.0.2] statusCode] == 200}]
+        lappend checks [expr {[dict get [send $router GET /] statusCode] == 200}]
+    }
+    lsort -unique $checks
+} -result 1
+
+test sensitive-captures {Changing topic IDs cannot bypass the write budget; reading topics has only the global limit} -body {
+    ::tratelimit::init_middleware $policy
+    for {set i 1} {$i <= 10} {incr i} {send $router POST /forum/topic/$i}
+    list [dict get [send $router POST /forum/topic/11] statusCode] [dict get [send $router GET /forum/topic/11] statusCode]
+} -result {429 200}
+
+test sensitive-form-methods {GET and POST share one login budget and HEAD cannot bypass it} -body {
+    ::tratelimit::init_middleware $policy
+    for {set i 0} {$i < 5} {incr i} {send $router GET /user/login; send $router POST /user/login}
+    list [dict get [send $router HEAD /user/login] statusCode] [dict get [send $router POST /user/login] statusCode]
+} -result {429 429}
+
+test global-boundary {The hundredth request is allowed and request 101 is rejected across routes} -body {
+    ::tratelimit::init_middleware $policy
+    set first {}
+    for {set i 0} {$i < 100} {incr i} {lappend first [dict get [send $router GET /] statusCode]}
+    set response [send $router GET /missing]
+    list [lsort -unique $first] [dict get $response statusCode] [dict get $response headers Retry-After]
+} -result {200 429 10}
+
+$router destroy
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

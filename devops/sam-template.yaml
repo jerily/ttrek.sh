@@ -34,6 +34,11 @@ Parameters:
     Type: String
     Default: Infra-DevOps-TTREK-CloudFrontCDN
     Description: CDN stack exporting BaseUrl; deploy it before this application stack.
+  BrowserAssetsPrefix:
+    Type: String
+    Default: cdn
+    AllowedPattern: '[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*'
+    Description: Must match content_images.assets_prefix and the CloudFront stack.
   AccountCleanupSchedule:
     Type: String
     Default: rate(5 minutes)
@@ -97,6 +102,19 @@ Resources:
                 Condition:
                   StringLike:
                     s3:prefix: !Sub ${ContentImagesPrefix}/*
+        - PolicyName: SyncBrowserAssets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${BrowserAssetsPrefix}/*
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}
+                Condition:
+                  StringLike:
+                    s3:prefix: !Sub ${BrowserAssetsPrefix}/*
         - PolicyName: WriteTelemetryBackups
           PolicyDocument:
             Version: '2012-10-17'

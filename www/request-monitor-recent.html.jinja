@@ -1,0 +1,25 @@
+{% extends 'master.html.jinja' %}
+{% block home_selected %}{% endblock %}
+{% block content %}
+<main class="site-main request-monitor">
+    <div class="content">
+        <p><a href="/request-monitor">← Request Monitor</a></p>
+        <h1 class="content-head">Last 100 requests</h1>
+        <p>The most recently completed requests, newest first.</p>
+        {% if count %}
+        <div class="recent-requests" role="region" aria-label="Recent requests" tabindex="0">
+            <table class="pure-table pure-table-horizontal">
+                <thead><tr><th scope="col">Time (UTC)</th><th scope="col">IP address</th><th scope="col">Method</th><th scope="col">Path</th><th scope="col">Status</th><th scope="col">User agent</th></tr></thead>
+                <tbody>
+                {% for request in requests %}
+                    <tr><td>{{ request.time }}</td><td>{{ request.ip }}</td><td>{{ request.method }}</td><td><code>{{ request.path }}</code></td><td>{{ request.status }}</td><td>{{ request.user_agent }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No requests have been recorded yet.</p>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}

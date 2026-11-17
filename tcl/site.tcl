@@ -8,8 +8,8 @@
 package require Tcl 9.1
 package require twebserver
 package require tjson
-package require tratelimit 1.1.0
-package require treqmon 2.2.0
+package require tratelimit 1.1.1
+package require treqmon 2.3.0
 package require web-static-wiki 0.1.10
 package require web-static-blog 0.1.9
 package require tpathexp 1.2.0
@@ -19,7 +19,7 @@ namespace eval ::site {
     variable router
 }
 
-foreach module {assets responses templates releases content-images request-validation search handlers homepage accounts forum package-tracker} {
+foreach module {assets browser-assets responses templates releases content-images request-validation search handlers request-monitor homepage accounts forum package-tracker} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
 }
 
@@ -86,7 +86,11 @@ proc ::site::mount {router} {
         $router add_middleware -enter_proc ::accounts::monitor_enter
     }
     # Monitoring is outermost so rate-limit responses are recorded as well.
-    if {[dict exists $settings tratelimit]} {::tratelimit::mount $router}
+    if {[dict exists $settings tratelimit]} {
+        ::tratelimit::mount $router
+        $router add_middleware -enter_proc [list ::site::sensitive_enter $router]
+    }
+    $router add_middleware -enter_proc ::accounts::monitor_authorize
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {
         set hooks {}
         if {[dict exists $settings tratelimit]} {
@@ -94,6 +98,23 @@ proc ::site::mount {router} {
         }
         $router add $method $pattern [list ::site::invoke $handler $name] -strict true {*}$hooks
     }
+}
+
+# Package-owned routes have no site route hook. Resolve the actual handler so
+# captures, query strings and different topic IDs cannot create fresh buckets.
+proc ::site::sensitive_enter {router context request} {
+    set method [dict get $request method]
+    set match [$router match $method [dict get $request path]]
+    if {[dict get $match statusCode] != 200} {return $request}
+    set handler [lindex [dict get $match handler] 0]
+    set action [namespace tail $handler]
+    if {[string match ::web::user::* $handler]} {
+        return [::tratelimit::middleware::enter_route account_$action $context $request]
+    }
+    if {[string match ::web::forum::* $handler] && ($method eq "POST" || $action in {new moderate})} {
+        return [::tratelimit::middleware::enter_route forum_$action $context $request]
+    }
+    return $request
 }
 
 # Build a router and mount the configured worker services.

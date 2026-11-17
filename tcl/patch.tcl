@@ -80,6 +80,14 @@ proc ::site_patch::task_sync_website {context} {
     if {![file isdirectory $registry] || ![llength [glob -nocomplain -directory $registry -types f */*/ttrek.json]]} {
         error "The deployed package has no registry snapshot; rebuild the Lambda ZIP before syncing"
     }
+    set completed {wiki blog registry}
+    set images [dict get $settings content_images]
+    if {[dict exists $images cloudfront_enabled] && [dict get $images cloudfront_enabled]} {
+        # Publish all browser files, including package assets, before committing
+        # pages that refer to them. S3 failures abort the sync.
+        ::browser_assets::upload $root $images
+        lappend completed assets
+    }
     set stores [::content_images::database_stores $::telemetry::connection [dict get $settings content_images]]
     # Both collections and the complete registry commit together. Image updates
     # in S3 are independent of this transaction and are not rolled back with SQL.
@@ -91,7 +99,7 @@ proc ::site_patch::task_sync_website {context} {
         ::telemetry::sync_registry_metadata $registry
         ::telemetry::publish_search_snapshot
     }
-    return {wiki blog registry}
+    return $completed
 }
 
 # Publish database edits or restored metadata without reimporting recipe files.

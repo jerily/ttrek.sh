@@ -20,7 +20,7 @@ proc ::tratelimit::middleware::localstore::get_requests_made {key start end} {
     set recent {}
     if {[dict exists $requests $key]} {
         foreach timestamp [dict get $requests $key] {
-            if {$timestamp >= $start && $timestamp <= $end} {lappend recent $timestamp}
+            if {$timestamp > $start && $timestamp <= $end} {lappend recent $timestamp}
         }
     }
     dict set requests $key $recent

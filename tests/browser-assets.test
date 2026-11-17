@@ -70,7 +70,25 @@ test browser-assets-upload {only browser files reach the configured prefix with 
         [lindex [dict get $browser_fixture::objects cdn/request-monitor/_assets/charts.js] 1] \
         [expr {[lindex [dict get $browser_fixture::objects cdn/request-monitor/_assets/charts.js] 0] eq \
             [::assets::read_bytes [file join $::treqmon::view::asset_dir charts.js]]}]
-} -cleanup browser_fixture::cleanup -result {7 {cdn/assets/favicon.svg cdn/assets/versioned/css/site.0123456789abcdef.css cdn/assets/versioned/js/chart.LICENSE.txt cdn/assets/versioned/js/site.0000000000000000.js cdn/assets/versioned/js/site.fedcba9876543210.js cdn/favicon.ico cdn/request-monitor/_assets/charts.js} 00000100ff80 image/svg+xml text/css application/javascript 1}
+} -cleanup browser_fixture::cleanup -result {11 {cdn/assets/favicon.svg cdn/assets/versioned/css/site.0123456789abcdef.css cdn/assets/versioned/js/chart.LICENSE.txt cdn/assets/versioned/js/site.0000000000000000.js cdn/assets/versioned/js/site.fedcba9876543210.js cdn/favicon.ico cdn/forum/_assets/editor.css cdn/forum/_assets/forum.css cdn/forum/_assets/markdown-editor.bundle.js cdn/request-monitor/_assets/charts.js cdn/user/_assets/admin.css} 00000100ff80 image/svg+xml text/css application/javascript 1}
+
+test browser-assets-packages {Package assets are published at the same stable URLs emitted by production templates} -setup browser_fixture::setup -body {
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
+    ::assets::configure $browser_fixture::settings
+    ::browser_assets::upload $browser_fixture::root $browser_fixture::settings
+    set checks {}
+    dict for {path asset} [::assets::package_files] {
+        set key cdn$path
+        lappend checks [expr {[::assets::base_url $path] eq "https://cdn.example/$key"}] \
+            [expr {[lindex [dict get $browser_fixture::objects $key] 0] eq [::assets::read_bytes [dict get $asset filename]]}] \
+            [expr {[lindex [dict get $browser_fixture::objects $key] 1] eq [dict get $asset type]}]
+    }
+    list [dict size [::assets::package_files]] [lsort -unique $checks]
+} -cleanup {
+    unset ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    ::assets::configure {}
+    browser_fixture::cleanup
+} -result {4 1}
 
 test browser-assets-repeat {immutable files are reused while stable paths refresh and old builds survive} -setup browser_fixture::setup -body {
     ::browser_assets::upload $browser_fixture::root $browser_fixture::settings
@@ -80,7 +98,7 @@ test browser-assets-repeat {immutable files are reused while stable paths refres
         [llength [lsearch -all -index 0 $browser_fixture::calls put]] \
         [lindex [dict get $browser_fixture::objects cdn/favicon.ico] 0] \
         [dict exists $browser_fixture::objects cdn/assets/versioned/js/site.0000000000000000.js]
-} -cleanup browser_fixture::cleanup -result {4 4 changed 1}
+} -cleanup browser_fixture::cleanup -result {8 8 changed 1}
 
 test browser-assets-prefix {a configured nested prefix controls every upload} -setup browser_fixture::setup -body {
     ::browser_assets::upload $browser_fixture::root [dict replace $browser_fixture::settings assets_prefix custom/cdn]

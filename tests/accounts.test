@@ -16,6 +16,8 @@ set ::env(ENV) LOCAL
 set work [makeDirectory account-site]
 set db [::tpersist::db_connect -database :memory: -autobegin false]
 ::web::user::initdb $db
+package require web-forum
+::web::forum::initdb $db
 ::web::static::wiki::initdb $db
 ::web::static::blog::initdb $db
 foreach kind {wiki blog} directory {docs blog} {
@@ -25,9 +27,11 @@ set account [::app_config::account {} $root $work]
 dict set account policy bcrypt_cost 4
 namespace eval ::treqmon::middleware::accountsteststore {
     variable history {}
-    proc init {config} {variable history; set history {}}
+    proc init {config} {variable history; set history {}; set ::treqmon::worker::memstore::recent_requests {}}
     proc register_datapoint {point} {variable history; lappend history $point}
     proc get_history_events {} {variable history; return $history}
+    proc register_recent_request {request} {::treqmon::worker::memstore::register_recent_request $request}
+    proc get_recent_requests {} {::treqmon::worker::memstore::get_recent_requests}
 }
 set settings [dict create rootdir $root content_connection $db content_images {} account $account \
     treqmon {store {accountsteststore {}}}]
@@ -210,6 +214,66 @@ test accounts-register {real registration uses the shared layout, CAPTCHA and re
     lappend result [string match {*class="pure-menu-link">Account</a>*} [dict get $::accountstest::last body]]
     set result
 } -result {200 1 1 1 no-store 200 200 200 1}
+
+test accounts-monitor-access {Live group permissions control the link and all monitor paths in direct and Lambda dispatch} -setup {
+    set savedCookie $::accountstest::cookie
+} -body {
+    set checks {}
+    foreach version {{} 1.0 2.0} {
+        set ::accountstest::lambdaVersion $version
+        foreach group {admin observer} {
+            foreach allowed {0 1 0} {
+                set grant [expr {$allowed ? "request_monitor.view" : "forum.moderate"}]
+                ::web::user::sync_access $::accounts::store [dict create $group site@example.com] [dict create $group $grant]
+                foreach path {/ /docs /blog /user /forum} {
+                    ::accountstest::request GET $path
+                    lappend checks [expr {[string match {*href="/request-monitor"*} [dict get $::accountstest::last body]] == $allowed}]
+                }
+                foreach path {/request-monitor /request-monitor/ /request-monitor/recent /request-monitor/_assets/charts.js} {
+                    foreach method {GET HEAD} {
+                        lappend checks [expr {[::accountstest::request $method $path] == ($allowed ? 200 : 403)}]
+                        if {!$allowed} {
+                            lappend checks [expr {[::responses::header $::accountstest::last Cache-Control] eq "no-store"}]
+                        }
+                    }
+                }
+            }
+        }
+        set ::accountstest::cookie {}
+        lappend checks [expr {[::accountstest::request GET /request-monitor] == 403}]
+        ::accountstest::request GET /
+        lappend checks [expr {![string match {*href="/request-monitor"*} [dict get $::accountstest::last body]]}]
+        set ::accountstest::cookie $savedCookie
+    }
+    lsort -unique $checks
+} -cleanup {
+    set ::accountstest::lambdaVersion {}
+    set ::accountstest::cookie $savedCookie
+    # Exercise the default admin grant through the real configured sync task.
+    dict set ::site::settings account access groups admin site@example.com
+    ::accounts::sync_access
+} -result 1
+
+test accounts-recent-requests {The authorized page shows only the last hundred requests and escapes paths and user agents} -body {
+    set ::treqmon::worker::memstore::recent_requests {}
+    ::accountstest::request GET /request-monitor/recent
+    set empty [string match {*No requests have been recorded yet.*} [dict get $::accountstest::last body]]
+    for {set i 0} {$i < 105} {incr i} {
+        ::site::dispatch $::site::router [dict create method GET path /recent-probe-$i \
+            headers [dict create User-Agent {<script>alert("agent")</script>}]] {addr 203.0.113.4}
+    }
+    ::site::dispatch $::site::router [dict create method GET path {/<img src=x onerror=alert(1)>} headers {}] {addr 203.0.113.5}
+    set status [::accountstest::request GET /request-monitor/recent]
+    set html [dict get $::accountstest::last body]
+    ::accountstest::request GET /request-monitor
+    list $empty $status [regexp -all {<tr>} $html] \
+        [expr {[string first 203.0.113.4 $html] >= 0}] \
+        [expr {[string first {&lt;script&gt;} $html] >= 0 && [string first {<script>alert} $html] < 0}] \
+        [expr {[string first {&lt;img} $html] >= 0 && [string first {<img src=x} $html] < 0}] \
+        [expr {[string first /recent-probe-104 $html] < [string first /recent-probe-6 $html]}] \
+        [expr {[string first {/recent-probe-5<} $html] < 0}] \
+        [string match {*href="/request-monitor/recent">Last 100 requests*} [dict get $::accountstest::last body]]
+} -result {1 200 101 1 1 1 1 1 1}
 
 test accounts-monitor {Direct and Lambda requests count one account across multiple sessions} -setup {
     set savedCookie $::accountstest::cookie

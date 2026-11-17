@@ -15,7 +15,7 @@ source [file join $root tcl config.tcl]
 set test_releases [::app_config::releases {}]
 # Stub external services, but exercise the real handlers, serializer and renderer.
 package require twebserver
-package provide tratelimit 1.1.0
+package provide tratelimit 1.1.1
 package require treqmon 2.2.0
 namespace eval ::twebserver {
     # Provide the get rootdir test fixture.

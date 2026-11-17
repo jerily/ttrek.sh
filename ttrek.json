@@ -108,17 +108,17 @@
     },
     "web-static-blog": "^0.1.9",
     "web-static-wiki": "^0.1.10",
-    "tratelimit": "^1.1.0",
-    "treqmon": "^2.2.0",
+    "tratelimit": "^1.1.1",
+    "treqmon": "^2.3.0",
     "pure-tcl-aws-s3": "^1.0.0",
     "pure-tcl-aws-sqs": "^1.0.0",
     "pure-tcl-aws-ses": "^1.0.0",
     "pure-tcl-aws-lambda": "^1.0.0",
     "tpersist": "^0.1.5",
     "tconfig": "^1.0.2",
-    "web-user": "=0.5.5",
+    "web-user": "=0.5.6",
     "tcaptcha": "^1.0.0",
-    "web-forum": "=0.3.1",
+    "web-forum": "=0.3.2",
     "tdbcsqlite3": {
       "version": ">=1.1.8",
       "if": "+local"
@@ -128,6 +128,7 @@
     "tcllib": "^2.0.0",
     "trequests": "^1.3.0",
     "twebserver": "^1.47.58",
-    "tdevops": "^0.2.1"
+    "tdevops": "^0.2.1",
+    "mock-proxy-app": "^0.1.2"
   }
 }
