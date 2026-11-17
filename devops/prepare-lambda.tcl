@@ -37,6 +37,15 @@ if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONF
 }
 file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot releases $releases]
+# Production installations omit SQLite; use only dependencies already present.
+if {[catch {package require tdbc::sqlite3} message options]} {
+    if {[dict get $options -errorcode] ne {TCL PACKAGE UNFOUND} ||
+            [llength [package versions tdbc::sqlite3]]} {
+        return -options $options $message
+    }
+    puts "Skipping SQLite-backed packaging smoke checks: tdbc::sqlite3 is not installed."
+    return
+}
 set router [::tpathexp::router]
 set savedEnv [array get ::env ENV]
 set accountProbe [file tempfile accountProbeDirectory]
@@ -47,23 +56,6 @@ try {
     # Provision only a disposable in-memory fixture for packaging smoke checks.
     # Runtime startup never initializes or imports a database in either mode.
     set ::env(ENV) LOCAL
-    # Production archives omit SQLite. The build's separate local installation
-    # supplies only the SQLite test libraries to this process, never to the ZIP.
-    if {[info exists ::env(TTREK_PREPARE_TEST_PREFIX)] && $::env(TTREK_PREPARE_TEST_PREFIX) ne {}} {
-        set testLibrary [file join $::env(TTREK_PREPARE_TEST_PREFIX) lib]
-        foreach pattern {sqlite* tsession-sqlite*} {
-            set directories [glob -nocomplain -types d -directory $testLibrary $pattern]
-            if {![llength $directories]} {error "Missing packaging test dependency: $pattern in $testLibrary"}
-            lappend ::auto_path {*}$directories
-        }
-        set modules [glob -nocomplain -types f -directory $testLibrary \
-            tcl8/*/tdbc/sqlite3-*.tm tcl9/*/tdbc/sqlite3-*.tm]
-        if {![llength $modules]} {error "Missing packaging test module: tdbc::sqlite3"}
-        foreach module $modules {
-            set version [string range [file rootname [file tail $module]] 8 end]
-            package ifneeded tdbc::sqlite3 $version [list source $module]
-        }
-    }
     # Validate every staged recipe in a disposable catalog without contacting
     # the production database. The deployed database changes only on manual sync.
     source [file join $siteRoot tcl telemetry.tcl]

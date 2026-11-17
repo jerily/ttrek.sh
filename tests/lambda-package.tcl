@@ -36,7 +36,7 @@ proc image_objects {directory {relative {}}} {
 
 set mount [zipfs mount $archive /ttrek-lambda-package-test]
 try {
-    # These belong to the separate +local test prefix, never the production ZIP.
+    # Local dependencies must never enter the production ZIP.
     foreach library {lib lib64} {
         foreach pattern {sqlite* libsqlite* tdbcsqlite* tsession-sqlite* mock-*-app*} {
             if {[llength [glob -nocomplain -directory [file join $mount local $library] $pattern]]} {

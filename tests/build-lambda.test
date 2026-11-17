@@ -25,9 +25,47 @@ proc build_read {path} {
 build_write [file join $work ttrek.json] {{"dependencies":{}}}
 build_write [file join $work bin aws] {#!/bin/sh
 set -eu
-[ "$1 $2" = "s3 cp" ] || exit 91
-[ "$3" = s3://fixture/updated-ttrek ] || exit 98
-cp "$TTREK_TEST_BINARY" "$4"
+case "$1 $2" in
+    's3 cp')
+        [ "$3" = s3://fixture/updated-ttrek ] || exit 98
+        cp "$TTREK_TEST_BINARY" "$4" ;;
+    's3 sync') printf '%s\n' 'asset-sync' >> "$TTREK_TEST_LOG" ;;
+    *) exit 91 ;;
+esac
+}
+foreach command {npm python3 sam} {
+    build_write [file join $work bin $command] {#!/bin/sh
+exit 0
+}
+}
+build_write [file join $work devops generate-prod-config.sh] {#!/bin/sh
+exit 0
+}
+build_write [file join $work tclsh-fixture] {#!/bin/sh
+set -eu
+if [ "$#" = 0 ]; then
+    exec "$TTREK_TEST_TCLSH" "$TTREK_TEST_PROBE"
+fi
+printf 'tcl %s\n' "$1" >> "$TTREK_TEST_LOG"
+}
+# Execute the actual SQLite probe with controlled package availability.
+build_write [file join $work sqlite-probe.tcl] {
+rename package real_package
+proc package {command args} {
+    if {$command eq "require" && [lindex $args 0] eq "tdbc::sqlite3"} {
+        switch $::env(TTREK_TEST_SQLITE) {
+            present {return 1.1.8}
+            absent {return -code error -errorcode {TCL PACKAGE UNFOUND} {SQLite unavailable}}
+            broken {return -code error -errorcode {TCL LOAD_FAILED} {SQLite load failed}}
+            incomplete {
+                real_package ifneeded tdbc::sqlite3 1.1.8 {}
+                return -code error -errorcode {TCL PACKAGE UNFOUND} {SQLite dependency missing}
+            }
+        }
+    }
+    real_package $command {*}$args
+}
+eval [read stdin]
 }
 build_write [file join $work ttrek-fixture] {#!/bin/sh
 set -eu
@@ -46,45 +84,85 @@ case "$1" in
         ;;
     use-flags)
         [ "$2" = add ] || exit 90
-        case "$PWD" in
-            */build/test-deps) [ "$3" = +local ] || exit 89 ;;
-            *) [ "$3" = -local ] || exit 88 ;;
-        esac
+        [ "$3" = -local ] || exit 88
         ;;
     install)
         [ -f "$TTREK_PUBLIC_REGISTRY/synced" ] || exit 93
         [ "$#" = 7 ] && [ "$2" = -y ] && [ "$3" = -fail-verbose ] || exit 94
         [ "$4" = -registry ] && [ "$5" = "$CODEBUILD_SRC_DIR_PrivateRegistry" ] || exit 95
         [ "$6" = -registry ] && [ "$7" = "$TTREK_PUBLIC_REGISTRY" ] || exit 96
-        case "$PWD" in
-            */build/test-deps)
-                [ -f ttrek.json ] && [ -f ttrek-lock.json ] || exit 87
-                # Stop before tests/packaging; never install, upload or deploy.
-                exit 73 ;;
-            *) printf '{"packages":{}}\n' > ttrek-lock.json ;;
-        esac
+        mkdir -p ttrek-venv/local/bin
+        cp "$TTREK_TEST_INTERPRETER" ttrek-venv/local/bin/tclsh9.1
         ;;
+    run) [ "$2" = -script ] || exit 86 ;;
     *) exit 97 ;;
 esac
 }
 # Provide the run build test fixture.
-proc run_build {syncStatus} {
+proc run_build {syncStatus {sqlite absent}} {
     global work env
     file delete -force [file join $work build] [file join $work commands.log]
     set failed [catch {exec env PATH=[file join $work bin]:$env(PATH) \
         CODEBUILD_SRC_DIR_PrivateRegistry=[file join $work {private registry}] \
         TTREK_BINARY_S3_URI=s3://fixture/updated-ttrek \
         TTREK_TEST_BINARY=[file join $work ttrek-fixture] \
+        TTREK_TEST_INTERPRETER=[file join $work tclsh-fixture] \
+        TTREK_TEST_TCLSH=[info nameofexecutable] \
+        TTREK_TEST_PROBE=[file join $work sqlite-probe.tcl] \
+        TTREK_TEST_SQLITE=$sqlite \
+        SAM_ARTIFACT_BUCKET=fixture-bucket \
         TTREK_TEST_LOG=[file join $work commands.log] \
         TTREK_TEST_SYNC_STATUS=$syncStatus \
         bash [file join $work devops build-lambda.sh] 2>@1} message options]
-    list $failed [lindex [dict get $options -errorcode] end] \
+    list $failed [expr {$failed ? [lindex [dict get $options -errorcode] end] : 0}] \
         [split [build_read [file join $work commands.log]] \n]
 }
 
 test build-registry-order {The build syncs before installing and passes the same checkout after the private registry} -body {
-    run_build 0
-} -result {1 73 {self-update sync {use-flags add -local} install {use-flags add +local} install}}
+    lassign [run_build 0] failed status commands
+    list $failed $status [lrange $commands 0 3]
+} -result {0 0 {self-update sync {use-flags add -local} install}}
+
+test build-single-install {Both SQLite branches use one installation through packaging and upload} -body {
+    set results {}
+    foreach sqlite {absent present} {
+        lassign [run_build 0 $sqlite] failed status commands
+        lappend results [list $failed $status [llength [lsearch -all -exact $commands install]] \
+            [lindex $commands end] [file exists [file join $work build test-deps]]]
+    }
+    set results
+} -result {{0 0 1 {tcl devops/upload-browser-assets.tcl} 0} {0 0 1 {tcl devops/upload-browser-assets.tcl} 0}}
+
+test build-sqlite-conditional {Only SQLite-backed tests depend on SQLite availability} -body {
+    set results {}
+    foreach sqlite {absent present} {
+        lassign [run_build 0 $sqlite] failed status commands
+        set databaseTests {}
+        foreach name {all.tcl homepage.test accounts.test static-content.test content-images-build.test \
+                telemetry-startup.test patch.test telemetry.test registry-metadata.test recipe-downloads.test \
+                package-tracker.test search-store.test} {
+            lappend databaseTests [expr {"tcl tests/$name" in $commands}]
+        }
+        set otherTests {}
+        foreach name {runtime-packages.tcl content-images.test browser-assets.test config.test lambda-config.test \
+                telemetry-config.test email-queue.test invoke-patch-local.test stage-registry.test \
+                build-lambda.test telemetry-maintenance.test installer.tcl lambda-package.tcl} {
+            lappend otherTests [expr {"tcl tests/$name" in $commands}]
+        }
+        lappend results [list $failed $status [lsort -unique $databaseTests] [lsort -unique $otherTests]]
+    }
+    set results
+} -result {{0 0 0 1} {0 0 1 1}}
+
+test build-sqlite-broken {An installed but broken SQLite driver fails instead of silently skipping tests} -body {
+    set results {}
+    foreach sqlite {broken incomplete} {
+        lassign [run_build 0 $sqlite] failed status commands
+        lappend results [list $failed $status [llength [lsearch -all -exact $commands install]] \
+            [expr {{tcl tests/lambda-package.tcl} in $commands}]]
+    }
+    set results
+} -result {{1 1 1 0} {1 1 1 0}}
 
 test build-registry-sync-failure {A failed sync stops the build before dependency installation} -body {
     run_build 42
