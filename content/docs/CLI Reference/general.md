@@ -38,6 +38,7 @@ means an argument can be repeated, and `|` separates alternatives.
 | [search](/docs/cli-reference/search) | Find packages by name, description, or tag. |
 | [run](/docs/cli-reference/run) | Run a command or named script in the project environment. |
 | [scripts](/docs/cli-reference/scripts) | List, inspect, add, or remove named scripts. |
+| [use-flags](/docs/cli-reference/use-flags) | Configure USE flags for an installation. |
 
 ## Registry options
 
