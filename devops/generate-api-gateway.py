@@ -8,6 +8,29 @@ import subprocess
 import tempfile
 
 
+def production_routes(definitions):
+    routes = {}
+    for definition in definitions:
+        cdn = definition.get('cdn_on_prod', False)
+        if type(cdn) is not bool:
+            raise ValueError('cdn_on_prod must be a boolean')
+        if cdn:
+            continue
+        route = dict(definition)
+        route.pop('cdn_on_prod', None)
+        path = route['path']
+        if not isinstance(path, str) or not path.startswith('/') or '//' in path:
+            raise ValueError(f'Invalid API Gateway route path: {path!r}')
+        # Local routes may include /docs/ aliases; Gateway rejects the empty segment.
+        route['path'] = path.rstrip('/') or '/'
+        route['method'] = route.get('method', 'ANY')
+        key = f"{route['method']} {route['path']}"
+        if key in routes and routes[key] != route:
+            raise ValueError(f'Conflicting API Gateway routes after normalization: {key}')
+        routes[key] = route
+    return list(routes.values())
+
+
 def route_logical_id(route_key):
     method, path = route_key.split(' ', 1)
     if route_key == 'GET /':
@@ -19,8 +42,6 @@ def route_logical_id(route_key):
         parts.extend(word[0].upper() + word[1:] for word in re.findall(r'[A-Za-z0-9]+', segment))
     if path == '/':
         parts.append('Root')
-    elif path.endswith('/'):
-        parts.append('TrailingSlash')
     return ''.join(parts) + 'Route'
 
 
@@ -32,11 +53,7 @@ def main():
     if 'authorizer' in routes.get('apiGateway', {}):
         raise ValueError('The website is public; remove apiGateway.authorizer')
 
-    # Keep local CDN routes in the shared manifest, but omit them from production.
-    for route in routes['routes']:
-        if type(route.get('cdn_on_prod', False)) is not bool:
-            raise ValueError('cdn_on_prod must be a boolean')
-    routes['routes'] = [route for route in routes['routes'] if not route.pop('cdn_on_prod', False)]
+    routes['routes'] = production_routes(routes['routes'])
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json') as filtered:
         json.dump(routes, filtered)
         filtered.flush()
