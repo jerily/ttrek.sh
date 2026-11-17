@@ -50,6 +50,11 @@
       "kicker": "From the blog",
       "link_text": "Read the latest post",
       "highlights": {
+        "/2026-11-17-ttrek-160-see-your-build-before-it-starts": {
+          "description": "Programming languages in your install plan, USE flags for each installation, and earlier checks for missing build requirements.",
+          "version": "1.6.0",
+          "note": "See your build before it starts."
+        },
         "/2026-11-14-bug-fixes-in-ttrek-150": {
           "description": "Fixes for Snap CMake builds, clearer missing-tool errors, and dependency order that stays yours.",
           "version": "1.5.0",
