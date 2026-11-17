@@ -777,7 +777,10 @@ python3 devops/generate-api-gateway.py
 ```
 
 The site generator reads `etc/routes.json`, omits routes marked
-`cdn_on_prod: true`, and passes the remaining routes to tdevops. Local proxies use
+`cdn_on_prod: true`, and collapses trailing-slash aliases such as `/docs/` into
+`/docs` before passing routes to tdevops. API Gateway rejects empty path segments;
+the generator rejects interior `//` and aliases with conflicting backends.
+The root `/` route is preserved. Local proxies use
 the complete manifest selected by `routes` in `etc/tdevops.tcl`. Generated route
 logical IDs describe the method and path, such as `GetUserLoginRoute`. It removes the shared generator's optional authorizer and sets
 every route to `AuthorizationType: NONE`. The website has no authorizer parameter,

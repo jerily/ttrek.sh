@@ -121,16 +121,13 @@
         "SitePermission",
         "RootRoute",
         "GetBlogRoute",
-        "GetBlogTrailingSlashRoute",
         "GetBlogByPathRoute",
         "GetDebugRoute",
         "GetDistByArchByArtifactRoute",
         "GetDocsRoute",
-        "GetDocsTrailingSlashRoute",
         "GetDocsByPathRoute",
         "GetDownloadByArtifactRoute",
         "GetForumRoute",
-        "GetForumTrailingSlashRoute",
         "GetForumMemberByIdRoute",
         "GetForumModerateByKindByIdByActionRoute",
         "GetForumModerationRoute",
@@ -150,11 +147,9 @@
         "GetRegistryByPackageNameByPackageVersionByOsByMachineRoute",
         "GetReleasesLatestByTargetRoute",
         "GetRequestMonitorRoute",
-        "GetRequestMonitorTrailingSlashRoute",
         "GetRequestMonitorRecentRoute",
         "GetSearchRoute",
         "GetUserRoute",
-        "GetUserTrailingSlashRoute",
         "GetUserAdminUsersRoute",
         "GetUserChangePasswordRoute",
         "GetUserCloseAccountRoute",
@@ -169,16 +164,13 @@
         "GetUserVerifyRoute",
         "HeadRootRoute",
         "HeadBlogRoute",
-        "HeadBlogTrailingSlashRoute",
         "HeadBlogByPathRoute",
         "HeadDebugRoute",
         "HeadDistByArchByArtifactRoute",
         "HeadDocsRoute",
-        "HeadDocsTrailingSlashRoute",
         "HeadDocsByPathRoute",
         "HeadDownloadByArtifactRoute",
         "HeadForumRoute",
-        "HeadForumTrailingSlashRoute",
         "HeadForumMemberByIdRoute",
         "HeadForumModerateByKindByIdByActionRoute",
         "HeadForumModerationRoute",
@@ -198,11 +190,9 @@
         "HeadRegistryByPackageNameByPackageVersionByOsByMachineRoute",
         "HeadReleasesLatestByTargetRoute",
         "HeadRequestMonitorRoute",
-        "HeadRequestMonitorTrailingSlashRoute",
         "HeadRequestMonitorRecentRoute",
         "HeadSearchRoute",
         "HeadUserRoute",
-        "HeadUserTrailingSlashRoute",
         "HeadUserAdminUsersRoute",
         "HeadUserChangePasswordRoute",
         "HeadUserCloseAccountRoute",
@@ -341,27 +331,6 @@
         }
       }
     },
-    "GetBlogTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "GET /blog/",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
     "GetBlogByPathRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -446,27 +415,6 @@
         }
       }
     },
-    "GetDocsTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "GET /docs/",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
     "GetDocsByPathRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -516,27 +464,6 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /forum",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
-    "GetForumTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "GET /forum/",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -950,27 +877,6 @@
         }
       }
     },
-    "GetRequestMonitorTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "GET /request-monitor/",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
     "GetRequestMonitorRecentRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -1020,27 +926,6 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /user",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
-    "GetUserTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "GET /user/",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -1349,27 +1234,6 @@
         }
       }
     },
-    "HeadBlogTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "HEAD /blog/",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
     "HeadBlogByPathRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -1454,27 +1318,6 @@
         }
       }
     },
-    "HeadDocsTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "HEAD /docs/",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
     "HeadDocsByPathRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -1524,27 +1367,6 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "HEAD /forum",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
-    "HeadForumTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "HEAD /forum/",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -1958,27 +1780,6 @@
         }
       }
     },
-    "HeadRequestMonitorTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "HEAD /request-monitor/",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
     "HeadRequestMonitorRecentRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -2028,27 +1829,6 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "HEAD /user",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
-    "HeadUserTrailingSlashRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "HEAD /user/",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
