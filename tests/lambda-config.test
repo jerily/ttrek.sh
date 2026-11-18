@@ -204,7 +204,7 @@ file copy [file join $sourceRoot etc ratelimits.json] [file join $root etc ratel
 file copy [file join $sourceRoot tests fixtures release-checksums.json] [file join $root etc releases.json]
 set config [::tconfig::read_config [file join $sourceRoot devops config.prod.ini]]
 # Existing packaged INI settings must not override the environment or its default.
-dict set config runtime loading lazy
+dict set config runtime loading eager
 dict set config account email_queue_url https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails
 dict set config tconfig tink_keyset dummy
 foreach section {redis postgres} {
@@ -251,8 +251,8 @@ test lambda-loading {environment policy reaches the worker and invalid values fa
     lappend result [catch {::site_lambda::initialize $root} message] $message $::config_loads
 } -cleanup {
     unset -nocomplain ::env(TTREK_LOADING)
-} -match glob -result {eager lazy eager 1 {TTREK_LOADING must be lazy or eager} 0} \
-    -errorOutput "site_init loading=eager duration_ms=*\nsite_init loading=lazy duration_ms=*\nsite_init loading=eager duration_ms=*\n"
+} -match glob -result {lazy lazy eager 1 {TTREK_LOADING must be lazy or eager} 0} \
+    -errorOutput "site_init loading=lazy duration_ms=*\nsite_init loading=lazy duration_ms=*\nsite_init loading=eager duration_ms=*\n"
 
 test lambda-init-timing {cold initialization logs milliseconds once and warm requests reuse config} -setup {
     package require tjson
@@ -273,7 +273,7 @@ test lambda-init-timing {cold initialization logs milliseconds once and warm req
 } -cleanup {
     rename ::site::dispatch {}
 } -match regexp -result {^200 200 1$} \
-    -errorOutput {^site_init loading=eager duration_ms=[0-9]+\.[0-9]{3}\n$}
+    -errorOutput {^site_init loading=lazy duration_ms=[0-9]+\.[0-9]{3}\n$}
 
 test lambda-releases-1 {Production startup loads releases and resolves the manifest from the application root} -setup {
     set ::env(ENV) PROD

@@ -40,7 +40,7 @@ proc ::site::validate_templates {} {
 # Apply the worker settings and initialize shared site resources.
 proc ::site::configure {config} {
     ::private_config::assert_public $config
-    if {![dict exists $config loading]} {dict set config loading eager}
+    if {![dict exists $config loading]} {dict set config loading lazy}
     if {[dict get $config loading] ni {lazy eager}} {error "loading must be lazy or eager"}
     if {[info exists ::accounts::mount] && $::accounts::mount ne {}} {::web::user::release $::accounts::mount}
     set ::accounts::mount {}; set ::accounts::store {}

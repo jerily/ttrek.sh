@@ -46,11 +46,11 @@ Open <http://127.0.0.1:8080/> to try the website. Press Ctrl-C to stop it.
 Both Lambda and the direct server read the `TTREK_LOADING` environment variable:
 
 ```sh
-export TTREK_LOADING=eager
+export TTREK_LOADING=lazy
 ```
 
-When unset, the default is `eager`; only `lazy` and `eager` are accepted. The SAM
-`LoadingMode` parameter sets this variable for Lambda and also defaults to `eager`.
+When unset, the default is `lazy`; only `lazy` and `eager` are accepted. The SAM
+`LoadingMode` parameter sets this variable for Lambda and also defaults to `lazy`.
 The old `[runtime] loading` INI setting is ignored. The mode is selected and
 validated before reading or decrypting application configuration. Other settings
 still require config decryption once during each worker's startup; warm Lambda
@@ -82,7 +82,7 @@ Compare modes using the same artifact and Lambda memory setting. Measure worker
 initialization, the first request for each feature, and repeated warm requests
 separately: lazy loading saves unused work but shifts required loading into a
 feature's first request. New Lambda workers each have their own caches.
-Each successful Lambda cold initialization logs `site_init loading=eager duration_ms=...`
-(or `loading=lazy`) to stderr. This measures application initialization, including
+Each successful Lambda cold initialization logs `site_init loading=lazy duration_ms=...`
+(or `loading=eager`) to stderr. This measures application initialization, including
 config decryption and worker preparation; it excludes runtime startup before the
 initializer and request handling. Warm invocations do not repeat the log.
