@@ -13,7 +13,7 @@ namespace eval ::views {
 }
 
 # Load trusted application templates once in each worker interpreter.
-proc ::views::init {directory} {
+proc ::views::init {directory {validate true}} {
     variable templates
     ::assets::load [file dirname $directory]
     set fields {}
@@ -41,8 +41,32 @@ proc ::views::init {directory} {
             close $channel
         }
     }
+    if {$validate} {
+        dict for {name template} $templates {
+            ::jinja2::validate $template -templates $templates -path $name
+        }
+    }
+}
+
+# Packaging validates the same compositions as runtime mounts, without SQL,
+# account keys, AWS clients or middleware connections. Always validate here,
+# even when the build environment is PROD.
+proc ::views::validate_all {{monitorMaster request-monitor-master.html.jinja}} {
+    variable templates
     dict for {name template} $templates {
         ::jinja2::validate $template -templates $templates -path $name
+    }
+    package require web-user 0.7.1
+    package require web-forum 0.3.3
+    foreach {provider master} [list \
+        ::web::user::prepare_templates account-master.html.jinja \
+        ::web::forum::prepare_templates forum-master.html.jinja \
+        ::web::static::wiki::prepare_templates docs-master.html.jinja \
+        ::web::static::blog::prepare_templates blog-master.html.jinja \
+        ::treqmon::view::prepare_templates $monitorMaster] {
+        $provider [dict create validate_templates true \
+            master_template [dict get $templates $master] \
+            templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
     }
 }
 

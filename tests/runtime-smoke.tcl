@@ -59,8 +59,16 @@ try {
     set path [file join $app tcl init-thread.tcl]
     set workerScript [read_file $path]
     append workerScript {
-        if {$::telemetry::connection ne [dict get [::site::config] content_connection]} {
-            error "Worker telemetry and content must share one database connection"
+        if {$::telemetry::connection ne {} || [dict exists [::site::config] content_connection]} {
+            error "Worker startup must not connect SQL"
+        }
+        rename ::site::ensure_worker ::site::real_ensure_worker
+        proc ::site::ensure_worker {} {
+            set router [real_ensure_worker]
+            if {$::telemetry::connection ne [dict get [config] content_connection]} {
+                error "Worker telemetry and content must share one database connection"
+            }
+            return $router
         }
     }
     write_file $path $workerScript

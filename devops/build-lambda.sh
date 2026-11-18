@@ -47,6 +47,8 @@ mkdir -p public/assets/versioned
 aws s3 sync "$ASSET_HISTORY" public/assets/versioned/ --only-show-errors
 ttrek run -script build-assets
 npm test
+"$TCLSH" tests/template-validation.test
+"$TCLSH" tests/worker-startup.test
 python3 -m unittest discover -s tests -p 'test_lambda_versions.py'
 python3 -m unittest discover -s tests -p 'test_vpc_network.py'
 # Run SQLite-backed tests only when the existing installation provides SQLite.

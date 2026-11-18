@@ -57,10 +57,7 @@ proc ::site_lambda::initialize {root} {
     set secret [dict get $separated secret_config]
     set maintenanceSettings [dict get $settings content_database]
     set maintenanceSecrets [dict get $secret postgres]
-    ::telemetry::connect $maintenanceSettings -secret_config $maintenanceSecrets
-    dict set settings content_connection $::telemetry::connection
-    ::site::init_worker $settings -secret_config $secret
-    set router $::site::router
+    ::site::prepare_worker $settings -secret_config $secret
 }
 
 # Dispatch a Lambda HTTP envelope or an explicitly private maintenance event.
@@ -70,6 +67,7 @@ proc ::site_lambda::handle {payload context} {
     # Scheduler invokes Lambda directly under IAM. API Gateway supplies an HTTP
     # envelope; request paths, headers and bodies never select this entry point.
     if {[lsort [dict keys $event]] eq {source task} && [dict get $event source] eq "ttrek.patch"} {
+        if {[info exists ::site::pending_secrets]} {set router [::site::ensure_worker]}
         return [::site_patch::run [dict get $event task] $context]
     }
     if {[dict exists $event version] && [dict get $event version] eq "2.0"} {
@@ -123,6 +121,7 @@ proc ::site_lambda::handle {payload context} {
     } elseif {[dict exists $event requestContext identity sourceIp]} {
         dict set context addr [dict get $event requestContext identity sourceIp]
     }
+    if {[info exists ::site::pending_secrets]} {set router [::site::ensure_worker]}
     set response [::site::dispatch $router $event $context]
     set headers {}
     dict for {key value} [dict get $response headers] {dict set headers $key [list S $value]}

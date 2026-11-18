@@ -19,24 +19,28 @@ foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js 
     }
 }
 package require http
-package require web-user 0.7.0
-package require web-forum 0.2.0
+package require web-user 0.7.1
+package require web-forum 0.3.3
 package require pure-tcl-aws-ses 1.0.0
 package require pure-tcl-aws-sqs 1.0.0
 package require pure-tcl-aws-lambda 1.0.0
 source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
 set releases [::app_config::releases {}]
+set monitor [::app_config::request_monitor {}]
 if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONFIG) ne {}} {
     ::app_config::validate_lambda_config $::env(TTREK_PRODUCTION_CONFIG)
     file copy -force $::env(TTREK_PRODUCTION_CONFIG) [file join $siteRoot etc config.ini]
     # Validate the staged public settings without decrypting secrets or calling AWS.
     set releases [::app_config::releases_from_ini [file join $siteRoot etc config.ini] $siteRoot]
     set images [::app_config::content_images_from_ini [file join $siteRoot etc config.ini] $siteRoot]
+    set monitor [::app_config::request_monitor [::tconfig::read_config [file join $siteRoot etc config.ini]]]
     if {[dict get $images bucket] eq {}} {error "Production configuration requires content_images.bucket"}
 }
 file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot releases $releases]
+# This is independent of database fixtures and must run in PostgreSQL-only builds.
+::views::validate_all [dict get $monitor master_template]
 # Production installations omit SQLite; use only dependencies already present.
 if {[catch {package require tdbc::sqlite3} message options]} {
     if {[dict get $options -errorcode] ne {TCL PACKAGE UNFOUND} ||

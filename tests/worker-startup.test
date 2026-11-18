@@ -1,0 +1,96 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl site.tcl]
+source [file join $root tcl lambda.tcl]
+
+# Instrument the service boundary without needing SQLite, PostgreSQL or Valkey.
+namespace eval ::telemetry {variable connection {}; variable connects 0; variable closes 0; variable fail 0}
+proc ::telemetry::connect {settings args} {
+    incr ::telemetry::connects
+    if {$::telemetry::fail} {error "Connection unavailable"}
+    set ::telemetry::connection connection-$::telemetry::connects
+}
+proc ::telemetry::close {} {incr ::telemetry::closes; set ::telemetry::connection {}}
+rename ::site::init_worker ::site::real_init_worker
+proc ::site::init_worker {config args} {
+    variable settings $config
+    if {$::failMount} {error "Mount unavailable"}
+    variable router [::tpathexp::router]
+    $router add GET /probe {apply {{request context params} {
+        ::twebserver::build_response 200 text/plain $::telemetry::connection
+    }}}
+}
+proc prepare {} {
+    set ::telemetry::connects 0; set ::telemetry::closes 0
+    set ::telemetry::connection {}; set ::telemetry::fail 0; set ::failMount 0
+    ::site::prepare_worker {rootdir /fixture content_database {dialect postgresql}} \
+        -secret_config {postgres {password secret}}
+}
+proc cleanup {} {
+    if {[info exists ::site::router]} {catch {$::site::router destroy}}
+    unset -nocomplain ::site::router ::site::pending_secrets ::site_lambda::router
+}
+set payload {{"httpMethod":"GET","path":"/probe","headers":{}}}
+
+test worker-deferred {preparation opens no SQL connection and keeps secrets private} -setup prepare -body {
+    list $::telemetry::connects $::telemetry::connection [dict exists [::site::config] content_connection] \
+        [string match *secret* [::site::config]]
+} -cleanup cleanup -result {0 {} 0 0}
+
+test worker-first-http {the first HTTP event connects and subsequent events reuse the worker} -setup prepare -body {
+    set first [::site_lambda::handle $payload {}]
+    set second [::site_lambda::handle $payload {}]
+    list [dict get [::tjson::json_to_simple $first] statusCode] [expr {$first eq $second}] \
+        $::telemetry::connects [info exists ::site::pending_secrets]
+} -cleanup cleanup -result {200 1 1 0}
+
+test worker-invalid-event {invalid envelopes do not connect SQL} -setup prepare -body {
+    list [catch {::site_lambda::handle {{"unexpected":true}} {}}] $::telemetry::connects
+} -cleanup cleanup -result {1 0}
+
+test worker-connect-retry {a failed first connection is retried on the next request} -setup prepare -body {
+    set ::telemetry::fail 1
+    set failed [catch {::site_lambda::handle $payload {}}]
+    set ::telemetry::fail 0
+    set response [::site_lambda::handle $payload {}]
+    list $failed [dict get [::tjson::json_to_simple $response] statusCode] $::telemetry::connects
+} -cleanup cleanup -result {1 200 2}
+
+test worker-mount-retry {failed mounting closes SQL and does not retain a dead connection in settings} -setup prepare -body {
+    set ::failMount 1
+    set failed [catch {::site_lambda::handle $payload {}}]
+    set public [::site::config]
+    set closed $::telemetry::closes
+    set ::failMount 0
+    set response [::site_lambda::handle $payload {}]
+    list $failed $closed [dict exists $public content_connection] \
+        [dict get [::tjson::json_to_simple $response] statusCode] $::telemetry::connects
+} -cleanup cleanup -result {1 1 0 200 2}
+
+namespace eval ::site_patch {}
+proc ::site_patch::run {task context} {
+    if {$::telemetry::connection eq {}} {error "Private task needs SQL"}
+    return {{"ok":true}}
+}
+test worker-private-event {private task invocation initializes SQL too} -setup prepare -body {
+    list [::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}] $::telemetry::connects
+} -cleanup cleanup -result {{{"ok":true}} 1}
+
+test worker-direct {the direct server also connects on its first request only} -setup {
+    prepare
+    rename ::twebserver::return_response ::twebserver::real_return_response
+    proc ::twebserver::return_response {connection response} {set ::captured $response}
+} -body {
+    ::site::process_conn {conn fixture} {method GET path /probe}
+    ::site::process_conn {conn fixture} {method GET path /probe}
+    list [dict get $::captured statusCode] $::telemetry::connects
+} -cleanup {
+    rename ::twebserver::return_response {}
+    rename ::twebserver::real_return_response ::twebserver::return_response
+    cleanup
+} -result {200 1}
+
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]

@@ -45,11 +45,12 @@ proc ::accounts::mount {router settings templates args} {
     set secret [::private_config::option {*}$args]
     variable store
     variable mount
-    package require web-user 0.7.0
+    package require web-user 0.7.1
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]
     set display [dict merge [dict get $config display] [dict create \
+        validate_templates [::site::validate_templates] \
         master_template [dict get $templates account-master.html.jinja] \
         templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]]
     dict set display assets_url [::assets::base_url /user/_assets]
