@@ -14,6 +14,7 @@ proc get_debug_handler {ctx req} {
 # Record a telemetry event using the configured failure policy.
 proc telemetry_event { event_type args } {
     try {
+        ::site::database
         ::telemetry::event $event_type {*}$args
     } on error {message options} {
         # Direct-server telemetry was asynchronous and never failed the request.
@@ -31,6 +32,7 @@ proc telemetry_event { event_type args } {
 proc telemetry_stats {package_name {package_version {}}} {
     # Statistics must not break package pages when the database is unavailable.
     if {[catch {
+        ::site::database
         ::telemetry::stats $package_name $package_version
     } result]} {
         puts "Error while accessing telemetry db: $result"
@@ -244,6 +246,7 @@ proc get_logo_handler {ctx req} {
 
 # Return package versions for the caller.
 proc get_package_versions {package_name} {
+    ::site::database
     return [lsort -command compare_versions -decreasing [dict keys [::telemetry::registry_versions $package_name]]]
 }
 
@@ -279,7 +282,10 @@ proc post_telemetry_register_handler {ctx req} {
 proc get_package_versions_handler {ctx req} {
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_reg_get_pkg -pkg_name $package_name
-    if {[catch {::telemetry::registry_versions $package_name} versions]} {
+    if {[catch {
+        ::site::database
+        ::telemetry::registry_versions $package_name
+    } versions]} {
         return [::recipe_search::unavailable]
     }
     set versions_typed {}
@@ -324,6 +330,7 @@ proc get_package_languages_handler {ctx req} {
     set name [::twebserver::get_path_param $req package_name]
     set version [::twebserver::get_path_param $req package_version]
     if {[catch {
+        ::site::database
         set rows [::telemetry::rows [::telemetry::registry_query {languages} $name $version]]
     }]} {return [::recipe_search::unavailable]}
     if {![llength $rows]} {return [::twebserver::build_response 404 text/plain "not found"]}
@@ -341,6 +348,7 @@ proc get_package_spec_handler {ctx req} {
         if {$package_version eq "latest"} {
             set package_version [lindex [get_package_versions $package_name] 0]
         }
+        ::site::database
         set stored [::telemetry::registry_recipe $package_name $package_version]
     }]} {return [::recipe_search::unavailable]}
     if {$stored eq {}} {
@@ -478,6 +486,7 @@ proc get_package_version_page_handler {ctx req} {
     telemetry_event_common req_pkg_version_get -pkg_name $package_name -pkg_version $package_version
 
     if {[catch {
+        ::site::database
         set stored [::telemetry::registry_recipe $package_name $package_version]
         set catalog [::recipe_search::catalog_entries [::telemetry::registry_catalog [list $package_name]]]
     }]} {
@@ -536,7 +545,10 @@ proc get_package_version_page_handler {ctx req} {
 
 # Return package stats for the caller.
 proc get_package_download_stats {name {version {}}} {
-    if {[catch {::telemetry::download_stats $name $version} result]} {
+    if {[catch {
+        ::site::database
+        ::telemetry::download_stats $name $version
+    } result]} {
         puts stderr "Could not read recipe download statistics"
         return {}
     }

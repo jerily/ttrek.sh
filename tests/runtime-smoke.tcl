@@ -14,6 +14,8 @@ set tclsh [file join $prefix bin tclsh9.1]
 lassign [::test_support::ports 3] httpPort httpsPort valkeyPort
 set base http://127.0.0.1:$httpPort
 set mode [expr {[info exists ::env(ENV)] ? $::env(ENV) : "LOCAL"}]
+set loading [expr {[info exists ::env(TTREK_TEST_LOADING)] ? $::env(TTREK_TEST_LOADING) : "lazy"}]
+assert {$loading in {lazy eager}} {TTREK_TEST_LOADING must be lazy or eager}
 assert {$mode in {LOCAL PROD}} {ENV must be LOCAL or PROD}
 if {$mode eq "PROD" && ![info exists ::env(TTREK_TEST_POSTGRES)]} {
     error "PROD smoke tests require TTREK_TEST_POSTGRES for a disposable PostgreSQL database and PGSSLROOTCERT for its CA"
@@ -59,16 +61,16 @@ try {
     set path [file join $app tcl init-thread.tcl]
     set workerScript [read_file $path]
     append workerScript {
-        if {$::telemetry::connection ne {} || [dict exists [::site::config] content_connection]} {
+        if {([info exists ::telemetry::connection] && $::telemetry::connection ne {}) || [dict exists [::site::config] content_connection]} {
             error "Worker startup must not connect SQL"
         }
-        rename ::site::ensure_worker ::site::real_ensure_worker
-        proc ::site::ensure_worker {} {
-            set router [real_ensure_worker]
+        rename ::site::database ::site::real_database
+        proc ::site::database {} {
+            set connection [real_database]
             if {$::telemetry::connection ne [dict get [config] content_connection]} {
                 error "Worker telemetry and content must share one database connection"
             }
-            return $router
+            return $connection
         }
     }
     write_file $path $workerScript
@@ -89,6 +91,7 @@ try {
         {{key}} [binary encode base64 -maxlen 0 [read_file [file join $app key.pem]]] \
         {{certificate}} [binary encode base64 -maxlen 0 [read_file [file join $app cert.pem]]]] \
         [read_file [file join $root tests fixtures local-config.ini.in]]]
+    append config "\n\[runtime\]\nloading=$loading\n"
     if {$mode eq "PROD"} {
         append config "\n\[postgres\]\n"
         foreach {name option} {host host port port database database username user password password} {

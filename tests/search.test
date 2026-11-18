@@ -218,6 +218,7 @@ test search-9 {Fresh workers load without registry files or index construction} 
         worker eval [list source [file join $root tcl search.tcl]]
         worker eval {
             foreach name {ttrie ttrigrams} {
+                package require $name
                 rename ::${name}::create {}
                 # Provide the create test fixture.
                 proc ::${name}::create {args} {error "Index construction is forbidden at runtime"}

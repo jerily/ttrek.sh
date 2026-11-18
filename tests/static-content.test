@@ -11,6 +11,7 @@ namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tests fixtures deny-thread.tcl]
 source [file join $root tcl site.tcl]
+foreach package {web-static-wiki web-static-blog treqmon jinja2 tratelimit pure-tcl-aws-s3} {package require $package}
 source [file join $root tcl config.tcl]
 source [file join $root tcl telemetry.tcl]
 ::telemetry::init_local {dialect sqlite database :memory:} [list [file join $root tests fixtures registry]]
@@ -97,11 +98,11 @@ test static-6 {The configured monitor master is passed to the package mount} -se
     $router destroy
     ::site::configure $settings
 } -result {1 6}
-test static-7 {A missing monitor master fails before the server begins dispatching} -setup {
+test static-7 {A missing monitor master fails during artifact validation} -setup {
     set router [::tpathexp::router]
 } -body {
     ::site::configure [dict replace $settings request_monitor {master_template missing.html.jinja}]
-    ::site::mount $router
+    ::views::validate_all missing.html.jinja
 } -cleanup {
     $router destroy
     ::site::configure $settings

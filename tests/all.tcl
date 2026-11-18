@@ -55,9 +55,12 @@ namespace eval ::twebserver {
 namespace eval ::tratelimit {proc init_middleware {config} {}}
 namespace eval ::treqmon {proc init_middleware {config} {}}
 source [file join $root tcl site.tcl]
+foreach package {pure-tcl-aws-s3 ttrie ttrigrams} {package require $package}
 # Provide the config test fixture.
 proc ::site::config {} {
-    dict merge [dict create rootdir $::test_root] [::twebserver::get_config_dict]
+    set config [dict merge [dict create rootdir $::test_root] [::twebserver::get_config_dict]]
+    if {[info exists ::telemetry::connection] && $::telemetry::connection ne {}} {dict set config content_connection $::telemetry::connection}
+    return $config
 }
 source [file join $root tcl telemetry.tcl]
 ::telemetry::init_local {dialect sqlite database :memory:}

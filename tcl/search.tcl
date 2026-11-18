@@ -27,6 +27,7 @@ proc ::recipe_search::reset {} {
 
 # Return the worker’s configured search database.
 proc ::recipe_search::database {command args} {
+    ::site::database
     ::telemetry::$command {*}$args
 }
 

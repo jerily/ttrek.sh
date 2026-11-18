@@ -14,6 +14,12 @@ proc ::site_patch::run {task context} {
     set status error
     log patch_task_start $task
     try {
+        switch -- $task {
+            task_process_email_queue {}
+            task_prune_accounts - task_sync_access - task_migrate_user_ids {::accounts::ensure}
+            task_backup_website {source [file join [::site::root] tcl telemetry-maintenance.tcl]}
+            default {::site::database}
+        }
         set completed {}
         foreach name [::site_patch::$task $context] {lappend completed [list S $name]}
         set result [::tjson::typed_to_json [list M [dict create ok {BOOL 1} task [list S $task] completed [list L $completed]]]]

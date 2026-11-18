@@ -7,8 +7,6 @@
 # Shared codec for maintenance publishers and lazy worker caches. Only search
 # inputs are snapshotted; display metadata remains in the package tables.
 package require tjson
-package require ttrie 0.2.0
-package require ttrigrams 0.2.0
 source [file join [file dirname [info script]] registry-metadata.tcl]
 namespace eval ::recipe_search {}
 
@@ -28,6 +26,8 @@ proc ::recipe_search::snapshot_value {value type} {
 }
 # Create a builder for the published search snapshot.
 proc ::recipe_search::snapshot_builder {} {
+    package require ttrie 0.2.0
+    package require ttrigrams 0.2.0
     # Bump the first component when normalization, document order or indexing changes.
     return "1/ttrie-[package present ttrie]/ttrigrams-[package present ttrigrams]"
 }
@@ -118,6 +118,8 @@ proc ::recipe_search::snapshot_revision {snapshot} {
 }
 # Build a complete search snapshot from registry metadata.
 proc ::recipe_search::build_snapshot {inputs} {
+    package require ttrie 0.2.0
+    package require ttrigrams 0.2.0
     try {
         ::ttrie::create ::recipe_search::build_names [dict get $inputs names]
         ::ttrigrams::create ::recipe_search::build_descriptions [dict get $inputs texts]
@@ -142,6 +144,8 @@ proc ::recipe_search::discard_staged {} {
 }
 # Prepare a replacement snapshot before publication.
 proc ::recipe_search::stage_snapshot {snapshot} {
+    package require ttrie 0.2.0
+    package require ttrigrams 0.2.0
     if {[dict get $snapshot format] ne "3"} {error "Unsupported search snapshot format"}
     if {![regexp {^[0-9a-f]{64}$} [dict get $snapshot fingerprint]] ||
         [dict get $snapshot revision] ne [snapshot_revision $snapshot]} {error "Search snapshot checksum mismatch"}

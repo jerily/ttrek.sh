@@ -40,3 +40,39 @@ Open <http://127.0.0.1:8080/> to try the website. Press Ctrl-C to stop it.
 - [Local development](docs/local-development.md): edit content and run the website.
 - [Package registry](docs/registry.md): manage the package catalog and search.
 - [All documentation](docs/readme.md): setup, testing, releases, deployment and security.
+
+## Worker loading policy
+
+Both Lambda and the direct server support this public INI setting:
+
+```ini
+[runtime]
+loading = lazy
+```
+
+`lazy` is the default. All configured routes and middleware are registered during
+initialization. A matched route loads its package implementation and prepares its
+resources once per worker. Anonymous navigation does not initialize accounts;
+a cookie with the account name triggers the normal session verification and live
+permission checks. Monitoring and rate limiting remain active for HTTP requests.
+
+`eager` loads implementation dependencies and prewarms the same template caches
+during initialization. It uses the same routes and handlers as `lazy`. SQL opens
+on its first actual use in either mode; schema changes and content imports remain
+explicit private tasks. This separates loading policy from connection timing.
+
+Templates are loaded by name through `jinja2::environment`, including inherited
+layouts and only executed includes. Parsed templates remain cached for the worker
+lifetime, with separate environments for site, account, forum, wiki, blog, and
+monitor layouts. JSON context and output are fresh for each render. Configuration
+reset destroys these caches. Production artifacts are immutable; deploy a new
+artifact to change templates in running Lambda workers.
+
+Packaging/CI validates every site template and each package composed with its
+site layout, independently of SQLite. SQLite-only packaging smoke checks retain
+their existing skip when that driver is unavailable.
+
+Compare modes using the same artifact and Lambda memory setting. Measure worker
+initialization, the first request for each feature, and repeated warm requests
+separately: lazy loading saves unused work but shifts required loading into a
+feature's first request. New Lambda workers each have their own caches.

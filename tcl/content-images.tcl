@@ -67,17 +67,19 @@ proc ::content_images::snapshots {root settings {uploadMissing {}}} {
 # Lightweight database handles: no source reads, image hashing, schema changes,
 # or content queries until a route requests an item or listing.
 proc ::content_images::database_stores {connection settings} {
-    package require web-static-wiki 0.1.7
-    package require web-static-blog 0.1.6
     set stores {}
-    foreach {kind title} {wiki Documentation blog Blog} {
-        set imageOptions [options $settings $kind 0]
-        set contentOptions {}
-        if {$kind eq "wiki"} {set contentOptions {-exclude_from_navigation images}}
-        dict set stores $kind [::web::static::${kind}::create -connection $connection \
-            -domain ttrek.sh -title $title {*}$contentOptions {*}$imageOptions]
-    }
+    foreach kind {wiki blog} {dict set stores $kind [database_store $kind $connection $settings]}
     return $stores
+}
+
+proc ::content_images::database_store {kind connection settings} {
+    if {$kind ni {wiki blog}} {error "Unknown content store: $kind"}
+    package require web-static-$kind
+    set title [dict get {wiki Documentation blog Blog} $kind]
+    set contentOptions {}
+    if {$kind eq "wiki"} {set contentOptions {-exclude_from_navigation images}}
+    ::web::static::${kind}::create -connection $connection -domain ttrek.sh -title $title \
+        {*}$contentOptions {*}[options $settings $kind 0]
 }
 
 # Open the database connection used by this service.

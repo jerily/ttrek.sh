@@ -7,9 +7,8 @@
 package require twebserver
 source [file join [file dirname [info script]] config.tcl]
 source [file join [file dirname [info script]] site.tcl]
-source [file join [file dirname [info script]] telemetry.tcl]
 set settings [::twebserver::get_config_dict]
-# Each worker opens its shared SQL connection on its first request, as in Lambda.
+# Each worker registers routes now and opens SQL on first use, as in Lambda.
 try {
     ::site::prepare_worker $settings -secret_config $::site_bootstrap_secrets
 } finally {
