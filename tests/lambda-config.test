@@ -11,6 +11,7 @@ set sourceRoot [file dirname [file dirname [file normalize [info script]]]]
 source [file join [file dirname [info script]] .. tcl config.tcl]
 source [file join [file dirname [info script]] .. tcl local-ratelimit.tcl]
 set saved_env [array get ::env]
+unset -nocomplain ::env(TTREK_LOADING)
 set root [::tcltest::makeDirectory lambda-config-fixture]
 file mkdir [file join $root etc]
 set prod [file join $root etc config.ini]
@@ -202,6 +203,8 @@ foreach {name script} {
 file copy [file join $sourceRoot etc ratelimits.json] [file join $root etc ratelimits.json]
 file copy [file join $sourceRoot tests fixtures release-checksums.json] [file join $root etc releases.json]
 set config [::tconfig::read_config [file join $sourceRoot devops config.prod.ini]]
+# Existing packaged INI settings must not override the environment or its default.
+dict set config runtime loading lazy
 dict set config account email_queue_url https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails
 dict set config tconfig tink_keyset dummy
 foreach section {redis postgres} {
@@ -217,6 +220,7 @@ foreach name {aead_keyset mac_keyset email_hash_salt} {
 rename ::tconfig::load_config ::tconfig::real_load_config
 # Provide the load config test fixture.
 proc ::tconfig::load_config {path} {
+    incr ::config_loads
     set config [read_config $path]
     foreach section {redis postgres} {dict set config $section password dummy}
     foreach name {aead_keyset mac_keyset email_hash_salt} {
@@ -228,6 +232,48 @@ proc ::tconfig::load_config {path} {
 source [file join $sourceRoot tcl lambda.tcl]
 source [file join $sourceRoot tcl releases.tcl]
 package require pure-tcl-aws-s3 1.0.0
+
+test lambda-loading {environment policy reaches the worker and invalid values fail before decryption} -setup {
+    set ::env(ENV) PROD
+    unset -nocomplain ::env(TTREK_LOCAL_S3_ENDPOINT)
+} -body {
+    set result {}
+    unset -nocomplain ::env(TTREK_LOADING)
+    ::site_lambda::initialize $root
+    lappend result [dict get [::site::config] loading]
+    foreach mode {lazy eager} {
+        set ::env(TTREK_LOADING) $mode
+        ::site_lambda::initialize $root
+        lappend result [dict get [::site::config] loading]
+    }
+    set ::env(TTREK_LOADING) typo
+    set ::config_loads 0
+    lappend result [catch {::site_lambda::initialize $root} message] $message $::config_loads
+} -cleanup {
+    unset -nocomplain ::env(TTREK_LOADING)
+} -match glob -result {eager lazy eager 1 {TTREK_LOADING must be lazy or eager} 0} \
+    -errorOutput "site_init loading=eager duration_ms=*\nsite_init loading=lazy duration_ms=*\nsite_init loading=eager duration_ms=*\n"
+
+test lambda-init-timing {cold initialization logs milliseconds once and warm requests reuse config} -setup {
+    package require tjson
+    set ::env(ENV) PROD
+    unset -nocomplain ::env(TTREK_LOADING) ::env(TTREK_LOCAL_S3_ENDPOINT)
+    set ::config_loads 0
+    proc ::site::dispatch {router event context} {
+        return {statusCode 200 headers {} body ok}
+    }
+} -body {
+    ::site_lambda::initialize $root
+    set result {}
+    for {set i 0} {$i < 2} {incr i} {
+        set response [::site_lambda::handle {{"httpMethod":"GET","path":"/debug","headers":{}}} {}]
+        lappend result [dict get [::tjson::json_to_simple $response] statusCode]
+    }
+    lappend result $::config_loads
+} -cleanup {
+    rename ::site::dispatch {}
+} -match regexp -result {^200 200 1$} \
+    -errorOutput {^site_init loading=eager duration_ms=[0-9]+\.[0-9]{3}\n$}
 
 test lambda-releases-1 {Production startup loads releases and resolves the manifest from the application root} -setup {
     set ::env(ENV) PROD

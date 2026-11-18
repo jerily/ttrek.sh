@@ -471,10 +471,10 @@ proc ::app_config::forum {config} {
     return $defaults
 }
 
-# Controls code/template loading, independently of connection timing.
-proc ::app_config::loading {config} {
-    set mode lazy
-    if {[dict exists $config runtime loading]} {set mode [dict get $config runtime loading]}
-    if {$mode ni {lazy eager}} {error "runtime.loading must be lazy or eager"}
+# Select loading policy before reading or decrypting application configuration.
+proc ::app_config::loading {} {
+    set mode eager
+    if {[info exists ::env(TTREK_LOADING)]} {set mode $::env(TTREK_LOADING)}
+    if {$mode ni {lazy eager}} {error "TTREK_LOADING must be lazy or eager"}
     return $mode
 }

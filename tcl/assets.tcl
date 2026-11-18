@@ -84,13 +84,22 @@ proc ::assets::allow_cdn {response} {
     set policy [::responses::header $response Content-Security-Policy]
     if {$policy eq {}} {return $response}
     set directives {}
+    set defaultSources {}
+    set hasScriptSource false
     foreach directive [split $policy {;}] {
         set directive [string trim $directive]
         if {$directive eq {}} {continue}
+        if {[lindex $directive 0] eq "default-src"} {set defaultSources [lrange $directive 1 end]}
+        if {[lindex $directive 0] eq "script-src"} {set hasScriptSource true}
         if {[lindex $directive 0] in {script-src style-src img-src} && $cdn_origin ni $directive} {
             append directive " $cdn_origin"
         }
         lappend directives $directive
+    }
+    # Account pages inherit script policy from default-src. Permit the CDN
+    # script without broadening default-src for other resource types.
+    if {!$hasScriptSource && $defaultSources ne {}} {
+        lappend directives [join [concat [list script-src] [lsearch -all -inline -not -exact $defaultSources "'none'"] [list $cdn_origin]] { }]
     }
     ::responses::set_header response Content-Security-Policy [join $directives {; }]
     return $response

@@ -43,14 +43,20 @@ Open <http://127.0.0.1:8080/> to try the website. Press Ctrl-C to stop it.
 
 ## Worker loading policy
 
-Both Lambda and the direct server support this public INI setting:
+Both Lambda and the direct server read the `TTREK_LOADING` environment variable:
 
-```ini
-[runtime]
-loading = lazy
+```sh
+export TTREK_LOADING=eager
 ```
 
-`lazy` is the default. All configured routes and middleware are registered during
+When unset, the default is `eager`; only `lazy` and `eager` are accepted. The SAM
+`LoadingMode` parameter sets this variable for Lambda and also defaults to `eager`.
+The old `[runtime] loading` INI setting is ignored. The mode is selected and
+validated before reading or decrypting application configuration. Other settings
+still require config decryption once during each worker's startup; warm Lambda
+invocations reuse the settings in memory. This switch alone does not defer decryption.
+
+All configured routes and middleware are registered during
 initialization. A matched route loads its package implementation and prepares its
 resources once per worker. Anonymous navigation does not initialize accounts;
 a cookie with the account name triggers the normal session verification and live
@@ -76,3 +82,7 @@ Compare modes using the same artifact and Lambda memory setting. Measure worker
 initialization, the first request for each feature, and repeated warm requests
 separately: lazy loading saves unused work but shifts required loading into a
 feature's first request. New Lambda workers each have their own caches.
+Each successful Lambda cold initialization logs `site_init loading=eager duration_ms=...`
+(or `loading=lazy`) to stderr. This measures application initialization, including
+config decryption and worker preparation; it excludes runtime startup before the
+initializer and request handling. Warm invocations do not repeat the log.

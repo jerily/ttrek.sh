@@ -219,15 +219,25 @@ test worker-first-docs {a real docs request initializes only wiki and caches its
     removeDirectory $fixture
 } -result {200 1 wiki {} 1 1 {} 0}
 
-test worker-config {lazy is the configuration default and unknown modes fail early} -setup {
+test worker-config {loading comes from the environment, defaults to eager and rejects invalid values} -setup {
+    set saved_env [array get ::env]
     set w [worker]
 } -body {
     $w eval {
-        list [::app_config::loading {}] [::app_config::loading {runtime {loading eager}}] \
-            [catch {::app_config::loading {runtime {loading typo}}}] \
-            [catch {::site::configure [dict replace $settings loading typo]}]
+        unset -nocomplain ::env(TTREK_LOADING)
+        set result [list [::app_config::loading]]
+        foreach mode {lazy eager {} typo} {
+            set ::env(TTREK_LOADING) $mode
+            catch {::app_config::loading} value
+            lappend result $value
+        }
+        lappend result [catch {::site::configure [dict replace $settings loading typo]}]
     }
-} -cleanup {interp delete $w} -result {lazy eager 1 1}
+} -cleanup {
+    interp delete $w
+    array unset ::env
+    array set ::env $saved_env
+} -result {eager lazy eager {TTREK_LOADING must be lazy or eager} {TTREK_LOADING must be lazy or eager} 1}
 
 set failed $::tcltest::numTests(Failed)
 cleanupTests
