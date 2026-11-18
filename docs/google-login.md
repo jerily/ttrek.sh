@@ -1,6 +1,6 @@
 # Google Login for local development and production
 
-The account UI uses `web-user` 0.6.0 and `pure-tcl-oauth2-client`. Install the new
+The account UI uses `web-user` 0.6.1 and `pure-tcl-oauth2-client`. Install the new
 core/client packages and updated native dependencies (`tjson` 1.0.28,
 `tink-tcl` 20240704.0.3, `thashlib` 0.1.1) before starting the site. Run the normal
 account schema initialization once to add identity and transaction tables.

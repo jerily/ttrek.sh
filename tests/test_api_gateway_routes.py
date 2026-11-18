@@ -36,6 +36,9 @@ class ApiGatewayRoutes(unittest.TestCase):
         self.assertEqual(actual['GET /user/google/callback'], 'GetUserGoogleCallbackRoute')
         self.assertEqual(actual['HEAD /user/google/callback'], 'HeadUserGoogleCallbackRoute')
         self.assertEqual(actual['POST /user/google/unlink'], 'PostUserGoogleUnlinkRoute')
+        for route in ['/user/email-login', '/user/email-login/verify']:
+            for method in ['GET', 'HEAD', 'POST']:
+                self.assertIn(f'{method} {route}', actual)
         self.assertEqual(actual['POST /forum/topic/{id}'], 'PostForumTopicByIdRoute')
         self.assertNotIn('GET /css/{path+}', actual)
         self.assertNotIn('GET /forum/_assets/{asset}', actual)

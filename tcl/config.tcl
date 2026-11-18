@@ -410,7 +410,7 @@ proc ::app_config::content_images {config root} {
 
 # Separate account policy, delivery and persistent worker keys from site settings.
 proc ::app_config::account {config root {localDirectory {}}} {
-    package require web-user 0.6.0
+    package require web-user 0.6.1
     if {![llength [info commands ::accounts::local_keys]]} {source [file join $root tcl accounts.tcl]}
     set input {}
     if {[dict exists $config account]} {set input [dict get $config account]}
@@ -418,7 +418,7 @@ proc ::app_config::account {config root {localDirectory {}}} {
         email_verification_required true verification_emails_enabled true captcha_length 6 \
         captcha_letters true login_captcha_after 3 login_captcha_window 900 cleanup_grace_period 3600]
     set display [dict create prefix /user title {Your account} issuer ttrek.sh origin https://ttrek.sh \
-        email_enabled true email_from noreply@ttrek.sh email_region eu-central-1 \
+        email_enabled true email_login_enabled true email_from noreply@ttrek.sh email_region eu-central-1 \
         email_queue_enabled false email_queue_url {} google_enabled false google_client_id {} google_redirect_uri {}]
     if {[mode] eq "LOCAL"} {
         dict set display origin http://localhost:8080

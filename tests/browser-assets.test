@@ -72,6 +72,24 @@ test browser-assets-upload {only browser files reach the configured prefix with 
             [::assets::read_bytes [file join $::treqmon::view::asset_dir charts.js]]}]
 } -cleanup browser_fixture::cleanup -result {11 {cdn/assets/favicon.svg cdn/assets/versioned/css/site.0123456789abcdef.css cdn/assets/versioned/js/chart.LICENSE.txt cdn/assets/versioned/js/site.0000000000000000.js cdn/assets/versioned/js/site.fedcba9876543210.js cdn/favicon.ico cdn/forum/_assets/editor.css cdn/forum/_assets/forum.css cdn/forum/_assets/markdown-editor.bundle.js cdn/request-monitor/_assets/charts.js cdn/user/_assets/admin.css} 00000100ff80 image/svg+xml text/css application/javascript 1}
 
+test browser-assets-accounts {account styles are uploaded with exact bytes at their immutable CDN URL} -setup browser_fixture::setup -body {
+    set path /assets/versioned/css/accounts.0123456789abcdef.css
+    set bytes [::assets::read_bytes [file join $root public css accounts.css]]
+    browser_fixture::write [file join $browser_fixture::root public [string trimleft $path /]] $bytes
+    browser_fixture::write [file join $browser_fixture::root public asset-manifest.json] \
+        [::tjson::typed_to_json [list M [dict create /css/accounts.css [list S $path]]]]
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
+    ::assets::configure $browser_fixture::settings
+    ::browser_assets::upload $browser_fixture::root $browser_fixture::settings
+    set uploaded [dict get $browser_fixture::objects cdn$path]
+    list [expr {[lindex $uploaded 0] eq $bytes}] [lindex $uploaded 1] \
+        [expr {[::assets::url /css/accounts.css] eq "https://cdn.example/cdn$path"}]
+} -cleanup {
+    unset ::env(CONTENT_IMAGES_CLOUDFRONT_URL)
+    ::assets::configure {}
+    browser_fixture::cleanup
+} -result {1 text/css 1}
+
 test browser-assets-packages {Package assets are published at the same stable URLs emitted by production templates} -setup browser_fixture::setup -body {
     set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
     ::assets::configure $browser_fixture::settings

@@ -116,7 +116,7 @@
     "pure-tcl-aws-lambda": "^1.0.0",
     "tpersist": "^0.1.5",
     "tconfig": "^1.0.2",
-    "web-user": "=0.6.0",
+    "web-user": "=0.6.1",
     "tcaptcha": "^1.0.0",
     "web-forum": "=0.3.2",
     "tdbcsqlite3": {
