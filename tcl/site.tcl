@@ -21,6 +21,9 @@ namespace eval ::site {
 }
 
 source [file join [file dirname [info script]] private-config.tcl]
+if {![llength [info commands ::site_profile::begin]]} {
+    source [file join [file dirname [info script]] profile.tcl]
+}
 
 foreach module {assets browser-assets responses templates releases content-images request-validation search handlers request-monitor homepage accounts forum package-tracker} {
     uplevel #0 [list source [file join [file dirname [info script]] $module.tcl]]
@@ -259,6 +262,13 @@ proc ::site::invoke {handler name request context params} {
 
 # Normalize the request and preserve package-owned response policies.
 proc ::site::dispatch {router request {context {}}} {
+    set profiling [::site_profile::begin $context]
+    set code [catch {dispatch_request $router $request $context} result options]
+    if {$profiling} {::site_profile::finish $code}
+    return -options $options $result
+}
+
+proc ::site::dispatch_request {router request context} {
     if {![dict exists $request method]} {dict set request method [dict get $request httpMethod]}
     dict set request httpMethod [dict get $request method]
     set request [dict merge [dict create headers {} queryString {} version HTTP/1.1 \

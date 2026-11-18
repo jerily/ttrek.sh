@@ -19,5 +19,6 @@ website live separately in `content/docs/`; blog posts live in `content/blog/`.
 
 - [Development](development.md): project principles, directory layout, runtime and request validation.
 - [Testing](testing.md): application checks, local stack tests and optional browser tests.
+- [Performance](performance.md): HTTP measurements and Lambda request profiles.
 - [Deployment](deployment.md): AWS builds, infrastructure and API Gateway configuration.
 - [Security](security.md): trust boundaries, protections and current limitations.

@@ -1,0 +1,148 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+
+proc worker {} {
+    set w [interp create]
+    $w eval [list set auto_path $::auto_path]
+    $w eval [list set root $::root]
+    $w eval {
+        set ::env(ENV) LOCAL
+        set ::env(TTREK_PROFILE) 0
+        source [file join $root tcl site.tcl]
+        source [file join $root tcl lambda.tcl]
+        set ::site_lambda::router [::site::prepare_worker [dict create rootdir $root]]
+        set logs {}
+        rename ::puts ::original_puts
+        proc ::puts {args} {
+            if {[llength $args] == 2 && [lindex $args 0] eq "stderr"} {
+                lappend ::logs [lindex $args 1]
+            } else {tailcall ::original_puts {*}$args}
+        }
+        proc request {{path /debug}} {
+            ::site::dispatch $::site::router [dict create method GET path $path]
+        }
+        proc profile {} {::tjson::json_to_simple [lindex $::logs end]}
+    }
+    return $w
+}
+
+test profile-disabled {explicit opt-out installs no traces} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set response [request]
+        list [dict get $response statusCode] $logs [trace info execution ::site::invoke] $::site_profile::active
+    }
+} -cleanup {interp delete $w} -result {200 {} {} false}
+
+test profile-default {an unset environment setting enables profiling} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        unset ::env(TTREK_PROFILE)
+        set response [request]
+        list [dict get $response statusCode] [llength $logs] [dict get [profile] route]
+    }
+} -cleanup {interp delete $w} -result {200 1 get_debug}
+
+test profile-direct {response parity, request isolation, and trace cleanup} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set plain [request]
+        set ::env(TTREK_PROFILE) 1
+        set measured [request]
+        set first [profile]
+        request
+        set second [profile]
+        list [expr {$plain eq $measured}] [llength $logs] \
+            [dict get $first route] [dict get $first status] \
+            [dict get $first first_request] [dict get $second first_request] \
+            [dict get $second timings handler calls] \
+            [trace info execution ::site::invoke] [trace info execution ::package]
+    }
+} -cleanup {interp delete $w} -result {1 2 get_debug 200 1 0 1 {} {}}
+
+test profile-lambda {one record covers decoding, dispatch and response encoding} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set payload {{"version":"2.0","requestContext":{"http":{"method":"GET"}},"rawPath":"/debug","headers":{}}}
+        set context {lambda-runtime-aws-request-id test-request}
+        set plain [::site_lambda::handle $payload $context]
+        set ::env(TTREK_PROFILE) 1
+        set measured [::site_lambda::handle $payload $context]
+        set data [profile]
+        list [expr {$plain eq $measured}] [llength $logs] [dict get $data request_id] \
+            [dict get $data timings json_decode calls] [dict get $data timings json_encode calls] \
+            [dict get $data timings dispatch calls]
+    }
+} -cleanup {interp delete $w} -result {1 1 test-request 1 1 1}
+
+test profile-lazy {newly loaded SQL is traced, upvar works, nested time is exclusive, and values stay private} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        package ifneeded profile_fixture 1.0 {
+            namespace eval ::tpersist {}
+            proc ::tpersist::db_execute {name} {upvar 1 $name value; set value private-marker; return $value}
+            package provide profile_fixture 1.0
+        }
+        proc get_debug_handler {context request} {
+            package require profile_fixture
+            ::tpersist::db_execute result
+            return [::twebserver::build_response 200 text/plain $result]
+        }
+        set ::env(TTREK_PROFILE) 1
+        set response [request]
+        set data [profile]
+        set handler [dict get $data timings handler]
+        list [dict get $response body] [dict get $data timings sql_execute calls] \
+            [expr {[dict get $handler total_ms] >= [dict get $handler self_ms]}] \
+            [string match *private-marker* $logs] [dict get $data route] \
+            [trace info execution ::tpersist::db_execute] $::site_profile::stack
+    }
+} -cleanup {interp delete $w} -result {private-marker 1 1 0 get_debug {} {}}
+
+test profile-errors {exceptions preserve error code, clean up traces, and do not leak diagnostics} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        proc broken_router {args} {return -code error -errorcode {PROFILE TEST} private-marker}
+        set ::env(TTREK_PROFILE) 1
+        set code [catch {::site::dispatch broken_router {method GET path /private-marker}} message options]
+        set data [profile]
+        set result [list $code $message [dict get $options -errorcode] \
+            [dict get $data completion_code] [string match *private-marker* $logs] \
+            [trace info execution ::site::dispatch_request] $::site_profile::stack]
+        request
+        lappend result [dict get [profile] status]
+    }
+} -cleanup {interp delete $w} -result {1 private-marker {PROFILE TEST} 1 0 {} {} 200}
+
+test profile-rejected {middleware rejection still records the resulting status} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set ::env(TTREK_PROFILE) 1
+        request /request-monitor
+        list [dict get [profile] status] [dict get [profile] timings authorization calls]
+    }
+} -cleanup {interp delete $w} -result {403 1}
+
+test profile-log-failure {a failed log write does not change the response or retain traces} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set plain [request]
+        proc ::puts {args} {error {Log unavailable}}
+        set ::env(TTREK_PROFILE) 1
+        set response [request]
+        list [expr {$plain eq $response}] $::site_profile::active [trace info execution ::package]
+    }
+} -cleanup {interp delete $w} -result {1 false {}}
+
+set failed $::tcltest::numTests(Failed)
+::tcltest::cleanupTests
+exit [expr {$failed > 0}]
