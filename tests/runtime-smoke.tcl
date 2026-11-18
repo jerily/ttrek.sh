@@ -14,13 +14,13 @@ set tclsh [file join $prefix bin tclsh9.1]
 lassign [::test_support::ports 3] httpPort httpsPort valkeyPort
 set base http://127.0.0.1:$httpPort
 set mode [expr {[info exists ::env(ENV)] ? $::env(ENV) : "LOCAL"}]
-set loading [expr {[info exists ::env(TTREK_TEST_LOADING)] ? $::env(TTREK_TEST_LOADING) : "lazy"}]
+set loading [expr {[info exists ::env(TTREK_TEST_LOADING)] ? $::env(TTREK_TEST_LOADING) : "eager"}]
 assert {$loading in {lazy eager}} {TTREK_TEST_LOADING must be lazy or eager}
 assert {$mode in {LOCAL PROD}} {ENV must be LOCAL or PROD}
 if {$mode eq "PROD" && ![info exists ::env(TTREK_TEST_POSTGRES)]} {
     error "PROD smoke tests require TTREK_TEST_POSTGRES for a disposable PostgreSQL database and PGSSLROOTCERT for its CA"
 }
-set environment [dict create AWS_EC2_METADATA_DISABLED true ENV $mode TTREK_SITE_PREFIX $prefix \
+set environment [dict create AWS_EC2_METADATA_DISABLED true ENV $mode TTREK_SITE_PREFIX $prefix TTREK_LOADING $loading \
     LD_LIBRARY_PATH $prefix/lib:$prefix/lib64]
 set envCommand [list {*}[auto_execok env]]
 dict for {key value} $environment {lappend envCommand $key=$value}
@@ -91,7 +91,6 @@ try {
         {{key}} [binary encode base64 -maxlen 0 [read_file [file join $app key.pem]]] \
         {{certificate}} [binary encode base64 -maxlen 0 [read_file [file join $app cert.pem]]]] \
         [read_file [file join $root tests fixtures local-config.ini.in]]]
-    append config "\n\[runtime\]\nloading=$loading\n"
     if {$mode eq "PROD"} {
         append config "\n\[postgres\]\n"
         foreach {name option} {host host port port database database username user password password} {

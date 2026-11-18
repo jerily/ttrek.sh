@@ -9,4 +9,8 @@
     {% block body %}{% endblock %}
 </main>
 {% endblock %}
-{% block scripts %}{% endblock %}
+{% block scripts %}
+{% if view == "login" or view == "register" %}
+<script type="module" src="{{ asset_urls['/js/account-forms.js'] }}"></script>
+{% endif %}
+{% endblock %}

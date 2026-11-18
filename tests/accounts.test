@@ -215,6 +215,22 @@ test accounts-lambda-registration {Lambda payloads preserve cookies through regi
     set ::accountstest::csrf {}
 } -result {200 200 302 /docs 200 1 200 200 302 /docs 200 1 200 200 302 /docs 200 1}
 
+test accounts-submit-script {login and registration load the fingerprinted script with CDN permission} -setup {
+    set savedCdn $::assets::cdn_origin
+    set ::assets::cdn_origin https://cdn.example
+} -body {
+    set result {}
+    foreach path {/user/login /user/register} {
+        lappend result [::accountstest::request GET $path]
+        set html [dict get $::accountstest::last body]
+        lappend result [expr {[string first [dict get $::assets::manifest /js/account-forms.js] $html] >= 0}] \
+            [string match {*script-src 'self' https://cdn.example*} [::responses::header $::accountstest::last Content-Security-Policy]]
+    }
+    set result
+} -cleanup {
+    set ::assets::cdn_origin $savedCdn
+} -result {200 1 1 200 1 1}
+
 test accounts-register {real registration uses the shared layout, CAPTCHA and requested password minimum} -body {
     set result [list [::accountstest::request GET /user/register]]
     set html [dict get $::accountstest::last body]

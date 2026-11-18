@@ -8,11 +8,12 @@ if {$argv ne {}} {error "Usage: app.tcl"}
 
 package require Tcl 9.1
 package require twebserver
-package require tconfig::decrypt
 
 set dir [file dirname [info script]]
 
 source [file join $dir tcl config.tcl]
+set loading [::app_config::loading]
+package require tconfig::decrypt
 set config [::app_config::load $dir]
 
 # Shared TLS connection settings for both middleware stores.
@@ -26,7 +27,7 @@ set treqmon_config [dict create store [::app_config::monitor_store $config]]
 # Compression is shared with Lambda in ::responses::prepare.
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
-    loading [::app_config::loading $config] \
+    loading $loading \
     releases $releases_config \
     content_images [::app_config::content_images $config [file normalize $dir]] \
     request_monitor [::app_config::request_monitor $config] \

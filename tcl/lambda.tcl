@@ -11,11 +11,13 @@ namespace eval ::site_lambda {}
 
 # Initialize the application services for this Lambda worker.
 proc ::site_lambda::initialize {root} {
+    set started [clock clicks -microseconds]
     variable router
     variable maintenanceSettings
     variable maintenanceSecrets
-    source [file join $root tcl site.tcl]
     source [file join $root tcl config.tcl]
+    set loading [::app_config::loading]
+    source [file join $root tcl site.tcl]
     source [file join $root tcl patch.tcl]
     if {[::app_config::mode] eq "LOCAL"} {
         source [file join $root tcl local-ratelimit.tcl]
@@ -26,7 +28,7 @@ proc ::site_lambda::initialize {root} {
         set dataDirectory $::env(TTREK_LOCAL_RUNTIME_DATA)
     }
     set settings [dict merge [dict create rootdir $root \
-        loading [::app_config::loading $config] \
+        loading $loading \
         releases [::app_config::releases $config $root] \
         content_images [::app_config::content_images $config $root] \
         request_monitor [::app_config::request_monitor $config]] [::app_config::lambda_middleware $config]]
@@ -57,6 +59,8 @@ proc ::site_lambda::initialize {root} {
     set maintenanceSettings [dict get $settings content_database]
     set maintenanceSecrets [dict get $secret postgres]
     set router [::site::prepare_worker $settings -secret_config $secret]
+    puts stderr [format {site_init loading=%s duration_ms=%.3f} $loading \
+        [expr {([clock clicks -microseconds] - $started) / 1000.0}]]
 }
 
 # Dispatch a Lambda HTTP envelope or an explicitly private maintenance event.

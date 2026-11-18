@@ -37,6 +37,9 @@
 .account-panel .account-button-danger { background: #b42318; border-color: #b42318; }
 .account-panel .account-button-danger:hover { background: #8f1c13; border-color: #8f1c13; }
 .account-panel .account-button:disabled { opacity: .55; cursor: default; transform: none; }
+.account-panel .account-button[aria-busy=true] { opacity: 1; cursor: progress; }
+.account-button[aria-busy=true]::before { content: ""; width: 1em; height: 1em; flex: 0 0 auto; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: account-spin .75s linear infinite; }
+@keyframes account-spin { to { transform: rotate(360deg); } }
 .account-panel [role=status] { padding: .9rem 1rem; background: #edf5ff; border-left: 3px solid #3975b1; border-radius: 6px; }
 .account-panel .account-verified { color: #276544; font-weight: 650; }
 .account-panel .captcha { margin: 1.4rem 0; padding: 1rem; border: 1px solid #dce5ef; border-radius: 10px; background: #f7f9fc; }
@@ -47,4 +50,7 @@
 .account-panel .local-code { display: block; margin: 1rem 0; padding: .8rem; border: 1px dashed #d3a646; border-radius: 8px; background: #fff9e9; font-size: .8rem; }
 .account-panel .local-code code { display: block; margin-top: .35rem; font-size: 1.15rem; letter-spacing: .15em; }
 .account-panel .qr svg { max-width: 100%; height: auto; }
-@media (prefers-reduced-motion: reduce) { .account-panel input, .account-panel .account-button { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .account-panel input, .account-panel .account-button { transition: none; }
+    .account-button[aria-busy=true]::before { animation: none; }
+}
