@@ -3,36 +3,6 @@
   "autoplay": true,
   "slides": [
     {
-      "id": "personal",
-      "type": "example",
-      "label": "Build a website",
-      "kicker": "Tcl in action",
-      "title": "A website, ready to become yours.",
-      "description": "Your own homepage, journal, and notebook. Start with a working example and make it your own.",
-      "path": "/websites/personal-site",
-      "link_text": "Build your website",
-      "image": "images/build-websites/personal-home.png",
-      "image_alt": "The personal website example, with Alex Rivers's introduction and notebook",
-      "image_width": 1280,
-      "image_height": 1694,
-      "preview_label": "your own little corner of the web"
-    },
-    {
-      "id": "community",
-      "type": "example",
-      "label": "Start a community",
-      "kicker": "Better together",
-      "title": "A place for your people to gather.",
-      "description": "Accounts, discussions, and a shared notebook. Bring a community to life with Tcl.",
-      "path": "/websites/community",
-      "link_text": "Explore the community example",
-      "image": "images/build-websites/community-home.png",
-      "image_alt": "Juniper Yard, the community website example, with a garden illustration and discussion links",
-      "image_width": 1280,
-      "image_height": 2058,
-      "preview_label": "a small place to bring people together"
-    },
-    {
       "id": "guide",
       "type": "doc",
       "label": "Getting started",
@@ -71,6 +41,36 @@
       "description": "A few useful starting points for working with JSON, serving websites, and rendering templates.",
       "link_text": "Explore the registry",
       "packages": ["tjson", "twebserver", "jinja2-tcl"]
+    },
+    {
+      "id": "personal",
+      "type": "example",
+      "label": "Build a website",
+      "kicker": "Tcl in action",
+      "title": "A website, ready to become yours.",
+      "description": "Your own homepage, journal, and notebook. Start with a working example and make it your own.",
+      "path": "/websites/personal-site",
+      "link_text": "Build your website",
+      "image": "images/build-websites/personal-home.png",
+      "image_alt": "The personal website example, with Alex Rivers's introduction and notebook",
+      "image_width": 1280,
+      "image_height": 1694,
+      "preview_label": "your own little corner of the web"
+    },
+    {
+      "id": "community",
+      "type": "example",
+      "label": "Start a community",
+      "kicker": "Better together",
+      "title": "A place for your people to gather.",
+      "description": "Accounts, discussions, and a shared notebook. Bring a community to life with Tcl.",
+      "path": "/websites/community",
+      "link_text": "Explore the community example",
+      "image": "images/build-websites/community-home.png",
+      "image_alt": "Juniper Yard, the community website example, with a garden illustration and discussion links",
+      "image_width": 1280,
+      "image_height": 2058,
+      "preview_label": "a small place to bring people together"
     }
   ]
 }
