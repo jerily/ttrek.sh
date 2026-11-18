@@ -23,6 +23,31 @@ test maintenance-lazy {Loading maintenance does not load database drivers} -body
     set unloaded
 } -result 1
 
+test maintenance-first-dispatch {A fresh worker loads maintenance from the site root without connecting SQL} -setup {
+    set worker [interp create]
+    $worker eval [list set auto_path $::auto_path]
+    $worker eval [list set root $root]
+} -body {
+    $worker eval {
+        source [file join $root tcl site.tcl]
+        source [file join $root tcl config.tcl]
+        ::site::configure [dict create rootdir $root]
+        source [file join $root tcl patch.tcl]
+        source [file join $root tcl lambda.tcl]
+        set ::env(ENV) LOCAL
+        set ::site_lambda::maintenanceSettings {dialect sqlite}
+        set ::site_lambda::maintenanceSecrets {}
+        set before [llength [info commands ::telemetry_maintenance::run]]
+        set failed [catch {::site_lambda::handle {{"source":"ttrek.patch","task":"task_backup_website"}} {}} message]
+        list $before $failed $message [llength [info commands ::telemetry_maintenance::run]] \
+            [package provide tdbc::postgres] [package provide tdbc::sqlite3]
+    }
+} -cleanup {
+    interp delete $worker
+    array unset ::env
+    array set ::env $savedEnv
+} -result {0 1 {Scheduled telemetry maintenance requires PROD PostgreSQL} 1 {} {}}
+
 rename ::telemetry_maintenance::run ::telemetry_maintenance::real_run
 # Provide the run test fixture.
 proc ::telemetry_maintenance::run {settings context args} {
