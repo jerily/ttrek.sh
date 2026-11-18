@@ -39,8 +39,8 @@ JSON types, ordinary output is escaped, and chart JSON is escaped into HTML data
 attributes before JavaScript parses it; it is never inserted as executable script.
 
 Production secrets are supplied by user-managed SSM SecureString parameters.
-tconfig encrypts them before packaging; Lambda decrypts through the private KMS
-endpoint. Generated production files, local INI files and ZIP artifacts are ignored
+tconfig encrypts them before packaging; Lambda decrypts through the regional KMS
+API over verified HTTPS through NAT. Generated production files, local INI files and ZIP artifacts are ignored
 by Git. No ACM private key is exported or stored in the repository.
 
 ## Pending

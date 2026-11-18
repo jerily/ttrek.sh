@@ -30,26 +30,61 @@ redirect clients to signed S3 URLs; the clients download directly from S3.
 Generating these URLs does not require a Lambda network call to S3, so the
 S3 gateway endpoint policy does not need release-download permissions.
 
-Lambda, Valkey and the Single-AZ RDS instance use the first isolated subnet.
+Lambda, Valkey and the Single-AZ RDS instance use the first private subnet.
 A second private subnet in another AZ satisfies RDS subnet-group requirements.
-There is no NAT gateway, internet gateway,
-public subnet, load balancer or Fargate service. A private KMS interface endpoint
-allows tconfig to decrypt the packaged configuration at startup. The website
-Lambda has no
-runtime SSM access: SSM values are resolved by the build outside the VPC. The
-security groups allow Lambda to reach Valkey on 6379, PostgreSQL on 5432, and the
-KMS, SES, SQS and Lambda API endpoints on 443. The website Lambda also reaches a free S3 gateway endpoint for scheduled
+One public subnet in Lambda's AZ contains a NAT gateway with an Elastic IP and
+an internet-gateway route. The private route table sends public IPv4 traffic
+through NAT. Lambda has outbound TCP 443 access for Google discovery, token
+exchange and signing keys, plus the regional KMS, SES, SQS and Lambda APIs.
+That HTTPS rule remains owned by the RDS stack (`ApplicationS3Egress`); the base
+stack reuses it to avoid creating a duplicate security-group rule.
+There are no paid interface endpoints in the final configuration. Lambda,
+Valkey and RDS retain their private subnets and existing security-group IDs;
+Valkey and RDS accept only the existing application connections.
+The website Lambda has no runtime SSM access: SSM values are resolved by the
+build outside the VPC. Lambda reaches Valkey on 6379 and PostgreSQL on 5432.
+The website Lambda also reaches a free S3 gateway endpoint for scheduled
 JSONL backups and explicit content-image synchronization. One private scheduled
-event performs backup and vacuum together. Future outbound AWS service calls
-need matching endpoints and policies; calls to public third-party services would
-need internet egress. API Gateway invocation and
-Lambda's normal stdout/stderr logging do not need a NAT gateway.
+event performs backup and vacuum together. Public AWS API calls still require
+the existing IAM permissions and verified TLS. API Gateway invocation and
+Lambda's normal stdout/stderr logging do not use NAT.
 
-Lambda, Valkey and the KMS endpoint use the first availability zone returned by
-CloudFormation's `Fn::GetAZs`. The endpoint has one network interface. Valkey is
+Lambda, Valkey and NAT use the first availability zone returned by
+CloudFormation's `Fn::GetAZs`. Valkey is
 one `cache.t4g.micro` node without a replica or automatic failover. An outage of
 that zone interrupts the website. Shared history is bounded and is not a durable
 audit log.
+
+## Google Login network migration
+
+The previous network had no internet route, preventing Google Login from
+fetching discovery metadata, exchanging authorization codes or reading signing
+keys. The NAT update allows outbound HTTPS and removes the paid KMS, SES, SQS
+and Lambda interface endpoints. Keep the S3 gateway endpoint in the RDS stack;
+it is free and keeps S3 traffic off NAT.
+
+First apply `devops/infra/00-deploy-iam-policy.sh` with an administrator profile.
+Both managed policies change: NAT, Elastic IP, internet-gateway and route
+permissions are added, and existing CloudFront actions move between policies
+without changing their conditions to stay within IAM's size limit.
+Then update the existing base stack in two stages:
+
+```bash
+# Establish NAT and HTTPS egress while retaining all four existing endpoints.
+TTREK_RETAIN_INTERFACE_ENDPOINTS=true bash devops/infra/20-deploy-infra-vpc0.sh
+
+# After the stack completes and Google sign-in redirects successfully, remove
+# the endpoints and their dedicated security groups. This is the default mode.
+bash devops/infra/20-deploy-infra-vpc0.sh
+```
+
+The first deployment must succeed before the second. The intermediate mode
+retains the endpoints' logical IDs, so AWS API access remains available during
+NAT creation. New installations can use the default mode directly. The public
+subnet defaults to `10.0.1.0/24`; override `PublicSubnetCIDR` if the existing VPC
+uses that range. No application rebuild, credential rotation or database schema
+change is needed. After endpoint removal, check account email delivery and a
+fresh Lambda startup as well as Google Login.
 
 ## Queued account emails
 
@@ -101,10 +136,8 @@ and deploy the SAM application. If overriding `TTREK_EMAIL_QUEUE_NAME`, update
 the SSM queue URL and the queue ARN in the deployment IAM policy, then rebuild.
 
 The queue uses SQS-managed encryption, with no extra Lambda or customer KMS key.
-The isolated VPC needs SQS and Lambda API interface endpoints; each uses one
-interface in the existing Lambda availability zone. These endpoints add ongoing
-PrivateLink charges even when the queue is idle. Runtime IAM permits only the
-required queue operations and invocation of this same function.
+SQS and Lambda API requests use outbound HTTPS through NAT. Runtime IAM permits
+only the required queue operations and invocation of this same function.
 
 ## Infrastructure and DNS
 
@@ -131,7 +164,8 @@ For a new deployment:
 When updating an existing deployment, redeploy the changed IAM policies first,
 then `20-deploy-infra-vpc0.sh`, then the new RDS stack. The network update adds a
 second private subnet and route-table export while retaining the first subnet,
-Lambda/Valkey security-group exports and the one-interface KMS endpoint.
+Lambda/Valkey security-group exports. Follow the two-stage migration above when
+upgrading the previous network without NAT.
 
 The keys template creates the customer-managed key used by tconfig and the SSM
 password. Key rotation is enabled. `DeletionPolicy` and `UpdateReplacePolicy`
@@ -252,19 +286,19 @@ charges; application event destinations can be added separately.
 exported identity and configuration set. Deploy the SES stack before creating
 or updating the SAM stack, which imports those ARNs. The deployment policies
 manage SES resources and read their status; the application role owns sending.
-`devops/infra/20-infra-vpc0.yml` provides the SES **API** interface endpoint
+During the first NAT migration stage, the base template retains the SES **API** interface endpoint
 (`com.amazonaws.${AWS::Region}.email`) in the same private subnet as the website
 Lambda. Private DNS routes the SDK's regional SES hostname to the endpoint.
 Its security group accepts TCP 443 from Lambda, and Lambda has matching egress;
-the VPC remains isolated without a NAT or internet gateway. Sending permissions
+the final stage removes it and SES API requests use NAT. Sending permissions
 remain controlled by the Lambda execution role. The base stack does not import
 the SES identity exports, so the existing stack deployment order is preserved.
 An SMTP endpoint cannot serve `awsses` API requests. See
 [SES VPC endpoints](https://docs.aws.amazon.com/ses/latest/dg/send-email-set-up-vpc-endpoints.html).
 
-For an existing deployment, run `devops/infra/20-deploy-infra-vpc0.sh` to add the
-endpoint and security-group rules. No application rebuild is required for this
-network change. Confirm regional sending is enabled and production access is
+Follow the two-stage network migration above for an existing deployment.
+No application rebuild is required for this network change.
+Confirm regional sending is enabled and production access is
 approved before sending to arbitrary recipients:
 
 ```sh
@@ -276,7 +310,7 @@ aws sesv2 get-account \
 
 This account-level check requires `ses:GetAccount`, which the deployment user's
 identity-scoped SES read permissions do not grant; use an authorized operator or
-the SES console. After the endpoint is available, request a fresh verification
+the SES console. After the network update, request a fresh verification
 email through the website to exercise the Lambda role and network path.
 
 ### Deployment IAM policy
@@ -308,7 +342,7 @@ CloudFormation template without changing AWS. The source JSON contains
 placeholders and must be rendered before it is submitted to IAM.
 
 The policies cover the application infrastructure scripts (Keys through SES): stack change
-sets, KMS keys and aliases, the S3 bucket, isolated VPC, Valkey, ACM/DNS, CodeBuild
+sets, KMS keys and aliases, the S3 bucket, VPC and NAT, Valkey, ACM/DNS, CodeBuild
 and its role, CloudFront distribution/cache/OAC resources, and the public API's
 Lambda invocation permission. CloudFront permissions are split between the two
 managed policies to keep both within IAM's size limit. Most resource

@@ -41,6 +41,16 @@ For production, set these SSM parameters and register the HTTPS callback in Goog
 The configuration adapter passes
 the secret to the mount's `-secret_config`, never to display properties.
 
+Production also requires outbound HTTPS. Before redirecting the browser, the
+OAuth client fetches Google's discovery document; the callback exchanges the
+code and fetches signing keys. A VPC with only AWS interface endpoints cannot
+reach these Google services and returns `Google sign-in could not start`.
+The base network template supplies one NAT gateway and reuses the Lambda TCP 443
+egress rule already owned by the RDS stack.
+See [the two-stage network migration](deployment.md#google-login-network-migration)
+to establish NAT before removing the four paid AWS interface endpoints.
+This network fix does not require changing account keys or rebuilding Lambda.
+
 The route manifest includes `POST /user/google/start`, `GET /user/google/callback`
 and `POST /user/google/unlink`. Regenerate the API Gateway template with
 `python3 devops/generate-api-gateway.py` after changing routes. It writes

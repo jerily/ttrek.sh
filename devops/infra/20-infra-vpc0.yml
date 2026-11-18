@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Isolated Lambda, Valkey and RDS network; no NAT or internet gateway.
+Description: Private Lambda, Valkey and RDS network with outbound HTTPS through NAT.
 
 Parameters:
   AppName:
@@ -14,6 +14,17 @@ Parameters:
   PrivateSubnet2CIDR:
     Type: String
     Default: 10.0.4.0/24
+  PublicSubnetCIDR:
+    Type: String
+    Default: 10.0.1.0/24
+  RetainInterfaceEndpoints:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Keep existing endpoints during the first NAT migration deployment.
+
+Conditions:
+  KeepInterfaceEndpoints: !Equals [!Ref RetainInterfaceEndpoints, 'true']
 
 Resources:
   TTrekVpc0:
@@ -41,6 +52,7 @@ Resources:
 
   TTrekKmsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    Condition: KeepInterfaceEndpoints
     Properties:
       GroupDescription: Private KMS endpoint
       VpcId: !Ref TTrekVpc0
@@ -52,6 +64,7 @@ Resources:
 
   TTrekSesSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    Condition: KeepInterfaceEndpoints
     Properties:
       GroupDescription: Private SES API endpoint
       VpcId: !Ref TTrekVpc0
@@ -63,6 +76,7 @@ Resources:
 
   TTrekEmailQueueSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    Condition: KeepInterfaceEndpoints
     Properties:
       GroupDescription: Private SQS and Lambda API endpoints
       VpcId: !Ref TTrekVpc0
@@ -76,7 +90,8 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       # Keep the deployed description: changing it replaces the group and breaks
-      # the ID export imported by Lambda. The RDS stack adds PostgreSQL egress.
+      # the ID export imported by Lambda. The RDS stack owns PostgreSQL and
+      # public HTTPS egress; do not duplicate its existing TCP 443 rule here.
       GroupDescription: Lambda access to Valkey and KMS only
       VpcId: !Ref TTrekVpc0
       SecurityGroupEgress:
@@ -84,18 +99,27 @@ Resources:
           FromPort: 6379
           ToPort: 6379
           DestinationSecurityGroupId: !Ref TTrekVpc0SecurityGroup
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          DestinationSecurityGroupId: !Ref TTrekKmsSecurityGroup
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          DestinationSecurityGroupId: !Ref TTrekSesSecurityGroup
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          DestinationSecurityGroupId: !Ref TTrekEmailQueueSecurityGroup
+        - !If
+          - KeepInterfaceEndpoints
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
+            DestinationSecurityGroupId: !Ref TTrekKmsSecurityGroup
+          - !Ref AWS::NoValue
+        - !If
+          - KeepInterfaceEndpoints
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
+            DestinationSecurityGroupId: !Ref TTrekSesSecurityGroup
+          - !Ref AWS::NoValue
+        - !If
+          - KeepInterfaceEndpoints
+          - IpProtocol: tcp
+            FromPort: 443
+            ToPort: 443
+            DestinationSecurityGroupId: !Ref TTrekEmailQueueSecurityGroup
+          - !Ref AWS::NoValue
 
   TTrekValkeyIngress:
     Type: AWS::EC2::SecurityGroupIngress
@@ -108,6 +132,7 @@ Resources:
 
   TTrekKmsIngress:
     Type: AWS::EC2::SecurityGroupIngress
+    Condition: KeepInterfaceEndpoints
     Properties:
       GroupId: !Ref TTrekKmsSecurityGroup
       IpProtocol: tcp
@@ -117,6 +142,7 @@ Resources:
 
   TTrekSesIngress:
     Type: AWS::EC2::SecurityGroupIngress
+    Condition: KeepInterfaceEndpoints
     Properties:
       GroupId: !Ref TTrekSesSecurityGroup
       IpProtocol: tcp
@@ -126,12 +152,79 @@ Resources:
 
   TTrekEmailQueueIngress:
     Type: AWS::EC2::SecurityGroupIngress
+    Condition: KeepInterfaceEndpoints
     Properties:
       GroupId: !Ref TTrekEmailQueueSecurityGroup
       IpProtocol: tcp
       FromPort: 443
       ToPort: 443
       SourceSecurityGroupId: !Ref TTrekLambdaSecurityGroup
+
+  TTrekInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  TTrekInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      InternetGatewayId: !Ref TTrekInternetGateway
+
+  # Only NAT occupies this subnet. Lambda, Valkey and RDS stay private.
+  TTrekPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref TTrekVpc0
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PublicSubnetCIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-nat-subnet
+
+  TTrekPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref TTrekVpc0
+
+  TTrekPublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref TTrekPublicRouteTable
+      SubnetId: !Ref TTrekPublicSubnet
+
+  TTrekPublicInternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: TTrekInternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref TTrekPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref TTrekInternetGateway
+
+  TTrekNatAddress:
+    Type: AWS::EC2::EIP
+    DependsOn: TTrekInternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  TTrekNatGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn:
+      - TTrekPublicInternetRoute
+      - TTrekPublicSubnetRouteTableAssociation
+    Properties:
+      AllocationId: !GetAtt TTrekNatAddress.AllocationId
+      SubnetId: !Ref TTrekPublicSubnet
+      ConnectivityType: public
+      Tags:
+        - Key: Name
+          Value: !Sub ${AppName}-nat
+
+  TTrekPrivateInternetRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref TTrekPrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref TTrekNatGateway
 
   TTrekPrivateSubnet1:
     Type: AWS::EC2::Subnet
@@ -175,6 +268,7 @@ Resources:
 
   TTrekKmsEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    Condition: KeepInterfaceEndpoints
     Properties:
       VpcId: !Ref TTrekVpc0
       VpcEndpointType: Interface
@@ -192,6 +286,7 @@ Resources:
 
   TTrekSesEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    Condition: KeepInterfaceEndpoints
     Properties:
       VpcId: !Ref TTrekVpc0
       VpcEndpointType: Interface
@@ -203,9 +298,10 @@ Resources:
       # Sending permissions remain scoped by the Lambda execution role. Keep
       # this base stack independent of the SES identity stack's exports.
 
-  # One interface per service in the Lambda's AZ; no NAT gateway is needed.
+  # Temporary during migration; regional AWS APIs use NAT after removal.
   TTrekSqsEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    Condition: KeepInterfaceEndpoints
     Properties:
       VpcId: !Ref TTrekVpc0
       VpcEndpointType: Interface
@@ -216,6 +312,7 @@ Resources:
 
   TTrekLambdaEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    Condition: KeepInterfaceEndpoints
     Properties:
       VpcId: !Ref TTrekVpc0
       VpcEndpointType: Interface

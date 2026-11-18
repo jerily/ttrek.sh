@@ -98,8 +98,9 @@ The database stays in the first AZ with Lambda/Valkey; the second private subnet
 satisfies that requirement. It does not create a standby database.
 
 Only the website security group reaches PostgreSQL. The website uses the existing
-KMS interface endpoint for encrypted configuration and a free S3 gateway endpoint
-for backups. No SSM endpoint, NAT gateway or additional Lambda is provisioned.
+KMS API over HTTPS through NAT for encrypted configuration and a free S3 gateway
+endpoint for backups. The RDS stack adds no SSM endpoint or additional Lambda;
+NAT belongs to the base network stack.
 Rotate the password by updating the SecureString, rerunning the RDS deployment
 and rebuilding/deploying the website.
 
