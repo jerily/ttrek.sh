@@ -6,6 +6,9 @@
 
 # Application policy for the shared tdevops Lambda runtime.
 package require http
+if {![llength [info commands ::site_profile::begin]]} {
+    source [file join [file dirname [info script]] profile.tcl]
+}
 
 namespace eval ::site_lambda {}
 
@@ -65,6 +68,13 @@ proc ::site_lambda::initialize {root} {
 
 # Dispatch a Lambda HTTP envelope or an explicitly private maintenance event.
 proc ::site_lambda::handle {payload context} {
+    set profiling [::site_profile::begin $context]
+    set code [catch {handle_request $payload $context} result options]
+    if {$profiling} {::site_profile::finish $code}
+    return -options $options $result
+}
+
+proc ::site_lambda::handle_request {payload context} {
     variable router
     set event [::tjson::json_to_simple [encoding convertfrom utf-8 $payload]]
     # Scheduler invokes Lambda directly under IAM. API Gateway supplies an HTTP
