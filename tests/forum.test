@@ -5,6 +5,7 @@ namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl config.tcl]
 source [file join $root tcl site.tcl]
+foreach package {web-static-wiki web-static-blog} {package require $package}
 source [file join $root tcl patch.tcl]
 source [file join $root tcl lambda.tcl]
 set ::env(ENV) LOCAL
@@ -19,6 +20,7 @@ set separated [::private_config::partition $settings]
 set settings [dict get $separated config]
 set siteSecrets [dict get $separated secret_config]
 ::site::init_worker $settings -secret_config $siteSecrets
+::accounts::ensure
 set store $::accounts::store
 set uid user_[ksuid::generate_ksuid]
 ::web::user::insert $store web_user_users [dict create id $uid active 1 verified 1 email_key [::web::user::email_key $store mira@example.com] email [::web::user::seal $store mira@example.com [list email $uid]] password unused mfa_secret {} last_step -1 revision 0 created_at 1]
@@ -112,6 +114,7 @@ test site-package-cdn {Forum, editor and admin pages use stable CloudFront asset
     # Restore the mount's registered key handles for subsequent requests.
     $originalRouter destroy
     ::site::init_worker $originalSettings -secret_config $siteSecrets
+    ::accounts::ensure
     set store $::accounts::store
     set ::site_lambda::router $::site::router
 } -result 1

@@ -410,7 +410,7 @@ proc ::app_config::content_images {config root} {
 
 # Separate account policy, delivery and persistent worker keys from site settings.
 proc ::app_config::account {config root {localDirectory {}}} {
-    package require web-user 0.6.2
+    package require web-user::config 1.0
     if {![llength [info commands ::accounts::local_keys]]} {source [file join $root tcl accounts.tcl]}
     set input {}
     if {[dict exists $config account]} {set input [dict get $config account]}
@@ -469,4 +469,12 @@ proc ::app_config::forum {config} {
         }
     }
     return $defaults
+}
+
+# Controls code/template loading, independently of connection timing.
+proc ::app_config::loading {config} {
+    set mode lazy
+    if {[dict exists $config runtime loading]} {set mode [dict get $config runtime loading]}
+    if {$mode ni {lazy eager}} {error "runtime.loading must be lazy or eager"}
+    return $mode
 }

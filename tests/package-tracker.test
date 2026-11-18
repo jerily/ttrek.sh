@@ -266,7 +266,7 @@ test tracker-stale {Old snapshots are visibly delayed and expire after 24 hours}
 
 test tracker-render {Tracker, widget and overview render real data and filter withdrawn links without an aggregate query} -constraints valkey -body {
     ::views::init [file join $root www]
-    set ::site::settings [dict create rootdir $root]
+    set ::site::settings [dict create rootdir $root content_connection $::telemetry::connection]
     rename ::package_tracker::aggregate ::package_tracker::saved_aggregate
     proc ::package_tracker::aggregate {args} {error {HTTP must not aggregate}}
     try {

@@ -45,7 +45,7 @@ proc ::accounts::mount {router settings templates args} {
     set secret [::private_config::option {*}$args]
     variable store
     variable mount
-    package require web-user 0.7.1
+    package require web-user 0.7.2
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]
@@ -59,6 +59,42 @@ proc ::accounts::mount {router settings templates args} {
         -policy [dict get $config policy] -config $display -secret_config $secret]
     set store [dict get $mount -store]
     return $mount
+}
+
+# Prepare account resources for a route that needs them; route registration has
+# already happened using web-user::routes.
+proc ::accounts::prepare {settings args} {
+    variable store
+    variable mount
+    package require web-user 0.7.2
+    if {$mount ne {}} {::web::user::release $mount}
+    set mount {}; set store {}
+    set config [dict get $settings account]
+    set display [dict merge [dict get $config display] [::views::mount_settings account]]
+    dict set display assets_url [::assets::base_url /user/_assets]
+    dict set display email_queue_callback ::accounts::email_queued
+    set mount [::web::user::prepare_mount -connection [dict get $settings content_connection] \
+        -policy [dict get $config policy] -config $display -secret_config [::private_config::option {*}$args]]
+    set store [dict get $mount -store]
+    return $mount
+}
+
+proc ::accounts::ensure {} {
+    variable mount
+    if {$mount eq {}} {::site::service account}
+    return $mount
+}
+
+proc ::accounts::has_cookie {request} {
+    set names {}
+    foreach pair [split [::responses::header $request Cookie] {;}] {
+        lappend names [string trim [lindex [split $pair =] 0]]
+    }
+    if {[dict exists $request cookies]} {lappend names {*}[dict keys [dict get $request cookies]]}
+    foreach name $names {
+        if {[string match web_user_* $name] || [string match __Host-web_user_* $name]} {return true}
+    }
+    return false
 }
 
 # Wake the deployed Lambda alias asynchronously after SQS has accepted an email.
@@ -75,6 +111,8 @@ proc ::accounts::email_queued {queueUrl} {
 proc ::accounts::monitor_enter {context request} {
     variable mount
     dict unset request session
+    if {![has_cookie $request]} {return $request}
+    ensure
     set user [::web::user::current_user $mount $request $context]
     if {$user ne {}} {
         dict set request session [dict create loggedin true id [dict get $user id]]
@@ -85,7 +123,8 @@ proc ::accounts::monitor_enter {context request} {
 # Use live group grants for both the dashboard and its navigation link.
 proc ::accounts::can_view_monitor {request context} {
     variable mount
-    if {![dict exists [::site::config] account]} {return 0}
+    if {![dict exists [::site::config] account] || ![has_cookie $request]} {return 0}
+    ensure
     ::web::user::authorize_permission $mount request_monitor.view $request $context view /request-monitor
 }
 
@@ -109,12 +148,17 @@ proc ::accounts::navigation {request response context} {
     set html {}
     set monitorHtml {}
     if {[dict exists [::site::config] account]} {
-        set prefix [dict get $mount -prefix]
+        package require web-user::config 1.0
+        set prefix [dict get [::site::config] account display prefix]
         set cookie [::responses::header $response Set-Cookie]
-        if {[string match [dict get $mount -cookie]=* $cookie]} {
+        if {$mount ne {} && [string match [dict get $mount -cookie]=* $cookie]} {
             ::responses::set_header request Cookie [lindex [split $cookie {;}] 0]
         }
-        set signedIn [expr {[::web::user::current_user $mount $request $context] ne {}}]
+        set signedIn false
+        if {[has_cookie $request]} {
+            ensure
+            set signedIn [expr {[::web::user::current_user $mount $request $context] ne {}}]
+        }
         if {$signedIn && [can_view_monitor $request $context]} {
             set monitorHtml { · <a href="/request-monitor">Request Monitor</a>}
         }

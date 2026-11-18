@@ -1,95 +1,230 @@
 package require tcltest 2
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
-source [file join $root tcl site.tcl]
-source [file join $root tcl lambda.tcl]
 
-# Instrument the service boundary without needing SQLite, PostgreSQL or Valkey.
-namespace eval ::telemetry {variable connection {}; variable connects 0; variable closes 0; variable fail 0}
-proc ::telemetry::connect {settings args} {
-    incr ::telemetry::connects
-    if {$::telemetry::fail} {error "Connection unavailable"}
-    set ::telemetry::connection connection-$::telemetry::connects
+# Each case gets a fresh worker so package presence measures actual loading.
+proc worker {{mode lazy}} {
+    set worker [interp create]
+    $worker eval [list set auto_path $::auto_path]
+    foreach package {jinja2 web-user web-forum web-static-wiki web-static-blog treqmon web-user::routes web-user::config web-forum::routes web-static-wiki::routes web-static-blog::routes treqmon::routes} {
+        foreach version [package versions $package] {
+            $worker eval [list package ifneeded $package $version [package ifneeded $package $version]]
+        }
+    }
+    $worker eval [list set root $::root]
+    $worker eval [list set loading $mode]
+    $worker eval {
+        set ::env(ENV) LOCAL
+        source [file join $root tcl site.tcl]
+        source [file join $root tcl config.tcl]
+        source [file join $root tcl lambda.tcl]
+        set settings [dict create rootdir $root loading $loading content_database {dialect postgresql} \
+            account {display {prefix /user origin https://ttrek.sh google_enabled true email_login_enabled true} policy {collect_names true}}]
+        set ::site_lambda::router [::site::prepare_worker $settings -secret_config {postgres {password private-value}}]
+        proc loaded {packages} {
+            set result {}
+            foreach package $packages {if {[package provide $package] ne {}} {lappend result $package}}
+            return $result
+        }
+        proc request {path {method GET} {headers {}}} {
+            ::site::dispatch $::site::router [dict create method $method path $path headers $headers]
+        }
+    }
+    return $worker
 }
-proc ::telemetry::close {} {incr ::telemetry::closes; set ::telemetry::connection {}}
-rename ::site::init_worker ::site::real_init_worker
-proc ::site::init_worker {config args} {
-    variable settings $config
-    if {$::failMount} {error "Mount unavailable"}
-    variable router [::tpathexp::router]
-    $router add GET /probe {apply {{request context params} {
-        ::twebserver::build_response 200 text/plain $::telemetry::connection
-    }}}
+
+proc fake_database {worker} {
+    $worker eval {
+        namespace eval ::telemetry {variable connection {}; variable connects 0; variable fail false; variable event_list {}}
+        proc ::telemetry::connect {config args} {
+            incr ::telemetry::connects
+            if {$::telemetry::fail} {error {Connection unavailable}}
+            set ::telemetry::connection connection-$::telemetry::connects
+        }
+        namespace eval ::tpersist {}
+        proc ::tpersist::db_dialect {connection} {return postgresql}
+    }
 }
-proc prepare {} {
-    set ::telemetry::connects 0; set ::telemetry::closes 0
-    set ::telemetry::connection {}; set ::telemetry::fail 0; set ::failMount 0
-    ::site::prepare_worker {rootdir /fixture content_database {dialect postgresql}} \
-        -secret_config {postgres {password secret}}
-}
-proc cleanup {} {
-    if {[info exists ::site::router]} {catch {$::site::router destroy}}
-    unset -nocomplain ::site::router ::site::pending_secrets ::site_lambda::router
-}
-set payload {{"httpMethod":"GET","path":"/probe","headers":{}}}
 
-test worker-deferred {preparation opens no SQL connection and keeps secrets private} -setup prepare -body {
-    list $::telemetry::connects $::telemetry::connection [dict exists [::site::config] content_connection] \
-        [string match *secret* [::site::config]]
-} -cleanup cleanup -result {0 {} 0 0}
-
-test worker-first-http {the first HTTP event connects and subsequent events reuse the worker} -setup prepare -body {
-    set first [::site_lambda::handle $payload {}]
-    set second [::site_lambda::handle $payload {}]
-    list [dict get [::tjson::json_to_simple $first] statusCode] [expr {$first eq $second}] \
-        $::telemetry::connects [info exists ::site::pending_secrets]
-} -cleanup cleanup -result {200 1 1 0}
-
-test worker-invalid-event {invalid envelopes do not connect SQL} -setup prepare -body {
-    list [catch {::site_lambda::handle {{"unexpected":true}} {}}] $::telemetry::connects
-} -cleanup cleanup -result {1 0}
-
-test worker-connect-retry {a failed first connection is retried on the next request} -setup prepare -body {
-    set ::telemetry::fail 1
-    set failed [catch {::site_lambda::handle $payload {}}]
-    set ::telemetry::fail 0
-    set response [::site_lambda::handle $payload {}]
-    list $failed [dict get [::tjson::json_to_simple $response] statusCode] $::telemetry::connects
-} -cleanup cleanup -result {1 200 2}
-
-test worker-mount-retry {failed mounting closes SQL and does not retain a dead connection in settings} -setup prepare -body {
-    set ::failMount 1
-    set failed [catch {::site_lambda::handle $payload {}}]
-    set public [::site::config]
-    set closed $::telemetry::closes
-    set ::failMount 0
-    set response [::site_lambda::handle $payload {}]
-    list $failed $closed [dict exists $public content_connection] \
-        [dict get [::tjson::json_to_simple $response] statusCode] $::telemetry::connects
-} -cleanup cleanup -result {1 1 0 200 2}
-
-namespace eval ::site_patch {}
-proc ::site_patch::run {task context} {
-    if {$::telemetry::connection eq {}} {error "Private task needs SQL"}
-    return {{"ok":true}}
-}
-test worker-private-event {private task invocation initializes SQL too} -setup prepare -body {
-    list [::site_lambda::handle {{"source":"ttrek.patch","task":"task_initdb_website"}} {}] $::telemetry::connects
-} -cleanup cleanup -result {{{"ok":true}} 1}
-
-test worker-direct {the direct server also connects on its first request only} -setup {
-    prepare
-    rename ::twebserver::return_response ::twebserver::real_return_response
-    proc ::twebserver::return_response {connection response} {set ::captured $response}
+test worker-routes {all methods and conditional package routes exist before implementation loading} -setup {
+    set w [worker]
 } -body {
-    ::site::process_conn {conn fixture} {method GET path /probe}
-    ::site::process_conn {conn fixture} {method GET path /probe}
-    list [dict get $::captured statusCode] $::telemetry::connects
+    $w eval {
+        set statuses {}
+        foreach {method path} {GET /user/login POST /user/login POST /user/logout GET /user/profile GET /user/google/callback POST /user/google/start GET /user/email-login GET /forum GET /forum/topic/abc POST /forum/topic/abc GET /docs/guide GET /blog/post GET /request-monitor DELETE /user/login} {
+            lappend statuses [dict get [$::site::router match $method $path] statusCode]
+        }
+        list $statuses [loaded {web-user web-forum web-static-wiki web-static-blog treqmon jinja2 tpersist bcrypt topenapi ttrie ttrigrams pure-tcl-aws-s3}] \
+            $::views::templates [dict exists [::site::config] content_connection] [string match *private-value* [::site::config]]
+    }
+} -cleanup {interp delete $w} -result {{200 200 200 200 200 200 200 200 200 200 200 200 200 405} {} {} 0 0}
+
+test worker-debug {simple requests and unrelated cookies do not load account or rendering services} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set first [request /debug]
+        set second [request /debug GET {Cookie theme=dark}]
+        list [dict get $first statusCode] [dict get $second statusCode] $::site::services \
+            [loaded {web-user web-forum web-static-wiki web-static-blog jinja2 tpersist}] $::views::templates
+    }
+} -cleanup {interp delete $w} -result {200 200 {} {} {}}
+
+test worker-lambda {Lambda dispatch uses the initialized router and does not initialize SQL for debug} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set payload {{"httpMethod":"GET","path":"/debug","headers":{}}}
+        set first [::site_lambda::handle $payload {}]
+        set second [::site_lambda::handle $payload {}]
+        list [dict get [::tjson::json_to_simple $first] statusCode] [expr {$first eq $second}] \
+            [dict exists [::site::config] content_connection]
+    }
+} -cleanup {interp delete $w} -result {200 1 0}
+
+test worker-invalid-event {invalid Lambda envelopes do not initialize any service} -setup {
+    set w [worker]
+} -body {
+    $w eval {list [catch {::site_lambda::handle {{"unexpected":true}} {}}] $::site::services}
+} -cleanup {interp delete $w} -result {1 {}}
+
+test worker-database {the first SQL consumer connects; a warm worker reuses the connection} -setup {
+    set w [worker]; fake_database $w
+} -body {
+    $w eval {
+        request /debug
+        set before $::telemetry::connects
+        list $before [::site::database] [::site::database] $::telemetry::connects
+    }
+} -cleanup {interp delete $w} -result {0 connection-1 connection-1 1}
+
+test worker-connect-retry {a failed connection leaves initialization retryable} -setup {
+    set w [worker]; fake_database $w
+} -body {
+    $w eval {
+        set ::telemetry::fail true
+        set failed [catch {::site::database}]
+        set partial [dict exists [::site::config] content_connection]
+        set ::telemetry::fail false
+        list $failed $partial [::site::database] $::telemetry::connects
+    }
+} -cleanup {interp delete $w} -result {1 0 connection-2 2}
+
+test worker-service-retry {a failed feature can retry without rebuilding routes or reconnecting SQL} -setup {
+    set w [worker]; fake_database $w
+} -body {
+    $w eval {
+        set prepares 0
+        proc ::accounts::prepare {settings args} {
+            if {[incr ::prepares] == 1} {error {Prepare failed}}
+            return {ready true}
+        }
+        set before [$::site::router match GET /user/login]
+        set failed [catch {::site::service account}]
+        set partial $::site::services
+        list $failed $partial [::site::service account] [::site::service account] \
+            $prepares $::telemetry::connects [expr {$before eq [$::site::router match GET /user/login]}]
+    }
+} -cleanup {interp delete $w} -result {1 {} {ready true} {ready true} 2 1 1}
+
+test worker-anonymous-security {anonymous monitor requests fail closed and forged session fields are removed} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        set request [::accounts::monitor_enter {} {method GET path /debug headers {Cookie theme=dark} session {loggedin true id forged}}]
+        list [dict exists $request session] [dict get [request /request-monitor] statusCode] \
+            [loaded {web-user tpersist}] $::site::services
+    }
+} -cleanup {interp delete $w} -result {0 403 {} {}}
+
+test worker-templates {an HTML response loads only reached templates and no account implementation} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        # Invalid search input still renders the search page, without querying SQL.
+        set response [request /search]
+        set first [[::views::environment site] loaded]
+        request /search
+        list [dict get $response statusCode] [expr {$first eq [[::views::environment site] loaded]}] \
+            [expr {"packages.html.jinja" in $first && "master.html.jinja" in $first}] \
+            [expr {"account-master.html.jinja" in $first || "forum-master.html.jinja" in $first || "package-tracker-bar.html.jinja" in $first}] \
+            [loaded {web-user web-forum tpersist}] [dict exists [::site::config] content_connection]
+    }
+} -cleanup {interp delete $w} -result {400 1 1 0 {} 0}
+
+test worker-eager {eager prewarms code and templates, while SQL still waits for a consumer} -setup {
+    set w [worker eager]
+} -body {
+    $w eval {
+        list [loaded {web-user web-forum web-static-wiki web-static-blog treqmon jinja2}] \
+            [expr {[llength [[::views::environment site] loaded]] > 5}] \
+            [dict exists [::site::config] content_connection] $::site::services
+    }
+} -cleanup {interp delete $w} -result {{web-user web-forum web-static-wiki web-static-blog treqmon jinja2} 1 0 {}}
+
+test worker-mode-parity {both modes retain identical route matching, rendered responses and HEAD behavior} -setup {
+    set lazy [worker]; set eager [worker eager]
+} -body {
+    set checks {}
+    foreach command {
+        {$::site::router match POST /user/google/start}
+        {$::site::router match DELETE /docs/guide}
+        {request /debug}
+        {request /search}
+        {request /search HEAD}
+        {request /request-monitor}
+    } {
+        lappend checks [expr {[$lazy eval $command] eq [$eager eval $command]}]
+    }
+    lsort -unique $checks
+} -cleanup {interp delete $lazy; interp delete $eager} -result 1
+
+testConstraint sqlite [expr {![catch {package require tdbc::sqlite3}]}]
+test worker-first-docs {a real docs request initializes only wiki and caches its templates and SQL connection} -constraints sqlite -setup {
+    package require web-static-wiki
+    set fixture [makeDirectory lazy-docs]
+    set database [file join $fixture content.sqlite3]
+    set source [file join $fixture content]
+    file mkdir $source
+    set channel [open [file join $source guide.md] w]
+    puts $channel {# Lazy documentation}
+    close $channel
+    set connection [::tpersist::db_connect -dialect sqlite -database $database -autobegin false]
+    try {
+        ::web::static::wiki::initdb $connection
+        ::web::static::wiki::sync [::web::static::wiki::create -connection $connection -domain ttrek.sh] $source
+    } finally {::tpersist::db_disconnect $connection}
+    set w [worker]
+    $w eval [list dict set ::site::settings content_database [dict create dialect sqlite database $database]]
+    $w eval {dict set ::site::private postgres {}}
+} -body {
+    $w eval {
+        set before [$::site::router match GET /docs/guide]
+        set response [request /docs/guide]
+        set connection $::telemetry::connection
+        set names [[::views::environment wiki] loaded]
+        set head [request /docs/guide HEAD]
+        list [dict get $response statusCode] [string match {*Lazy documentation*} [dict get $response body]] \
+            [dict keys $::site::services] [loaded {web-user web-forum web-static-blog bcrypt tmfa tqrcodegen}] \
+            [expr {$connection eq $::telemetry::connection && $names eq [[::views::environment wiki] loaded]}] \
+            [expr {$before eq [$::site::router match GET /docs/guide]}] [dict get $head body] \
+            [dict size $::web::static::wiki::templates]
+    }
 } -cleanup {
-    rename ::twebserver::return_response {}
-    rename ::twebserver::real_return_response ::twebserver::return_response
-    cleanup
-} -result {200 1}
+    catch {$w eval {::telemetry::close}}
+    interp delete $w
+    removeDirectory $fixture
+} -result {200 1 wiki {} 1 1 {} 0}
+
+test worker-config {lazy is the configuration default and unknown modes fail early} -setup {
+    set w [worker]
+} -body {
+    $w eval {
+        list [::app_config::loading {}] [::app_config::loading {runtime {loading eager}}] \
+            [catch {::app_config::loading {runtime {loading typo}}}] \
+            [catch {::site::configure [dict replace $settings loading typo]}]
+    }
+} -cleanup {interp delete $w} -result {lazy eager 1 1}
 
 set failed $::tcltest::numTests(Failed)
 cleanupTests

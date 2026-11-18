@@ -12,7 +12,7 @@ source [file join $root tcl telemetry.tcl]
 source [file join $root tests private-database.tcl]
 source [file join $root tcl search.tcl]
 source [file join $root tcl patch.tcl]
-namespace eval ::site {proc config {} {return {}}}
+namespace eval ::site {proc config {} {return {}}; proc database {} {}}
 
 if {[llength $argv] && [lindex $argv 0] in {--worker --reader}} {
     ::test_private_db::connect [lindex $argv 1]
@@ -73,6 +73,7 @@ proc replace_snapshot {snapshot} {
 # Provide the no build test fixture.
 proc no_build {} {
     foreach name {ttrie ttrigrams} {
+        package require $name
         rename ::${name}::create ::${name}::real_create
         # Provide the create test fixture.
         proc ::${name}::create {args} {error "Index construction in a request"}
@@ -132,9 +133,10 @@ test snapshot-fresh-worker {A fresh interpreter loads native blobs without build
         worker eval [list set auto_path $auto_path]
         worker eval [list source [file join $root tcl search.tcl]]
         worker eval {
-            namespace eval ::site {proc config {} {return {}}}
+            namespace eval ::site {proc config {} {return {}}; proc database {} {}}
             namespace eval ::telemetry {}
             foreach name {ttrie ttrigrams} {
+                package require $name
                 rename ::${name}::create {}
                 # Provide the create test fixture.
                 proc ::${name}::create {args} {error "Unexpected build"}

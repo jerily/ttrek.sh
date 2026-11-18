@@ -21,6 +21,9 @@ file copy [file join $root tests fixtures registry] [file join $patchRoot regist
 set saved [array get ::env]
 set ::env(ENV) LOCAL
 namespace eval ::site {}
+proc ::site::database {} {return $::telemetry::connection}
+namespace eval ::accounts {}
+proc ::accounts::ensure {} {}
 # Provide the config test fixture.
 proc ::site::config {} {
     dict create rootdir $::patchRoot content_images {}

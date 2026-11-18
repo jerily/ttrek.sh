@@ -12,6 +12,7 @@ source [file join $root tcl telemetry.tcl]
 source [file join $root tcl handlers.tcl]
 namespace eval ::site {
     variable settings {}
+    proc database {} {return $::telemetry::connection}
     # Provide the config test fixture.
     proc config {} {variable settings; return $settings}
 }

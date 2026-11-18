@@ -1,3 +1,7 @@
+[runtime]
+# Routes always mount at initialization; eager also preloads code and templates.
+loading = lazy
+
 # Copy to etc/config.local.ini (gitignored) and configure your running Valkey service.
 [redis]
 host=localhost

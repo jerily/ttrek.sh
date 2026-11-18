@@ -42,7 +42,7 @@ try {
     }
     ::test_private_db::init_local $settings [list $registry]
     ::views::init [file join $root www]
-    set ::site::settings [dict create rootdir $root]
+    set ::site::settings [dict create rootdir $root content_connection $::telemetry::connection]
     set identity [format %064x 1]
     ::telemetry::event register_environment -env $identity -description fixture
     proc sql {query {params {}}} {::tpersist::_raw $::telemetry::connection $query $params}

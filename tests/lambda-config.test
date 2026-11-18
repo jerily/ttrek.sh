@@ -227,6 +227,7 @@ proc ::tconfig::load_config {path} {
 }
 source [file join $sourceRoot tcl lambda.tcl]
 source [file join $sourceRoot tcl releases.tcl]
+package require pure-tcl-aws-s3 1.0.0
 
 test lambda-releases-1 {Production startup loads releases and resolves the manifest from the application root} -setup {
     set ::env(ENV) PROD
@@ -234,7 +235,7 @@ test lambda-releases-1 {Production startup loads releases and resolves the manif
     set ::releases::client [::aws::s3::create {region eu-central-1 aws_access_key_id test aws_secret_access_key test}]
 } -body {
     ::site_lambda::initialize $root
-    if {$::telemetry::registries ne {}} {error "PROD startup must not import registry metadata"}
+    if {[info exists ::telemetry::registries] && $::telemetry::registries ne {}} {error "PROD startup must not import registry metadata"}
     set releases [dict get [::site::config] releases]
     set artifact [::releases::artifact aarch64-apple-darwin]
     set url [::releases::signed_url $artifact]
@@ -263,8 +264,8 @@ test lambda-releases-2 {Local mock release overrides remain independent of the p
 } -result {ttrek-local 2.0.0 test/2.0.0 http://127.0.0.1:9999 1}
 
 test lambda-registry-metadata {Local Lambda startup leaves connections to requests and imports to explicit tasks} -body {
-    set ::telemetry::registries
-} -result {}
+    list [info exists ::telemetry::registries] [info commands ::telemetry::connect]
+} -result {0 {}}
 
 rename ::tconfig::load_config {}
 rename ::tconfig::real_load_config ::tconfig::load_config

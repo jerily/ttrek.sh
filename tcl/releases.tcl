@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: MIT.
 # 
 
-package require pure-tcl-aws-s3 1.0.0
 
 namespace eval ::releases {
     variable client {}
@@ -45,6 +44,7 @@ proc ::releases::source_url {artifact} {
 
 # Sign a validated object key in the configured distribution bucket.
 proc ::releases::signed_key {key expiry} {
+    package require pure-tcl-aws-s3 1.0.0
     variable client
     set settings [dict get [::site::config] releases]
     if {$client eq ""} {

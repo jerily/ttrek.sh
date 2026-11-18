@@ -26,6 +26,7 @@ set treqmon_config [dict create store [::app_config::monitor_store $config]]
 # Compression is shared with Lambda in ::responses::prepare.
 set config_dict [dict create \
     rootdir [file dirname [info script]] \
+    loading [::app_config::loading $config] \
     releases $releases_config \
     content_images [::app_config::content_images $config [file normalize $dir]] \
     request_monitor [::app_config::request_monitor $config] \

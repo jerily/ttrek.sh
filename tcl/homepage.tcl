@@ -40,7 +40,10 @@ proc ::homepage::text_fields {values} {
 # Build the database-backed content stores for the homepage.
 proc ::homepage::stores {} {
     set settings [::site::config]
-    if {![dict exists $settings content_connection]} {return {}}
+    if {![dict exists $settings content_connection]} {
+        if {[catch {::site::database}]} {return {}}
+        set settings [::site::config]
+    }
     set images {}
     if {[dict exists $settings content_images]} {set images [dict get $settings content_images]}
     ::content_images::database_stores [dict get $settings content_connection] $images
@@ -68,8 +71,7 @@ proc ::homepage::image {entry store item} {
             error "showcase image is unavailable: $source"
         }
     }
-    set markup [::jinja2::render {<img src="{{ src }}" alt="{{ alt }}" width="{{ width }}" height="{{ height }}" decoding="async" loading="lazy">} \
-        [::tjson::typed_to_json [list M [text_fields $image]]]]
+    set markup [::views::render homepage-image.html.jinja [text_fields $image]]
     if {[dict get $store -s3] ne {}} {
         # Let the package validate/sign the URL; only this generated img is HTML.
         return [::web::static::wiki::render_markdown $store [dict create \

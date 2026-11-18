@@ -3,6 +3,7 @@ namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl config.tcl]
 source [file join $root tcl site.tcl]
+foreach package {tratelimit} {package require $package}
 source [file join $root tcl local-ratelimit.tcl]
 set policy [::app_config::rate_limits {} {localstore {}}]
 test rate-json-invalid {Invalid route budgets fail before serving requests} -body {
@@ -78,6 +79,29 @@ test sensitive-form-methods {GET and POST share one login budget and HEAD cannot
     for {set i 0} {$i < 5} {incr i} {send $router GET /user/login; send $router POST /user/login}
     list [dict get [send $router HEAD /user/login] statusCode] [dict get [send $router POST /user/login] statusCode]
 } -result {429 429}
+
+test sensitive-lazy-bindings {lazy handler wrappers preserve account and forum write budgets} -setup {
+    set lazyRouter [::tpathexp::router]
+    ::tratelimit::mount $lazyRouter
+    $lazyRouter add_middleware -enter_proc [list ::site::sensitive_enter $lazyRouter]
+    rename ::site::package_dispatch ::site::saved_package_dispatch
+    proc ::site::package_dispatch {kind handler request context params} {dict create statusCode 200 headers {} body ok}
+    ::site::bind_routes $lazyRouter account {{{GET POST} /user/login {::web::user::login @mount}}}
+    ::site::bind_routes $lazyRouter forum {{{GET POST} /forum/topic/:id {::web::forum::topic @mount}}}
+} -body {
+    ::tratelimit::init_middleware $policy
+    for {set i 1} {$i <= 10} {incr i} {
+        send $lazyRouter GET /user/login
+        send $lazyRouter POST /forum/topic/$i
+    }
+    list [dict get [send $lazyRouter POST /user/login] statusCode] \
+        [dict get [send $lazyRouter POST /forum/topic/11] statusCode] \
+        [dict get [send $lazyRouter GET /forum/topic/11] statusCode]
+} -cleanup {
+    $lazyRouter destroy
+    rename ::site::package_dispatch {}
+    rename ::site::saved_package_dispatch ::site::package_dispatch
+} -result {429 429 200}
 
 test global-boundary {The hundredth request is allowed and request 101 is rejected across routes} -body {
     ::tratelimit::init_middleware $policy
