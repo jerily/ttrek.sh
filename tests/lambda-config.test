@@ -256,6 +256,9 @@ test lambda-loading {environment policy reaches the worker and invalid values fa
 
 test lambda-init-timing {cold initialization logs milliseconds once and warm requests reuse config} -setup {
     package require tjson
+    # Assert only the initialization log; request profiling has its own suite.
+    set saved_profile_env [array get ::env TTREK_PROFILE]
+    set ::env(TTREK_PROFILE) 0
     set ::env(ENV) PROD
     unset -nocomplain ::env(TTREK_LOADING) ::env(TTREK_LOCAL_S3_ENDPOINT)
     set ::config_loads 0
@@ -272,6 +275,8 @@ test lambda-init-timing {cold initialization logs milliseconds once and warm req
     lappend result $::config_loads
 } -cleanup {
     rename ::site::dispatch {}
+    unset -nocomplain ::env(TTREK_PROFILE)
+    array set ::env $saved_profile_env
 } -match regexp -result {^200 200 1$} \
     -errorOutput {^site_init loading=lazy duration_ms=[0-9]+\.[0-9]{3}\n$}
 
