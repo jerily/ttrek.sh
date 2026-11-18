@@ -38,17 +38,29 @@ proc homepage {} {
     dict get [::site::dispatch $::site::router {method GET path / headers {Host ttrek.sh}}] body
 }
 
+test homepage-query-count {All slide metadata is read in three package-owned queries} -body {
+    set ::homepage_queries 0
+    proc count_homepage_queries {args} {incr ::homepage_queries}
+    trace add execution ::tpersist::db_execute enter count_homepage_queries
+    try {slides} finally {trace remove execution ::tpersist::db_execute enter count_homepage_queries}
+    set ::homepage_queries
+} -cleanup {rename count_homepage_queries {}; unset ::homepage_queries} -result 3
+
 test homepage-five {Published configuration renders five slides including the latest release} -body {
     set data [slides]
     set post [lindex $data 3]
+    set latest [lindex [::web::static::blog::posts [dict get $stores blog]] 0]
+    set path [dict get $latest path]
+    set highlights [dict get [lindex [dict get $config slides] 3] highlights]
+    set version [expr {[dict exists $highlights $path] ? [dict get $highlights $path version] : {}}]
     set html [homepage]
-    list [lmap slide $data {dict get $slide id}] [dict get $post version] \
-        [dict get $post url] [dict get $post date] \
+    list [lmap slide $data {dict get $slide id}] [expr {[dict get $post version] eq $version}] \
+        [expr {[dict get $post url] eq "/blog$path"}] [expr {[dict get $post date] eq [dict get $latest published_at]}] \
         [expr {[string first {class="home-showcase"} $html] < [string first {class="registry-search"} $html]}] \
         [regexp -all {class="showcase-dot"} $html] \
         [expr {![regexp {<article[^>]*(aria-hidden="true"|inert)} $html]}] \
         [expr {[string match {*Source on GitHub*Registry on GitHub*} $html] && ![string match {*href="/request-monitor"*} $html]}]
-} -result {{personal community guide blog packages} 1.6.0 /blog/2026-11-17-ttrek-160-see-your-build-before-it-starts 2026-11-17 1 5 1 1}
+} -result {{personal community guide blog packages} 1 1 1 1 5 1 1}
 
 test homepage-nested-article {The personal showcase links a nested article and preserves its copy} -body {
     set personal [lindex [slides] 0]

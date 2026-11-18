@@ -92,19 +92,21 @@ proc ::site_patch::task_sync_website {context} {
     }
     set completed {wiki blog registry}
     set images [dict get $settings content_images]
-    if {[dict exists $images cloudfront_enabled] && [dict get $images cloudfront_enabled]} {
-        # Publish all browser files, including package assets, before committing
-        # pages that refer to them. S3 failures abort the sync.
-        ::browser_assets::upload $root $images
-        lappend completed assets
-    }
+    # Asset publication now belongs to deployment, before SAM updates Lambda.
+    set prepared [expr {[::app_config::mode] eq "PROD"}]
+    if {$prepared} {set snapshot [::content_images::read_snapshot $root $images]}
     set stores [::content_images::database_stores $::telemetry::connection [dict get $settings content_images]]
-    # Both collections and the complete registry commit together. Image updates
-    # in S3 are independent of this transaction and are not rolled back with SQL.
+    # Both collections and the complete registry commit together. Production
+    # imports prepared references; it never reads or copies image files to S3.
     ::telemetry::transaction {
         ::telemetry::lock_search_snapshot
         foreach {kind directory} {wiki docs blog blog} {
-            ::web::static::${kind}::sync [dict get $stores $kind] [file join $root content $directory]
+            if {$prepared} {
+                ::content_images::import_snapshot [dict get $stores $kind] $snapshot $kind
+            } else {
+                # LOCAL retains package sync for its disposable S3 mock.
+                ::web::static::${kind}::sync [dict get $stores $kind] [file join $root content $directory]
+            }
         }
         ::telemetry::sync_registry_metadata $registry
         ::telemetry::publish_search_snapshot

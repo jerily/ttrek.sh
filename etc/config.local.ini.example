@@ -14,8 +14,8 @@ master_template=request-monitor-master.html.jinja
 history_max_events=10000
 
 [releases]
-version=1.6.0
-prefix=ttrek/1.6.0
+version=1.7.0
+prefix=ttrek/1.7.0
 checksums_file=etc/releases.json
 
 [content_images]

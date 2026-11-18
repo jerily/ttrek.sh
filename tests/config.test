@@ -198,7 +198,7 @@ test releases-config-9 {Unrelated local configuration keeps default release sett
     puts $channel "\[registry\]\ndirectory=registry"
     close $channel
     dict get [::app_config::releases_from_ini $path $root] version
-} -result 1.6.0
+} -result 1.7.0
 
 unset -nocomplain ::env(ENV)
 array set ::env $saved_env

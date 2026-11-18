@@ -27,5 +27,5 @@ POST for `/user/email-login` and `/user/email-login/verify`.
 `npm run build` includes `public/css/accounts.css` in `site.css` and creates a
 standalone fingerprinted `accounts.<hash>.css`. Both are in the asset manifest
 and browser-asset upload inventory used by `devops/upload-browser-assets.tcl`
-and `task_sync_website`. The shared page loads `site.css` from its configured CDN
+during deployment. The shared page loads `site.css` from its configured CDN
 URL. Publish the assets with the application release so the layout is available.

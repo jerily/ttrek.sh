@@ -80,9 +80,14 @@ try {
         if {![string match "$mount/content/*" "$directory/"] || ![file isdirectory $directory]} {
             error "Production content_images.$key must be bundled under content/"
         }
-        if {[image_objects $directory] ne [image_objects [dict get $buildImages $key]]} {
-            error "Packaged $key image paths or bytes differ from the files to upload"
+        if {[dict size [image_objects $directory]]} {
+            error "Content image bytes must not be bundled in the production ZIP"
         }
+    }
+    source [file join $root tcl content-images.tcl]
+    set snapshot [::content_images::read_snapshot $mount $images]
+    if {$snapshot ne [::content_images::prepare_snapshot $root $buildImages]} {
+        error "Packaged content snapshot differs from the upload sources"
     }
     set assetManifest [read_bytes [file join $mount public asset-manifest.json]]
     if {[read_bytes [file join $mount etc homepage.json]] ne [read_bytes [file join $root etc homepage.json]]} {
@@ -113,7 +118,7 @@ try {
     foreach forbidden {etc/config.local.ini etc/config.enc} {
         if {[file exists [file join $mount $forbidden]]} {error "Unexpected host configuration in ZIP: $forbidden"}
     }
-    puts "PASS packaged release configuration and manifest ([dict size $checksums] production targets), image settings and bytes"
+    puts "PASS packaged release configuration and manifest ([dict size $checksums] production targets), content snapshot and image exclusion"
 } finally {
     zipfs unmount $mount
 }

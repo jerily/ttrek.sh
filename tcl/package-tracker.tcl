@@ -257,10 +257,11 @@ proc ::package_tracker::publish {snapshot token} {
     variable prefix
     set staged $prefix:staged:$token
     try {
-        cache HSET $staged meta [json [dict get $snapshot meta]]
+        set fields [list meta [json [dict get $snapshot meta]]]
+        dict for {id rows} [dict get $snapshot rankings] {lappend fields $id [json [dict create rows $rows]]}
+        dict for {name stats} [dict get $snapshot packages] {lappend fields pkg:$name [json $stats]}
+        cache HSET $staged {*}$fields
         cache EXPIRE $staged 86400
-        dict for {id rows} [dict get $snapshot rankings] {cache HSET $staged $id [json [dict create rows $rows]]}
-        dict for {name stats} [dict get $snapshot packages] {cache HSET $staged pkg:$name [json $stats]}
         set published [cache EVAL {
             if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
             redis.call('RENAME', KEYS[2], KEYS[3])
