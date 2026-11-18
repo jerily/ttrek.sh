@@ -14,7 +14,7 @@ set tclsh [file join $prefix bin tclsh9.1]
 lassign [::test_support::ports 3] httpPort httpsPort valkeyPort
 set base http://127.0.0.1:$httpPort
 set mode [expr {[info exists ::env(ENV)] ? $::env(ENV) : "LOCAL"}]
-set loading [expr {[info exists ::env(TTREK_TEST_LOADING)] ? $::env(TTREK_TEST_LOADING) : "eager"}]
+set loading [expr {[info exists ::env(TTREK_TEST_LOADING)] ? $::env(TTREK_TEST_LOADING) : "lazy"}]
 assert {$loading in {lazy eager}} {TTREK_TEST_LOADING must be lazy or eager}
 assert {$mode in {LOCAL PROD}} {ENV must be LOCAL or PROD}
 if {$mode eq "PROD" && ![info exists ::env(TTREK_TEST_POSTGRES)]} {

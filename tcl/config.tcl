@@ -473,7 +473,7 @@ proc ::app_config::forum {config} {
 
 # Select loading policy before reading or decrypting application configuration.
 proc ::app_config::loading {} {
-    set mode eager
+    set mode lazy
     if {[info exists ::env(TTREK_LOADING)]} {set mode $::env(TTREK_LOADING)}
     if {$mode ni {lazy eager}} {error "TTREK_LOADING must be lazy or eager"}
     return $mode
