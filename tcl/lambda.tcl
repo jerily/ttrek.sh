@@ -13,6 +13,7 @@ namespace eval ::site_lambda {}
 proc ::site_lambda::initialize {root} {
     variable router
     variable maintenanceSettings
+    variable maintenanceSecrets
     source [file join $root tcl site.tcl]
     source [file join $root tcl config.tcl]
     source [file join $root tcl telemetry.tcl]
@@ -50,9 +51,15 @@ proc ::site_lambda::initialize {root} {
     dict set settings forum [::app_config::forum $config]
     dict set settings package_tracker [::app_config::package_tracker $config]
     set maintenanceSettings [::app_config::telemetry $config $root $dataDirectory]
-    ::telemetry::connect $maintenanceSettings
+    dict set settings content_database $maintenanceSettings
+    set separated [::private_config::partition $settings]
+    set settings [dict get $separated config]
+    set secret [dict get $separated secret_config]
+    set maintenanceSettings [dict get $settings content_database]
+    set maintenanceSecrets [dict get $secret postgres]
+    ::telemetry::connect $maintenanceSettings -secret_config $maintenanceSecrets
     dict set settings content_connection $::telemetry::connection
-    ::site::init_worker $settings
+    ::site::init_worker $settings -secret_config $secret
     set router $::site::router
 }
 

@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] private-config.tcl]
 # 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
@@ -80,7 +81,8 @@ proc ::content_images::database_stores {connection settings} {
 }
 
 # Open the database connection used by this service.
-proc ::content_images::connect {settings} {
+proc ::content_images::connect {settings args} {
+    set settings [::private_config::password $settings {*}$args]
     package require tpersist 0.1.4
     set options {-autobegin false}
     dict for {key value} $settings {lappend options -$key $value}

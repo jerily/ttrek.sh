@@ -95,8 +95,8 @@
     },
     "tcl": "^9.1.0",
     "jinja2-tcl": "^0.1.1",
-    "tink-tcl": "^20240704.0.2",
-    "tjson": "^1.0.27",
+    "tink-tcl": "^20240704.0.3",
+    "tjson": "^1.0.28",
     "topenapi": "^0.2.0",
     "tpathexp": "^1.2.0",
     "ttrie": "=0.2.0",
@@ -116,13 +116,14 @@
     "pure-tcl-aws-lambda": "^1.0.0",
     "tpersist": "^0.1.5",
     "tconfig": "^1.0.2",
-    "web-user": "=0.5.6",
+    "web-user": "=0.6.0",
     "tcaptcha": "^1.0.0",
     "web-forum": "=0.3.2",
     "tdbcsqlite3": {
       "version": ">=1.1.8",
       "if": "+local"
-    }
+    },
+    "pure-tcl-oauth2-client": "^0.1.0"
   },
   "devDependencies": {
     "tcllib": "^2.0.0",

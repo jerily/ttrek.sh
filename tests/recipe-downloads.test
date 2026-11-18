@@ -6,10 +6,11 @@ namespace import ::tcltest::test
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl site.tcl]
 source [file join $root tcl telemetry.tcl]
+source [file join $root tests private-database.tcl]
 source [file join $root tests support.tcl]
 
 if {[lindex $argv 0] eq "--worker"} {
-    ::telemetry::connect [lindex $argv 1]
+    ::test_private_db::connect [lindex $argv 1]
     for {set i 0} {$i < 20} {incr i} {
         ::telemetry::recipe_download concurrent 1.0.0 Linux x86_64
     }
@@ -39,7 +40,7 @@ try {
         } else {set recipe {{"build":{"default":[]}}}}
         ::test_support::write_file $path $recipe
     }
-    ::telemetry::init_local $settings [list $registry]
+    ::test_private_db::init_local $settings [list $registry]
     ::views::init [file join $root www]
     set ::site::settings [dict create rootdir $root]
     set identity [format %064x 1]
@@ -169,7 +170,7 @@ try {
             read $worker
             if {[catch {close $worker} message]} {lappend errors $message}
         }
-        ::telemetry::connect $settings
+        ::test_private_db::connect $settings
         if {[llength $errors]} {error $errors}
         list [total concurrent] [events concurrent]
     } -result {80 0}

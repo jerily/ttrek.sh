@@ -174,14 +174,14 @@ test lambda-config-12 {Invalid monitor history limits fail during configuration}
 # Run the real Lambda initializer with disposable configuration. Only KMS
 # decryption, database connections and router startup are replaced.
 file mkdir [file join $root tcl]
-foreach name {config local-ratelimit patch accounts} {
+foreach name {config private-config local-ratelimit patch accounts} {
     file copy [file join $sourceRoot tcl $name.tcl] [file join $root tcl $name.tcl]
 }
 foreach {name script} {
     site {
         namespace eval ::site {variable router test_router}
         # Provide the init worker test fixture.
-        proc ::site::init_worker {config} {variable settings $config}
+        proc ::site::init_worker {config args} {variable settings $config}
         # Provide the config test fixture.
         proc ::site::config {} {variable settings; return $settings}
     }
@@ -190,7 +190,7 @@ foreach {name script} {
         # Provide the init local test fixture.
         proc ::telemetry::init_local {args} {error "Startup must not provision or sync"}
         # Provide the connect test fixture.
-        proc ::telemetry::connect {settings} {set ::telemetry::connection test; set ::telemetry::registries {}}
+        proc ::telemetry::connect {settings args} {set ::telemetry::connection test; set ::telemetry::registries {}}
     }
     telemetry-maintenance {}
     local-assets {}

@@ -22,6 +22,10 @@ try {
     set ::env(ENV) PROD
     set config [::tconfig::load_config [lindex $argv 1]]
     set settings [::app_config::telemetry $config $root]
+    set separated [::private_config::partition [dict create content_database $settings]]
+    set settings [dict get $separated config content_database]
+    set secret [dict get $separated secret_config postgres]
+    unset config separated
     set channel [open [lindex $argv 0] rb]
     try {
         zlib push gunzip $channel
@@ -31,7 +35,7 @@ try {
     if {$format eq "tpersist"} {
         package require tpersist 0.1.5
         set options {-autobegin false}
-        dict for {key value} $settings {lappend options -$key $value}
+        dict for {key value} [::private_config::password $settings -secret_config $secret] {lappend options -$key $value}
         set connection [::tpersist::db_connect {*}$options]
         try {
             set counts [::tpersist::db_import_jsonl $connection [lindex $argv 0]]
@@ -39,13 +43,13 @@ try {
         puts "Application tables restored: $counts"
     } elseif {$format eq "ttrek-telemetry"} {
         # Historical backups contained only telemetry and used package schemas.
-        ::telemetry::connect $settings
+        ::telemetry::connect $settings -secret_config $secret
         ::telemetry::initdb
         ::telemetry::close
-        set db [::telemetry_maintenance::connect $settings]
+        set db [::telemetry_maintenance::connect $settings -secret_config $secret]
         set counts [::telemetry_maintenance::restore $db [lindex $argv 0]]
         set restored true
-        ::telemetry::connect $settings
+        ::telemetry::connect $settings -secret_config $secret
         try {::telemetry::publish_search_snapshot} finally {::telemetry::close}
         puts "Telemetry restored: $counts"
     } else {error "Unsupported backup format"}

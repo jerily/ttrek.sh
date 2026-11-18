@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] private-config.tcl]
 # 
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
@@ -9,7 +10,8 @@
 namespace eval ::telemetry_maintenance {}
 
 # Open the database connection used by this service.
-proc ::telemetry_maintenance::connect {settings} {
+proc ::telemetry_maintenance::connect {settings args} {
+    set settings [::private_config::password $settings {*}$args]
     package require tdbc::postgres
     set options {}
     dict for {key value} $settings {
@@ -29,7 +31,8 @@ proc ::telemetry_maintenance::check_deadline {deadline} {
 # Export every application table in the current schema, including its live JSON
 # schema. The maintenance connection keeps the advisory lock while this dedicated
 # tpersist connection owns the consistent export snapshot.
-proc ::telemetry_maintenance::backup {settings path deadline} {
+proc ::telemetry_maintenance::backup {settings path deadline args} {
+    set settings [::private_config::password $settings {*}$args]
     package require tpersist 0.1.5
     set startup {}
     if {[dict exists $settings options]} {set startup [dict get $settings options]}
@@ -53,7 +56,9 @@ proc ::telemetry_maintenance::upload {path bucket key} {
 }
 
 # Execute the selected maintenance operation with validated settings.
-proc ::telemetry_maintenance::run {settings context} {
+proc ::telemetry_maintenance::run {settings context args} {
+    set secret [::private_config::option {*}$args]
+    if {[dict exists $settings password]} {error "Database password belongs in -secret_config"}
     if {[::app_config::mode] ne "PROD" || [dict get $settings dialect] ne "postgresql"} {
         error "Scheduled telemetry maintenance requires PROD PostgreSQL"
     }
@@ -65,7 +70,7 @@ proc ::telemetry_maintenance::run {settings context} {
     set path {}
     set phase connect
     try {
-        set db [connect $settings]
+        set db [connect $settings -secret_config $secret]
         $db allrows {SET statement_timeout = '20s'}
         $db allrows {SET lock_timeout = '5s'}
         $db allrows {SET idle_in_transaction_session_timeout = '60s'}
@@ -74,7 +79,7 @@ proc ::telemetry_maintenance::run {settings context} {
         set channel [file tempfile path /tmp/ttrek-telemetry-XXXXXX]
         close $channel
         set phase backup
-        backup $settings $path $deadline
+        backup $settings $path $deadline -secret_config $secret
         check_deadline $deadline
         set id [dict get $context lambda-runtime-aws-request-id]
         if {![regexp {^[A-Za-z0-9-]+$} $id]} {error "Invalid invocation ID"}

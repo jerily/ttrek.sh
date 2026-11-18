@@ -25,12 +25,13 @@ test maintenance-lazy {Loading maintenance does not load database drivers} -body
 
 rename ::telemetry_maintenance::run ::telemetry_maintenance::real_run
 # Provide the run test fixture.
-proc ::telemetry_maintenance::run {settings context} {
+proc ::telemetry_maintenance::run {settings context args} {
     incr ::calls
     set ::received [list $settings $context]
     return -options $::maintenanceOptions $::maintenanceResult
 }
 set ::site_lambda::maintenanceSettings {dialect postgresql database test}
+set ::site_lambda::maintenanceSecrets {}
 set maintenanceResult {status completed key telemetry/backups/test.jsonl.gz}
 set maintenanceOptions {-code 0}
 set calls 0
@@ -89,14 +90,17 @@ if {$postgres} {
     set ::env(ENV) PROD
     set ::env(TELEMETRY_BACKUP_BUCKET) test-backups
     set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
-    set admin [::telemetry_maintenance::connect $settings]
+    set parts [::private_config::partition [dict create content_database $settings]]
+    set settings [dict get $parts config content_database]
+    set dbSecrets [dict get $parts secret_config postgres]
+    set admin [::telemetry_maintenance::connect $settings -secret_config $dbSecrets]
     set sourceSchema telemetry_backup_[pid]
     set targetSchema telemetry_restore_[pid]
     $admin allrows "CREATE SCHEMA $sourceSchema"
     $admin allrows "CREATE SCHEMA $targetSchema"
     dict set settings options "-c search_path=$sourceSchema"
     set targetSettings [dict replace $settings options "-c search_path=$targetSchema"]
-    ::telemetry::init_local $settings
+    ::telemetry::init_local $settings {} -secret_config $dbSecrets
     set identity [string repeat ab 32]
     set description "Quotes \" and newline\nUnicode λ 日本語"
     ::telemetry::event register_environment -env $identity -description $description
@@ -113,7 +117,7 @@ if {$postgres} {
     ::tpersist::db_execute $::telemetry::connection [::tpersist::db_values [::tpersist::db_update packages] \
         [dict create description $description url {https://example.org/project?q='quoted'&lang=en}]]
     ::telemetry::close
-    set db [::telemetry_maintenance::connect $settings]
+    set db [::telemetry_maintenance::connect $settings -secret_config $dbSecrets]
     set dump [file join $work backup.jsonl.gz]
     set deadline [expr {[clock milliseconds] + 60000}]
     # Provide the reset target test fixture.
@@ -139,7 +143,7 @@ test maintenance-application-backup {Catalog discovery includes future applicati
     $db allrows {CREATE TABLE future_app_table (id INTEGER PRIMARY KEY, payload BYTEA, optional TEXT)}
     $db allrows {INSERT INTO future_app_table VALUES (7, decode('00ff','hex'), NULL)}
     set applicationDump [file join $work application.jsonl.gz]
-    ::telemetry_maintenance::backup $settings $applicationDump $deadline
+    ::telemetry_maintenance::backup $settings $applicationDump $deadline -secret_config $dbSecrets
     set destination [::tpersist::db_connect -database :memory: -autobegin false]
     try {
         set counts [::tpersist::db_import_jsonl $destination $applicationDump]
@@ -150,14 +154,14 @@ test maintenance-application-backup {Catalog discovery includes future applicati
 } -result {1 1 00ff 0}
 
 test maintenance-application-deadline {The generic exporter rejects an expired invocation before writing} -constraints postgres -body {
-    catch {::telemetry_maintenance::backup $settings [file join $work expired.jsonl.gz] 0} message options
+    catch {::telemetry_maintenance::backup $settings [file join $work expired.jsonl.gz] 0 -secret_config $dbSecrets} message options
     list [dict get $options -errorcode] [file exists [file join $work expired.jsonl.gz]]
 } -result {{TPERSIST LIMIT} 0}
 
 test maintenance-roundtrip {All tables, binary hashes, duplicate rows and text restore exactly across cursor pages} -constraints postgres -body {
     ::legacy_backup::backup $db $dump $deadline
     reset_target
-    set target [::telemetry_maintenance::connect $targetSettings]
+    set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
     set counts [::telemetry_maintenance::restore $target $dump]
     set matches {}
     dict for {table definition} [::telemetry::table_definitions] {
@@ -169,12 +173,12 @@ test maintenance-roundtrip {All tables, binary hashes, duplicate rows and text r
 
 test maintenance-search-snapshot {Restore invalidates derived indexes without changing the backup table list} -constraints postgres -body {
     reset_target
-    set target [::telemetry_maintenance::connect $targetSettings]
+    set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
     set before [dict get [lindex [$target allrows {SELECT revision FROM registry_search_snapshot}] 0] revision]
     ::telemetry_maintenance::restore $target $dump
     set invalidated [dict get [lindex [$target allrows {SELECT revision FROM registry_search_snapshot}] 0] revision]
     $target close
-    ::telemetry::connect $targetSettings
+    ::telemetry::connect $targetSettings -secret_config $dbSecrets
     try {set rebuilt [::telemetry::publish_search_snapshot]} finally {::telemetry::close}
     list [expr {$before ne {}}] $invalidated [expr {$rebuilt ne {}}] \
         [dict exists [::telemetry::table_definitions] registry_search_snapshot]
@@ -189,7 +193,7 @@ test maintenance-sequences {Restored identifiers do not collide with subsequent 
 } -result 2
 
 test maintenance-nonempty {Restoring into a populated database fails without changing it} -constraints postgres -body {
-    set target [::telemetry_maintenance::connect $targetSettings]
+    set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
     set failed [catch {::telemetry_maintenance::restore $target $dump}]
     set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
     $target close
@@ -213,7 +217,7 @@ test maintenance-legacy-metadata {Old version 1 backups restore with empty packa
     }
     set legacy [file join $work legacy.jsonl.gz]
     write_dump $legacy "[join $lines \n]\n"
-    set target [::telemetry_maintenance::connect $targetSettings]
+    set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
     ::telemetry_maintenance::restore $target $legacy
     set rows [$target allrows {SELECT description, url FROM packages}]
     $target close
@@ -225,7 +229,7 @@ test maintenance-truncated {Missing footer rolls back every inserted row} -const
     set lines [split [string trimright [read_dump $dump] \n] \n]
     set broken [file join $work broken.jsonl.gz]
     write_dump $broken "[join [lrange $lines 0 end-1] \n]\n"
-    set target [::telemetry_maintenance::connect $targetSettings]
+    set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
     set failed [catch {::telemetry_maintenance::restore $target $broken}]
     set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
     $target close
@@ -236,7 +240,7 @@ test maintenance-counts {A changed row count prevents restoring a partial backup
     reset_target
     set broken [file join $work counts.jsonl.gz]
     write_dump $broken [string map {"\"req_logo_get\":601" "\"req_logo_get\":600"} [read_dump $dump]]
-    set target [::telemetry_maintenance::connect $targetSettings]
+    set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
     set failed [catch {::telemetry_maintenance::restore $target $broken}]
     set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
     $target close
@@ -256,7 +260,7 @@ test maintenance-corruption {A gzip checksum error rolls back the restore} -cons
     set ch [open $broken wb]
     puts -nonewline $ch $bytes
     close $ch
-    set target [::telemetry_maintenance::connect $targetSettings]
+    set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
     set failed [catch {::telemetry_maintenance::restore $target $broken}]
     set rows [$target allrows {SELECT COUNT(*) AS n FROM environments}]
     $target close
@@ -284,26 +288,26 @@ if {$postgres} {
 }
 test maintenance-overlap {The PostgreSQL advisory lock prevents overlapping jobs} -constraints postgres -body {
     $db allrows {SELECT pg_advisory_lock(208894771, 1)}
-    try {set result [::telemetry_maintenance::run $settings $context]} finally {
+    try {set result [::telemetry_maintenance::run $settings $context -secret_config $dbSecrets]} finally {
         $db allrows {SELECT pg_advisory_unlock(208894771, 1)}
     }
     set result
 } -result {status skipped reason already-running}
 test maintenance-combined {One invocation exports, uploads, vacuums, removes its temp file and releases its lock} -constraints postgres -body {
-    set result [::telemetry_maintenance::run $settings $context]
+    set result [::telemetry_maintenance::run $settings $context -secret_config $dbSecrets]
     set locked [dict get [lindex [$db allrows {SELECT pg_try_advisory_lock(208894771, 1) AS locked}] 0] locked]
     $db allrows {SELECT pg_advisory_unlock(208894771, 1)}
     list [dict get $result status] [file exists $uploaded] [expr {$locked in {1 t true}}]
 } -result {completed 0 1}
 test maintenance-upload-error {Upload failures are sanitized and temporary data is removed} -constraints postgres -body {
     set failUpload true
-    catch {::telemetry_maintenance::run $settings $context} message options
+    catch {::telemetry_maintenance::run $settings $context -secret_config $dbSecrets} message options
     list $message [dict get $options -errorcode] [file exists $uploaded] \
         [string match {*internal diagnostics*} [dict get $options -errorinfo]]
 } -result {{Telemetry maintenance failed during upload} {TELEMETRY MAINTENANCE upload} 0 0}
 
 test maintenance-snapshot {Writes committed during export cannot mix dimensions and events from different snapshots} -constraints postgres -body {
-    set concurrent [::telemetry_maintenance::connect $settings]
+    set concurrent [::telemetry_maintenance::connect $settings -secret_config $dbSecrets]
     rename ::legacy_backup::write_record ::legacy_backup::original_write_record
     set wrote false
     # Provide the write record test fixture.
@@ -320,7 +324,7 @@ test maintenance-snapshot {Writes committed during export cannot mix dimensions 
         set snapshot [file join $work snapshot.jsonl.gz]
         ::legacy_backup::backup $db $snapshot [expr {[clock milliseconds]+60000}]
         reset_target
-        set target [::telemetry_maintenance::connect $targetSettings]
+        set target [::telemetry_maintenance::connect $targetSettings -secret_config $dbSecrets]
         set counts [::telemetry_maintenance::restore $target $snapshot]
         $target close
         list [dict get $counts environments] [dict get $counts req_logo_get] $wrote

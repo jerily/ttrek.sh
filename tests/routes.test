@@ -16,6 +16,7 @@ test routes-covered {The explicit manifest covers main, account, forum, nested c
         POST /telemetry/collect/tcl/9.1.0 GET /docs GET /docs/ GET /docs/nested/path GET /blog GET /blog/post
         GET /user GET /user/ GET /user/admin/users GET /user/profile POST /user/profile
         GET /user/login POST /user/login GET /user/register POST /user/register
+        POST /user/google/start GET /user/google/callback HEAD /user/google/callback POST /user/google/unlink
         POST /user/verify POST /user/resend-verification POST /user/forgot POST /user/reset
         POST /user/change-password POST /user/close-account POST /user/two-factor
         POST /user/two-factor/setup POST /user/two-factor/disable POST /user/logout

@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] private-config.tcl]
 #
 # Copyright Jerily LTD. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 Neofytos Dimitriou (neo@jerily.cy)
@@ -40,7 +41,8 @@ namespace eval ::telemetry {
 }
 
 # Runtime startup opens the connection only. Provisioning is explicit.
-proc ::telemetry::connect {settings} {
+proc ::telemetry::connect {settings args} {
+    set settings [::private_config::password $settings {*}$args]
     variable connection
     variable dialect
     variable event_list
@@ -60,8 +62,8 @@ proc ::telemetry::connect {settings} {
 }
 
 # Explicit fixture/provisioning helper. Runtime startup always uses connect.
-proc ::telemetry::init_local {settings {registryDirectories {}}} {
-    connect $settings
+proc ::telemetry::init_local {settings {registryDirectories {}} args} {
+    connect $settings {*}$args
     try {
         initdb
         transaction {

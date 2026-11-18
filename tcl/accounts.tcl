@@ -7,7 +7,6 @@
 namespace eval ::accounts {
     variable store {}
     variable mount {}
-    variable handles {}
 }
 
 # Create persistent development keys atomically so local workers share one identity.
@@ -42,35 +41,22 @@ proc ::accounts::local_keys {directory} {
 }
 
 # Mount accounts on the worker's existing SQL connection and site templates.
-proc ::accounts::mount {router settings templates} {
+proc ::accounts::mount {router settings templates args} {
+    set secret [::private_config::option {*}$args]
     variable store
     variable mount
-    variable handles
-    package require web-user 0.5.6
-    foreach handle $handles {::tink::unregister_keyset $handle}
-    set handles {}
+    package require web-user 0.6.0
+    if {$mount ne {}} {::web::user::release $mount}
+    set mount {}; set store {}
     set config [dict get $settings account]
-    set policy [dict get $config policy]
-    try {
-        foreach {name key} {aead aead_keyset mac mac_keyset} {
-            set handle [::tink::register_keyset [dict get $config keys $key]]
-            lappend handles $handle
-            dict set policy $name $handle
-        }
-        dict set policy email_hash_salt [dict get $config keys email_hash_salt]
-        set store [::web::user::create -connection [dict get $settings content_connection] -config $policy]
-        set display [dict merge [dict get $config display] [dict create \
-            master_template [dict get $templates account-master.html.jinja] \
-            templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]]
-        dict set display assets_url [::assets::base_url /user/_assets]
-        dict set display email_queue_callback ::accounts::email_queued
-        set mount [::web::user::mount $router -store $store -config $display]
-    } on error {message options} {
-        foreach handle $handles {::tink::unregister_keyset $handle}
-        set handles {}
-        set store {}
-        return -options $options $message
-    }
+    set display [dict merge [dict get $config display] [dict create \
+        master_template [dict get $templates account-master.html.jinja] \
+        templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]]
+    dict set display assets_url [::assets::base_url /user/_assets]
+    dict set display email_queue_callback ::accounts::email_queued
+    set mount [::web::user::mount $router -connection [dict get $settings content_connection] \
+        -policy [dict get $config policy] -config $display -secret_config $secret]
+    set store [dict get $mount -store]
     return $mount
 }
 

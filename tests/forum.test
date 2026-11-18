@@ -15,7 +15,10 @@ foreach package {wiki blog} {::web::static::${package}::initdb $db}
 set raw {groups {admin mira@example.com} forum {moderation true posting_captcha true page_size 2}}
 set settings [dict create rootdir $root content_connection $db content_images {} \
     account [::app_config::account $raw $root $work] forum [::app_config::forum $raw]]
-::site::init_worker $settings
+set separated [::private_config::partition $settings]
+set settings [dict get $separated config]
+set siteSecrets [dict get $separated secret_config]
+::site::init_worker $settings -secret_config $siteSecrets
 set store $::accounts::store
 set uid user_[ksuid::generate_ksuid]
 ::web::user::insert $store web_user_users [dict create id $uid active 1 verified 1 email_key [::web::user::email_key $store mira@example.com] email [::web::user::seal $store mira@example.com [list email $uid]] password unused mfa_secret {} last_step -1 revision 0 created_at 1]
@@ -82,7 +85,7 @@ test site-package-cdn {Forum, editor and admin pages use stable CloudFront asset
     # Keep the existing local account fixture while using production CDN URLs.
     set ::env(ENV) LOCAL
     set ::site::router [::tpathexp::router]
-    ::site::mount $::site::router
+    ::site::mount $::site::router -secret_config $siteSecrets
 } -body {
     set checks {}
     foreach {path assets} {
@@ -108,7 +111,7 @@ test site-package-cdn {Forum, editor and admin pages use stable CloudFront asset
     set ::site::router $originalRouter
     # Restore the mount's registered key handles for subsequent requests.
     $originalRouter destroy
-    ::site::init_worker $originalSettings
+    ::site::init_worker $originalSettings -secret_config $siteSecrets
     set store $::accounts::store
     set ::site_lambda::router $::site::router
 } -result 1
@@ -135,7 +138,7 @@ test site-users-id-migration {private patch migrates user identity and existing 
 } -result {{users:1 registrations:0 profiles:0 sessions:1} {users:0 registrations:0 profiles:0 sessions:0} before@example.com 1 1}
 
 $::site::router destroy
-foreach handle $::accounts::handles {::tink::unregister_keyset $handle}
+::web::user::release $::accounts::mount
 ::tpersist::db_disconnect $db
 removeDirectory $work
 cleanupTests

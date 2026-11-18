@@ -12,6 +12,7 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl config.tcl]
 source [file join $root tcl content-images.tcl]
 source [file join $root tcl telemetry.tcl]
+source [file join $root tests private-database.tcl]
 source [file join $root tcl patch.tcl]
 source [file join $root tcl lambda.tcl]
 set patchRoot [makeDirectory patch-site]
@@ -27,11 +28,11 @@ proc ::site::config {} {
 set schema {}
 if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
     set ::env(ENV) PROD
-    ::telemetry::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    ::test_private_db::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
     set schema patch_[pid]_[clock clicks]
     ::tpersist::_raw $::telemetry::connection "CREATE SCHEMA $schema"
     ::tpersist::_raw $::telemetry::connection "SET search_path TO $schema"
-} else {::telemetry::connect {dialect sqlite database :memory:}}
+} else {::test_private_db::connect {dialect sqlite database :memory:}}
 
 test patch-initdb {direct invocation initializes all installed website schema providers, repeatedly} -body {
     set payload {{"source":"ttrek.patch","task":"task_initdb_website"}}
