@@ -44,7 +44,11 @@ dict set config_dict content_database [::app_config::telemetry $config [file nor
 # create the server
 set dir [file dirname [info script]]
 
-set init_script "source [file normalize [file join $dir tcl init-thread.tcl]]"
+set separated [::private_config::partition $config_dict]
+set config_dict [dict get $separated config]
+set init_script [list set ::site_bootstrap_secrets [dict get $separated secret_config]]
+append init_script \n [list source [file normalize [file join $dir tcl init-thread.tcl]]]
+unset separated
 set server_handle [::twebserver::create_server $config_dict process_conn $init_script]
 
 file mkdir [file join $dir certs]

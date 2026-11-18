@@ -9,12 +9,13 @@ package require tcltest 2
 namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tcl telemetry.tcl]
+source [file join $root tests private-database.tcl]
 source [file join $root tcl search.tcl]
 source [file join $root tcl patch.tcl]
 namespace eval ::site {proc config {} {return {}}}
 
 if {[llength $argv] && [lindex $argv 0] in {--worker --reader}} {
-    ::telemetry::connect [lindex $argv 1]
+    ::test_private_db::connect [lindex $argv 1]
     if {[lindex $argv 0] eq "--reader"} {
         puts [::recipe_search::results [lindex $argv 2]]
         ::telemetry::close
@@ -33,14 +34,14 @@ set work [makeDirectory search-store-fixture]
 set schema {}
 if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
     set settings [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
-    ::telemetry::connect $settings
+    ::test_private_db::connect $settings
     set schema search_store_[pid]_[clock clicks]
     ::tpersist::_raw $::telemetry::connection "CREATE SCHEMA $schema"
     dict set settings options "-c search_path=$schema -c statement_timeout=10000"
-    ::telemetry::connect $settings
+    ::test_private_db::connect $settings
 } else {
     set settings [dict create dialect sqlite database [file join $work test.sqlite3] timeout 5000]
-    ::telemetry::connect $settings
+    ::test_private_db::connect $settings
 }
 # Provide the recipe test fixture.
 proc recipe {directory name version description {tags {}}} {
@@ -312,7 +313,7 @@ test snapshot-concurrent {Competing publishers commit complete matching catalogs
 
 ::telemetry::close
 if {$schema ne {}} {
-    ::telemetry::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
+    ::test_private_db::connect [dict merge {dialect postgresql} $::env(TTREK_TEST_POSTGRES)]
     ::tpersist::_raw $::telemetry::connection "DROP SCHEMA $schema CASCADE"
     ::telemetry::close
 }

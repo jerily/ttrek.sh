@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT.
 #
 
+source [file join [file dirname [info script]] private-config.tcl]
+
 namespace eval ::app_config {
     variable directory [file dirname [file normalize [info script]]]
 }
@@ -408,7 +410,7 @@ proc ::app_config::content_images {config root} {
 
 # Separate account policy, delivery and persistent worker keys from site settings.
 proc ::app_config::account {config root {localDirectory {}}} {
-    package require web-user 0.5.0
+    package require web-user 0.6.0
     if {![llength [info commands ::accounts::local_keys]]} {source [file join $root tcl accounts.tcl]}
     set input {}
     if {[dict exists $config account]} {set input [dict get $config account]}
@@ -417,7 +419,7 @@ proc ::app_config::account {config root {localDirectory {}}} {
         captcha_letters true login_captcha_after 3 login_captcha_window 900 cleanup_grace_period 3600]
     set display [dict create prefix /user title {Your account} issuer ttrek.sh origin https://ttrek.sh \
         email_enabled true email_from noreply@ttrek.sh email_region eu-central-1 \
-        email_queue_enabled false email_queue_url {}]
+        email_queue_enabled false email_queue_url {} google_enabled false google_client_id {} google_redirect_uri {}]
     if {[mode] eq "LOCAL"} {
         dict set display origin http://localhost:8080
         dict set display email_enabled false
@@ -427,9 +429,12 @@ proc ::app_config::account {config root {localDirectory {}}} {
         bcrypt_cost password_min_length session_ttl persistent_session_ttl code_ttl challenge_ttl cleanup_grace_period throttle_window \
         browse_limit post_limit account_limit challenge_limit resend_cooldown totp_digits totp_period totp_algorithm totp_window form_max_bytes}
     set keys {}
+    set secrets {google_client_secret {}}
     dict for {name value} $input {
         if {$name in {aead_keyset mac_keyset email_hash_salt}} {
             dict set keys $name $value
+        } elseif {[dict exists $secrets $name]} {
+            dict set secrets $name $value
         } elseif {$name in $policyKeys} {
             dict set policy $name $value
         } elseif {[dict exists $display $name]} {
@@ -450,7 +455,7 @@ proc ::app_config::account {config root {localDirectory {}}} {
     if {[dict exists $config groups]} {set groups [dict merge $groups [dict get $config groups]]}
     if {[dict exists $config permissions]} {set permissions [dict merge $permissions [dict get $config permissions]]}
     ::web::user::access_config $groups $permissions
-    dict create policy $policy display $display keys $keys access [dict create groups $groups permissions $permissions]
+    dict create policy $policy display $display secret_config [dict merge $keys $secrets] access [dict create groups $groups permissions $permissions]
 }
 
 proc ::app_config::forum {config} {

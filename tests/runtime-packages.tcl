@@ -11,7 +11,7 @@ set packages [expr {$production ? {} : $argv}]
 if {![llength $packages]} {
     set packages {
         twebserver topenapi jinja2 tjson ttrie ttrigrams valkey tink
-        thashlib pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
+        thashlib pure-tcl-oauth2-core pure-tcl-oauth2-client pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
         tratelimit treqmon web-user web-forum tcaptcha tclgd pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda
         web-static-wiki web-static-blog tpersist tpathexp cmark_gfm
         trequests
@@ -31,7 +31,9 @@ foreach name $packages {
                 if {![::valkey::pkgconfig get feature-ssl]} {error "valkey requires TLS support"}
                 set version
             }
-            tink {package require tink 20240704.0.1}
+            tink {package require tink 20240704.0.3}
+            tjson {package require tjson 1.0.28}
+            thashlib {package require thashlib 0.1.1}
             topenapi {package require topenapi 0.2.0}
             ttrie {package require ttrie 0.2.0}
             ttrigrams {package require ttrigrams 0.2.0}
@@ -44,7 +46,7 @@ foreach name $packages {
             pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 1.0.0}
             web-static-wiki {package require $name 0.1.10}
             web-static-blog {package require $name 0.1.9}
-            web-user {package require $name 0.5.5}
+            web-user {package require $name 0.6.0}
             web-forum {package require $name 0.3.1}
             tcaptcha {package require $name 1.0.0}
             tconfig::decrypt - tconfig::encrypt {package require $name 1.0.2}

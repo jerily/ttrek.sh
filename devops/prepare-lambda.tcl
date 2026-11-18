@@ -69,7 +69,9 @@ try {
     ::web::user::initdb $::telemetry::connection
     ::web::forum::initdb $::telemetry::connection
     dict set ::site::settings account [::app_config::account {} $siteRoot $accountProbeDirectory]
-    ::site::mount $router
+    set separated [::private_config::partition $::site::settings]
+    set ::site::settings [dict get $separated config]
+    ::site::mount $router -secret_config [dict get $separated secret_config]
     foreach path {/ /docs /docs/getting-started /blog /packages /forum /user/register /user/login /user/forgot} {
         set response [::site::dispatch $router [dict create method GET path $path]]
         if {[dict get $response statusCode] != 200} {error "staged request failed: $path"}

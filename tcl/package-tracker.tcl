@@ -5,13 +5,16 @@
 # HTTP requests read a snapshot and resolve links against the current catalog.
 namespace eval ::package_tracker {
     variable client {}
+    variable private {}
     variable settings {}
     variable prefix {ttrek:package-tracker:v2}
     variable limit 5
     variable defaults {min_current 10 min_previous 5 min_delta 5 min_growth 25}
 }
 
-proc ::package_tracker::configure {config} {
+proc ::package_tracker::configure {config args} {
+    variable private [::private_config::option {*}$args]
+    if {[dict exists $config valkey password]} {error "Cache password belongs in -secret_config"}
     variable client
     variable settings
     if {$client ne {}} {catch {$client destroy}; set client {}}
@@ -32,13 +35,14 @@ proc ::package_tracker::thresholds {} {
 }
 
 proc ::package_tracker::cache {args} {
+    variable private
     variable client
     variable settings
     try {
         if {$client eq {}} {
             if {![dict exists $settings valkey]} {error "Package Tracker cache is not configured"}
             package require valkey 1.0.3
-            set config [dict get $settings valkey]
+            set config [::private_config::password [dict get $settings valkey] -secret_config $private]
             set options {}
             if {[dict exists $config ssl] && [dict get $config ssl]} {lappend options -ssl}
             foreach key {host port username password ssl_ca_file ssl_cert_file ssl_key_file} {

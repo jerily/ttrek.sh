@@ -1,0 +1,44 @@
+package require tcltest
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root tcl config.tcl]
+source [file join $root tcl site.tcl]
+test private-partition {bootstrap extracts every account and connection secret} -body {
+    set raw {rootdir /site account {policy {tenant test} display {origin https://test.example} secret_config {aead_keyset aead mac_keyset mac email_hash_salt salt google_client_secret google}} content_database {dialect postgresql host db password pg-secret} package_tracker {valkey {host cache password cache-secret}} tratelimit {store {valkeystore {host cache password cache-secret}}} treqmon {store {valkeystore {host cache password cache-secret}}}}
+    set separated [::private_config::partition $raw]
+    set public [dict get $separated config]
+    set secrets [dict get $separated secret_config]
+    list [::private_config::assert_public $public] [dict get $secrets postgres password] [dict get $secrets redis password] \
+        [lsort [dict keys [dict get $secrets account]]] \
+        [expr {[string first pg-secret $public] == -1 && [string first cache-secret $public] == -1 && [string first google_client_secret $public] == -1}]
+} -result {{} pg-secret cache-secret {aead_keyset email_hash_salt google_client_secret mac_keyset} 1}
+test private-no-fallback {public credentials and conflicting duplicate passwords fail} -body {
+    list [catch {::site::configure {content_database {password forbidden}}}] \
+        [catch {::private_config::password {password forbidden}}] \
+        [catch {::private_config::partition {package_tracker {valkey {password one}} treqmon {store {valkeystore {password two}}}}}]
+} -result {1 1 1}
+test private-backend {only private credentials reach backend connection options} -body {
+    set public {store {valkeystore {host localhost}}}
+    set internal [::site::middleware_config $public {password private-password}]
+    list [dict exists $public store valkeystore password] [dict get $internal store valkeystore password] \
+        [dict get [::private_config::password {host db} -secret_config {password db-password}] password]
+} -result {0 private-password db-password}
+test private-account-mount {mount owns keys from secret_config and releases them} -setup {
+    package require web-user 0.6.0
+    set ::env(ENV) LOCAL
+    set db [::tpersist::db_connect -database :memory: -autobegin false]
+    ::web::user::initdb $db
+    set router [::tpathexp::router]
+    set private [dict create aead_keyset [::tink::aead::create_keyset AES256_GCM] mac_keyset [::tink::mac::create_keyset HMAC_SHA256] email_hash_salt private-salt]
+} -body {
+    set mount [::web::user::mount $router -connection $db -policy {tenant test bcrypt_cost 4} -config {origin http://localhost:8080} -secret_config $private]
+    set handles [dict get $mount -owned-keys]
+    set response [$router dispatch {method GET path /user/login headers {}} {}]
+    set result [list [dict get $response statusCode] [string match *private-salt* [dict get $response body]] [llength $handles]]
+    ::web::user::release $mount
+    lappend result [catch {::tink::aead::encrypt [lindex $handles 0] test context}]
+    set result
+} -cleanup {$router destroy; ::tpersist::db_disconnect $db} -result {200 0 2 1}
+set failures $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failures > 0}]

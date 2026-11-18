@@ -187,7 +187,7 @@ proc ::site_patch::task_refresh_package_tracker {context} {
 
 # Reuse the production backup, upload and vacuum with patch lifecycle logging.
 proc ::site_patch::task_backup_website {context} {
-    set result [::telemetry_maintenance::run $::site_lambda::maintenanceSettings $context]
+    set result [::telemetry_maintenance::run $::site_lambda::maintenanceSettings $context -secret_config $::site_lambda::maintenanceSecrets]
     set completed {}
     dict for {name value} $result {lappend completed "$name:$value"}
     return $completed

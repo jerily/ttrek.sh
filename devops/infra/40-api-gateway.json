@@ -154,6 +154,7 @@
         "GetUserChangePasswordRoute",
         "GetUserCloseAccountRoute",
         "GetUserForgotRoute",
+        "GetUserGoogleCallbackRoute",
         "GetUserLoginRoute",
         "GetUserProfileRoute",
         "GetUserRegisterRoute",
@@ -197,6 +198,7 @@
         "HeadUserChangePasswordRoute",
         "HeadUserCloseAccountRoute",
         "HeadUserForgotRoute",
+        "HeadUserGoogleCallbackRoute",
         "HeadUserLoginRoute",
         "HeadUserProfileRoute",
         "HeadUserRegisterRoute",
@@ -213,6 +215,8 @@
         "PostUserChangePasswordRoute",
         "PostUserCloseAccountRoute",
         "PostUserForgotRoute",
+        "PostUserGoogleStartRoute",
+        "PostUserGoogleUnlinkRoute",
         "PostUserLoginRoute",
         "PostUserLogoutRoute",
         "PostUserProfileRoute",
@@ -1010,6 +1014,27 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /user/forgot",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserGoogleCallbackRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/google/callback",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -1927,6 +1952,27 @@
         }
       }
     },
+    "HeadUserGoogleCallbackRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/google/callback",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
     "HeadUserLoginRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -2249,6 +2295,48 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "POST /user/forgot",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserGoogleStartRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/google/start",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserGoogleUnlinkRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/google/unlink",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
