@@ -36,6 +36,30 @@ test telemetry-prepared {runtime startup and requests never call initdb or regis
     }
 } -result {1 {}}
 
+test telemetry-first-request {real worker mounting connects once on the first Lambda request without provisioning} -setup {
+    set savedEnv [array get ::env ENV]
+    set ::env(ENV) LOCAL
+    source [file join $root tcl config.tcl]
+    source [file join $root tcl site.tcl]
+    source [file join $root tcl lambda.tcl]
+    ::site::prepare_worker [dict create rootdir $root content_database {dialect sqlite database :memory:}]
+} -body {
+    set before $::telemetry::connection
+    set payload {{"httpMethod":"GET","path":"/debug","headers":{}}}
+    set first [::site_lambda::handle $payload {}]
+    set connection $::telemetry::connection
+    ::site_lambda::handle $payload {}
+    list $before [dict get [::tjson::json_to_simple $first] statusCode] \
+        [expr {$connection eq $::telemetry::connection}] \
+        [::tpersist::_raw $connection {SELECT name FROM sqlite_master WHERE type = 'table'}]
+} -cleanup {
+    ::telemetry::close
+    if {[info exists ::site::router]} {$::site::router destroy}
+    unset -nocomplain ::site::router ::site_lambda::router ::site::pending_secrets
+    unset ::env(ENV)
+    array set ::env $savedEnv
+} -result {{} 200 1 {}}
+
 removeDirectory telemetry-startup
 set failed $::tcltest::numTests(Failed)
 cleanupTests

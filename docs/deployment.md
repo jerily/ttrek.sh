@@ -448,18 +448,21 @@ The build:
    conditional project dependencies; configuring this URI does not publish it.
 2. Runs `ttrek sync` into `build/public-registry`, then installs from the private
    registry followed by that public checkout. A fresh production `ttrek-venv`
-   is required and `-local` is explicitly set. SQLite-backed test dependencies
-   are installed separately under `build/test-deps` with `+local`.
+   is required and `-local` is explicitly set. Production uses PostgreSQL and
+   does not require SQLite.
 3. Restores and builds browser assets, checks production package loading, then
-   runs application tests using the separate local prefix. Only the production
-   prefix is packaged. The staged smoke checks can load SQLite test libraries
-   from `TTREK_PREPARE_TEST_PREFIX`; those libraries are never copied into the ZIP.
+   runs application tests. SQLite-backed suites remain skipped when that driver
+   is absent. Template validation and deferred-worker tests run independently
+   of SQLite availability.
 4. Generates encrypted production config from SSM and packages with tdevops using
    `--local-only`. `TTREK_PUBLIC_REGISTRY` tells packaging to reuse the synced
    dependency checkout. It exports that commit into the ZIP, excludes Git metadata
    and ignored files, and records `etc/registry-revision` without another fetch.
    The later `task_sync_website` imports this same bundled snapshot.
-   It validates the staged recipes in an in-memory database and sets executable
+   It validates all site/package templates and their composed layouts without
+   a database or decrypted secrets. If SQLite is installed, it also validates
+   staged recipes and routes using an in-memory fixture; otherwise those smoke
+   checks remain skipped. It sets executable
    ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,
    dependency resolution, and staged-site checks still run.

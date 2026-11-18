@@ -9,9 +9,9 @@ package require Tcl 9.1
 package require twebserver
 package require tjson
 package require tratelimit 1.1.1
-package require treqmon 2.3.0
-package require web-static-wiki 0.1.10
-package require web-static-blog 0.1.9
+package require treqmon 2.3.1
+package require web-static-wiki 0.1.11
+package require web-static-blog 0.1.10
 package require tpathexp 1.2.0
 
 namespace eval ::site {
@@ -30,6 +30,12 @@ proc ::site::config {} {variable settings; return $settings}
 # Return the configured application root directory.
 proc ::site::root {} {dict get [config] rootdir}
 
+# Packaged production templates are validated before deployment. Development
+# keeps the early diagnostics, including when ENV has not been set by a host.
+proc ::site::validate_templates {} {
+    expr {![info exists ::env(ENV)] || $::env(ENV) ne "PROD"}
+}
+
 # Apply the worker settings and initialize shared site resources.
 proc ::site::configure {config} {
     ::private_config::assert_public $config
@@ -37,7 +43,7 @@ proc ::site::configure {config} {
     set imageSettings {}
     if {[dict exists $config content_images]} {set imageSettings [dict get $config content_images]}
     ::assets::configure $imageSettings
-    ::views::init [file join [root] www]
+    ::views::init [file join [root] www] [validate_templates]
     ::homepage::configure [root]
     # Defer database reads until a catalog request, so provisioning tasks can
     # initialize a new deployment before its first public request.
@@ -74,7 +80,7 @@ proc ::site::mount {router args} {
     foreach {kind directory prefix} {wiki docs /docs blog blog /blog} {
         set store [dict get $stores $kind]
         ::web::static::${kind}::mount $router -store $store -prefix $prefix \
-            -config [dict create master_template [dict get $templates ${directory}-master.html.jinja] \
+            -config [dict create validate_templates [validate_templates] master_template [dict get $templates ${directory}-master.html.jinja] \
                 templates [dict create master.html.jinja [dict get $templates master.html.jinja]]]
     }
     set monitor_master request-monitor-master.html.jinja
@@ -84,7 +90,7 @@ proc ::site::mount {router args} {
     ::treqmon::mount $router -prefix /request-monitor \
         -middleware [dict exists $settings treqmon] \
         -include_active_users [dict exists $settings account] \
-        -config [dict create master_template [dict get $templates $monitor_master] \
+        -config [dict create validate_templates [validate_templates] master_template [dict get $templates $monitor_master] \
             templates [dict create master.html.jinja [dict get $templates master.html.jinja]] \
             chart_script [::assets::url /js/chart.umd.js]]
     if {[dict exists $settings treqmon] && [dict exists $settings account]} {
@@ -127,7 +133,53 @@ proc ::site::init_worker {settings args} {
     variable router
     configure $settings
     set router [::tpathexp::router]
-    mount $router {*}$args
+    try {
+        mount $router {*}$args
+    } on error {message options} {
+        $router destroy
+        unset router
+        return -options $options $message
+    }
+}
+
+# Keep credentials out of public settings while postponing the SQL connection
+# and the mounts that borrow it until this interpreter receives its first event.
+proc ::site::prepare_worker {config args} {
+    ::private_config::assert_public $config
+    variable pending_secrets [::private_config::site {*}$args]
+    variable settings $config
+    variable starting 0
+}
+
+proc ::site::ensure_worker {} {
+    variable router
+    variable pending_secrets
+    variable starting
+    variable settings
+    if {![info exists pending_secrets]} {return $router}
+    if {$starting} {error "Worker initialization is already in progress"}
+    set starting 1
+    set config $settings
+    try {
+        ::telemetry::connect [dict get $config content_database] -secret_config [dict get $pending_secrets postgres]
+        dict set config content_connection $::telemetry::connection
+        init_worker $config -secret_config $pending_secrets
+        unset pending_secrets
+        return $router
+    } on error {message options} {
+        # A failed first event must not retain keys, sockets or a partial mount.
+        if {$::accounts::mount ne {}} {catch {::web::user::release $::accounts::mount}}
+        set ::accounts::mount {}; set ::accounts::store {}
+        foreach package {tratelimit treqmon} {
+            catch {::${package}::middleware::valkeystore::shutdown}
+        }
+        catch {::telemetry::close}
+        dict unset config content_connection
+        set settings $config
+        return -options $options $message
+    } finally {
+        set starting 0
+    }
 }
 
 # Attach the route name and invoke its handler.
@@ -181,7 +233,7 @@ proc ::site::dispatch {router request {context {}}} {
 # Serve a native connection and report unexpected handler failures.
 proc ::site::process_conn {context request} {
     variable router
-    if {[catch {dispatch $router $request $context} response options]} {
+    if {[catch {dispatch [ensure_worker] $request $context} response options]} {
         puts stderr [dict get $options -errorinfo]
         set response [::twebserver::build_response 500 text/plain {Unable to serve this request.}]
     }

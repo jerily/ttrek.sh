@@ -181,16 +181,16 @@ foreach {name script} {
     site {
         namespace eval ::site {variable router test_router}
         # Provide the init worker test fixture.
-        proc ::site::init_worker {config args} {variable settings $config}
+        proc ::site::prepare_worker {config args} {variable settings $config}
         # Provide the config test fixture.
         proc ::site::config {} {variable settings; return $settings}
     }
     telemetry {
-        namespace eval ::telemetry {}
+        namespace eval ::telemetry {variable registries {}}
         # Provide the init local test fixture.
         proc ::telemetry::init_local {args} {error "Startup must not provision or sync"}
         # Provide the connect test fixture.
-        proc ::telemetry::connect {settings args} {set ::telemetry::connection test; set ::telemetry::registries {}}
+        proc ::telemetry::connect {settings args} {error "Startup must not connect SQL"}
     }
     telemetry-maintenance {}
     local-assets {}
@@ -262,7 +262,7 @@ test lambda-releases-2 {Local mock release overrides remain independent of the p
         [expr {[dict get $releases checksums linux-amd64-glibc] eq [string repeat b 64]}]
 } -result {ttrek-local 2.0.0 test/2.0.0 http://127.0.0.1:9999 1}
 
-test lambda-registry-metadata {Local Lambda startup only connects and leaves imports to explicit tasks} -body {
+test lambda-registry-metadata {Local Lambda startup leaves connections to requests and imports to explicit tasks} -body {
     set ::telemetry::registries
 } -result {}
 

@@ -39,15 +39,15 @@ foreach name $packages {
             ttrigrams {package require ttrigrams 0.2.0}
             trequests {package require trequests 1.3.0}
             tdom {package require tdom 0.9.6}
-            treqmon {package require treqmon 2.2.0}
+            treqmon {package require treqmon 2.3.1}
             tratelimit {package require tratelimit 1.1.0}
             tpathexp {package require tpathexp 1.2.0}
             pure-tcl-aws-s3 {package require pure-tcl-aws-s3 1.0.0}
             pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 1.0.0}
-            web-static-wiki {package require $name 0.1.10}
-            web-static-blog {package require $name 0.1.9}
-            web-user {package require $name 0.7.0}
-            web-forum {package require $name 0.3.1}
+            web-static-wiki {package require $name 0.1.11}
+            web-static-blog {package require $name 0.1.10}
+            web-user {package require $name 0.7.1}
+            web-forum {package require $name 0.3.3}
             tcaptcha {package require $name 1.0.0}
             tconfig::decrypt - tconfig::encrypt {package require $name 1.0.2}
             default {package require $name}

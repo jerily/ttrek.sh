@@ -9,14 +9,9 @@ source [file join [file dirname [info script]] config.tcl]
 source [file join [file dirname [info script]] site.tcl]
 source [file join [file dirname [info script]] telemetry.tcl]
 set settings [::twebserver::get_config_dict]
-# Each worker owns one connection for telemetry, search and content, as in Lambda.
-::telemetry::connect [dict get $settings content_database] -secret_config [dict get $::site_bootstrap_secrets postgres]
-dict set settings content_connection $::telemetry::connection
+# Each worker opens its shared SQL connection on its first request, as in Lambda.
 try {
-    ::site::init_worker $settings -secret_config $::site_bootstrap_secrets
-} on error {message options} {
-    ::telemetry::close
-    return -options $options $message
+    ::site::prepare_worker $settings -secret_config $::site_bootstrap_secrets
 } finally {
     unset settings ::site_bootstrap_secrets
 }

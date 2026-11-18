@@ -9,9 +9,14 @@
 - Request handlers prepare explicitly typed JSON through tjson. Templates render
   data and contain no Tcl code. Plain strings are automatically HTML-escaped;
   package names and versions in links are also URL-encoded.
-- Each worker loads and validates the complete template dictionary at startup.
-  Restart the server after editing templates. Missing includes and invalid
-  templates fail startup.
+- Packaging validates all site and package templates, including their composed
+  layouts, without SQL or secrets. Production workers skip that validation.
+  LOCAL workers retain validation when their first request initializes the site.
+  Restart the server after editing templates.
+- Direct-server workers and Lambda open their shared SQL connection and mount
+  services on the first request (including private Lambda tasks), then reuse
+  them. Failed initialization closes partial resources and can retry. Schema
+  initialization and content synchronization remain explicit maintenance tasks.
 - Documentation and blog content use `web-static-wiki` at `/docs` and
   `web-static-blog` at `/blog`, mounted on the host's `tpathexp` router.
   Both LOCAL and PROD query content rows through `tpersist`; explicit patch tasks

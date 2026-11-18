@@ -38,7 +38,20 @@ set settings [dict create rootdir $root content_connection $db content_images {}
 set separated [::private_config::partition $settings]
 set settings [dict get $separated config]
 set siteSecrets [dict get $separated secret_config]
-::site::init_worker $settings -secret_config $siteSecrets
+# Exercise real mounts with production's validation policy and a disposable
+# SQLite store. The rest of this suite renders these prevalidated templates.
+rename ::site::validate_templates ::site::real_validate_templates
+proc ::site::validate_templates {} {return false}
+rename ::jinja2::validate ::jinja2::real_validate
+proc ::jinja2::validate {args} {error "Production mounts must not validate templates"}
+try {
+    ::site::init_worker $settings -secret_config $siteSecrets
+} finally {
+    rename ::site::validate_templates {}
+    rename ::site::real_validate_templates ::site::validate_templates
+    rename ::jinja2::validate {}
+    rename ::jinja2::real_validate ::jinja2::validate
+}
 namespace eval ::accountstest {
     variable cookie {}; variable csrf {}; variable last {}; variable origin http://localhost:8080
     variable lambdaVersion {}; variable extraCookies {}

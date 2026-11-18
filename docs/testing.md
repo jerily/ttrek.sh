@@ -15,6 +15,8 @@ ttrek run tclsh9.1 "$PWD/tests/homepage.test"
 ttrek run tclsh9.1 "$PWD/tests/accounts.test"
 ttrek run tclsh9.1 "$PWD/tests/account-password-migration.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-packages.tcl"
+ttrek run tclsh9.1 "$PWD/tests/template-validation.test"
+ttrek run tclsh9.1 "$PWD/tests/worker-startup.test"
 ttrek run tclsh9.1 "$PWD/tests/all.tcl"
 ttrek run tclsh9.1 "$PWD/tests/config.test"
 ttrek run tclsh9.1 "$PWD/tests/rate-limits.test"
@@ -42,6 +44,14 @@ ttrek run tclsh9.1 "$PWD/tests/upload-archives.test"
 ttrek run tclsh9.1 "$PWD/tests/runtime-smoke.tcl"
 ttrek run tclsh9.1 "$PWD/tests/local-stack.tcl"
 ```
+
+`tests/template-validation.test` verifies the actual packaging hook with SQLite
+unavailable, checks package defaults and their host layouts, and proves production
+mount preparation does not validate again. `tests/worker-startup.test` verifies
+first-event SQL initialization, reuse, failure/retry and private/direct dispatch.
+Both run in CI independently of the optional SQLite-backed suites. Packaging
+calls the same template providers before its SQLite availability check; existing
+SQLite fixture checks remain skipped when the driver is absent.
 
 `tests/runtime-packages.tcl` loads runtime and development packages without starting services.
 `tests/test_lambda_versions.py` uses fake AWS responses to verify version retention,

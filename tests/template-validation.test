@@ -1,0 +1,143 @@
+package require tcltest 2
+namespace import ::tcltest::*
+set root [file dirname [file dirname [file normalize [info script]]]]
+
+# Run even in PostgreSQL-only builds. No driver or service may be needed to
+# validate defaults and the exact package/host layout compositions.
+rename package ::original_package
+proc package {command args} {
+    if {$command eq "require" && [lindex $args 0] in {tdbc::sqlite3 sqlite3 tdbc::postgres valkey}} {
+        error "Template validation must not load a database driver or cache"
+    }
+    ::original_package $command {*}$args
+}
+source [file join $root tcl config.tcl]
+source [file join $root tcl site.tcl]
+set savedEnv [array get ::env ENV]
+set ::env(ENV) PROD
+::site::configure [dict create rootdir $root]
+
+test templates-artifact {all package compositions validate without SQL or secrets in PROD} -body {
+    ::views::validate_all
+} -result {}
+
+test templates-artifact-broken-host {packaging still rejects broken host templates in PROD} -body {
+    set original $::views::templates
+    try {
+        dict set ::views::templates master.html.jinja {{% if true %}}
+        ::views::validate_all
+    } finally {set ::views::templates $original}
+} -returnCodes error -match glob -result *
+
+set providers {
+    ::web::user::prepare_templates
+    ::web::forum::prepare_templates
+    ::web::static::wiki::prepare_templates
+    ::web::static::blog::prepare_templates
+    ::treqmon::view::prepare_templates
+}
+foreach provider $providers {
+    test templates-compose-$provider {the provider validates host layout dependencies by default} -body {
+        $provider {master_template {{% extends "missing.html.jinja" %}}}
+    } -returnCodes error -match glob -result *
+
+    test templates-boolean-$provider {validation switches reject ambiguous configuration} -body {
+        $provider {validate_templates invalid}
+    } -returnCodes error -result {validate_templates must be a boolean}
+
+    test templates-runtime-$provider {prevalidated runtime compositions never call the validator} -setup {
+        rename ::jinja2::validate ::jinja2::real_validate
+        proc ::jinja2::validate {args} {error "Unexpected runtime validation"}
+    } -body {
+        dict exists [$provider {validate_templates false}] page.html.jinja
+    } -cleanup {
+        rename ::jinja2::validate {}
+        rename ::jinja2::real_validate ::jinja2::validate
+    } -result 1
+}
+
+test templates-site-runtime {production site configuration never calls the validator} -setup {
+    rename ::jinja2::validate ::jinja2::real_validate
+    proc ::jinja2::validate {args} {error "Unexpected runtime validation"}
+} -body {
+    ::site::configure [dict create rootdir $root]
+} -cleanup {
+    rename ::jinja2::validate {}
+    rename ::jinja2::real_validate ::jinja2::validate
+} -result {}
+
+foreach mount {
+    {::web::static::wiki::mount -store {kind wiki} -prefix /probe}
+    {::web::static::blog::mount -store {kind blog} -prefix /probe}
+    {::web::forum::mount -store {fixture true} -user {fixture true} -prefix /probe}
+    {::treqmon::mount -prefix /probe -middleware false}
+} {
+    set command [lindex $mount 0]
+    test templates-secret-$command {unused mount secrets are accepted but never retained} -setup {
+        set router [::tpathexp::router]
+    } -body {
+        set result [$command $router {*}[lrange $mount 1 end] \
+            -secret_config {password private-marker}]
+        list [dict exists $result -secret_config] [string match *private-marker* $result] \
+            [string match *private-marker* [$router match GET /probe]]
+    } -cleanup {$router destroy} -result {0 0 0}
+
+    test templates-secret-shape-$command {reserved mount secrets must still be a dictionary} -setup {
+        set router [::tpathexp::router]
+    } -body {
+        set failed [catch {$command $router {*}[lrange $mount 1 end] -secret_config {password}}]
+        list $failed [dict get [$router match GET /probe] statusCode]
+    } -cleanup {$router destroy} -result {1 404}
+}
+
+# Exercise the actual packaging hook with SQLite unavailable. Only registry
+# staging is replaced: validation must finish before the existing skip/return.
+set stage [makeDirectory template-artifact]
+foreach directory {tcl www schemas} {file copy [file join $root $directory] $stage}
+file link -symbolic [file join $stage public] [file join $root public]
+file mkdir [file join $stage runtime] [file join $stage devops] [file join $stage etc]
+foreach name {releases.json homepage.json} {file copy [file join $root etc $name] [file join $stage etc $name]}
+file copy [file join $root devops prepare-lambda.tcl] [file join $stage devops prepare-lambda.tcl]
+set channel [open [file join $stage devops stage-registry.tcl] w]
+puts $channel {namespace eval ::registry_build {}; proc ::registry_build::stage {args} {}}
+close $channel
+set channel [open [file join $stage runtime paths.tcl] w]
+puts $channel [list namespace eval ::tdevops::runtime [list variable root $stage]]
+puts $channel {
+    rename package real_package
+    proc package {command args} {
+        if {[lindex $args 0] eq "tdbc::sqlite3"} {
+            if {$command eq "require"} {
+                return -code error -errorcode {TCL PACKAGE UNFOUND} "SQLite deliberately unavailable"
+            }
+            if {$command eq "versions"} {return {}}
+        }
+        real_package $command {*}$args
+    }
+}
+close $channel
+set prepare [list exec env -u TTREK_PRODUCTION_CONFIG -u TTREK_PUBLIC_REGISTRY \
+    [info nameofexecutable] [file join $stage devops prepare-lambda.tcl] 2>@1]
+
+test templates-package-no-sqlite {the packaging hook keeps its SQLite skip after validation} -body {
+    string match {*Skipping SQLite-backed packaging smoke checks*} [{*}$prepare]
+} -result 1
+
+test templates-package-broken-no-sqlite {broken templates fail packaging even without SQLite} -setup {
+    set channel [open [file join $stage www docs-master.html.jinja] w]
+    puts $channel {{% extends "missing-package-layout.html.jinja" %}}
+    close $channel
+} -body {
+    set failed [catch {{*}$prepare} message]
+    list $failed [string match *missing-package-layout* $message] \
+        [string match {*Skipping SQLite-backed*} $message]
+} -result {1 1 0}
+removeDirectory $stage
+
+rename package {}
+rename ::original_package package
+unset ::env(ENV)
+array set ::env $savedEnv
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]
