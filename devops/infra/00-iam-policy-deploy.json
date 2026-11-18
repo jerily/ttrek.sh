@@ -243,6 +243,12 @@
       "Effect": "Allow",
       "Action": [
         "cloudfront:CreateDistribution",
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:CreateCachePolicy",
+        "cloudfront:UpdateCachePolicy",
+        "cloudfront:DeleteCachePolicy",
         "cloudfront:CreateDistributionWithTags",
         "cloudfront:GetDistribution",
         "cloudfront:GetDistributionConfig",

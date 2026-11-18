@@ -48,6 +48,7 @@ aws s3 sync "$ASSET_HISTORY" public/assets/versioned/ --only-show-errors
 ttrek run -script build-assets
 npm test
 python3 -m unittest discover -s tests -p 'test_lambda_versions.py'
+python3 -m unittest discover -s tests -p 'test_vpc_network.py'
 # Run SQLite-backed tests only when the existing installation provides SQLite.
 # A broken installed driver must still fail the build.
 HAS_SQLITE=$("$TCLSH" <<'TCL'

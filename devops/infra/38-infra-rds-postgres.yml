@@ -158,8 +158,10 @@ Resources:
       IpProtocol: tcp
       FromPort: 443
       ToPort: 443
-      # This isolated route table reaches S3 through its gateway endpoint;
-      # there is no default internet/NAT route. The endpoint limits the bucket.
+      # Preserve ownership of this existing rule: it now also allows Google and
+      # regional AWS APIs through NAT. S3 still takes the more specific gateway
+      # endpoint route, whose policy limits the bucket. Do not duplicate this
+      # rule in the base stack when adding NAT.
       CidrIp: 0.0.0.0/0
   MaintenanceErrors:
     Type: AWS::CloudWatch::Alarm
