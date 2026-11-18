@@ -1,6 +1,6 @@
 # Google Login for local development and production
 
-The account UI uses `web-user` 0.6.1 and `pure-tcl-oauth2-client`. Install the new
+The account UI uses `web-user` 0.6.2 and `pure-tcl-oauth2-client`. Install the new
 core/client packages and updated native dependencies (`tjson` 1.0.28,
 `tink-tcl` 20240704.0.3, `thashlib` 0.1.1) before starting the site. Run the normal
 account schema initialization once to add identity and transaction tables.
@@ -21,7 +21,8 @@ google_redirect_uri = http://localhost:8080/user/google/callback
 The placeholders let the UI and configuration be exercised; they cannot complete
 a real Google login. Replace them in the private local configuration when ready.
 No environment variables supply these values. The production template
-`devops/config.prod.ini` leaves all four Google fields empty, keeping login disabled.
+`devops/config.prod.ini` enables Google Login and leaves credentials and the
+redirect URI empty for SSM to supply.
 
 Create a Google Cloud OAuth client of type **Web application**, configure the
 consent branding/audience, and add test users if the application is in testing.
@@ -31,11 +32,13 @@ If you change the port or account prefix, change both the site origin/callback a
 the Google registration. Use the client ID and secret from that same OAuth client.
 See [Google's setup instructions](https://developers.google.com/identity/openid-connect/openid-connect).
 
-For production supply `account.google_enabled=true`, the production client ID,
-its client secret and `https://ttrek.sh/user/google/callback` through the site's
-private configuration mechanism; register that HTTPS callback in Google. Keep the
-client secret private (for SSM use SecureString at
-`/ttrek_sh/prod/account/google_client_secret`). The configuration adapter passes
+For production, set these SSM parameters and register the HTTPS callback in Google:
+
+- `/ttrek_sh/prod/account/google_client_id`: the production OAuth client ID.
+- `/ttrek_sh/prod/account/google_client_secret`: its client secret, as SecureString.
+- `/ttrek_sh/prod/account/google_redirect_uri`: `https://ttrek.sh/user/google/callback`.
+
+The configuration adapter passes
 the secret to the mount's `-secret_config`, never to display properties.
 
 The route manifest includes `POST /user/google/start`, `GET /user/google/callback`
