@@ -550,6 +550,7 @@ test accounts-email-queue-config {SSM String and SecureString queue URLs reach m
         set production [::app_config::account $input $root]
         set display [dict get $production display]
         dict set display prefix /queue-$type
+        dict set display google_enabled false
         set mail [::web::user::mount $queueRouter -store [dict replace $::accounts::store -env PROD] -config $display]
         ::web::user::deliver $mail verify member@example.com 012345
         lappend result $::accountstest::sqs_region $::accountstest::sqs_url

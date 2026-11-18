@@ -185,23 +185,33 @@ test email-queue-http {HTTP envelopes cannot invoke the queue processor} -setup 
     set ::queuetest::calls
 } -cleanup {rename ::site::dispatch {}; ::queuetest::cleanup} -result {}
 
-test email-queue-end-to-end {web-user queue payload is consumed by the worker without changing mail contents} -setup {
+test email-queue-end-to-end {all account emails use the same queue and worker without inline SES or changed contents} -setup {
     ::queuetest::setup
 } -body {
     set config [dict create -prefix /user -deliver {} \
         -store {-env PROD -config {verification_emails_enabled true code_ttl 900}} \
         -config [dict merge [dict get $::queuetest::settings account display] \
             {email_from sender@example.com title Garden origin https://garden.test email_queue_callback ::accounts::email_queued}]]
-    ::web::user::deliver $config verify recipient@example.com 012345
-    set call [lindex $::queuetest::calls 1]
-    set ::queuetest::batches [list [list [dict create ReceiptHandle receipt Body [lindex $call 3]]]]
-    set result [::site_patch::task_process_email_queue {}]
-    set sent [lindex [lsearch -inline -index 1 $::queuetest::calls send_email] 2]
-    set expected [::web::user::email_message $config verify recipient@example.com 012345]
-    set equal 1
-    dict for {key value} $expected {if {[dict get $sent $key] ne $value} {set equal 0}}
-    list $result $equal
-} -cleanup {::queuetest::cleanup} -result {{sent:1 expired:0} 1}
+    set results {}
+    foreach purpose {verify reset login password-changed mfa-enabled mfa-disabled} {
+        set ::queuetest::calls {}
+        ::web::user::deliver $config $purpose recipient@example.com 012345
+        set queued [lmap call $::queuetest::calls {lrange $call 0 1}]
+        if {$queued ne {{sqs create} {sqs send_message} {sqs destroy} {lambda create} {lambda invoke_function} {lambda destroy}}} {
+            error "Unexpected delivery path for $purpose: $queued"
+        }
+        set call [lindex $::queuetest::calls 1]
+        set body [::tjson::json_to_simple [lindex $call 3]]
+        if {([dict get $body expires_at] > 0) != ($purpose in {verify reset login})} {error "Incorrect expiry for $purpose"}
+        set ::queuetest::batches [list [list [dict create ReceiptHandle receipt Body [lindex $call 3]]]]
+        set result [::site_patch::task_process_email_queue {}]
+        set sent [lindex [lsearch -inline -index 1 $::queuetest::calls send_email] 2]
+        set expected [::web::user::email_message $config $purpose recipient@example.com 012345]
+        dict for {key value} $expected {if {[dict get $sent $key] ne $value} {error "Changed $key for $purpose"}}
+        lappend results $result
+    }
+    lsort -unique $results
+} -cleanup {::queuetest::cleanup} -result {{sent:1 expired:0}}
 
 set failed $::tcltest::numTests(Failed)
 cleanupTests

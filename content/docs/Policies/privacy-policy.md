@@ -2,19 +2,30 @@
 
 ![A blue shield with a cream padlock protecting personal information](images/policies/privacy-policy.png)
 
-*Updated November 14, 2026*
+*Updated November 18, 2026*
 
 JERILY LTD runs ttrek.sh. This page explains what information the service uses
 and why.
 
 ## What we collect
 
-- **Account details:** your name, email, protected password, and sign-in and
-  security records when you create an account.
+- **Account details:** your email, any name or password you choose to add, and
+  sign-in and security records. Passwords are protected; you can also use an
+  email code or Google to sign in without setting a password.
 - **Visit details:** technical information such as your IP address, browser,
   requested pages, and errors, to run and protect the site.
 - **Package-use details:** the ttrek tool can send an environment ID, system
   details, package names and versions, and whether an installation worked.
+
+## Signing in with Google
+
+Google sign-in is optional. If you use it, Google shares your email address,
+name, and an account identifier so we can recognize you. We use these details
+to create your account, sign you in, or link Google to an existing account.
+We do not receive your Google password or access your Gmail messages.
+
+You can manage the Google connection in [Your account](/user). Google also
+handles information under its own [Privacy Policy](https://policies.google.com/privacy).
 
 ## Why we use it
 

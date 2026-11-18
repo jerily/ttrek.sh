@@ -89,6 +89,7 @@ fi
 "$TCLSH" tests/invoke-patch-local.test
 "$TCLSH" tests/stage-registry.test
 "$TCLSH" tests/build-lambda.test
+"$TCLSH" tests/api-gateway.test
 "$TCLSH" tests/telemetry-maintenance.test
 "$TCLSH" tests/installer.tcl
 bash devops/generate-prod-config.sh

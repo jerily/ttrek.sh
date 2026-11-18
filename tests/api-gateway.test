@@ -1,0 +1,134 @@
+package require tcltest 2
+package require tjson
+package require tdevops 0.2.3
+namespace import ::tcltest::*
+# Production builds omit the local mocks; still check the deployed routes and
+# normalization there. An installed but broken mock must fail, not be skipped.
+set mockAvailable 1
+if {[catch {package require mock-proxy-app 0.1.2} message options]} {
+    if {[dict get $options -errorcode] ne {TCL PACKAGE UNFOUND} || [llength [package versions mock-proxy-app]]} {
+        return -options $options $message
+    }
+    set mockAvailable 0
+}
+testConstraint mockProxy $mockAvailable
+set root [file dirname [file dirname [file normalize [info script]]]]
+source [file join $root devops generate-api-gateway.tcl]
+namespace eval ::gatewaytest {}
+proc ::gatewaytest::definitions {json} {lindex [::tjson::json_to_typed $json] 1}
+proc ::gatewaytest::generate {args} {
+    exec [info nameofexecutable] [file join $::tdevops::directory main.tcl] generate-api-gateway {*}$args
+}
+set savedEnv [array get ::env]
+set ::env(PROJECT_HOME) $root
+set work [makeDirectory api-gateway-tests]
+set destination [file join $root devops infra 40-api-gateway.json]
+set original [::tdevops::read_text $destination]
+
+test gateway-routes {deployed routes cover production paths with stable IDs, public auth and permission dependencies} -body {
+    set manifest [::tjson::json_to_simple [::tdevops::read_text [file join $root etc routes.json]]]
+    set expected {}
+    foreach route [dict get $manifest routes] {
+        if {[dict exists $route cdn_on_prod] && [dict get $route cdn_on_prod]} continue
+        set path [string trimright [dict get $route path] /]
+        if {$path eq {}} {set path /}
+        lappend expected "[dict get $route method] $path"
+        if {[dict get $route method] eq "GET"} {lappend expected "HEAD $path"}
+    }
+    set template [::tjson::json_to_simple $original]
+    set actual {}; set dependencies SitePermission
+    dict for {name resource} [dict get $template Resources] {
+        if {[dict get $resource Type] ne "AWS::ApiGatewayV2::Route"} continue
+        set properties [dict get $resource Properties]
+        set key [dict get $properties RouteKey]
+        if {$name ne [::site_gateway::route_logical_id $key]} {error "Unstable logical ID: $name"}
+        if {[dict get $properties AuthorizationType] ne "NONE" || [dict exists $properties AuthorizerId]} {error "Unexpected authorizer"}
+        dict set actual $key $name
+        lappend dependencies $name
+    }
+    list [expr {[lsort [dict keys $actual]] eq [lsort -unique $expected]}] \
+        [dict get $actual {GET /user/google/link}] [dict get $actual {HEAD /user/google/link}] \
+        [dict get $actual {POST /forum/topic/{id}}] [dict get $actual {GET /}] [dict get $actual {HEAD /}] \
+        [expr {[lsort $dependencies] eq [lsort [dict get $template Resources ApiStage DependsOn]]}]
+} -result {1 GetUserGoogleLinkRoute HeadUserGoogleLinkRoute PostForumTopicByIdRoute RootRoute HeadRootRoute 1}
+
+test gateway-aliases {trailing-slash aliases collapse independent of declaration and field order; local routes are unchanged} -body {
+    set definitions [::gatewaytest::definitions {[
+        {"method":"GET","path":"/","function":"site"},
+        {"method":"GET","path":"/docs","function":"site"},
+        {"function":"site","path":"/docs/","method":"GET"},
+        {"method":"HEAD","path":"/docs/","function":"site"},
+        {"path":"/other","function":"site"},
+        {"method":"GET","path":"/assets/{path+}","function":"site","cdn_on_prod":true}
+    ]}]
+    set before $definitions; set result {}
+    foreach routes [list $definitions [lreverse $definitions]] {
+        set normalized [::tjson::json_to_simple [::tjson::typed_to_json [list L [::site_gateway::production_routes $routes]]]]
+        lappend result [lsort [lmap route $normalized {list [dict get $route method] [dict get $route path]}]]
+    }
+    lappend result [expr {$before eq $definitions}]
+    set result
+} -result {{{ANY /other} {GET /} {GET /docs} {HEAD /docs}} {{ANY /other} {GET /} {GET /docs} {HEAD /docs}} 1}
+
+test gateway-conflicts {conflicting aliases cannot switch backends} -body {
+    ::site_gateway::production_routes [::gatewaytest::definitions {[
+        {"method":"GET","path":"/docs","function":"site"},
+        {"method":"GET","path":"/docs/","function":"other"}
+    ]}]
+} -returnCodes error -match glob -result {Conflicting API Gateway routes*}
+
+test gateway-invalid-paths {invalid paths fail before generation} -body {
+    set result {}
+    foreach path {{S {}} {S docs} {S //} {S //docs} {S /docs//page} {S /docs//} {NULL {}}} {
+        catch {::site_gateway::production_routes [list [list M [dict create path $path function {S site}]]]} message
+        lappend result [string match {Invalid API Gateway route path*} $message]
+    }
+    lsort -unique $result
+} -result 1
+
+test gateway-cdn-type {CDN flag must be a JSON boolean} -body {
+    set result {}
+    foreach value {{N 0} {N 1} {S true} {NULL {}}} {
+        catch {::site_gateway::production_routes [list [list M [dict create path {S /assets} function {S site} cdn_on_prod $value]]]} message
+        lappend result $message
+    }
+    lsort -unique $result
+} -result {{cdn_on_prod must be a boolean}}
+
+test gateway-installed {the installed tdevops script preserves the complete maintained template, including domain configuration} -constraints mockProxy -body {
+    set output [file join $work generated.json]
+    ::gatewaytest::generate --output $output
+    set generated [::tdevops::read_text $output]
+    set stdout [::gatewaytest::generate --output -]
+    list [expr {$generated eq $original}] \
+        [expr {[::tjson::json_to_simple $stdout] eq [::tjson::json_to_simple $original]}] \
+        [expr {[::tdevops::read_text $destination] eq $original}]
+} -result {1 1 1}
+
+test gateway-failures {invalid public configuration and logical ID collisions never overwrite output or local routes} -constraints mockProxy -body {
+    set output [file join $work guarded.json]
+    ::tdevops::write_text $output sentinel
+    set input [file join $work routes.json]
+    set result {}
+    foreach json {
+        {{"routes":[{"path":"/","function":"site"}],"apiGateway":{"authorizer":{}}}}
+        {{"routes":[{"path":"/a-b","function":"site"},{"path":"/a_b","function":"site"}]}}
+        {{"routes":[{"path":"/","function":"site"},{"path":"/other","function":"other"}]}}
+    } message {{remove apiGateway.authorizer} {Duplicate route logical ID} {Expected one website Lambda function}} {
+        ::tdevops::write_text $input $json
+        set failed [catch {::gatewaytest::generate --routes $input --output $output} error]
+        lappend result [expr {$failed && [string first $message $error] >= 0}] \
+            [expr {[::tdevops::read_text $output] eq "sentinel\n"}] \
+            [expr {[::tdevops::read_text $input] eq "$json\n"}]
+    }
+    lappend result [catch {::gatewaytest::generate --routes $input --output $input}] \
+        [expr {[::tdevops::read_text $destination] eq $original}]
+    lsort -unique $result
+} -result 1
+
+removeDirectory $work
+array unset ::env
+array set ::env $savedEnv
+set failed $::tcltest::numTests(Failed)
+cleanupTests
+exit [expr {$failed > 0}]
