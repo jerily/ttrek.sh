@@ -22,6 +22,16 @@
 .account-panel .account-button:focus-visible { outline: 3px solid #58aafa; outline-offset: 3px; }
 .account-panel .account-button-secondary { background: #f3f7fc; border-color: #c6d5e6; color: #194a7b; box-shadow: none; }
 .account-panel .account-button-secondary:hover { background: #e6eff9; border-color: #9db7d4; }
+.account-signin-options { display: grid; gap: .75rem; width: min(100%, 22rem); margin: 0 auto; }
+.account-signin-options form { margin: 0; }
+.account-panel .account-signin-options .account-button { margin: 0; min-height: 48px; padding: .85rem 1rem; font-weight: 600; box-shadow: 0 2px 4px #172b4608; }
+.account-panel .account-button-google { background: #fff; border-color: #b8c5d4; color: #253e5a; }
+.account-panel .account-button-google:hover { background: #f7f9fc; border-color: #7f98b2; box-shadow: 0 3px 9px #172b4614; }
+.account-panel .account-button-email { background: #f1f6fc; border-color: #d2dfed; color: #225d98; }
+.account-panel .account-button-email:hover { background: #e6eff9; border-color: #9db7d4; }
+.account-button-email svg { flex: 0 0 auto; }
+.account-divider { display: flex; align-items: center; gap: 1rem; margin: 1.8rem 0 1.3rem; color: #708096; font: 600 .72rem/1 system-ui, sans-serif; letter-spacing: .12em; }
+.account-divider::before, .account-divider::after { content: ""; flex: 1; height: 1px; background: #dce5ef; }
 .account-panel .account-danger { color: #b42318; }
 .account-panel .account-danger:hover { color: #8f1c13; }
 .account-panel .account-button-danger { background: #b42318; border-color: #b42318; }

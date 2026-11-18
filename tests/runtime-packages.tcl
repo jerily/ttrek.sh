@@ -46,7 +46,7 @@ foreach name $packages {
             pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 1.0.0}
             web-static-wiki {package require $name 0.1.10}
             web-static-blog {package require $name 0.1.9}
-            web-user {package require $name 0.6.0}
+            web-user {package require $name 0.6.1}
             web-forum {package require $name 0.3.1}
             tcaptcha {package require $name 1.0.0}
             tconfig::decrypt - tconfig::encrypt {package require $name 1.0.2}

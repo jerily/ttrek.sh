@@ -153,6 +153,8 @@
         "GetUserAdminUsersRoute",
         "GetUserChangePasswordRoute",
         "GetUserCloseAccountRoute",
+        "GetUserEmailLoginRoute",
+        "GetUserEmailLoginVerifyRoute",
         "GetUserForgotRoute",
         "GetUserGoogleCallbackRoute",
         "GetUserLoginRoute",
@@ -197,6 +199,8 @@
         "HeadUserAdminUsersRoute",
         "HeadUserChangePasswordRoute",
         "HeadUserCloseAccountRoute",
+        "HeadUserEmailLoginRoute",
+        "HeadUserEmailLoginVerifyRoute",
         "HeadUserForgotRoute",
         "HeadUserGoogleCallbackRoute",
         "HeadUserLoginRoute",
@@ -214,6 +218,8 @@
         "PostTelemetryRegisterByEnvironmentIdRoute",
         "PostUserChangePasswordRoute",
         "PostUserCloseAccountRoute",
+        "PostUserEmailLoginRoute",
+        "PostUserEmailLoginVerifyRoute",
         "PostUserForgotRoute",
         "PostUserGoogleStartRoute",
         "PostUserGoogleUnlinkRoute",
@@ -993,6 +999,48 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /user/close-account",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserEmailLoginRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/email-login",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserEmailLoginVerifyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/email-login/verify",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -1931,6 +1979,48 @@
         }
       }
     },
+    "HeadUserEmailLoginRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/email-login",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserEmailLoginVerifyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/email-login/verify",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
     "HeadUserForgotRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -2274,6 +2364,48 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "POST /user/close-account",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserEmailLoginRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/email-login",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostUserEmailLoginVerifyRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /user/email-login/verify",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [

@@ -27,6 +27,7 @@ test('fingerprints track exact bytes, rebuilds are stable, and old URLs survive'
         for (const [name, bytes] of Object.entries(sources)) await put(name, bytes);
         for (const filename of stylesheets) await put(`public/css/${filename}`, `/* ${filename} */\n`);
         const first = await buildAssets(root);
+        assert.match(first['/css/accounts.css'], /^\/assets\/versioned\/css\/accounts\.[0-9a-f]{16}\.css$/);
         assert.equal(Object.keys(first).length, 4 + stylesheets.length + 1);
         assert.equal(await readFile(path.join(root, 'public/css/site.css'), 'utf8'), stylesheets.map(name => `/* ${name} */\n\n`).join(''));
         for (const [original, hashed] of Object.entries(first)) {

@@ -565,6 +565,36 @@ test accounts-email-queue-config {SSM String and SecureString queue URLs reach m
     rename ::accountstest::ssm_queue {}
 } -result {0 eu-central-1 https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails 1 eu-central-1 https://sqs.eu-central-1.amazonaws.com/123456789012/user-emails}
 
+test accounts-email-login {site email-code sign-in uses CAPTCHA, preserves return_to and records the completed login} -setup {
+    set savedCookie $::accountstest::cookie
+    set savedCsrf $::accountstest::csrf
+    set ::accountstest::cookie {}; set ::accountstest::csrf {}
+    set store $::accounts::store
+    set uid user_[::ksuid::generate_ksuid]
+    set email code-login@example.com
+    ::web::user::insert $store web_user_users [dict create id $uid active 1 verified 1 \
+        email_key [::web::user::email_key $store $email] email [::web::user::seal $store $email [list email $uid]] \
+        password {} mfa_secret {} last_step -1 revision 0 created_at [clock seconds]]
+} -body {
+    set result [list [::accountstest::request GET /user/login]]
+    lappend result [string match {*Login</h1>*Email me a one-time code*OR*Email <input*Password <input*} [dict get $::accountstest::last body]]
+    lappend result [::accountstest::request GET /user/email-login?return_to=%2Fdocs]
+    lappend result [::accountstest::request POST /user/email-login?return_to=%2Fdocs [dict create email $email]]
+    regexp {name="captcha_id" value="([^"]+)"} [dict get $::accountstest::last body] -> id
+    lappend result [::accountstest::request POST /user/email-login?return_to=%2Fdocs [dict create \
+        email $email captcha_id $id captcha_answer $::accountstest::answer]]
+    regexp {id="local-code">([0-9]+)</code>} [dict get $::accountstest::last body] -> code
+    lappend result [::accountstest::request POST /user/email-login/verify?return_to=%2Fdocs [dict create code $code]] \
+        [dict get $::accountstest::last headers Location] \
+        [expr {[dict get [::web::user::user_by_id $store $uid] last_email_login_at] > 0}]
+    set result
+} -cleanup {
+    ::web::user::revoke $store $uid
+    ::web::user::remove $store web_user_users [dict create id $uid]
+    set ::accountstest::cookie $savedCookie
+    set ::accountstest::csrf $savedCsrf
+} -result {200 1 200 400 200 302 /docs 1}
+
 rename ::tcaptcha::image {}
 rename ::tcaptcha::site_test_image ::tcaptcha::image
 $::site::router destroy
