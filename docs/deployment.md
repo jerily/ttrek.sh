@@ -807,10 +807,11 @@ replacement and preserve needed cache data before updating an existing cache.
 
 ```sh
 ttrek install -D -force -registry ../private-ttrek-registry -add-pubreg tdevops
-python3 devops/generate-api-gateway.py
+ttrek run -package tdevops -script generate-api-gateway
 ```
 
-The site generator reads `etc/routes.json`, omits routes marked
+The Tcl hook in `devops/generate-api-gateway.tcl`, configured through
+`api-gateway-hook` in `etc/tdevops.tcl`, reads `etc/routes.json`, omits routes marked
 `cdn_on_prod: true`, and collapses trailing-slash aliases such as `/docs/` into
 `/docs` before passing routes to tdevops. API Gateway rejects empty path segments;
 the generator rejects interior `//` and aliases with conflicting backends.
@@ -825,7 +826,9 @@ The generator preserves the deployed logical IDs and the domain, certificate,
 mapping, DNS and related outputs maintained in `devops/infra/40-api-gateway.json`.
 It writes the complete result to `dist/api-gateway.json` and copies it to that
 tracked template. Review the diff before deploying with `40-deploy-api-gateway.sh`.
-The local mock ignores deployment settings. Generation does not deploy AWS resources.
+The local mock ignores deployment settings. Generation does not deploy AWS
+resources. Use `-- --output FILE` to write only to another file, or
+`-- --output -` to print JSON without changing either template.
 
 Both website routes specify `prod-Api-TtrekWebsite-Function:DEFAULT`. The generator
 already accepts qualified names and uses the same target for integration and

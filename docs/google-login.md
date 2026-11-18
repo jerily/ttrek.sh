@@ -1,6 +1,6 @@
 # Google Login for local development and production
 
-The account UI uses `web-user` 0.6.2 and `pure-tcl-oauth2-client`. Install the new
+The account UI uses `web-user` 0.7.0 and `pure-tcl-oauth2-client`. Install the new
 core/client packages and updated native dependencies (`tjson` 1.0.28,
 `tink-tcl` 20240704.0.3, `thashlib` 0.1.1) before starting the site. Run the normal
 account schema initialization once to add identity and transaction tables.
@@ -53,7 +53,7 @@ This network fix does not require changing account keys or rebuilding Lambda.
 
 The route manifest includes `GET/HEAD /user/google/link`, `POST /user/google/start`,
 `GET /user/google/callback` and `POST /user/google/unlink`. Regenerate the API Gateway template with
-`python3 devops/generate-api-gateway.py` after changing routes. It writes
+`ttrek run -package tdevops -script generate-api-gateway` after changing routes. It writes
 `dist/api-gateway.json` and `devops/infra/40-api-gateway.json`; deploy the updated
 template through `devops/infra/40-deploy-api-gateway.sh` with the application release.
 

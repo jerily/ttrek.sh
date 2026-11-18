@@ -19,9 +19,14 @@
     package-help devops/package-usage.txt
     local-help devops/local-usage.txt
     local-hook ::project_devops::local
+    api-gateway-hook ::project_devops::api_gateway
 }
 
 namespace eval ::project_devops {}
+proc ::project_devops::api_gateway {options} {
+    source [file join $::tdevops::root devops generate-api-gateway.tcl]
+    ::site_gateway::main $options
+}
 # Configure local services from the checkout settings.
 proc ::project_devops::local {options work} {
     set root $::tdevops::root
