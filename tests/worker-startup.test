@@ -152,7 +152,10 @@ test worker-templates {an HTML response loads only reached templates and no acco
     }
 } -cleanup {interp delete $w} -result {400 1 1 0 {} 0}
 
-test worker-eager {eager prewarms code and templates, while SQL still waits for a consumer} -setup {
+# LOCAL eager startup preloads the SQLite session backend, omitted in production.
+testConstraint sqliteSession [expr {![catch {package require tsession-sqlite 1.0.1}]}]
+
+test worker-eager {eager prewarms code and templates, while SQL still waits for a consumer} -constraints sqliteSession -setup {
     set w [worker eager]
 } -body {
     $w eval {
@@ -162,7 +165,7 @@ test worker-eager {eager prewarms code and templates, while SQL still waits for 
     }
 } -cleanup {interp delete $w} -result {{web-user web-forum web-static-wiki web-static-blog treqmon jinja2} 1 0 {}}
 
-test worker-mode-parity {both modes retain identical route matching, rendered responses and HEAD behavior} -setup {
+test worker-mode-parity {both modes retain identical route matching, rendered responses and HEAD behavior} -constraints sqliteSession -setup {
     set lazy [worker]; set eager [worker eager]
 } -body {
     set checks {}
