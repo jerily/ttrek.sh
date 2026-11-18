@@ -263,7 +263,11 @@ proc ::site::invoke {handler name request context params} {
 # Normalize the request and preserve package-owned response policies.
 proc ::site::dispatch {router request {context {}}} {
     set profiling [::site_profile::begin $context]
-    set code [catch {dispatch_request $router $request $context} result options]
+    set code [catch {
+        package require web-user::request 1.0
+        set method [expr {[dict exists $request method] ? [dict get $request method] : [dict get $request httpMethod]}]
+        ::web::user::with_request $method [list dispatch_request $router $request $context]
+    } result options]
     if {$profiling} {::site_profile::finish $code}
     return -options $options $result
 }

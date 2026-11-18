@@ -1,4 +1,4 @@
-# Shared browser-asset publication for deployment and task_sync_website.
+# Browser-asset publication during deployment.
 namespace eval ::browser_assets {}
 
 # Collect local files recursively for asset publication.

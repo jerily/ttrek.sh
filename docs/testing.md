@@ -54,6 +54,15 @@ Both run in CI independently of the optional SQLite-backed suites. Packaging
 calls the same template providers before its SQLite availability check; existing
 SQLite fixture checks remain skipped when the driver is absent.
 
+Query-count regressions in `accounts.test` cover a fresh email-login GET (four
+statements) and authenticated Forum/Docs/Blog/Account pages with the fixture's
+in-memory monitor. `homepage.test` checks three package-owned metadata queries.
+`package-tracker.test` verifies one batched hash write and atomic publication.
+These counts are fixture measurements, not production latency estimates.
+
+This optimization requires tpersist 0.1.6, web-user 0.7.3, web-static-wiki 0.1.13
+and web-static-blog 0.1.12. Resolve the site's updated dependency manifest from their published registry recipes.
+
 `tests/runtime-packages.tcl` loads runtime and development packages without starting services.
 `tests/test_lambda_versions.py` uses fake AWS responses to verify version retention,
 alias/weighted-target protection, stack ownership, failure handling, dry runs and
@@ -61,11 +70,14 @@ qualified deletion. It also exercises the API deployment script with fake AWS/Tc
 commands to check name/ARN overrides without deploying. CodeBuild runs this suite
 before deploying.
 `ttrek run tclsh9.1 tests/lambda-package.tcl dist/ttrek-sh.zip` checks a production
-ZIP's release settings, bundled checksum manifest, image settings and bytes, and
-exclusion of host config.
+ZIP's release settings, bundled checksum manifest, prepared content snapshot,
+and exclusion of content image bytes and host config.
 CodeBuild runs this after packaging and finalization, before deployment; it needs
 neither decrypted credentials nor running services.
-`tests/content-images-build.test` uses a fake S3 client to verify upload
+`tests/test_finalize_lambda.py` checks image pruning and preservation of runtime
+files; `tests/build-lambda.test` checks that upload failures stop finalization.
+`tests/content-images-build.test` stubs AWS CLI sync to check image-only staging,
+collection prefixes, cleanup and failure propagation, and uses a fake S3 client to verify upload
 separate docs/blog paths, repeat-sync change detection, validation before uploads, build failure
 on S3 errors, and production rendering without S3 calls. Config and image tests
 cover the PROD-only CloudFront toggle, imported URL validation, path encoding,
@@ -267,7 +279,8 @@ local route manifest; `tests/test_api_gateway_routes.py` verifies that productio
 omits CDN routes and uses meaningful, unique logical IDs. Account tests verify
 monitor grants and immediate revocation for direct and Lambda requests. Forum and
 browser-asset tests cover CDN template context, stable paths, uploaded bytes, and
-MIME types; patch tests ensure upload failures stop content synchronization.
+MIME types; patch tests verify production sync imports prepared references
+without local image files or uploads.
 
 The recent-request tests check the 100-entry bound, newest-first order, missing
 user agents, trusted IPs, omission of other headers/query strings, HTML escaping,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check required runtime files and set executable ZIP attributes for Lambda."""
+"""Check runtime files, omit deployed content images, and set executable modes."""
 import os
 from pathlib import Path
 import stat
@@ -7,17 +7,26 @@ import sys
 import tempfile
 import zipfile
 
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg", ".ico", ".bmp"}
+
+
+def content_image(name):
+    return name.startswith("content/") and Path(name).suffix.lower() in IMAGE_EXTENSIONS
+
 
 def finalize(path):
     descriptor, temporary = tempfile.mkstemp(dir=path.parent, suffix=".zip")
     os.close(descriptor)
     try:
         with zipfile.ZipFile(path) as source, zipfile.ZipFile(temporary, "w") as target:
-            for required in ("bootstrap", "local/bin/tclsh", "etc/config.ini", "etc/releases.json"):
+            for required in ("bootstrap", "local/bin/tclsh", "etc/config.ini", "etc/releases.json",
+                             "etc/content-snapshot.data"):
                 source.getinfo(required)
             if "etc/config.local.ini" in source.namelist():
                 raise ValueError("Local configuration must not be in the deployment archive")
             for entry in source.infolist():
+                if content_image(entry.filename):
+                    continue
                 if entry.filename in ("bootstrap", "local/bin/tclsh"):
                     entry.create_system = 3
                     entry.external_attr = (stat.S_IFREG | 0o755) << 16

@@ -9,7 +9,7 @@ cd "$SITE_ROOT"
 TTREK_BIN_DIR="$SITE_ROOT/build/ttrek"
 mkdir -p "$TTREK_BIN_DIR"
 # Override with an artifact built from ttrek's installation USE-flag changes.
-TTREK_BINARY_S3_URI=${TTREK_BINARY_S3_URI:-s3://jerily-ttrek-app/ttrek/1.6.0/linux-amd64-glibc/ttrek}
+TTREK_BINARY_S3_URI=${TTREK_BINARY_S3_URI:-s3://jerily-ttrek-app/ttrek/1.7.0/linux-amd64-glibc/ttrek}
 aws s3 cp "$TTREK_BINARY_S3_URI" \
   "$TTREK_BIN_DIR/ttrek" --only-show-errors
 chmod 0755 "$TTREK_BIN_DIR/ttrek"
@@ -52,6 +52,7 @@ npm test
 "$TCLSH" tests/profile.test
 python3 -m unittest discover -s tests -p 'test_lambda_versions.py'
 python3 -m unittest discover -s tests -p 'test_vpc_network.py'
+python3 -m unittest discover -s tests -p 'test_finalize_lambda.py'
 # Run SQLite-backed tests only when the existing installation provides SQLite.
 # A broken installed driver must still fail the build.
 HAS_SQLITE=$("$TCLSH" <<'TCL'
@@ -99,8 +100,11 @@ bash devops/generate-prod-config.sh
 export TTREK_PRODUCTION_CONFIG="$SITE_ROOT/build/prod/config.ini"
 # Build on AL2023 and skip tdevops' numeric glibc cutoff, which rejects backports.
 ttrek run -script package-lambda -- --local-only
+sam validate --lint --template-file devops/sam-template.yaml
+# Publish while source images are available. A failed sync stops the deployment
+# before finalization removes images from the production ZIP.
+"$TCLSH" devops/upload-content-images.tcl "$TTREK_PRODUCTION_CONFIG"
 python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 "$TCLSH" tests/lambda-package.tcl dist/ttrek-sh.zip
-sam validate --lint --template-file devops/sam-template.yaml
 aws s3 sync public/assets/versioned/ "$ASSET_HISTORY" --only-show-errors
 "$TCLSH" devops/upload-browser-assets.tcl "$TTREK_PRODUCTION_CONFIG"

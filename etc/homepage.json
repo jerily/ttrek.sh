@@ -20,6 +20,11 @@
       "kicker": "From the blog",
       "link_text": "Read the latest post",
       "highlights": {
+        "/2026-11-18-ttrek-170-step-into-your-project": {
+          "description": "Open an interactive shell with your project's installed tools ready to use, then deactivate when you are done.",
+          "version": "1.7.0",
+          "note": "Step into your project's environment."
+        },
         "/2026-11-17-ttrek-160-see-your-build-before-it-starts": {
           "description": "Programming languages in your install plan, USE flags for each installation, and earlier checks for missing build requirements.",
           "version": "1.6.0",

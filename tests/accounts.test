@@ -138,6 +138,17 @@ rename ::tcaptcha::image ::tcaptcha::site_test_image
 # Capture the generated answer only inside this test interpreter.
 proc ::tcaptcha::image {text} {set ::accountstest::answer $text; site_test_image $text}
 
+test accounts-anonymous-query-count {fresh email login creates both throttle buckets and sessions in four statements} -body {
+    set ::account_queries 0
+    proc count_account_queries {args} {incr ::account_queries}
+    trace add execution ::tpersist::db_execute enter count_account_queries
+    try {set status [::accountstest::request GET /user/email-login]} finally {
+        trace remove execution ::tpersist::db_execute enter count_account_queries
+        rename count_account_queries {}
+    }
+    list $status $::account_queries
+} -cleanup {set ::accountstest::cookie {}; set ::accountstest::csrf {}} -result {200 4}
+
 test accounts-config {site defaults enable CAPTCHA, six-character password minimum, and persistent development keys} -body {
     set again [::app_config::account {} $root $work]
     list [dict get $account policy registration_captcha] [dict get $account policy password_min_length] \
@@ -247,6 +258,20 @@ test accounts-register {real registration uses the shared layout, CAPTCHA and re
     lappend result [string match {*class="pure-menu-link">Account</a>*} [dict get $::accountstest::last body]]
     set result
 } -result {200 1 1 1 no-store 200 200 200 1}
+
+test accounts-shared-query-count {authentication, handler and navigation share identity reads across mounted pages} -body {
+    proc count_account_queries {args} {incr ::account_queries}
+    set result {}
+    foreach path {/forum /docs /blog /user/} {
+        set ::account_queries 0
+        trace add execution ::tpersist::db_execute enter count_account_queries
+        try {set status [::accountstest::request GET $path]} finally {
+            trace remove execution ::tpersist::db_execute enter count_account_queries
+        }
+        lappend result $status $::account_queries
+    }
+    set result
+} -cleanup {rename count_account_queries {}; unset ::account_queries} -result {200 6 200 5 200 5 200 5}
 
 test accounts-monitor-access {Live group permissions control the link and all monitor paths in direct and Lambda dispatch} -setup {
     set savedCookie $::accountstest::cookie

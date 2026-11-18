@@ -201,11 +201,19 @@ if {$valkey_available} {
 
 test tracker-cache {One atomically published generation serves rankings and package charts} -constraints valkey -body {
     ::package_tracker::cache SET ttrek:package-tracker:v2:lock fixture EX 240
-    ::package_tracker::publish $snapshot fixture
+    set ::tracker_writes 0
+    proc count_tracker_writes {command args} {
+        if {[lindex $command 1] eq "HSET"} {incr ::tracker_writes}
+    }
+    trace add execution ::package_tracker::cache enter count_tracker_writes
+    try {::package_tracker::publish $snapshot fixture} finally {
+        trace remove execution ::package_tracker::cache enter count_tracker_writes
+        rename count_tracker_writes {}
+    }
     set cached [::package_tracker::read rising]
     list [dict get $cached pkg:rising total] [dict get $cached meta as_of] \
-        [llength [dict get [::package_tracker::read] new rows]]
-} -result [list 12 $now 5]
+        [llength [dict get [::package_tracker::read] new rows]] $::tracker_writes
+} -result [list 12 $now 5 1]
 
 test tracker-metric-format {Installation snapshots cannot be displayed as unique downloads} -constraints valkey -body {
     set old $snapshot

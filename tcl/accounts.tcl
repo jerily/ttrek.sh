@@ -45,7 +45,7 @@ proc ::accounts::mount {router settings templates args} {
     set secret [::private_config::option {*}$args]
     variable store
     variable mount
-    package require web-user 0.7.2
+    package require web-user 0.7.3
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]
@@ -66,7 +66,7 @@ proc ::accounts::mount {router settings templates args} {
 proc ::accounts::prepare {settings args} {
     variable store
     variable mount
-    package require web-user 0.7.2
+    package require web-user 0.7.3
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]

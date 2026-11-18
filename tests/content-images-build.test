@@ -155,6 +155,53 @@ test build-images-bucket {an absent production bucket fails before any uploads} 
     ::content_images::upload $build_images::root [dict replace $build_images::settings bucket {}]
 } -cleanup ::build_images::cleanup -returnCodes error -result {Production image uploads require content_images.bucket}
 
+source [file join $root devops upload-content-images.tcl]
+proc ::build_images::aws_setup {} {
+    setup
+    variable awsCalls {}
+    variable awsFail false
+    variable staging {}
+    rename ::exec ::build_images::real_exec
+    proc ::exec {args} {
+        if {[lrange $args 0 2] ne {aws s3 sync}} {tailcall ::build_images::real_exec {*}$args}
+        set source [lindex $args 3]
+        set ::build_images::staging [file dirname [string trimright $source /]]
+        set channel [open [file join $source images pixel.png] rb]
+        try {set bytes [read $channel]} finally {close $channel}
+        lappend ::build_images::awsCalls [list [lindex $args 4] $bytes \
+            [expr {"--delete" in $args}] [glob -nocomplain -directory $source *.md]]
+        if {$::build_images::awsFail} {error {AWS sync failed}}
+    }
+}
+proc ::build_images::aws_cleanup {} {
+    rename ::exec {}
+    rename ::build_images::real_exec ::exec
+    cleanup
+}
+
+test build-images-aws {Deployment syncs only image bytes under separate collection prefixes} \
+        -setup ::build_images::aws_setup -body {
+    ::content_images::upload_aws $build_images::root $build_images::settings
+    lassign $build_images::awsCalls docs blog
+    list [lindex $docs 0] [binary encode hex [lindex $docs 1]] [lrange $docs 2 end] \
+        $blog [file exists $build_images::staging] $build_images::calls
+} -cleanup ::build_images::aws_cleanup \
+    -result {s3://test-images/ttrek/content/images/docs/ 89504e470d0a00ff {0 {}} {s3://test-images/ttrek/content/images/blog/ blog-image 0 {}} 0 {}}
+
+test build-images-aws-invalid {Invalid references abort before either AWS sync} \
+        -setup ::build_images::aws_setup -body {
+    ::build_images::write [file join $build_images::root content blog 2026-11-11-guide.md] \
+        {![Missing](images/missing.png)}
+    list [catch {::content_images::upload_aws $build_images::root $build_images::settings}] $build_images::awsCalls
+} -cleanup ::build_images::aws_cleanup -result {1 {}}
+
+test build-images-aws-failure {AWS errors propagate and temporary image copies are removed} \
+        -setup ::build_images::aws_setup -body {
+    set build_images::awsFail true
+    set failed [catch {::content_images::upload_aws $build_images::root $build_images::settings} message]
+    list $failed $message [llength $build_images::awsCalls] [file exists $build_images::staging]
+} -cleanup ::build_images::aws_cleanup -result {1 {AWS sync failed} 1 0}
+
 set failed $::tcltest::numTests(Failed)
 cleanupTests
 exit [expr {$failed > 0}]

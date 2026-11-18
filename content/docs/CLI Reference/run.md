@@ -3,6 +3,8 @@
 Run a named shell script from the project's `ttrek.json`, or a command in its
 installed environment.
 
+For an interactive Bash or Zsh session, use [ttrek activate](/docs/cli-reference/activate).
+
 ## Usage
 
 ```text

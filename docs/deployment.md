@@ -443,8 +443,8 @@ The build:
 
 1. Downloads the CLI selected by `TTREK_BINARY_S3_URI`, makes it executable,
    and checks it with `ttrek self-update -version`. Before using these recipes,
-   upload a tested 1.6.0 binary at the configured S3 URI (or override the URI).
-   The 1.6.0 default supports unsigned `iuse`, default-disabled flags and
+   upload a tested 1.7.0 binary at the configured S3 URI (or override the URI).
+   The 1.7.0 default supports unsigned `iuse`, default-disabled flags and
    conditional project dependencies; configuring this URI does not publish it.
 2. Runs `ttrek sync` into `build/public-registry`, then installs from the private
    registry followed by that public checkout. A fresh production `ttrek-venv`
@@ -466,43 +466,40 @@ The build:
    ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,
    dependency resolution, and staged-site checks still run.
-5. Validates the SAM template and packaged image settings/bytes, preserves the
-   new asset fingerprints, and deploys `devops/sam-template.yaml` with SAM.
-   When CDN delivery is enabled, browser assets are uploaded before SAM deployment.
-   Content images are uploaded by the explicit `task_sync_website` patch task.
+5. Validates the SAM template, then uploads validated docs/blog images with
+   `devops/upload-content-images.tcl`, using `aws s3 sync` under each collection's
+   S3 prefix. Upload failures stop the build. Finalization removes all content
+   image bytes (including original artwork) from the Lambda ZIP. The archive
+   check verifies the prepared content snapshot and image exclusion.
+   It preserves new asset fingerprints, uploads browser assets when CDN delivery
+   is enabled, and deploys `devops/sam-template.yaml` with SAM.
 
-Content images use `[content_images]` in `devops/config.prod.ini`, which is carried
-into the generated production config. After deploying content changes, run the
-[explicit sync patch task](#explicit-website-patch-tasks). It uses the website
-Lambda role to upload missing or changed wiki and blog images before committing their
-database references. Validation or upload errors fail the task and roll back
-its database changes. Keys preserve paths under `<prefix>/docs/` and
-`<prefix>/blog/`. SHA-256 comparisons skip unchanged bytes; changes replace the
-same key. S3 replacements are independent of the SQL transaction. Each response
-uses signed S3 URLs or CloudFront paths according to the production setting.
-Production startup and HTTP requests make no S3 listing or upload calls for
-images. Local workers still upload missing images to their configured bucket or
-local S3 mock. `task_initdb_website` initializes schemas and runs the temporary
-account password-hash encryption upgrade described below.
+Content images use `[content_images]` in `devops/config.prod.ini`, carried into
+the generated production config. Deployment validates both collections and
+stages only recognized image files for `aws s3 sync`; Markdown and other source
+files are not uploaded. Keys preserve paths under `<prefix>/docs/` and
+`<prefix>/blog/`. Existing objects are updated, and old keys are retained for
+existing pages and rollbacks (`--delete` is never used). This upload also runs
+when CloudFront is disabled, for signed S3 delivery.
 
-Before relying on patch-task uploads, update the S3 gateway endpoint policy with
-`bash devops/infra/38-deploy-infra-rds-postgres.sh`. It allows `s3:GetObject` and
-`s3:PutObject` for the configured image prefix, `s3:PutObject` for the browser asset
-prefix, and `s3:ListBucket` restricted to those two prefixes, alongside existing
-backup writes. Set `BROWSER_ASSETS_PREFIX` when using a prefix other than `cdn`.
-The SAM Lambda role already grants the corresponding permissions;
-the [endpoint policy](https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html#edit-vpc-endpoint-policy-s3)
-must also allow these calls.
-Deploying the website does not run the sync task automatically.
+Packaging prepares `etc/content-snapshot.data` from the Markdown and validated
+image references while the source images are present. The production ZIP keeps
+this data and the Markdown, but omits content images. After deployment, run the
+[explicit sync patch task](#explicit-website-patch-tasks) to import the snapshot
+and registry into the database in one transaction. Production `task_sync_website`
+does not upload images or browser assets. Missing snapshots or mismatched bucket
+and prefix settings fail before database changes. Local synchronization continues
+to use the packages' normal image upload path with its configured S3 mock.
+Deploying the website does not run the database sync task automatically.
 
 The defaults use bucket `jerily-ttrek-app`, region `eu-central-1`, prefix
-`ttrek/content/images`, `docs_directory=content/docs`, and `blog_directory=content/blog`. If changing the bucket or
-prefix, keep the PostgreSQL stack's endpoint and SAM
-`ContentImagesBucket`/`ContentImagesPrefix` parameters aligned with the generated
-production configuration (including any SSM overrides). Production image
-directories must be included under `content/`
-in the Lambda archive. The build checks their paths and bytes against the
-checkout; the patch task uploads images from the deployed archive.
+`ttrek/content/images`, `docs_directory=content/docs`, and
+`blog_directory=content/blog`. Keep the CodeBuild, CloudFront and SAM bucket and
+prefix parameters aligned with the generated production configuration, including
+SSM overrides. CodeBuild needs List/Get/Put access under the image prefix; the
+existing CodeBuild policy provides it. Content directories must remain under
+`content/` in the archive. No image upload permissions or S3 gateway upload calls
+are needed by the production patch task.
 
 ### Content image CDN
 
@@ -692,8 +689,11 @@ export TTREK_CONFIG_KMS_KEY=$(aws cloudformation describe-stacks \
   --query 'Stacks[0].Outputs[?OutputKey==`TTrekKMSMasterKeyArn`].OutputValue | [0]' --output text)
 bash devops/generate-prod-config.sh
 TTREK_PRODUCTION_CONFIG="$PWD/build/prod/config.ini" ttrek run -script package-lambda -- --local-only
-python3 devops/finalize-lambda.py dist/ttrek-sh.zip
 sam validate --lint --template-file devops/sam-template.yaml
+ttrek run tclsh9.1 devops/upload-content-images.tcl build/prod/config.ini
+python3 devops/finalize-lambda.py dist/ttrek-sh.zip
+TTREK_PRODUCTION_CONFIG="$PWD/build/prod/config.ini" ttrek run tclsh9.1 tests/lambda-package.tcl dist/ttrek-sh.zip
+ttrek run tclsh9.1 devops/upload-browser-assets.tcl build/prod/config.ini
 aws s3 sync public/assets/versioned/ s3://jerily-ttrek-app/lambda/ttrek-sh-assets/ --only-show-errors
 sam deploy --template-file devops/sam-template.yaml \
   --stack-name Infra-DevOps-TTREK-Lambda \
@@ -710,8 +710,9 @@ Build deployment packages and their native dependencies on AL2023 for the target
 Lambda architecture. Here `--local-only` bypasses the glibc version check; it
 does not change the production configuration or prevent deployment. Compatibility
 with the Lambda runtime is not verified by this packaging step.
-`finalize-lambda.py` requires the production configuration and release manifest,
-and sets the executable ZIP attributes for `bootstrap` and `local/bin/tclsh`.
+`finalize-lambda.py` requires the production configuration, release manifest and
+prepared content snapshot. After the image upload succeeds, it removes content
+images and sets executable ZIP attributes for `bootstrap` and `local/bin/tclsh`.
 CodeBuild then checks that the packaged configuration loads the exact checkout
 manifest before deploying. The packaging file list explicitly includes
 `etc/releases.json`; staged validation catches missing or invalid checksum files.
@@ -881,8 +882,8 @@ may not recognize the action because it is absent from the published action list
 The existing website Lambda accepts private direct invocations with
 `{"source":"ttrek.patch","task":"task_initdb_website"}` or
 `{"source":"ttrek.patch","task":"task_sync_website"}`. The first initializes the
-installed packages' schemas; the second synchronizes wiki/blog content, images,
-and the bundled registry's complete recipes, then publishes both search indexes
+installed packages' schemas; the second imports prepared wiki/blog content and
+image references, plus the bundled registry's complete recipes, then publishes both search indexes
 in the same transaction. The sync is invoked manually after deployment;
 CodeBuild never runs it.
 
@@ -1051,13 +1052,12 @@ are collected for new requests after upgrading. After deployment, run
 `task_sync_access` to apply configured groups and grants to the account store.
 
 Forum/editor assets and the admin stylesheet use stable paths under the configured
-CloudFront asset prefix. `task_sync_website` uploads all browser assets to S3 before
-committing its SQL content sync; upload failures fail the task. These files share
-the existing CloudFront caching behavior used for stable browser assets.
-The Lambda and PostgreSQL stacks' `BrowserAssetsPrefix` parameters must match
-`content_images.assets_prefix` and the CDN stack. Deploy both the Lambda IAM policy
-and the PostgreSQL stack's S3 endpoint policy before running the task.
-The same upload implementation is used by the deployment asset uploader.
+CloudFront asset prefix. Deployment uploads these through
+`devops/upload-browser-assets.tcl` before SAM updates Lambda; upload failures stop
+the build. The upload block in `task_sync_website` is commented out. These files
+share the existing CloudFront caching behavior used for stable browser assets.
+The CodeBuild and CDN stack prefix parameters must match
+`content_images.assets_prefix`.
 
 The package changes required by this update are tratelimit 1.1.1, treqmon 2.3.0, web-user 0.5.6,
 web-forum 0.3.2, and tdevops 0.2.2. The first four recipes are in

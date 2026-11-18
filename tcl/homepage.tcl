@@ -85,11 +85,24 @@ proc ::homepage::resolve {entries stores} {
     set slides {}
     set seen {}
     set pages {}
-    set listed {}
-    set posts {}
-    set items {}
+    set post {}
+    set paths {}
+    set names {}
+    foreach entry $entries {
+        if {![dict exists $entry type]} continue
+        if {[dict get $entry type] in {example doc} && [dict exists $entry path] &&
+            ![catch {::web::static::wiki::canonical_path [dict get $entry path]} path]} {lappend paths $path}
+        if {[dict get $entry type] eq "packages" && [dict exists $entry packages]} {
+            lappend names {*}[lrange [dict get $entry packages] 0 2]
+        }
+    }
     # Either collection may be unavailable independently during provisioning.
-    catch {set posts [::web::static::blog::posts [dict get $stores blog]]}
+    catch {set post [::web::static::blog::latest_post [dict get $stores blog]]}
+    catch {set pages [::web::static::wiki::page_summaries [dict get $stores wiki] $paths]}
+    set catalog {}
+    if {[llength $names]} {
+        catch {set catalog [::recipe_search::catalog_entries [::recipe_search::database registry_catalog [lsort -unique $names]]]}
+    }
     foreach entry $entries {
         try {
             set id [dict get $entry id]
@@ -102,31 +115,19 @@ proc ::homepage::resolve {entries stores} {
                 example - doc {
                     set path [dict get $entry path]
                     ::web::static::wiki::canonical_path $path
-                    set parent [file dirname $path]
-                    # Articles may live in folders. Query each configured parent
-                    # once, without reading unrelated article bodies or directories.
-                    if {![dict exists $listed $parent]} {
-                        foreach page [::web::static::wiki::children [dict get $stores wiki] $parent] {
-                            if {[dict get $page item_type] eq "page"} {dict set pages [dict get $page path] $page}
-                        }
-                        dict set listed $parent 1
-                    }
                     if {![dict exists $pages $path]} {continue}
                     foreach key {title description} {dict set fields $key [list S [dict get $entry $key]]}
                     dict set fields url [list S /docs$path]
                     if {$type eq "example"} {
-                        if {![dict exists $items $path]} {
-                            dict set items $path [::web::static::wiki::load [dict get $stores wiki] $path]
-                        }
-                        dict set fields image_html [list S [image $entry [dict get $stores wiki] [dict get $items $path]]]
+                        set item [::web::static::wiki::summary_images [dict get $stores wiki] [dict get $pages $path]]
+                        dict set fields image_html [list S [image $entry [dict get $stores wiki] $item]]
                         dict set fields preview_label [list S [dict get $entry preview_label]]
                     } else {
                         dict set fields commands [list S [dict get $entry commands]]
                     }
                 }
                 latest_blog {
-                    if {![llength $posts]} {continue}
-                    set post [lindex $posts 0]
+                    if {$post eq {}} {continue}
                     set path [dict get $post path]
                     ::web::static::blog::canonical_path $path
                     dict set fields title [list S [dict get $post title]]
@@ -144,7 +145,6 @@ proc ::homepage::resolve {entries stores} {
                 packages {
                     set names [lrange [dict get $entry packages] 0 2]
                     if {![llength $names]} {continue}
-                    set catalog [::recipe_search::catalog_entries [::recipe_search::database registry_catalog $names]]
                     set cards {}
                     foreach name $names {
                         if {![dict exists $catalog $name]} {continue}

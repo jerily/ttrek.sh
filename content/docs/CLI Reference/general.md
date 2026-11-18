@@ -37,6 +37,7 @@ means an argument can be repeated, and `|` separates alternatives.
 | [ls](/docs/cli-reference/ls) | List packages recorded in the lockfile. |
 | [search](/docs/cli-reference/search) | Find packages by name, description, or tag. |
 | [run](/docs/cli-reference/run) | Run a command or named script in the project environment. |
+| [activate](/docs/cli-reference/activate) | Open Bash or Zsh with the installed environment and a `(ttrek)` prompt. |
 | [scripts](/docs/cli-reference/scripts) | List, inspect, add, or remove named scripts. |
 | [use-flags](/docs/cli-reference/use-flags) | Configure USE flags for an installation. |
 

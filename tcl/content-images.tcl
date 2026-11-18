@@ -50,8 +50,8 @@ proc ::content_images::options {settings kind {uploadMissing {}}} {
 
 # Build and runtime use the same directories, image options and navigation rules.
 proc ::content_images::snapshots {root settings {uploadMissing {}}} {
-    package require web-static-wiki 0.1.7
-    package require web-static-blog 0.1.6
+    package require web-static-wiki 0.1.13
+    package require web-static-blog 0.1.12
     set stores {}
     foreach {kind title directory} {wiki Documentation docs blog Blog blog} {
         set imageOptions [options $settings $kind $uploadMissing]
@@ -101,4 +101,56 @@ proc ::content_images::upload {root settings} {
     set stores [snapshots $root [dict replace $settings cloudfront_enabled false] 0]
     dict for {kind store} $stores {::web::static::${kind}::sync_images $store}
     return
+}
+
+# Prepare portable content records while the build still has the image files.
+# This is data, never a sourced Tcl script; Lambda imports it without S3 I/O.
+proc ::content_images::prepare_snapshot {root settings} {
+    set collections {}
+    dict for {kind store} [snapshots $root [dict replace $settings cloudfront_enabled false] 0] {
+        set items {}
+        dict for {path item} [dict get $store items] {
+            # Source paths are metadata; keep them independent of the build host.
+            set source [dict get $item source_path]
+            if {[string first "$root/" $source] == 0} {
+                dict set item source_path [string range $source [string length "$root/"] end]
+            }
+            dict set items $path $item
+        }
+        dict set collections $kind $items
+    }
+    return [dict create version 1 bucket [dict get $settings bucket] \
+        prefix [dict get $settings prefix] collections $collections]
+}
+
+proc ::content_images::write_snapshot {root settings} {
+    set snapshot [prepare_snapshot $root $settings]
+    set channel [open [file join $root etc content-snapshot.data] w]
+    try {
+        chan configure $channel -encoding utf-8 -translation lf
+        puts $channel $snapshot
+    } finally {close $channel}
+}
+
+proc ::content_images::read_snapshot {root settings} {
+    set channel [open [file join $root etc content-snapshot.data] r]
+    try {
+        chan configure $channel -encoding utf-8
+        set snapshot [string trim [read $channel]]
+    } finally {close $channel}
+    if {[dict get $snapshot version] != 1} {error "Unsupported content snapshot version"}
+    foreach key {bucket prefix} {
+        if {[dict get $snapshot $key] ne [dict get $settings $key]} {
+            error "Content snapshot $key differs from runtime configuration"
+        }
+    }
+    foreach kind {wiki blog} {dict size [dict get $snapshot collections $kind]}
+    return $snapshot
+}
+
+# Production uses build-prepared records instead of package sync, which requires
+# local image files and uploads them. The caller owns the all-content transaction.
+proc ::content_images::import_snapshot {store snapshot kind} {
+    if {$kind ni {wiki blog}} {error "Unknown content collection: $kind"}
+    ::web::static::${kind}::sync_prepared $store [dict get $snapshot collections $kind]
 }

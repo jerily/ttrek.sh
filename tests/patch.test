@@ -36,6 +36,9 @@ if {[info exists ::env(TTREK_TEST_POSTGRES)]} {
     ::tpersist::_raw $::telemetry::connection "CREATE SCHEMA $schema"
     ::tpersist::_raw $::telemetry::connection "SET search_path TO $schema"
 } else {::test_private_db::connect {dialect sqlite database :memory:}}
+# Directory-import fixtures use LOCAL semantics with either database backend.
+# The image-free production test below selects PROD explicitly.
+set ::env(ENV) LOCAL
 
 test patch-initdb {direct invocation initializes all installed website schema providers, repeatedly} -body {
     set payload {{"source":"ttrek.patch","task":"task_initdb_website"}}
@@ -75,39 +78,57 @@ test patch-sync {sync updates rows through package APIs and preserves the websit
     }
 } -result {{wiki blog registry} {Getting started} 1 1}
 
-test patch-sync-assets {The sync task publishes browser assets first and S3 failures stop the SQL sync} -setup {
+test patch-sync-assets {Production imports prepared image references without image files or uploads} -setup {
     source [file join $root tcl browser-assets.tcl]
-    rename ::browser_assets::upload ::browser_assets::real_upload
+    set imageFreeRoot [makeDirectory patch-image-free]
+    file copy [file join $patchRoot content] [file join $imageFreeRoot content]
+    file copy [file join $patchRoot registry] [file join $imageFreeRoot registry]
+    file mkdir [file join $imageFreeRoot etc] [file join $imageFreeRoot content docs images]
+    set channel [open [file join $imageFreeRoot content docs images test.png] w]
+    puts $channel pixel
+    close $channel
+    set channel [open [file join $imageFreeRoot content docs image-reference.md] w]
+    puts $channel {# Image reference
+
+![Test](images/test.png)}
+    close $channel
+    set ::patchImages [::app_config::content_images {content_images {
+        bucket test-images region eu-central-1 cloudfront_enabled true}} $imageFreeRoot]
+    ::content_images::write_snapshot $imageFreeRoot $::patchImages
+    file delete -force [file join $imageFreeRoot content docs images] [file join $imageFreeRoot content blog images]
+    set savedImageEnv [array get ::env]
+    set ::env(ENV) PROD
+    set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
     rename ::site::config ::site::original_config
-    set ::patchImages [::app_config::content_images {content_images {cloudfront_enabled true}} $patchRoot]
-    proc ::site::config {} {dict create rootdir $::patchRoot content_images $::patchImages}
-    proc ::browser_assets::upload {root settings} {
-        set ::assetUpload [list $root $settings]
-        if {$::assetFail} {error {S3 upload failed}}
-        return 11
+    proc ::site::config {} {dict create rootdir $::imageFreeRoot content_images $::patchImages}
+    foreach command {::browser_assets::upload ::web::static::wiki::sync ::web::static::blog::sync} {
+        rename $command ${command}_original
+        proc $command {args} {error {Production sync must not upload or scan images}}
     }
 } -body {
-    set ::assetFail 0
     set completed [::site_patch::task_sync_website {}]
-    set uploaded [expr {$::assetUpload eq [list $patchRoot $::patchImages]}]
-    set ::assetFail 1
-    # An upload error must occur before entering the database transaction.
-    rename ::telemetry::transaction ::telemetry::original_transaction
-    proc ::telemetry::transaction {args} {error {SQL must not run after upload failure}}
-    try {
-        set code [catch {::site_patch::task_sync_website {}} message]
-    } finally {
-        rename ::telemetry::transaction {}
-        rename ::telemetry::original_transaction ::telemetry::transaction
-    }
-    list $completed $uploaded $code $message
+    set store [::content_images::database_store wiki $::telemetry::connection $::patchImages]
+    set item [::web::static::wiki::load $store /image-reference]
+    set html [::web::static::wiki::render_markdown $store $item]
+    set ::patchImages [dict replace $::patchImages prefix changed/prefix]
+    set mismatch [catch {::site_patch::task_sync_website {}} message]
+    set ::patchImages [dict replace $::patchImages prefix ttrek/content/images]
+    file delete [file join $imageFreeRoot etc content-snapshot.data]
+    set missing [catch {::site_patch::task_sync_website {}}]
+    list $completed [string match {*src="https://cdn.example/ttrek/content/images/docs/images/test.png"*} $html] \
+        $mismatch $message $missing [dict get [::web::static::wiki::load $store /image-reference] title]
 } -cleanup {
-    rename ::browser_assets::upload {}
-    rename ::browser_assets::real_upload ::browser_assets::upload
+    foreach command {::browser_assets::upload ::web::static::wiki::sync ::web::static::blog::sync} {
+        rename $command {}
+        rename ${command}_original $command
+    }
     rename ::site::config {}
     rename ::site::original_config ::site::config
-    unset ::patchImages ::assetUpload ::assetFail
-} -result {{wiki blog registry assets} 1 1 {S3 upload failed}}
+    array unset ::env
+    array set ::env $savedImageEnv
+    unset ::patchImages
+    removeDirectory patch-image-free
+} -result {{wiki blog registry} 1 1 {Content snapshot prefix differs from runtime configuration} 1 {Image reference}}
 
 test patch-sync-content {sync publishes body edits and removes deleted docs and posts} -setup {
     set contentRoot [makeDirectory patch-content]
