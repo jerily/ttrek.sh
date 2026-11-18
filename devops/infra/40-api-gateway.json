@@ -157,6 +157,7 @@
         "GetUserEmailLoginVerifyRoute",
         "GetUserForgotRoute",
         "GetUserGoogleCallbackRoute",
+        "GetUserGoogleLinkRoute",
         "GetUserLoginRoute",
         "GetUserProfileRoute",
         "GetUserRegisterRoute",
@@ -203,6 +204,7 @@
         "HeadUserEmailLoginVerifyRoute",
         "HeadUserForgotRoute",
         "HeadUserGoogleCallbackRoute",
+        "HeadUserGoogleLinkRoute",
         "HeadUserLoginRoute",
         "HeadUserProfileRoute",
         "HeadUserRegisterRoute",
@@ -1083,6 +1085,27 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /user/google/callback",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetUserGoogleLinkRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /user/google/link",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -2049,6 +2072,27 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "HEAD /user/google/callback",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadUserGoogleLinkRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /user/google/link",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [

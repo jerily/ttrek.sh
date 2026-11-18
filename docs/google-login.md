@@ -51,16 +51,18 @@ See [the two-stage network migration](deployment.md#google-login-network-migrati
 to establish NAT before removing the four paid AWS interface endpoints.
 This network fix does not require changing account keys or rebuilding Lambda.
 
-The route manifest includes `POST /user/google/start`, `GET /user/google/callback`
-and `POST /user/google/unlink`. Regenerate the API Gateway template with
+The route manifest includes `GET/HEAD /user/google/link`, `POST /user/google/start`,
+`GET /user/google/callback` and `POST /user/google/unlink`. Regenerate the API Gateway template with
 `python3 devops/generate-api-gateway.py` after changing routes. It writes
 `dist/api-gateway.json` and `devops/infra/40-api-gateway.json`; deploy the updated
 template through `devops/infra/40-deploy-api-gateway.sh` with the application release.
 
 The button requests `openid email profile`. Verified issuer and subject identify
 the account; matching email alone never links an existing account. Existing users
-sign in normally and explicitly link Google from their account page. New Google
-accounts can operate without a password, retain local MFA requirements, and can
+sign in normally and choose “Link Google account” on their account page. The
+separate `/user/google/link` page asks for their current password before starting
+the Google flow. New Google accounts can operate without a password, retain
+local MFA requirements, and can
 set a password after confirming Google. Unlinking cannot remove the only sign-in
 method. The site does not retain Google access or refresh tokens for login.
 

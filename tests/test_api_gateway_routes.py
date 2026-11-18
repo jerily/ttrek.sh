@@ -33,6 +33,8 @@ class ApiGatewayRoutes(unittest.TestCase):
         self.assertFalse(any('{proxy+}' in key for key in actual))
         self.assertEqual(actual['GET /user/login'], 'GetUserLoginRoute')
         self.assertEqual(actual['POST /user/google/start'], 'PostUserGoogleStartRoute')
+        self.assertEqual(actual['GET /user/google/link'], 'GetUserGoogleLinkRoute')
+        self.assertEqual(actual['HEAD /user/google/link'], 'HeadUserGoogleLinkRoute')
         self.assertEqual(actual['GET /user/google/callback'], 'GetUserGoogleCallbackRoute')
         self.assertEqual(actual['HEAD /user/google/callback'], 'HeadUserGoogleCallbackRoute')
         self.assertEqual(actual['POST /user/google/unlink'], 'PostUserGoogleUnlinkRoute')
