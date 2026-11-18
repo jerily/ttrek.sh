@@ -4,7 +4,7 @@ The account UI uses `web-user` 0.6.0 and `pure-tcl-oauth2-client`. Install the n
 core/client packages and updated native dependencies (`tjson` 1.0.28,
 `tink-tcl` 20240704.0.3, `thashlib` 0.1.1) before starting the site. Run the normal
 account schema initialization once to add identity and transaction tables.
-Registry recipes pin the source commits; tagged releases can follow separately.
+Registry recipes pin the package release tags.
 Local source packages can also be installed with CMake into the runtime prefix.
 
 `etc/config.ini` and the ignored `etc/config.local.ini` use these explicit LOCAL
