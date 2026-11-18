@@ -17,7 +17,11 @@ proc ::site_patch::run {task context} {
         switch -- $task {
             task_process_email_queue {}
             task_prune_accounts - task_sync_access - task_migrate_user_ids {::accounts::ensure}
-            task_backup_website {source [file join [::site::root] tcl telemetry-maintenance.tcl]}
+            task_backup_website {
+                if {![llength [info commands ::telemetry_maintenance::run]]} {
+                    source [file join [::site::root] tcl telemetry-maintenance.tcl]
+                }
+            }
             default {::site::database}
         }
         set completed {}
