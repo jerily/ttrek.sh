@@ -21,7 +21,7 @@
       "link_text": "Read the latest post",
       "highlights": {
         "/2026-11-19-install-ttrek-on-ubuntu-with-apt": {
-          "description": "Find the build for Ubuntu 26.04 LTS in Jerily's PPA, then install ttrek and keep it updated with apt.",
+          "description": "Install ttrek with apt on Ubuntu 26.04 LTS and get new versions through your usual system updates.",
           "version": "1.8.0",
           "note": "sudo apt install ttrek"
         },
