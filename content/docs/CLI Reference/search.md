@@ -5,7 +5,7 @@ Find packages and print their names and descriptions, separated by a tab.
 ## Usage
 
 ```text
-ttrek search [-registry SOURCE]... [-add-pubreg] QUERY
+ttrek search [-registry URL]... [-add-pubreg] QUERY
 ```
 
 Matching ignores ASCII case and preserves punctuation. Queries accept 1–255
@@ -28,32 +28,25 @@ Results are ranked in this order:
 Ties prefer fewer edits, greater query-trigram coverage, less unmatched name
 text, then alphabetical name.
 
-Name typos use a trie; descriptions and tags use `ttrigrams` with substring
-verification. Queries of at most three characters allow one edit; longer
+On ttrek.sh, queries of at most three characters allow one edit; longer
 queries allow two. Distances are Levenshtein: insertions, deletions, and
 substitutions. Description and tag suggestions require a shared trigram;
 queries shorter than three characters match them literally.
 
 ## Registries
 
-Search uses an explicit registry, the nearest project's saved registry, or an
-existing `~/.local/ttrek-registry`, in that order. When no local public registry
-is available, it queries `https://ttrek.sh/registry/search?q=QUERY`. It works
-outside a project.
+Search queries registry websites and works outside a project. Pass an HTTP(S)
+registry API base URL with `-registry`, or use the nearest project's saved registry
+list. An explicit `-registry` must support the search API. A directory argument
+produces an error. Explicit URLs replace the saved list. Search skips directory
+entries in the saved list.
+When the list has no website, it queries `https://ttrek.sh/registry/search?q=QUERY`,
+including when a public checkout has been synced.
 
-`-registry` accepts directories or HTTP(S) registry API base URLs. Repeat it
-to select ordered sources. `-add-pubreg` appends the public default after
-explicit or saved sources. HTTP registries must provide
-`GET BASE/search?q=QUERY`.
+Repeat `-registry` to search multiple websites. Each must provide
+`GET BASE/search?q=QUERY`. `-add-pubreg` appends the public website. Results are
+ranked together, with earlier websites taking precedence for duplicate packages.
 
-Results from ordered sources are ranked together; an earlier source's package
-hides later copies. Descriptions and tags from all versions are indexed, and
-each package appears once. Missing descriptions and tags are allowed. Tags
-are searched individually. A description hit displays its matching text;
-name and tag hits display the first nonempty description in alphabetical order.
-
-## Offline search and side effects
-
-Local indexes are built only for this command. Search never downloads source
-archives, creates project state, sends telemetry, or checks for updates. Use
-`ttrek sync` to make the public registry available for offline search.
+Results include language labels in brackets when available, for example
+`tjson [C, TCL]`. Search reads registry metadata without creating project state,
+sending telemetry, or checking for updates.

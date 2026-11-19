@@ -60,7 +60,9 @@ saved paths resolve from the project directory.
 `-add-pubreg` appends the public default after explicit or saved sources,
 regardless of option placement. It uses the synced `~/.local/ttrek-registry`
 when available, otherwise `https://ttrek.sh/registry`. `init` saves this as a
-portable public entry.
+portable public entry. For `search`, the public entry always uses the website.
+For `search`, each explicit `-registry` must be an HTTP(S) API base URL.
+Search skips saved directory entries and defaults to ttrek.sh when no website is selected.
 
 With no explicit or saved sources, ttrek uses `~/.local/ttrek-registry` after a
 successful `ttrek sync`, otherwise the ttrek.sh website. Normal commands do
