@@ -56,7 +56,7 @@ test homepage-five {Published configuration renders five slides including the la
     set html [homepage]
     list [lmap slide $data {dict get $slide id}] [expr {[dict get $post version] eq $version}] \
         [expr {[dict get $post url] eq "/blog$path"}] [expr {[dict get $post date] eq [dict get $latest published_at]}] \
-        [expr {[string first {class="home-showcase"} $html] < [string first {class="registry-search"} $html]}] \
+        [string match {*class="registry-search"*class="install-panel"*class="home-showcase"*} $html] \
         [regexp -all {class="showcase-dot"} $html] \
         [expr {![regexp {<article[^>]*(aria-hidden="true"|inert)} $html]}] \
         [expr {[string match {*Source on GitHub*Registry on GitHub*} $html] && ![string match {*href="/request-monitor"*} $html]}]

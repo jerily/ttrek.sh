@@ -2,7 +2,8 @@
 .home-page .splash-container { padding: 1.8rem 1.5rem 2rem; align-items: flex-start; }
 .home-page .splash { width: min(100%, 824px); }
 .home-page .eyebrow { margin-bottom: .55rem; }
-.home-page .splash-head { font-size: clamp(1.5rem, 4vw, 1.85rem); letter-spacing: -.03em; margin-bottom: 1.4rem; }
+.home-page .splash-head { font-size: clamp(1.5rem, 4vw, 1.85rem); letter-spacing: -.03em; }
+.home-page .splash-subhead { margin: .4rem 0 0; font-size: 1rem; }
 .home-page .registry-search { max-width: none; margin-top: 1.4rem; }
 .home-page .install-panel { margin-top: 1.3rem; padding-top: 1rem; }
 .install-panel h2 { margin: 0 0 .8rem; font-size: 1.25rem; color: #ebf3fc; }
@@ -13,6 +14,7 @@
 .install-methods .bash-wrapper { padding: .25rem; background: #102338; border-radius: 5px; }
 .install-methods .bash { flex: 1; border: 0; white-space: pre-wrap; text-align: left; }
 .home-showcase {
+    margin-top: 1.4rem;
     --showcase-paper: #172d45;
     --showcase-ink: #ebf3fc;
     --showcase-subtle: #b9cce0;
