@@ -7,7 +7,7 @@
 .home-page .install-panel { margin-top: 1.3rem; padding-top: 1rem; }
 .install-panel h2 { margin: 0 0 .8rem; font-size: 1.25rem; color: #ebf3fc; }
 .install-methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr)); gap: .75rem; text-align: left; }
-.install-methods section { padding: 1rem; border: 1px solid #334d65; border-radius: 10px; background: #172d45; }
+.install-methods section { padding: 1rem 0.5rem; border: 1px solid #334d65; border-radius: 10px; background: #172d45; }
 .install-methods h3 { margin: 0; font-size: 1rem; color: #ebf3fc; }
 .install-methods p { margin: .35rem 0 .75rem; color: #b9cce0; }
 .install-methods .bash-wrapper { padding: .25rem; background: #102338; border-radius: 5px; }
