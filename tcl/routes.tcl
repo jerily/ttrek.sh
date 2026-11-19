@@ -6,6 +6,7 @@
 
 # Shared by the direct HTTP server and the Lambda HTTP-event adapter.
 return {
+    GET /admin ::accounts::dashboard get_admin_dashboard
     GET /request-monitor/recent get_recent_requests_handler get_recent_requests
     GET /debug get_debug_handler get_debug
     GET / get_index_page_handler get_index

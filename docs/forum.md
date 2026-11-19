@@ -17,7 +17,7 @@ admin = mira@example.com, rowan@example.com
 moderator = alex@example.com
 
 [permissions]
-admin = forum.moderate, wiki.edit, blog.edit, users.manage
+admin = admin_dashboard.manage, forum.moderate, wiki.edit, blog.edit, users.manage, request_monitor.view
 moderator = forum.moderate
 ```
 
@@ -60,8 +60,8 @@ The UI hides controls from ordinary members; the server independently checks
 permission, CSRF, origin and revision. Restoring hidden content preserves its
 approval state. Hidden or unapproved posts are absent from public lists.
 
-Administrators also receive `users.manage` in the default configuration. After
-access sync, **Account → Manage users** shows registered users, registration, last sign-in and last visit
+Administrators receive `admin_dashboard.manage` and `users.manage` in the default configuration. After
+access sync, **Account → Admin dashboard → Manage users** shows registered users, registration, last sign-in and last visit
 times, authenticator status and group assignments. Choose **Recently signed in**,
 **Recently active**, or **Newest registrations** to change the order. The directory is checked
 against current permissions on every request and contains only this account

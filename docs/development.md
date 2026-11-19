@@ -187,7 +187,8 @@ The Valkey store receives `[redis]` connection, ACL and TLS settings and shares
 history across workers and processes. A `[redis]` section is required; local
 launchers fail if it is missing and never manage the Valkey service.
 
-The shared footer links to the CLI source, public registry and request monitor.
+The shared footer links to the CLI source and public registry. Administrators
+can open Request Monitor from **Account → Admin dashboard**.
 The host renders the footer year from the system clock on each request, including
 documentation, blog and monitor pages.
 

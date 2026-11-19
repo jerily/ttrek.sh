@@ -1043,8 +1043,10 @@ Both the direct server and Lambda load this JSON. Invalid budgets fail startup.
 The reviewed Valkey implementation requires tratelimit 1.1.1; it performs an
 atomic check-and-record, preserves simultaneous requests, and expires idle keys.
 
-Request Monitor and its navigation link require the live `request_monitor.view`
-group permission. The default admin grant includes it.
+`admin_dashboard.manage` grants access to `/admin` and shows **Admin dashboard**
+on the account overview. The dashboard shows **Request Monitor** to accounts with
+`request_monitor.view` and **Manage users** to accounts with `users.manage`.
+The default `admin` group receives all three permissions.
 `/request-monitor/recent` uses the same permission and shows the latest 100
 completed requests, with time, trusted source IP, method, path, status, and user
 agent. treqmon 2.3.0 keeps this bounded log separately from chart history; details

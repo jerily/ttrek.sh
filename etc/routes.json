@@ -8,6 +8,8 @@
   "routes": [
     {"method": "GET", "path": "/", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},
     {"method": "HEAD", "path": "/", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},
+    {"method": "GET", "path": "/admin", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},
+    {"method": "HEAD", "path": "/admin", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},
     {"method": "GET", "path": "/debug", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},
     {"method": "HEAD", "path": "/debug", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},
     {"method": "GET", "path": "/init", "function": "prod-Api-TtrekWebsite-Function:DEFAULT"},

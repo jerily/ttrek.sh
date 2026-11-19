@@ -70,7 +70,7 @@ Sync imports body edits and removes pages/posts whose files were deleted from
 the packaged content. Running sync on an older package republishes its older
 files; it does not read changes from your checkout.
 
-The footer's **Request Monitor** link opens `/request-monitor`. Its shared site
+Open **Account → Admin dashboard → Request Monitor** to visit `/request-monitor`. Its shared site
 layout is selected by `[request_monitor] master_template` in the INI configuration,
 defaulting to `request-monitor-master.html.jinja` in `www/`. Custom monitor masters
 provide a `body` block and load the chart assets, as the default bridge does.

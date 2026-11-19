@@ -43,9 +43,11 @@ tconfig encrypts them before packaging; Lambda decrypts through the regional KMS
 API over verified HTTPS through NAT. Generated production files, local INI files and ZIP artifacts are ignored
 by Git. No ACM private key is exported or stored in the repository.
 
+The admin dashboard checks `admin_dashboard.manage`. The request monitor and user
+directory check `request_monitor.view` and `users.manage` respectively on direct requests.
+
 ## Pending
 
-The existing request-monitor and debug routes have no authentication guard in
-this repository. Apply the deployment's access controls before exposing them.
+Apply the deployment's access controls before exposing the debug route.
 The mocks execute trusted local code and do not authenticate callers. They are
 development services. The website HTTP API is public and has no authorizer.

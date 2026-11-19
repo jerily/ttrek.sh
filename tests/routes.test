@@ -14,7 +14,7 @@ test routes-covered {The explicit manifest covers main, account, forum, nested c
         GET /registry/tcl GET /registry/tcl/9.1.0/languages GET /registry/tcl/9.1.0/Linux/x86_64
         GET /registry/search GET /registry/autocomplete POST /telemetry/register/example
         POST /telemetry/collect/tcl/9.1.0 GET /docs GET /docs/ GET /docs/nested/path GET /blog GET /blog/post
-        GET /user GET /user/ GET /user/admin/users GET /user/profile POST /user/profile
+        GET /admin HEAD /admin GET /user GET /user/ GET /user/admin/users GET /user/profile POST /user/profile
         GET /user/login POST /user/login GET /user/register POST /user/register
         GET /user/google/link HEAD /user/google/link POST /user/google/start GET /user/google/callback HEAD /user/google/callback POST /user/google/unlink
         GET /user/email-login POST /user/email-login GET /user/email-login/verify POST /user/email-login/verify

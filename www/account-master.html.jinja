@@ -6,6 +6,11 @@
     {% if not admin_view %}
     <div class="account-intro"><p class="eyebrow">YOUR TTREK ACCOUNT</p><p>{% if signed_in %}Manage your profile and account security.{% else %}Create an account or sign in to continue.{% endif %}</p></div>
     {% endif %}
+    {% if view == "account" %}
+    {# The host dashboard owns the tools shown on the account overview. #}
+    {% set can_manage_users = false %}
+    <!-- ttrek-admin-dashboard-link -->
+    {% endif %}
     {% block body %}{% endblock %}
 </main>
 {% endblock %}

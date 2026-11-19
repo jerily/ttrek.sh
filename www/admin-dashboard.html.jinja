@@ -1,0 +1,27 @@
+{% extends 'master.html.jinja' %}
+{% block content %}
+<main class="site-main admin-dashboard">
+    <header>
+        <a href="{{ prefix }}">Back to account</a>
+        <h1>Admin dashboard</h1>
+    </header>
+    {% if can_view_monitor or can_manage_users %}
+    <nav class="admin-tools" aria-label="Admin tools">
+        {% if can_view_monitor %}
+        <a class="admin-tool" href="/request-monitor">
+            <h2>Request Monitor</h2>
+            <p>Inspect traffic trends, response times, and the last 100 requests.</p>
+        </a>
+        {% endif %}
+        {% if can_manage_users %}
+        <a class="admin-tool admin-tool-users" href="{{ prefix }}/admin/users">
+            <h2>Manage users</h2>
+            <p>Review sign-in activity, account security, and group membership.</p>
+        </a>
+        {% endif %}
+    </nav>
+    {% else %}
+    <p class="admin-tools-empty">Your account has dashboard access. No tools are assigned yet.</p>
+    {% endif %}
+</main>
+{% endblock %}
