@@ -271,9 +271,9 @@ test accounts-shared-query-count {authentication, handler and navigation share i
         lappend result $status $::account_queries
     }
     set result
-} -cleanup {rename count_account_queries {}; unset ::account_queries} -result {200 6 200 5 200 5 200 5}
+} -cleanup {rename count_account_queries {}; unset ::account_queries} -result {200 5 200 4 200 4 200 5}
 
-test accounts-monitor-access {Live group permissions control the link and all monitor paths in direct and Lambda dispatch} -setup {
+test accounts-monitor-access {Monitor paths enforce live grants and public footers omit the monitor link} -setup {
     set savedCookie $::accountstest::cookie
 } -body {
     set checks {}
@@ -285,7 +285,7 @@ test accounts-monitor-access {Live group permissions control the link and all mo
                 ::web::user::sync_access $::accounts::store [dict create $group site@example.com] [dict create $group $grant]
                 foreach path {/ /docs /blog /user /forum} {
                     ::accountstest::request GET $path
-                    lappend checks [expr {[string match {*href="/request-monitor"*} [dict get $::accountstest::last body]] == $allowed}]
+                    lappend checks [expr {![string match {*href="/request-monitor"*} [dict get $::accountstest::last body]]}]
                 }
                 foreach path {/request-monitor /request-monitor/ /request-monitor/recent /request-monitor/_assets/charts.js} {
                     foreach method {GET HEAD} {
@@ -311,6 +311,61 @@ test accounts-monitor-access {Live group permissions control the link and all mo
     dict set ::site::settings account access groups admin site@example.com
     ::accounts::sync_access
 } -result 1
+
+test accounts-dashboard-access {Dashboard access and individual tool links follow independent live grants} -setup {
+    set savedCookie $::accountstest::cookie
+} -body {
+    foreach version {{} 1.0 2.0} {
+        set ::accountstest::lambdaVersion $version
+        set ::accountstest::cookie {}
+        foreach method {GET HEAD} {
+            if {[::accountstest::request $method /admin] != 302 ||
+                [::responses::header $::accountstest::last Location] ne "/user/login?return_to=%2Fadmin" ||
+                [::responses::header $::accountstest::last Cache-Control] ne "no-store"} {
+                error "$method /admin did not redirect a guest to sign in"
+            }
+        }
+        set ::accountstest::cookie $savedCookie
+        foreach grants {
+            {request_monitor.view users.manage}
+            {admin_dashboard.manage}
+            {admin_dashboard.manage request_monitor.view}
+            {admin_dashboard.manage users.manage}
+            {admin_dashboard.manage users.manage request_monitor.view}
+            {}
+        } {
+            ::web::user::sync_access $::accounts::store {operator site@example.com} [dict create operator [join $grants ,]]
+            set allowed [expr {"admin_dashboard.manage" in $grants}]
+            foreach path {/user /user/} {
+                set status [::accountstest::request GET $path]
+                set body [dict get $::accountstest::last body]
+                if {$status != 200 || [string match {*href="/admin">Admin dashboard*} $body] != $allowed ||
+                    [string match {*href="/user/admin/users"*} $body]} {
+                    error "Incorrect account navigation on $path with grants: $grants"
+                }
+            }
+            foreach method {GET HEAD} {
+                set status [::accountstest::request $method /admin]
+                set body [dict get $::accountstest::last body]
+                if {$status != ($allowed ? 200 : 403) || [::responses::header $::accountstest::last Cache-Control] ne "no-store"} {
+                    error "Incorrect $method /admin response with grants: $grants"
+                }
+                if {$method eq "HEAD" && $body ne {}} {error "HEAD /admin returned a body"}
+                if {$method eq "GET" && $allowed} {
+                    foreach {permission path} {request_monitor.view /request-monitor users.manage /user/admin/users} {
+                        if {([string first "href=\"$path\"" $body] >= 0) != ($permission in $grants)} {
+                            error "Incorrect dashboard link to $path with grants: $grants"
+                        }
+                    }
+                }
+            }
+        }
+    }
+} -cleanup {
+    set ::accountstest::lambdaVersion {}
+    set ::accountstest::cookie $savedCookie
+    ::accounts::sync_access
+} -result {}
 
 test accounts-recent-requests {The authorized page shows only the last hundred requests and escapes paths and user agents} -body {
     set ::treqmon::worker::memstore::recent_requests {}

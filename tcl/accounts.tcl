@@ -120,7 +120,7 @@ proc ::accounts::monitor_enter {context request} {
     return $request
 }
 
-# Use live group grants for both the dashboard and its navigation link.
+# Check the live grant for protected monitor routes.
 proc ::accounts::can_view_monitor {request context} {
     variable mount
     if {![dict exists [::site::config] account] || ![has_cookie $request]} {return 0}
@@ -138,15 +138,29 @@ proc ::accounts::monitor_authorize {context request} {
     return $request
 }
 
+proc ::accounts::dashboard {context request} {
+    if {![dict exists [::site::config] account]} {return [get_catchall_handler $context $request]}
+    set mount [ensure]
+    set user [::web::user::current_user $mount $request $context]
+    if {$user eq {}} {return [::web::user::sign_in_redirect $mount $request]}
+
+    set grants [::web::user::permissions [dict get $mount -store] [dict get $user id]]
+    if {"admin_dashboard.manage" ni $grants} {
+        return [::web::user::response 403 Forbidden text/plain]
+    }
+    set html [::views::render admin-dashboard.html.jinja [dict create \
+        title {S {Admin dashboard}} prefix [list S [dict get $mount -prefix]] \
+        can_view_monitor [list BOOL [expr {"request_monitor.view" in $grants}]] \
+        can_manage_users [list BOOL [expr {"users.manage" in $grants}]]]]
+    return [::web::user::response 200 $html]
+}
+
 # Fill the shared layout from this request's session, including a newly rotated cookie.
 proc ::accounts::navigation {request response context} {
     variable mount
     set marker {<!-- ttrek-account-navigation -->}
-    set monitorMarker {<!-- ttrek-request-monitor-navigation -->}
-    if {[string first $marker [dict get $response body]] < 0 &&
-        [string first $monitorMarker [dict get $response body]] < 0} {return $response}
+    if {[string first $marker [dict get $response body]] < 0} {return $response}
     set html {}
-    set monitorHtml {}
     if {[dict exists [::site::config] account]} {
         package require web-user::config 1.0
         set prefix [dict get [::site::config] account display prefix]
@@ -154,23 +168,28 @@ proc ::accounts::navigation {request response context} {
         if {$mount ne {} && [string match [dict get $mount -cookie]=* $cookie]} {
             ::responses::set_header request Cookie [lindex [split $cookie {;}] 0]
         }
-        set signedIn false
+        set user {}
         if {[has_cookie $request]} {
             ensure
-            set signedIn [expr {[::web::user::current_user $mount $request $context] ne {}}]
-        }
-        if {$signedIn && [can_view_monitor $request $context]} {
-            set monitorHtml { · <a href="/request-monitor">Request Monitor</a>}
+            set user [::web::user::current_user $mount $request $context]
         }
         set selected [expr {[dict get $request path] eq $prefix || [string match $prefix/* [dict get $request path]]}]
+        set dashboardMarker {<!-- ttrek-admin-dashboard-link -->}
+        if {$selected && [string first $dashboardMarker [dict get $response body]] >= 0} {
+            set link {}
+            if {$user ne {} && [::web::user::has_permission [dict get $mount -store] [dict get $user id] admin_dashboard.manage]} {
+                set link {<p class="account-dashboard-link"><a href="/admin">Admin dashboard</a></p>}
+            }
+            dict set response body [string map [list $dashboardMarker $link] [dict get $response body]]
+        }
         set target [expr {$selected ? [::web::user::requested_return_to $request] : [::web::user::request_target $request]}]
         set html [::views::render account-navigation.html.jinja [dict create \
-            signed_in [list BOOL $signedIn] selected [list BOOL $selected] prefix [list S $prefix] \
+            signed_in [list BOOL [expr {$user ne {}}]] selected [list BOOL $selected] prefix [list S $prefix] \
             return_query [list S [::web::user::return_query $target]]]]
         ::responses::set_header response Cache-Control no-store
         ::responses::set_header response ETag {}
     }
-    dict set response body [string map [list $marker $html $monitorMarker $monitorHtml] [dict get $response body]]
+    dict set response body [string map [list $marker $html] [dict get $response body]]
     return $response
 }
 

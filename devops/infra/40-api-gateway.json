@@ -120,6 +120,7 @@
       "DependsOn": [
         "SitePermission",
         "RootRoute",
+        "GetAdminRoute",
         "GetBlogRoute",
         "GetBlogByPathRoute",
         "GetDebugRoute",
@@ -167,6 +168,7 @@
         "GetUserTwoFactorSetupRoute",
         "GetUserVerifyRoute",
         "HeadRootRoute",
+        "HeadAdminRoute",
         "HeadBlogRoute",
         "HeadBlogByPathRoute",
         "HeadDebugRoute",
@@ -308,6 +310,27 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetAdminRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /admin",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -1295,6 +1318,27 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "HEAD /",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "HeadAdminRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /admin",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [

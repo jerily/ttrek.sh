@@ -50,6 +50,18 @@
 .account-panel .local-code { display: block; margin: 1rem 0; padding: .8rem; border: 1px dashed #d3a646; border-radius: 8px; background: #fff9e9; font-size: .8rem; }
 .account-panel .local-code code { display: block; margin-top: .35rem; font-size: 1.15rem; letter-spacing: .15em; }
 .account-panel .qr svg { max-width: 100%; height: auto; }
+.account-dashboard-link { margin: 0 0 1rem; text-align: right; font-weight: 650; }
+.admin-dashboard { max-width: 60rem; }
+.admin-dashboard header > a { font-size: .95rem; }
+.admin-dashboard h1 { margin: .6rem 0 1.75rem; color: #172b46; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.15; letter-spacing: -.04em; }
+.admin-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 1.25rem; }
+.admin-tool, .admin-tools-empty { padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid #d0deeb; border-radius: 14px; background: white; }
+.admin-tool { --accent: #225d98; display: block; border-top: .3rem solid var(--accent); color: #465970; text-decoration: none; box-shadow: 0 4px 18px #172b460a; }
+.admin-tool-users { --accent: #276654; }
+.admin-tool h2 { margin: 0 0 .5rem; color: var(--accent); font-size: 1.35rem; line-height: 1.3; }
+.admin-tool p { margin: 0; }
+.admin-tool:hover, .admin-tool:focus-visible { border-color: var(--accent); box-shadow: 0 6px 20px #172b4614; }
+.admin-tool:hover h2, .admin-tool:focus-visible h2 { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
     .account-panel input, .account-panel .account-button { transition: none; }
     .account-button[aria-busy=true]::before { animation: none; }
