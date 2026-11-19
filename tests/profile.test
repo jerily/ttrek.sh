@@ -36,15 +36,15 @@ test profile-disabled {explicit opt-out installs no traces} -setup {
     }
 } -cleanup {interp delete $w} -result {200 {} {} false}
 
-test profile-default {an unset environment setting enables profiling} -setup {
+test profile-default {an unset environment setting skips profiling} -setup {
     set w [worker]
 } -body {
     $w eval {
         unset ::env(TTREK_PROFILE)
         set response [request]
-        list [dict get $response statusCode] [llength $logs] [dict get [profile] route]
+        list [dict get $response statusCode] $logs [trace info execution ::site::invoke]
     }
-} -cleanup {interp delete $w} -result {200 1 get_debug}
+} -cleanup {interp delete $w} -result {200 {} {}}
 
 test profile-direct {response parity, request isolation, and trace cleanup} -setup {
     set w [worker]

@@ -44,7 +44,7 @@ namespace eval ::site_profile {
 
 proc ::site_profile::begin {context} {
     variable active
-    if {$active || ([info exists ::env(TTREK_PROFILE)] && $::env(TTREK_PROFILE) ne "1")} {return false}
+    if {$active || ![info exists ::env(TTREK_PROFILE)] || $::env(TTREK_PROFILE) ne "1"} {return false}
     variable sequence
     incr sequence
     variable started [clock clicks -microseconds]

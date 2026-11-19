@@ -104,3 +104,51 @@ foreach name {language-mixed language-native language-data language-cpp language
 }
 ::telemetry::sync_registry_metadata $registry_fixture
 ::telemetry::publish_search_snapshot
+
+test browse-pagination {Filtered browse links advance using only after, including a withdrawn boundary} -setup {
+    # This prefix sorts ahead of the other fixtures. Put a literal plus at the first boundary.
+    for {set i 1} {$i <= 49} {incr i} {
+        set name [format 000-page-%02d $i]
+        if {$i == 24} {append name +}
+        language_recipe $name 1.0.0 {TCL}
+    }
+    ::telemetry::sync_registry_metadata $registry_fixture
+    proc browse_page {url} {
+        set req [dict create queryString [lindex [split $url ?] 1]]
+        set html [body [get_packages_page_handler {} $req]]
+        set page [dict create next {}]
+        foreach {link rel href} [regexp -all -inline {rel="(prev|next)" href="([^"]+)"} $html] {
+            dict set page $rel [string map {&amp; &} $href]
+        }
+        set names {}
+        foreach {link name} [regexp -all -inline {<h2><a href="/package/[^"]+">([^<]+)</a>} $html] {
+            lappend names $name
+        }
+        dict set page names $names
+        return $page
+    }
+} -body {
+    set url /packages?language=tcl-only
+    set first [browse_page $url]
+    set second [browse_page [dict get $first next]]
+    set last [browse_page [dict get $second next]]
+    file delete -force [file join $registry_fixture 000-page-24+]
+    ::telemetry::sync_registry_metadata $registry_fixture
+    set resumed [browse_page [dict get $first next]]
+    list [llength [dict get $first names]] [dict get $first next] \
+        [lindex [dict get $second names] 0] [dict get $second next] \
+        [lindex [dict get $last names] 0] [dict get $last next] \
+        [expr {[dict get $resumed names] eq [dict get $second names]}]
+} -cleanup {
+    rename browse_page {}
+    foreach directory [glob -directory $registry_fixture 000-page-*] {file delete -force $directory}
+    ::telemetry::sync_registry_metadata $registry_fixture
+} -result {24 /packages?language=tcl-only&after=000-page-24%2B 000-page-25 /packages?language=tcl-only&after=000-page-48 000-page-49 {} 1}
+
+test browse-pagination-invalid {A supplied after parameter must be one valid package name} -body {
+    foreach query {after= after=.. after=not%2Fa%2Fname after=tjson&after=tcl} {
+        set response [get_packages_page_handler {} [dict create queryString $query]]
+        if {[dict get $response status] != 400} {error "Expected 400 for $query"}
+    }
+    return ok
+} -result ok

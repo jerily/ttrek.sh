@@ -78,3 +78,15 @@
     .language-filter select { width: auto; min-width: 5rem; }
     .search-controls .search-field { flex-basis: 100%; }
 }
+
+.package-more { margin: 2rem auto 0; text-align: center; }
+.package-more-link {
+    display: inline-flex; align-items: center; justify-content: center; gap: .65rem;
+    min-height: 44px; padding: .2rem 1.4rem; border: 1px solid #a7c5df; border-radius: 2rem;
+    background: #edf5fe; color: #224f7e; font-weight: 650; text-decoration: none;
+}
+.package-more-link:hover { background: #dfedfc; border-color: #679ac6; }
+.package-more-link:focus-visible { outline: 3px solid #3685ce; outline-offset: 3px; }
+.package-more-link[aria-busy="true"] { cursor: progress; }
+.package-more-link[hidden] { display: none; }
+.package-more-status { margin: .6rem 0 0; color: #596b80; font-size: .875rem; }

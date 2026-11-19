@@ -221,15 +221,32 @@ proc get_packages_page_handler {ctx req} {
     if {[catch {::recipe_search::request_language $req} language]} {
         return [::twebserver::build_response 400 text/plain "Choose Any, Only TCL, TCL and C/C++, or Only C or C++."]
     }
+    if {[catch {::recipe_search::request_after $req} after]} {
+        return [::twebserver::build_response 400 text/plain $after]
+    }
     if {[catch {::recipe_search::catalog_entries [::recipe_search::database registry_catalog]} catalog]} {
         return [::recipe_search::unavailable]
     }
-    set packages {}
+    set page_size $::recipe_search::page_size
+    set names {}
+    set start 0
+    # catalog_entries supplies ASCII name order, including when the cursor's package was withdrawn.
     dict for {name package} $catalog {
-        if {[::recipe_search::matches_language [dict get $package languages] $language]} {lappend packages $package}
+        if {![::recipe_search::matches_language [dict get $package languages] $language]} continue
+        lappend names $name
+        if {[string compare $name $after] <= 0} {incr start}
+    }
+    set total [llength $names]
+    set end [expr {$start + $page_size - 1}]
+    set packages [lmap name [lrange $names $start $end] {dict get $catalog $name}]
+    set next_url {}
+    if {$end < $total - 1} {
+        set next_url [::recipe_search::page_url $language [lindex $names $end]]
     }
     set data [dict create title {S Packages} packages [::recipe_search::cards $packages] \
-        result_count [list N [llength $packages]] query {S {}} is_search {BOOL 0} error {S {}} \
+        next_url [list S $next_url] \
+        canonical_path [list S [::recipe_search::page_url $language [lindex $names [expr {$start - 1}]]]] \
+        result_count [list N $total] query {S {}} is_search {BOOL 0} error {S {}} \
         tracker [::package_tracker::view $catalog] language_filter {BOOL 1} language [list S $language]]
     set html [::views::render packages.html.jinja $data]
     set res [::twebserver::build_response 200 "text/html; charset=utf-8" $html]

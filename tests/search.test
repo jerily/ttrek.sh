@@ -51,6 +51,30 @@ test search-1 {Exact, prefix and substring names precede descriptions and typo s
     search_names web
 } -result {web webserver atweb zzwebzzz twebserver doc-server portal wec}
 
+test search-html-pagination {Load more traverses freshly ranked results in relevance order} -setup {
+    set original_size $::recipe_search::page_size
+    set ::recipe_search::page_size 2
+} -body {
+    set req {queryString {q=web}}
+    set names {}
+    set handler get_search_page_handler
+    for {set i 0} {$i < 5} {incr i} {
+        set response [$handler {} $req]
+        set html [dict get $response body]
+        if {[dict get $response status] != 200} {error "Search page failed"}
+        set rows [regexp -all -inline {<h2><a href="/package/([^"]+)"} $html]
+        if {[llength $rows] != 4} {error "Expected two cards"}
+        foreach {link name} $rows {lappend names $name}
+        if {![regexp {rel="next" href="/packages\?q=web&amp;after=([^"]+)"} $html -> after]} break
+        set req [dict create queryString "q=web&after=$after"]
+        set handler get_packages_page_handler
+    }
+    set stale [get_search_page_handler {} {queryString {q=web&after=absent}}]
+    list $names [dict get $stale status]
+} -cleanup {
+    set ::recipe_search::page_size $original_size
+} -result {{web webserver atweb zzwebzzz twebserver doc-server portal wec} 409}
+
 test search-2 {Case folding, whitespace and short-query typo limit} -body {
     list [expr {[search_names { WEB }] eq [search_names web]}] [search_names TCL] \
         [expr {"b" ni [search_names web]}] [lindex [search_names b] 0]

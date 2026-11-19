@@ -50,22 +50,15 @@ The checked-in SAM template configures 256 MB.
 
 ## Application profiles
 
-Profiling is enabled by default, including when `TTREK_PROFILE` is unset.
-The SAM `RequestProfiling` parameter also defaults to `1`. To disable profiling,
-set `TTREK_PROFILE=0` in the worker environment or deploy with `RequestProfiling=0`.
-An existing stack with an explicit `RequestProfiling=0` needs an override of `1`
-to re-enable it.
-Deploy the new artifact and ensure the public `DEFAULT` alias uses that version;
-changing `$LATEST` alone does not change an already published alias target.
-For local direct-server runs:
+Request profiling is off by default. CodeBuild deploys with `RequestProfiling=0`.
+For a diagnostic Lambda deployment, pass `RequestProfiling=1` and point the
+public `DEFAULT` alias at the new version. To profile a local run:
 
 ```sh
-./run.sh
-# Explicitly disable profiling:
-TTREK_PROFILE=0 ./run.sh
+TTREK_PROFILE=1 ./run.sh
 ```
 
-Each invocation emits one JSON record to stderr with `event: site_profile`.
+With profiling enabled, each invocation emits one JSON record to stderr with `event: site_profile`.
 Direct HTTP requests emit one too; the Lambda adapter shares the inner dispatch
 profile and emits only after response JSON encoding. Private maintenance events
 and invalid Lambda envelopes can also produce records, with route `unmatched`
