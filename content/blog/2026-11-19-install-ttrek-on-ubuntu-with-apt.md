@@ -2,10 +2,7 @@
 
 ![A penguin pushes a parcel labeled “ttrek” through a mail slot in a terminal window.](images/ttrek-ubuntu-apt.jpg)
 
-On Ubuntu 26.04 LTS, look for a build for your architecture in
-[Jerily’s Personal Package Archive (PPA)](https://launchpad.net/~jerily/+archive/ubuntu/ttrek/+packages).
-
-Once the build is listed, add the archive and install ttrek.
+On Ubuntu 26.04 LTS, add the archive and install ttrek.
 
 ```bash
 sudo add-apt-repository ppa:jerily/ttrek

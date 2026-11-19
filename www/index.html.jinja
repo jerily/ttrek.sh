@@ -10,10 +10,22 @@
             {% include 'home-showcase.html.jinja' %}
             {% include 'search-form.html.jinja' %}
             <p class="search-examples">Try <a href="/search?q=web">web</a>, <a href="/search?q=json">json</a> or <a href="/search?q=compression">compression</a><span> · </span><a href="/packages">Browse all packages →</a></p>
-            <div class="install-panel">
-                <p>One command to get started</p>
-                {{ bashline(install_command, "justify-content: center;") }}
-            </div>
+            <section class="install-panel" aria-labelledby="install-heading">
+                <h2 id="install-heading">Install ttrek</h2>
+                <div class="install-methods">
+                    <section>
+                        <h3>Installer script</h3>
+                        <p>Run this command in your terminal.</p>
+                        {{ bashline(install_command) }}
+                    </section>
+                    <section>
+                        <h3>Ubuntu 26.04 LTS</h3>
+                        <p>Add the package archive, then install with apt.</p>
+                        {{ bashline("sudo add-apt-repository ppa:jerily/ttrek
+sudo apt install ttrek") }}
+                    </section>
+                </div>
+            </section>
         </div>
     </main>
 {% endblock %}

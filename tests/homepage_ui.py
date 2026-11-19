@@ -163,15 +163,18 @@ def check_homepage(browser, base):
     page.clock.run_for(60000)
     current(4)
 
-    for selector in ('.registry-search input', '.clipboard'):
+    for selector in ('.registry-search input', '.install-methods section:first-child .clipboard'):
         start()
         page.locator(selector).focus()
         expect(rotation).to_have_text('Play')
         page.clock.run_for(20000)
         current(0)
     start()
-    page.locator('.clipboard').click()
-    expect(page.locator('.clipboard-tooltip')).to_have_text('Copied')
+    for method in page.locator('.install-methods section').all():
+        command = method.locator('code').text_content()
+        expect(method.locator('.clipboard')).to_have_attribute('data-clipboard-text', command)
+        method.locator('.clipboard').click()
+        expect(method.locator('.clipboard-tooltip')).to_have_text('Copied')
     expect(rotation).to_have_text('Play')
 
     # Synthetic visibility changes exercise suspension without background-tab
