@@ -17,7 +17,7 @@
 .search-field button:focus-visible, .package-card a:focus-visible { outline: 3px solid #58aafa; outline-offset: 3px; }
 .search-examples { color: #a3b8d0; font-size: .85rem; margin: 1rem 0; }
 .search-examples a { color: #d0e8ff; }
-.install-panel { margin: 3rem auto 0; padding-top: 1.7rem; border-top: 1px solid #ffffff25; color: #d0e0f0; }
+.install-panel { margin: 3rem auto 0; padding-top: 1.7rem; color: #d0e0f0; }
 .install-panel > p { font-size: .8rem; margin: 0 0 .8rem; color: #b7cde3; }
 .install-panel code { white-space: normal; overflow-wrap: anywhere; font-size: .85rem; text-transform: none; }
 .registry-intro h1 { margin: .7rem 0; color: #213851; font-size: clamp(1.8rem, 4vw, 2.7rem); line-height: 1.25; letter-spacing: -.04em; }

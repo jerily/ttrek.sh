@@ -1,4 +1,7 @@
 {% extends 'master.html.jinja' %}
+{% block styles %}
+{% if not admin_view %}<link rel="canonical" href="https://ttrek.sh{{ prefix }}{% if view != 'account' %}/{{ view }}{% endif %}" />{% endif %}
+{% endblock %}
 {% block home_selected %}{% endblock %}
 {% block body_class %}account-page{% endblock %}
 {% block content %}
