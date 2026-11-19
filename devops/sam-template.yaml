@@ -8,11 +8,6 @@ Parameters:
     Default: '0'
     AllowedValues: ['0', '1']
     Description: Temporarily log per-invocation application timings (adds tracing overhead).
-  LoadingMode:
-    Type: String
-    Default: lazy
-    AllowedValues: [lazy, eager]
-    Description: Worker code/template loading policy, independent of encrypted configuration.
   FunctionName:
     Type: String
     Default: prod-Api-TtrekWebsite-Function
@@ -260,7 +255,7 @@ Resources:
       Environment:
         Variables:
           ENV: PROD
-          TTREK_LOADING: !Ref LoadingMode
+          TTREK_LOADING: lazy
           TTREK_PROFILE: !Ref RequestProfiling
           CONTENT_IMAGES_CLOUDFRONT_URL:
             Fn::ImportValue: !Sub ${CloudFrontStackName}-BaseUrl
