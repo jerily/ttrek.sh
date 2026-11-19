@@ -23,6 +23,8 @@ Registry commands prefer an explicit `-registry` option, then a saved project
 registry, then a successfully synced `~/.local/ttrek-registry`, then
 `https://ttrek.sh`.
 
+Package search always uses a registry website.
+
 With a single selected local registry, absent packages do not fall back to the
 website. Use repeated `-registry` options to select additional sources explicitly.
 
