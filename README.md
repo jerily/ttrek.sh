@@ -50,7 +50,7 @@ export TTREK_LOADING=lazy
 ```
 
 When unset, the default is `lazy`; only `lazy` and `eager` are accepted. The SAM
-`LoadingMode` parameter sets this variable for Lambda and also defaults to `lazy`.
+template sets `TTREK_LOADING` to `lazy` for Lambda.
 The old `[runtime] loading` INI setting is ignored. The mode is selected and
 validated before reading or decrypting application configuration. Other settings
 still require config decryption once during each worker's startup; warm Lambda
