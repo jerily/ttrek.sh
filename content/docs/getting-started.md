@@ -5,7 +5,7 @@ ttrek manages Tcl packages and their native dependencies in a project environmen
 ## Install the command-line tool
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://ttrek.sh/init | sh
+curl -fsS https://ttrek.sh/init | sh
 ```
 
 Open a new terminal after installation so your shell picks up the executable.
