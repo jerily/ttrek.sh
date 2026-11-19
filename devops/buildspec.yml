@@ -34,7 +34,7 @@ phases:
         --s3-bucket "$SAM_ARTIFACT_BUCKET" --s3-prefix lambda/ttrek-sh
         --region "$AWS_DEFAULT_REGION"
         --capabilities CAPABILITY_NAMED_IAM
-        --parameter-overrides "FunctionName=$LAMBDA_FUNCTION_NAME" Architecture=x86_64
+        --parameter-overrides "FunctionName=$LAMBDA_FUNCTION_NAME" Architecture=x86_64 RequestProfiling=0
         --no-confirm-changeset --no-fail-on-empty-changeset
       # Run only after sam deploy succeeds, never during an update or rollback.
       - >-

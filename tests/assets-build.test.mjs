@@ -72,3 +72,50 @@ test('the combined browser bundle initializes clipboard without a global vendor 
     runInNewContext(`(function() {\n${source}\n})();`, { ...context });
     assert.deepEqual(listeners, []);
 });
+
+test('auto-load and the Load more link share one request and recover from a failed fetch', async () => {
+    let click, intersect, pending, focused = false;
+    const urls = [], appended = [];
+    const link = { href: '/packages?after=a', addEventListener: (_, fn) => { click = fn; },
+        setAttribute() {}, removeAttribute() {} };
+    const status = {};
+    const grid = { append: (...cards) => appended.push(...cards) };
+    const nav = { querySelector: selector => selector.includes('next') ? link : status,
+        closest: () => ({ querySelector: () => grid }) };
+    const document = { querySelectorAll: () => [nav], activeElement: null };
+    const card = { querySelector: () => ({ focus: () => { focused = true; } }) };
+    const page = next => ({
+        querySelector: selector => selector.includes('canonical') || (next && { getAttribute: () => next }),
+        querySelectorAll: () => [card],
+    });
+    class IntersectionObserver {
+        constructor(fn) { intersect = () => fn([{ isIntersecting: true }]); }
+        observe() {}
+        disconnect() {}
+    }
+    const context = { document, window: { IntersectionObserver }, IntersectionObserver,
+        DOMParser: class { parseFromString(page) { return page; } },
+        fetch: url => { urls.push(url); return new Promise(resolve => { pending = resolve; }); } };
+    const script = await readFile(new URL('../assets/js/package-more.js', import.meta.url), 'utf8');
+    runInNewContext(script, context);
+    const tick = () => new Promise(resolve => setImmediate(resolve));
+    intersect();
+    click({ preventDefault() {} });
+    assert.deepEqual(urls, ['/packages?after=a']);
+    pending({ ok: true, text: () => page('/packages?after=b') });
+    await tick();
+    assert.deepEqual(appended, [card]);
+    assert.equal(focused, false);
+    intersect();
+    pending({ ok: false });
+    await tick();
+    assert.match(status.textContent, /try again/);
+    document.activeElement = link;
+    click({ preventDefault() {} });
+    pending({ ok: true, text: () => page(null) });
+    await tick();
+    assert.deepEqual(urls, ['/packages?after=a', '/packages?after=b', '/packages?after=b']);
+    assert.deepEqual(appended, [card, card]);
+    assert.equal(link.hidden, true);
+    assert.equal(focused, true);
+});

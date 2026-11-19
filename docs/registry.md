@@ -97,8 +97,15 @@ Tag hits use `field: "tags"` with the existing `description` or `description-fuz
 match value so older CLI clients can still consume the results.
 
 `GET /registry/autocomplete?q=web` returns up to eight `{name, description}`
-objects with the same ranking and validation. Both endpoints read the database catalog. `GET /search?q=web` renders the full results page; `/packages` browses
-all packages. The home and registry pages share an accessible search form with
+objects with the same ranking and validation. Both endpoints read the database catalog. `GET /search?q=web` shows 24 matches at a time in relevance order. Load more repeats the search with the same
+`q` and language filter, starting after the package named by `after`. If that package no longer
+matches, the page offers a fresh search.
+
+`/packages` browses
+packages alphabetically, 24 per page. Scrolling or selecting **Load more** appends the next group of packages. The control
+links directly to the next page (for example, `/packages?after=tjson`) and preserves the
+language filter, so crawlers and browsers without JavaScript can follow it.
+The home and registry pages share an accessible search form with
 keyboard navigation and a 200 ms `throttle-debounce` throttle. Pending lookups
 are cancelled and stale responses ignored. Normal form submission works without
 JavaScript, including when suggestions are unavailable.

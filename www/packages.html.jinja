@@ -1,4 +1,5 @@
 {% extends 'master.html.jinja' %}
+{% block styles %}{% if canonical_path %}<link rel="canonical" href="https://ttrek.sh{{ canonical_path }}" />{% endif %}{% endblock %}
 {% block body_class %}registry-page{% endblock %}
 {% block home_selected %}{% endblock %}
 {% block packages_selected %} pure-menu-selected{% endblock %}
@@ -34,6 +35,12 @@
         </div>
     {% else %}
         <div class="empty-results"><h2>No packages found.</h2><p>Try a shorter name or describe what you need, like “web” or “compression”.</p><a href="/packages">Browse all packages →</a></div>
+    {% endif %}
+    {% if next_url %}
+    <nav class="package-more" aria-label="More packages">
+        <a rel="next" href="{{ next_url }}" class="package-more-link"><span aria-hidden="true">↓</span> Load more</a>
+        <p class="package-more-status" role="status"></p>
+    </nav>
     {% endif %}
     {% if is_search %}<p class="browse-link"><a href="/packages">← Back to all packages</a></p>{% endif %}
 </main>

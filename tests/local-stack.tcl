@@ -98,7 +98,7 @@ try {
         /docs {Getting started} /blog {ttrek 1.0.0 is now public}
         /blog/2026-11-07-ttrek-100-is-now-public {Kostiantyn Kushnir}
         /docs/getting-started {ttrek init -y} /docs/registries private-ttrek-registry
-        /docs/_assets/style.css .cards /packages tjson /search?q=web twebserver
+        /docs/_assets/style.css .cards /packages {<article class="package-card">} /search?q=web twebserver
         /registry/autocomplete?q=web twebserver /package/tcl 9.1.0
         /package/web-static-blog 0.1.0 /registry/web-static-wiki 0.1.0
         /package/treqmon 2.2.0 /registry/treqmon 2.2.0

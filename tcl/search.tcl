@@ -287,8 +287,30 @@ proc ::recipe_search::cards {matches} {
     return [list L $cards]
 }
 
+namespace eval ::recipe_search {variable page_size 24}
+
+proc ::recipe_search::request_after {req} {
+    set values [request_values $req after]
+    if {![llength $values]} {return {}}
+    set after [lindex $values 0]
+    if {[llength $values] != 1 || ![valid_name $after]} {error "after must be a single package name."}
+    return $after
+}
+
+proc ::recipe_search::page_url {language after {query {}}} {
+    set params {}
+    if {$query ne {}} {lappend params q=[::twebserver::encode_uri_component $query]}
+    if {$language ne {}} {lappend params language=$language}
+    if {$after ne {}} {lappend params after=[::twebserver::encode_uri_component $after]}
+    if {![llength $params]} {return /packages}
+    return /packages?[join $params &]
+}
+
 # Return search page handler for the caller.
 proc get_search_page_handler {ctx req} {
+    set total 0
+    set next_url {}
+    set canonical_path {}
     set status 200
     set matches {}
     set message {}
@@ -300,11 +322,32 @@ proc get_search_page_handler {ctx req} {
         set status 400
         set query {}
         set message {Use 1–255 letters, numbers, spaces, dots, underscores, plus signs or hyphens.}
+    } elseif {[catch {::recipe_search::request_after $req} after]} {
+        set status 400
+        set message $after
     } else {
         if {[catch {::recipe_search::results $query 0 $language} matches]} {return [::recipe_search::unavailable]}
+        set total [llength $matches]
+        set start 0
+        if {$after ne {}} {
+            set names [lmap match $matches {dict get $match name}]
+            set index [lsearch -exact $names $after]
+            if {$index < 0} {
+                set status 409
+                set message {The results have changed. Submit the search again to start over.}
+            }
+            set start [expr {$index + 1}]
+        }
+        set matches [lrange $matches $start [expr {$start + $::recipe_search::page_size - 1}]]
+        if {$status == 200} {
+            set canonical_path [::recipe_search::page_url $language $after $query]
+            if {$start + [llength $matches] < $total} {
+                set next_url [::recipe_search::page_url $language [dict get [lindex $matches end] name] $query]
+            }
+        }
     }
     set data [dict create title {S {Search packages}} query [list S $query] \
-        is_search {BOOL 1} error [list S $message] result_count [list N [llength $matches]] \
+        is_search {BOOL 1} error [list S $message] result_count [list N $total] canonical_path [list S $canonical_path] next_url [list S $next_url] \
         packages [::recipe_search::cards $matches] language_filter {BOOL 1} language [list S $language]]
     return [::twebserver::build_response $status "text/html; charset=utf-8" \
         [::views::render packages.html.jinja $data]]
