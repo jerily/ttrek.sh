@@ -65,7 +65,12 @@
     },
     "1.7.0": {
       "linux-amd64-glibc": "01791390484850dffa5195f325fba109e958cf4966a36eff582a0948f1eb4ee8",
-      "linux-amd64-musl": "def3c1e3ce8f9ddf1c5c3bd5c8e77d5fbec38993a57ad59af2bdd7189b841b0e"
+      "linux-amd64-musl": "def3c1e3ce8f9ddf1c5c3bd5c8e77d5fbec38993a57ad59af2bdd7189b841b0e",
+      "linux-arm64-glibc": "aac5cf71bf2b846b45c13c82f2aca8c32f7853a647921a3542ebfd4096f59a16",
+      "linux-arm64-musl": "b38480a118c0e6eb1e40c78aa1932335e48008e337eacd38ae1d04a94d176da6",
+      "macos-arm64": "bc33289c8404a1a0a8f6c70b5193ca5304e2702470650abb6cd5dc6ba4012569",
+      "macos-universal2": "bcecab7a3bfbd242f687ed96b085fd4bf28ba19566494c3a160bfbeb9f80688e",
+      "macos-x86_64": "842c320a582653e97d42bbba03d634a71a00389aed95029ac56efddf36db543a"
     }
   }
 }
