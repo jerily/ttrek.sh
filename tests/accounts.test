@@ -167,6 +167,20 @@ test accounts-guests {Signed-out visitors see only sign-in in the account naviga
     lsort -unique $result
 } -result {1 200}
 
+test accounts-canonical {Account forms identify their clean URL with or without a return destination} -body {
+    foreach path {/user/forgot /user/register /user/login /user/email-login} {
+        foreach suffix {{} ?return_to=%2Fforum%3Fpage%3D2} {
+            set status [::accountstest::request GET $path$suffix]
+            set html [dict get $::accountstest::last body]
+            set links [regexp -all -inline {<link rel="canonical" href="([^"]+)" />} $html]
+            if {$status != 200 || [llength $links] != 2 || [lindex $links 1] ne "https://ttrek.sh$path" ||
+                [string first [lindex $links 0] $html] > [string first </head> $html]} {
+                error "Unexpected canonical for $path$suffix (HTTP $status): $links"
+            }
+        }
+    }
+} -result {}
+
 test accounts-redirect {An anonymous protected page redirects to sign-in with the original destination} -body {
     list [::accountstest::request GET /user/profile?tab=security] \
         [dict get $::accountstest::last headers Location] \
