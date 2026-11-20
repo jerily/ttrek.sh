@@ -85,7 +85,6 @@ proc ::homepage::resolve {entries stores} {
     set slides {}
     set seen {}
     set pages {}
-    set post {}
     set paths {}
     set names {}
     foreach entry $entries {
@@ -97,7 +96,6 @@ proc ::homepage::resolve {entries stores} {
         }
     }
     # Either collection may be unavailable independently during provisioning.
-    catch {set post [::web::static::blog::latest_post [dict get $stores blog]]}
     catch {set pages [::web::static::wiki::page_summaries [dict get $stores wiki] $paths]}
     set catalog {}
     if {[llength $names]} {
@@ -127,6 +125,12 @@ proc ::homepage::resolve {entries stores} {
                     }
                 }
                 latest_blog {
+                    set store [dict get $stores blog]
+                    if {[dict exists $entry path]} {
+                        set post [::web::static::blog::load $store [dict get $entry path]]
+                    } else {
+                        set post [::web::static::blog::latest_post $store]
+                    }
                     if {$post eq {}} {continue}
                     set path [dict get $post path]
                     ::web::static::blog::canonical_path $path
@@ -136,9 +140,9 @@ proc ::homepage::resolve {entries stores} {
                     dict set fields description {S {Release notes, practical guides, and news from ttrek.}}
                     dict set fields note {S {Ideas for your next Tcl project.}}
                     dict set fields version {S {}}
-                    if {[dict exists $entry highlights $path]} {
+                    if {[dict exists $entry path]} {
                         foreach key {description version note} {
-                            dict set fields $key [list S [dict get $entry highlights $path $key]]
+                            dict set fields $key [list S [dict get $entry $key]]
                         }
                     }
                 }

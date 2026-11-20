@@ -38,7 +38,7 @@ proc homepage {} {
     dict get [::site::dispatch $::site::router {method GET path / headers {Host ttrek.sh}}] body
 }
 
-test homepage-query-count {All slide metadata is read in three package-owned queries} -body {
+test homepage-query-count {The configured showcase uses three queries} -body {
     set ::homepage_queries 0
     proc count_homepage_queries {args} {incr ::homepage_queries}
     trace add execution ::tpersist::db_execute enter count_homepage_queries
@@ -49,10 +49,10 @@ test homepage-query-count {All slide metadata is read in three package-owned que
 test homepage-five {Published configuration renders five slides including the latest release} -body {
     set data [slides]
     set post [lindex $data 3]
-    set latest [lindex [::web::static::blog::posts [dict get $stores blog]] 0]
-    set path [dict get $latest path]
-    set highlights [dict get [lindex [dict get $config slides] 3] highlights]
-    set version [expr {[dict exists $highlights $path] ? [dict get $highlights $path version] : {}}]
+    set entry [lindex [dict get $config slides] 3]
+    set path [dict get $entry path]
+    set latest [::web::static::blog::load [dict get $stores blog] $path]
+    set version [dict get $entry version]
     set html [homepage]
     list [lmap slide $data {dict get $slide id}] [expr {[dict get $post version] eq $version}] \
         [expr {[dict get $post url] eq "/blog$path"}] [expr {[dict get $post date] eq [dict get $latest published_at]}] \
@@ -113,6 +113,9 @@ test homepage-missing-image {An unavailable screenshot is omitted without losing
 } -result {community guide blog packages}
 
 test homepage-sync {An already configured worker sees a new post, then withdrawal, without stale release copy} -setup {
+    set entries [dict get $config slides]
+    lset entries 3 [dict remove [lindex $entries 3] path]
+    dict set ::homepage::config slides $entries
     set directory [makeDirectory homepage-blog]
     set channel [open [file join $directory 2026-11-15-new-post.md] w]
     puts $channel {# A new <release> & "news"}
@@ -128,6 +131,7 @@ test homepage-sync {An already configured worker sees a new post, then withdrawa
         [expr {[string first {See your build before it starts.} $html] < 0}] \
         [lmap slide [slides] {dict get $slide id}]
 } -cleanup {
+    set ::homepage::config $config
     removeDirectory $directory
     ::web::static::blog::sync [dict get $stores blog] [file join $root content blog]
 } -result {/blog/2026-11-15-new-post {} 1 1 {personal community guide packages}}

@@ -19,28 +19,10 @@
       "label": "Latest blog post",
       "kicker": "From the blog",
       "link_text": "Read the latest post",
-      "highlights": {
-        "/2026-11-19-install-ttrek-on-ubuntu-with-apt": {
-          "description": "Install ttrek with apt on Ubuntu 26.04 LTS and get new versions through your usual system updates.",
-          "version": "1.8.0",
-          "note": "sudo apt install ttrek"
-        },
-        "/2026-11-18-ttrek-170-step-into-your-project": {
-          "description": "Open an interactive shell with your project's installed tools ready to use, then deactivate when you are done.",
-          "version": "1.7.0",
-          "note": "Step into your project's environment."
-        },
-        "/2026-11-17-ttrek-160-see-your-build-before-it-starts": {
-          "description": "Programming languages in your install plan, USE flags for each installation, and earlier checks for missing build requirements.",
-          "version": "1.6.0",
-          "note": "See your build before it starts."
-        },
-        "/2026-11-14-bug-fixes-in-ttrek-150": {
-          "description": "Fixes for Snap CMake builds, clearer missing-tool errors, and dependency order that stays yours.",
-          "version": "1.5.0",
-          "note": "Small fixes. Smoother builds."
-        }
-      }
+      "path": "/2026-11-19-ttrek-190-batch-package-lookups",
+      "description": "ttrek looks up packages and fetches build recipes in batches, cutting registry round trips before a build.",
+      "version": "1.9.0",
+      "note": "Fewer requests per install."
     },
     {
       "id": "packages",
