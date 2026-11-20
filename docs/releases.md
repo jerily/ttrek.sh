@@ -17,11 +17,15 @@ configuration contain the same release settings:
 [releases]
 bucket = jerily-ttrek-app
 region = eu-central-1
-prefix = ttrek/1.9.0
-version = 1.9.0
+prefix = ttrek/<version>
+version = <version>
 url_expiry_seconds = 300
 checksums_file = etc/releases.json
 ```
+
+Set the shell variable `version` to the new CLI version. From the website checkout,
+run `bin/bump-ttrek-version.sh "$version"` to update the release settings, build
+defaults, and test fixtures.
 
 The [portable release build](https://github.com/jerily/ttrek/pull/33) exports
 `dist/<target>/ttrek`. Upload each executable to `<prefix>/<target>/ttrek` in the
@@ -85,7 +89,7 @@ selected uploads succeed. Its structure is environment → version → target �
 {
   "local": {},
   "prod": {
-    "1.9.0": {
+    "<version>": {
       "linux-amd64-glibc": "<64-character SHA-256 of the executable>"
     }
   }
@@ -99,8 +103,8 @@ versions or targets have no checksum; malformed JSON, invalid entries, and
 missing configured files fail startup. Inline `sha256_<target>` settings are
 replaced by this manifest.
 
-From the `ttrek` checkout, run `ttrek run -script upload-local -- 1.9.0` or
-`ttrek run -script upload-prod -- 1.9.0`; optionally append target names.
+From the `ttrek` checkout, run `ttrek run -script upload-local -- "$version"` or
+`ttrek run -script upload-prod -- "$version"`; optionally append target names.
 The script defaults to this checkout's `etc/releases.json` when the repositories
 are siblings. Otherwise set `TTREK_CHECKSUMS_FILE` to the configured file.
 It preserves previous versions and targets and rejects changed bytes for an
@@ -115,8 +119,8 @@ manifest with the configuration; the production build already packages `etc/`.
 Both endpoints send `Cache-Control: no-store` so cached redirects cannot outlive
 their signatures. Restart the application after changing configuration or hashes.
 The local mock stack reads the same INI reference and `local` section at startup,
-using its `ttrek-local` bucket. Packaged 1.9.0 seed binaries supply hashes only for
-targets without uploaded metadata; uploaded hashes take precedence. Repackage
+using its `ttrek-local` bucket. Seed binaries for the configured release supply hashes
+only for targets without uploaded metadata; uploaded hashes take precedence. Repackage
 after runtime code changes, and restart the local stack after uploads.
 Local uploads also update the S3 seed directory (`dist/s3` here by default),
 because the mock's object database is disposable. Packaging preserves existing
