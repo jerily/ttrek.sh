@@ -9,7 +9,7 @@ cd "$SITE_ROOT"
 TTREK_BIN_DIR="$SITE_ROOT/build/ttrek"
 mkdir -p "$TTREK_BIN_DIR"
 # Override with an artifact built from ttrek's installation USE-flag changes.
-TTREK_BINARY_S3_URI=${TTREK_BINARY_S3_URI:-s3://jerily-ttrek-app/ttrek/1.8.0/linux-amd64-glibc/ttrek}
+TTREK_BINARY_S3_URI=${TTREK_BINARY_S3_URI:-s3://jerily-ttrek-app/ttrek/1.9.0/linux-amd64-glibc/ttrek}
 aws s3 cp "$TTREK_BINARY_S3_URI" \
   "$TTREK_BIN_DIR/ttrek" --only-show-errors
 chmod 0755 "$TTREK_BIN_DIR/ttrek"

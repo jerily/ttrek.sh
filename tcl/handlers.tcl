@@ -55,8 +55,23 @@ proc telemetry_event_common { event_type args } {
     telemetry_event $event_type -env $environment_id {*}$args
 }
 
+# Record calls to the individual endpoints even when telemetry is disabled.
+proc log_legacy_package_request {route req} {
+    set fields [dict create event {S legacy_package_request} route [list S $route]]
+    foreach key {package_name package_version os machine} {
+        if {[dict exists $req pathParameters $key]} {
+            dict set fields $key [list S [string range [dict get $req pathParameters $key] 0 254]]
+        }
+    }
+    if {[regexp {^ttrek/([0-9]+\.[0-9]+\.[0-9]+)$} [::responses::header $req User-Agent] -> version]} {
+        dict set fields client_version [list S $version]
+    }
+    catch {puts stderr [::tjson::typed_to_json [list M $fields]]}
+}
+
 # Validate and record a submitted telemetry event.
 proc post_telemetry_collect_handler {ctx req} {
+    log_legacy_package_request post_telemetry_collect $req
     if {[catch {
         [::request_validation::validator telemetry-collect] bind [::topenapi::from_twebserver $req] {
             package_name    {params package_name}
@@ -297,6 +312,7 @@ proc post_telemetry_register_handler {ctx req} {
 
 # Return package versions handler for the caller.
 proc get_package_versions_handler {ctx req} {
+    log_legacy_package_request get_package_versions $req
     set package_name [::twebserver::get_path_param $req package_name]
     telemetry_event_common req_reg_get_pkg -pkg_name $package_name
     if {[catch {
@@ -344,6 +360,7 @@ proc compute_iuse_flags {spec_handle} {
 
 # Lightweight display metadata, without recording a build-recipe download.
 proc get_package_languages_handler {ctx req} {
+    log_legacy_package_request get_package_languages $req
     set name [::twebserver::get_path_param $req package_name]
     set version [::twebserver::get_path_param $req package_version]
     if {[catch {
@@ -356,6 +373,7 @@ proc get_package_languages_handler {ctx req} {
 
 # Return package spec handler for the caller.
 proc get_package_spec_handler {ctx req} {
+    log_legacy_package_request get_package_spec $req
     set package_name [::twebserver::get_path_param $req package_name]
     set package_version [::twebserver::get_path_param $req package_version]
     set os [::twebserver::get_path_param $req os]
