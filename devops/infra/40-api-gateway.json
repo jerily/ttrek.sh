@@ -123,7 +123,6 @@
         "GetAdminRoute",
         "GetBlogRoute",
         "GetBlogByPathRoute",
-        "GetDebugRoute",
         "GetDistByArchByArtifactRoute",
         "GetDocsRoute",
         "GetDocsByPathRoute",
@@ -172,7 +171,6 @@
         "HeadAdminRoute",
         "HeadBlogRoute",
         "HeadBlogByPathRoute",
-        "HeadDebugRoute",
         "HeadDistByArchByArtifactRoute",
         "HeadDocsRoute",
         "HeadDocsByPathRoute",
@@ -378,27 +376,6 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /blog/{path+}",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
-    "GetDebugRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "GET /debug",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -1407,27 +1384,6 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "HEAD /blog/{path+}",
-        "AuthorizationType": "NONE",
-        "Target": {
-          "Fn::Join": [
-            "/",
-            [
-              "integrations",
-              {
-                "Ref": "SiteIntegration"
-              }
-            ]
-          ]
-        }
-      }
-    },
-    "HeadDebugRoute": {
-      "Type": "AWS::ApiGatewayV2::Route",
-      "Properties": {
-        "ApiId": {
-          "Ref": "HttpApi"
-        },
-        "RouteKey": "HEAD /debug",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [

@@ -507,6 +507,7 @@ test static-images-config {separate image directories and keys serve both mounts
 
 test static-rate-limits {Mounted custom-route limits count once, record rejections and issue no cookies} -setup {
     source [file join $root tcl local-ratelimit.tcl]
+    set ::env(ENV) LOCAL
     set limitedSettings $settings
     dict set limitedSettings tratelimit {
         store {localstore {}}

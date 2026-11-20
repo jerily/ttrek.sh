@@ -816,7 +816,7 @@ ttrek run -package tdevops -script generate-api-gateway
 
 The Tcl hook in `devops/generate-api-gateway.tcl`, configured through
 `api-gateway-hook` in `etc/tdevops.tcl`, reads `etc/routes.json`, omits routes marked
-`cdn_on_prod: true`, and collapses trailing-slash aliases such as `/docs/` into
+`cdn_on_prod: true` and the local-only `/debug` endpoint, and collapses trailing-slash aliases such as `/docs/` into
 `/docs` before passing routes to tdevops. API Gateway rejects empty path segments;
 the generator rejects interior `//` and aliases with conflicting backends.
 The root `/` route is preserved. Local proxies use

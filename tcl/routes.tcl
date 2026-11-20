@@ -5,10 +5,9 @@
 #
 
 # Shared by the direct HTTP server and the Lambda HTTP-event adapter.
-return {
+set routes {
     GET /admin ::accounts::dashboard get_admin_dashboard
     GET /request-monitor/recent get_recent_requests_handler get_recent_requests
-    GET /debug get_debug_handler get_debug
     GET / get_index_page_handler get_index
     GET /homepage/images/:id get_homepage_image_handler get_homepage_image
     GET /init get_ttrek_init_handler get_ttrek_init
@@ -35,5 +34,8 @@ return {
     POST /telemetry/register/:environment_id post_telemetry_register_handler post_telemetry_register
     POST /telemetry/collect/:package_name/:package_version post_telemetry_collect_handler post_telemetry_collect
     GET /logo get_logo_handler get_logo
-    GET /:path(.*) get_catchall_handler get_catchall
 }
+if {[info exists ::env(ENV)] && $::env(ENV) eq "LOCAL"} {
+    lappend routes GET /debug get_debug_handler get_debug
+}
+return [concat $routes {GET /:path(.*) get_catchall_handler get_catchall}]
