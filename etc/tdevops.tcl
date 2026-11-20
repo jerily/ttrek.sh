@@ -44,8 +44,8 @@ proc ::project_devops::local {options work} {
     set releases [::app_config::releases {}]
     if {[file isfile $configPath]} {set releases [::app_config::releases_from_ini $configPath $root]}
     # Seed binaries are only a fallback for targets without uploaded metadata.
-    if {[dict get $releases version] eq "1.8.0" && [dict get $releases prefix] eq "ttrek/1.8.0"} {
-        foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.8.0/*/ttrek] {
+    if {[dict get $releases version] eq "1.9.0" && [dict get $releases prefix] eq "ttrek/1.9.0"} {
+        foreach binary [glob -nocomplain -directory [dict get $options --s3-dir] ttrek-local/ttrek/1.9.0/*/ttrek] {
             set target [file tail [file dirname $binary]]
             if {![dict exists $releases checksums $target]} {
                 dict set releases checksums $target [lindex [exec sha256sum $binary] 0]

@@ -443,8 +443,8 @@ The build:
 
 1. Downloads the CLI selected by `TTREK_BINARY_S3_URI`, makes it executable,
    and checks it with `ttrek self-update -version`. Before using these recipes,
-   upload a tested 1.8.0 binary at the configured S3 URI (or override the URI).
-   The 1.8.0 default supports unsigned `iuse`, default-disabled flags and
+   upload a tested 1.9.0 binary at the configured S3 URI (or override the URI).
+   The 1.9.0 default supports unsigned `iuse`, default-disabled flags and
    conditional project dependencies; configuring this URI does not publish it.
 2. Runs `ttrek sync` into `build/public-registry`, then installs from the private
    registry followed by that public checkout. A fresh production `ttrek-venv`

@@ -236,7 +236,7 @@ test releases-7 {The real SDK generates a signed URL without an AWS request} -se
     set ::releases::client [::aws::s3::create {region eu-west-1 aws_access_key_id test aws_secret_access_key test}]
 } -body {
     set url [::releases::signed_url linux-amd64-glibc]
-    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.8.0/linux-amd64-glibc/ttrek?*} $url] \
+    list [string match {https://public-releases.s3.eu-west-1.amazonaws.com/ttrek/1.9.0/linux-amd64-glibc/ttrek?*} $url] \
         [regexp {[?&]X-Amz-Expires=300(&|$)} $url] \
         [regexp {[?&]X-Amz-Signature=[0-9a-f]{64}(&|$)} $url]
 } -cleanup {

@@ -100,6 +100,11 @@ client can split it. Only successfully served recipes increment download counts.
 `POST /telemetry/collect/batch` accepts up to 64 install outcomes using the same
 environment identification as the individual telemetry endpoint.
 
+Filter application logs on `event = "legacy_package_request"` to count individual
+version, language, recipe, and install-outcome requests by `route`. Each JSON
+entry includes the requested package and any version or platform in the path.
+Clients that send a `ttrek/X.Y.Z` user agent also supply the `client_version` field.
+
 ## Recipe search
 
 `GET /registry/search?q=web` returns JSON objects with `name`, `description`, `tags`, `languages`, and
