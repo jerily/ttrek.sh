@@ -34,7 +34,7 @@ try {
             error "SQLite Tcl module in production ZIP"
         }
     }
-    foreach executable {mock-lambda-app mock-proxy-app mock-s3-app sqlite3} {
+    foreach executable {mock-lambda-app mock-proxy-app mock-s3-app mock-ses-app sqlite3} {
         if {[file exists [file join $mount local bin $executable]]} {
             error "Local executable in production ZIP: $executable"
         }

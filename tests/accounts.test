@@ -25,6 +25,9 @@ foreach kind {wiki blog} directory {docs blog} {
     ::web::static::${kind}::sync [dict get [::content_images::database_stores $db {}] $kind] [file join $root content $directory]
 }
 set account [::app_config::account {} $root $work]
+# The registration tests use the LOCAL verification code in the response.
+# Exercise the actual delivery callback separately with a captured SES client.
+dict set account display email_enabled false
 dict set account policy bcrypt_cost 4
 namespace eval ::treqmon::middleware::accountsteststore {
     variable history {}
@@ -595,6 +598,27 @@ test accounts-close-account {direct and Lambda account closure confirms the pass
     set ::accountstest::cookie {}
     set ::accountstest::csrf {}
 } -result {200 1 200 1 1 1 401 1 200 1 1 1 1 302 200 1 200 1 1 1 401 1 200 1 1 1 1 302 200 1 200 1 1 1 401 1 200 1 1 1 1 302}
+
+test accounts-local-ses {local verification uses the configured loopback service and formatted account email} -setup {
+    package require pure-tcl-aws-ses
+    set localDisplay [dict get [::app_config::account {} $root $work] display]
+    set localMail [dict replace $::accounts::mount -config $localDisplay -deliver [dict get $localDisplay deliver]]
+    set savedPort [array get ::env TTREK_LOCAL_SES_PORT]
+    set ::env(TTREK_LOCAL_SES_PORT) 42345
+    rename ::aws::ses::create ::accountstest::real_ses_create
+    proc ::aws::ses::create {options} {set ::sesOptions $options; return ::accountstest::capture_mail}
+    proc ::accountstest::capture_mail {method args} {if {$method eq "send_email"} {set ::sesMessage [lindex $args 0]}}
+} -body {
+    ::web::user::deliver $localMail verify member@example.com 012345
+    list [dict get $::sesOptions endpoint] [dict get $::sesOptions aws_access_key_id] \
+        [dict get $::sesMessage to] [string match {*012345*} [dict get $::sesMessage text]]
+} -cleanup {
+    rename ::aws::ses::create {}
+    rename ::accountstest::real_ses_create ::aws::ses::create
+    rename ::accountstest::capture_mail {}
+    unset ::env(TTREK_LOCAL_SES_PORT)
+    array set ::env $savedPort
+} -result {http://127.0.0.1:42345 local member@example.com 1}
 
 test accounts-ses {production configuration sends verification and recovery through the configured SES sender} -setup {
     package require tconfig::decrypt

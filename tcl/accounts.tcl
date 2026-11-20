@@ -97,6 +97,20 @@ proc ::accounts::has_cookie {request} {
     return false
 }
 
+# Deliver the same account message that production formats, using local credentials.
+proc ::accounts::send_local_email {purpose destination code} {
+    variable mount
+    if {[::app_config::mode] ne "LOCAL"} {error "local SES delivery requires ENV=LOCAL"}
+    set port 3016
+    if {[info exists ::env(TTREK_LOCAL_SES_PORT)]} {set port $::env(TTREK_LOCAL_SES_PORT)}
+    if {![string is integer -strict $port] || $port < 1 || $port > 65535} {error "invalid local SES port"}
+    package require pure-tcl-aws-ses 1.0.0
+    set message [::web::user::email_message $mount $purpose $destination $code]
+    set client [::aws::ses::create [dict create region [dict get $mount -config email_region] \
+        endpoint http://127.0.0.1:$port aws_access_key_id local aws_secret_access_key local]]
+    try {$client send_email $message} finally {$client destroy}
+}
+
 # Wake the deployed Lambda alias asynchronously after SQS has accepted an email.
 proc ::accounts::email_queued {queueUrl} {
     package require pure-tcl-aws-lambda 1.0.0

@@ -19,7 +19,7 @@ if {![llength $packages]} {
     if {$production} {
         lappend packages tdbc::postgres tsession-postgres
     } else {
-        lappend packages sqlite3 tdbc::sqlite3 tsession-sqlite mock-proxy-app mock-lambda-app mock-s3-app
+        lappend packages sqlite3 tdbc::sqlite3 tsession-sqlite mock-proxy-app mock-lambda-app mock-s3-app mock-ses-app
     }
 }
 set failed 0
