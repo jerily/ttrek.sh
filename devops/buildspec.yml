@@ -26,15 +26,16 @@ phases:
   build:
     on-failure: ABORT
     commands:
-      # Publish content images, strip them from the ZIP, and publish browser assets.
+      # Build the runtime and publish browser assets.
       - bash devops/build-lambda.sh
+      - bash bin/upload-content.sh
       - >-
         sam deploy --template-file devops/sam-template.yaml
         --stack-name "$SAM_STACK_NAME"
         --s3-bucket "$SAM_ARTIFACT_BUCKET" --s3-prefix lambda/ttrek-sh
         --region "$AWS_DEFAULT_REGION"
         --capabilities CAPABILITY_NAMED_IAM
-        --parameter-overrides "FunctionName=$LAMBDA_FUNCTION_NAME" Architecture=x86_64 RequestProfiling=0
+        --parameter-overrides "FunctionName=$LAMBDA_FUNCTION_NAME" "ContentImagesBucket=$CONTENT_IMAGES_BUCKET" "ContentImagesPrefix=$CONTENT_IMAGES_PREFIX" Architecture=x86_64 RequestProfiling=0
         --no-confirm-changeset --no-fail-on-empty-changeset
       # Run only after sam deploy succeeds, never during an update or rollback.
       - >-

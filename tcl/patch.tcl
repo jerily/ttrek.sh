@@ -92,17 +92,14 @@ proc ::site_patch::task_sync_website {context} {
     }
     set completed {wiki blog registry}
     set images [dict get $settings content_images]
-    # Asset publication now belongs to deployment, before SAM updates Lambda.
-    set prepared [expr {[::app_config::mode] eq "PROD"}]
-    if {$prepared} {set snapshot [::content_images::read_snapshot $root $images]}
-    set stores [::content_images::database_stores $::telemetry::connection [dict get $settings content_images]]
-    # Both collections and the complete registry commit together. Production
-    # imports prepared references; it never reads or copies image files to S3.
+    set production [expr {[::app_config::mode] eq "PROD"}]
+    set stores [::content_images::database_stores $::telemetry::connection $images]
     ::telemetry::transaction {
         ::telemetry::lock_search_snapshot
+        if {$production} {set collections [::content_images::archive_items $root $images]}
         foreach {kind directory} {wiki docs blog blog} {
-            if {$prepared} {
-                ::content_images::import_snapshot [dict get $stores $kind] $snapshot $kind
+            if {$production} {
+                ::web::static::${kind}::sync_prepared [dict get $stores $kind] [dict get $collections $kind]
             } else {
                 # LOCAL retains package sync for its disposable S3 mock.
                 ::web::static::${kind}::sync [dict get $stores $kind] [file join $root content $directory]

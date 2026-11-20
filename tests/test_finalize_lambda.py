@@ -14,7 +14,7 @@ SPEC.loader.exec_module(MODULE)
 
 
 class FinalizeTests(unittest.TestCase):
-    def archive(self, path, snapshot=True):
+    def archive(self, path, bootstrap=True):
         files = {
             "bootstrap": b"bootstrap", "local/bin/tclsh": b"tclsh",
             "etc/config.ini": b"config", "etc/releases.json": b"{}",
@@ -24,8 +24,9 @@ class FinalizeTests(unittest.TestCase):
             "content/docs/nested/diagram.SVG": b"svg",
             "public/favicon.ico": b"favicon", "local/lib/icon.png": b"package icon",
         }
-        if snapshot:
-            files["etc/content-snapshot.data"] = b"prepared records"
+        if not bootstrap:
+            del files["bootstrap"]
+        files["etc/content-snapshot.data"] = b"prepared records"
         with zipfile.ZipFile(path, "w") as archive:
             for name, data in files.items():
                 archive.writestr(name, data)
@@ -38,17 +39,17 @@ class FinalizeTests(unittest.TestCase):
             MODULE.finalize(path)
             MODULE.finalize(path)  # Finalization is repeatable.
             with zipfile.ZipFile(path) as archive:
-                expected = {name for name in files if not MODULE.content_image(name)}
+                expected = {name for name in files if not name.startswith("content/") and name != "etc/content-snapshot.data"}
                 self.assertEqual(set(archive.namelist()), expected)
                 for name in expected:
                     self.assertEqual(archive.read(name), files[name])
                 for name in ("bootstrap", "local/bin/tclsh"):
                     self.assertEqual(stat.S_IMODE(archive.getinfo(name).external_attr >> 16), 0o755)
 
-    def test_missing_snapshot_leaves_archive_untouched(self):
+    def test_missing_bootstrap_leaves_archive_untouched(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "site.zip"
-            self.archive(path, snapshot=False)
+            self.archive(path, bootstrap=False)
             original = path.read_bytes()
             with self.assertRaises(KeyError):
                 MODULE.finalize(path)

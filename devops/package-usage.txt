@@ -17,7 +17,6 @@ Git metadata and working databases are excluded. No AWS deployment occurs.
 Requires Linux, Git with HTTPS access to GitHub, readelf, ldd, ttrek and a Tcl
 interpreter with zipfs. Packaging does not synchronize the deployed database.
 
-Production packaging prepares content and image references in
-etc/content-snapshot.data. The deployment pipeline uploads images to S3, then
-finalize-lambda.py removes content images from the ZIP. Local packages retain
-images for the local S3 mock. Wiki/blog package APIs own the prepared-content import.
+Production packaging excludes content/. Deployment uploads that directory,
+including its images, as ttrek/content/latest.zip. The website sync patch
+downloads the archive and publishes its images. Local packages retain content/.

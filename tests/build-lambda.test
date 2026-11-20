@@ -50,9 +50,6 @@ if [ "$#" = 0 ]; then
     exec "$TTREK_TEST_TCLSH" "$TTREK_TEST_PROBE"
 fi
 printf 'tcl %s\n' "$1" >> "$TTREK_TEST_LOG"
-if [ "$1" = devops/upload-content-images.tcl ]; then
-    exit "$TTREK_TEST_UPLOAD_STATUS"
-fi
 }
 # Execute the actual SQLite probe with controlled package availability.
 build_write [file join $work sqlite-probe.tcl] {
@@ -105,7 +102,7 @@ case "$1" in
 esac
 }
 # Provide the run build test fixture.
-proc run_build {syncStatus {sqlite absent} {uploadStatus 0}} {
+proc run_build {syncStatus {sqlite absent}} {
     global work env
     file delete -force [file join $work build] [file join $work commands.log]
     set failed [catch {exec env PATH=[file join $work bin]:$env(PATH) \
@@ -119,7 +116,6 @@ proc run_build {syncStatus {sqlite absent} {uploadStatus 0}} {
         SAM_ARTIFACT_BUCKET=fixture-bucket \
         TTREK_TEST_LOG=[file join $work commands.log] \
         TTREK_TEST_SYNC_STATUS=$syncStatus \
-        TTREK_TEST_UPLOAD_STATUS=$uploadStatus \
         bash [file join $work devops build-lambda.sh] 2>@1} message options]
     list $failed [expr {$failed ? [lindex [dict get $options -errorcode] end] : 0}] \
         [split [build_read [file join $work commands.log]] \n]
@@ -174,20 +170,6 @@ test build-sqlite-broken {An installed but broken SQLite driver fails instead of
 test build-registry-sync-failure {A failed sync stops the build before dependency installation} -body {
     run_build 42
 } -result {1 42 {self-update sync}}
-
-test build-image-order {Images upload before ZIP pruning and package validation} -body {
-    lassign [run_build 0] failed status commands
-    set upload [lsearch -exact $commands {tcl devops/upload-content-images.tcl}]
-    set finalize [lsearch -exact $commands {python devops/finalize-lambda.py}]
-    set validate [lsearch -exact $commands {tcl tests/lambda-package.tcl}]
-    list $failed [expr {$upload >= 0 && $upload < $finalize && $finalize < $validate}]
-} -result {0 1}
-
-test build-image-failure {An upload failure prevents finalization and further publication} -body {
-    lassign [run_build 0 absent 43] failed status commands
-    list $failed $status [lindex $commands end] \
-        [expr {{python devops/finalize-lambda.py} in $commands}]
-} -result {1 43 {tcl devops/upload-content-images.tcl} 0}
 
 removeDirectory lambda-build
 set failed $::tcltest::numTests(Failed)

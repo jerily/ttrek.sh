@@ -78,7 +78,7 @@ test patch-sync {sync updates rows through package APIs and preserves the websit
     }
 } -result {{wiki blog registry} {Getting started} 1 1}
 
-test patch-sync-assets {Production imports prepared image references without image files or uploads} -setup {
+test patch-sync-assets {Production fetches the archive, uploads its images and imports the references} -setup {
     source [file join $root tcl browser-assets.tcl]
     set imageFreeRoot [makeDirectory patch-image-free]
     file copy [file join $patchRoot content] [file join $imageFreeRoot content]
@@ -94,41 +94,58 @@ test patch-sync-assets {Production imports prepared image references without ima
     close $channel
     set ::patchImages [::app_config::content_images {content_images {
         bucket test-images region eu-central-1 cloudfront_enabled true}} $imageFreeRoot]
-    ::content_images::write_snapshot $imageFreeRoot $::patchImages
-    file delete -force [file join $imageFreeRoot content docs images] [file join $imageFreeRoot content blog images]
+    set archive [file join $imageFreeRoot latest.zip]
+    zipfs mkzip $archive $imageFreeRoot $imageFreeRoot
+    file delete -force [file join $imageFreeRoot content]
+    set uploaded {}
+    rename ::content_images::client ::content_images::saved_client
+    proc ::content_images::client {settings} {return ::patch_s3}
+    proc ::patch_s3 {method bucket key args} {
+        switch $method {
+            get {
+                if {$key ne "ttrek/content/latest.zip"} {error "Unexpected key $key"}
+                file copy -force $::archive [lindex $args 0]
+            }
+            ls {return {}}
+            put {dict set ::uploaded $key [file size [lindex $args 0]]}
+        }
+    }
     set savedImageEnv [array get ::env]
     set ::env(ENV) PROD
     set ::env(CONTENT_IMAGES_CLOUDFRONT_URL) https://cdn.example
     rename ::site::config ::site::original_config
     proc ::site::config {} {dict create rootdir $::imageFreeRoot content_images $::patchImages}
-    foreach command {::browser_assets::upload ::web::static::wiki::sync ::web::static::blog::sync} {
-        rename $command ${command}_original
-        proc $command {args} {error {Production sync must not upload or scan images}}
-    }
 } -body {
     set completed [::site_patch::task_sync_website {}]
     set store [::content_images::database_store wiki $::telemetry::connection $::patchImages]
     set item [::web::static::wiki::load $store /image-reference]
     set html [::web::static::wiki::render_markdown $store $item]
-    set ::patchImages [dict replace $::patchImages prefix changed/prefix]
-    set mismatch [catch {::site_patch::task_sync_website {}} message]
-    set ::patchImages [dict replace $::patchImages prefix ttrek/content/images]
-    file delete [file join $imageFreeRoot etc content-snapshot.data]
+    # Replace the S3 object while keeping the same runtime and database.
+    file mkdir [file join $imageFreeRoot content docs]
+    set channel [open [file join $imageFreeRoot content docs image-reference.md] w]
+    puts $channel {# Updated page}
+    close $channel
+    file copy -force [file join $patchRoot content blog] [file join $imageFreeRoot content]
+    file delete $archive
+    zipfs mkzip $archive $imageFreeRoot $imageFreeRoot
+    file delete -force [file join $imageFreeRoot content]
+    ::site_patch::task_sync_website {}
+    file delete $archive
     set missing [catch {::site_patch::task_sync_website {}}]
     list $completed [string match {*src="https://cdn.example/ttrek/content/images/docs/images/test.png"*} $html] \
-        $mismatch $message $missing [dict get [::web::static::wiki::load $store /image-reference] title]
+        [dict get $uploaded ttrek/content/images/docs/images/test.png] $missing \
+        [dict get [::web::static::wiki::load $store /image-reference] title]
 } -cleanup {
-    foreach command {::browser_assets::upload ::web::static::wiki::sync ::web::static::blog::sync} {
-        rename $command {}
-        rename ${command}_original $command
-    }
+    rename ::patch_s3 {}
+    rename ::content_images::client {}
+    rename ::content_images::saved_client ::content_images::client
     rename ::site::config {}
     rename ::site::original_config ::site::config
     array unset ::env
     array set ::env $savedImageEnv
     unset ::patchImages
     removeDirectory patch-image-free
-} -result {{wiki blog registry} 1 1 {Content snapshot prefix differs from runtime configuration} 1 {Image reference}}
+} -result {{wiki blog registry} 1 6 1 {Updated page}}
 
 test patch-sync-content {sync publishes body edits and removes deleted docs and posts} -setup {
     set contentRoot [makeDirectory patch-content]

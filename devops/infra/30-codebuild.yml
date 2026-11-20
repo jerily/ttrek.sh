@@ -93,13 +93,14 @@ Resources:
                 Condition:
                   StringLike:
                     s3:prefix:
-                      - !Sub ${ContentImagesPrefix}/*
                       - !Sub ${BrowserAssetsPrefix}/*
               - Effect: Allow
                 Action: [s3:GetObject, s3:PutObject]
                 Resource:
-                  - !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${ContentImagesPrefix}/*
                   - !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/${BrowserAssetsPrefix}/*
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/ttrek/content/latest.zip
               - Effect: Allow
                 Action: cloudformation:CreateChangeSet
                 Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
@@ -216,6 +217,10 @@ Resources:
         EnvironmentVariables:
           - Name: TTREK_CONFIG_KMS_KEY
             Value: !ImportValue Infra-DevOps-TTREK-Keys-KMSMasterKeyArn
+          - Name: CONTENT_IMAGES_BUCKET
+            Value: !Ref ContentImagesBucket
+          - Name: CONTENT_IMAGES_PREFIX
+            Value: !Ref ContentImagesPrefix
           - Name: SAM_STACK_NAME
             Value: !Ref LambdaStackName
           - Name: SAM_ARTIFACT_BUCKET
