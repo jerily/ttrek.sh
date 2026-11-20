@@ -371,6 +371,13 @@ proc get_package_spec_handler {ctx req} {
     if {$stored eq {}} {
         return [::twebserver::build_response 404 text/plain "not found"]
     }
+    set rendered [render_registry_recipe $stored $package_version $os $machine]
+    if {$rendered eq {}} {return [::twebserver::build_response 404 text/plain "not found"]}
+    count_registry_recipe $req $package_name $package_version $os $machine
+    return [::twebserver::build_response 200 application/json [::tjson::typed_to_json $rendered]]
+}
+
+proc render_registry_recipe {stored package_version os machine} {
     ::tjson::parse [dict get $stored recipe] spec_handle
     set deps_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle dependencies]]
     set scripts_typed [::tjson::to_typed [::tjson::get_object_item $spec_handle scripts]]
@@ -386,7 +393,7 @@ proc get_package_spec_handler {ctx req} {
     } elseif { [::tjson::has_object_item $spec_build_handle "default"] } {
         set spec_build_handle [::tjson::get_object_item $spec_build_handle "default"]
     } else {
-        return [::twebserver::build_response 404 text/plain "not found"]
+        return {}
     }
 
     set spec_build_typed [::tjson::to_typed $spec_build_handle]
@@ -420,7 +427,10 @@ proc get_package_spec_handler {ctx req} {
         ::tjson::add_item_to_object $result_handle patches [list M $patches_typed]
     }
 
-    set res [::twebserver::build_response 200 application/json [::tjson::to_json $result_handle]]
+    return [::tjson::to_typed $result_handle]
+}
+
+proc count_registry_recipe {req package_name package_version os machine} {
     set environment {}
     if {[dict exists $req headers ttrek-environment-id]} {set environment [dict get $req headers ttrek-environment-id]}
     # Count only successfully prepared recipes, using the resolved version.
@@ -428,7 +438,6 @@ proc get_package_spec_handler {ctx req} {
     if {[catch {::telemetry::recipe_download $package_name $package_version $os $machine $environment}]} {
         puts stderr "Could not record recipe download statistics"
     }
-    return $res
 }
 
 # Order package versions for registry presentation.
@@ -586,4 +595,110 @@ proc get_package_version_stats {package_name package_version} {
 proc get_catchall_handler {ctx req} {
     set res [::twebserver::build_response 404 text/plain "not found"]
     return $res
+}
+
+proc registry_capabilities_handler {ctx req} {
+    return [::twebserver::build_response 200 application/json {{"batch":1}}]
+}
+
+# Leave headroom for the Lambda HTTP response envelope. Clients split a 413
+# before any download counters are recorded. Singletons retain the GET limit.
+proc registry_batch_response {result} {
+    set json [::tjson::typed_to_json [list M $result]]
+    if {[dict size $result] > 1 && [string length [encoding convertto utf-8 $json]] > 2 * 1024 * 1024} {
+        return [::twebserver::build_response 413 text/plain "Split the registry batch"]
+    }
+    return [::twebserver::build_response 200 application/json $json]
+}
+
+proc registry_packages_handler {ctx req} {
+    if {[catch {
+        [::request_validation::validator registry-packages] bind [::topenapi::from_twebserver $req] {
+            names {body names} mode {body mode}
+        }
+    }]} {return [::twebserver::build_response 400 text/plain "Invalid package batch"]}
+    set names [lsort -unique $names]
+    set result {}
+    foreach name $names {dict set result $name {BOOL 0}}
+    if {[catch {
+        ::site::database
+        set columns [expr {$mode eq "exists" ? "name" : "name version recipe"}]
+        foreach row [::telemetry::registry_batch_rows $columns $names] {
+            set name [dict get $row name]
+            if {$mode eq "exists"} {
+                dict set result $name {BOOL 1}
+            } else {
+                set recipe [lindex [::tjson::json_to_typed [dict get $row recipe]] 1]
+                dict set versions $name [dict get $row version] [dict get $recipe dependencies]
+            }
+        }
+        if {[info exists versions]} {
+            dict for {name entries} $versions {dict set result $name [list M $entries]}
+        }
+    }]} {return [::recipe_search::unavailable]}
+    set response [registry_batch_response $result]
+    if {[dict get $response statusCode] == 200 && [dict exists $req headers ttrek-environment-id]} {
+        foreach name $names {telemetry_event_common req_reg_get_pkg -pkg_name $name}
+    }
+    return $response
+}
+
+proc registry_plan_handler {ctx req} {
+    if {[catch {
+        [::request_validation::validator registry-plan] bind [::topenapi::from_twebserver $req] {
+            items {body items} os {body os} arch {body arch}
+        }
+    }]} {return [::twebserver::build_response 400 text/plain "Invalid plan batch"]}
+    set result {}
+    set groups {}
+    foreach item $items {
+        set name [dict get $item name]
+        set version [dict get $item version]
+        set field [dict get $item field]
+        set key "$name@$version"
+        if {[dict exists $result $key]} {return [::twebserver::build_response 400 text/plain "Duplicate plan item"]}
+        dict set result $key {BOOL 0}
+        dict lappend groups $field [list $name $version]
+    }
+    set served {}
+    if {[catch {
+        ::site::database
+        dict for {field pairs} $groups {
+            set columns [expr {$field eq "recipe" ? "name version pkg_id recipe patches" : "name version languages"}]
+            foreach row [::telemetry::registry_batch_rows $columns {} $pairs] {
+                set name [dict get $row name]
+                set version [dict get $row version]
+                if {$field eq "languages"} {
+                    dict set result "$name@$version" [::tjson::json_to_typed [dict get $row languages]]
+                } else {
+                    set recipe [render_registry_recipe $row $version $os $arch]
+                    if {$recipe eq {}} continue
+                    dict set result "$name@$version" $recipe
+                    lappend served [dict get $row pkg_id]
+                }
+            }
+        }
+    }]} {return [::recipe_search::unavailable]}
+    set response [registry_batch_response $result]
+    if {[dict get $response statusCode] == 200 && [llength $served]} {
+        set environment {}
+        if {[dict exists $req headers ttrek-environment-id]} {set environment [dict get $req headers ttrek-environment-id]}
+        if {[catch {::telemetry::count_recipe_ids $served $os $arch $environment}]} {
+            puts stderr "Could not record recipe download statistics"
+        }
+    }
+    return $response
+}
+
+proc telemetry_batch_handler {ctx req} {
+    if {[catch {
+        [::request_validation::validator telemetry-batch] bind [::topenapi::from_twebserver $req] {events {body events}}
+    }]} {return [::twebserver::build_response 400 text/plain "Invalid telemetry batch"]}
+    foreach event $events {
+        dict with event {
+            telemetry_event_common req_pkg_install_event -pkg_name $name -pkg_version $version \
+                -install_outcome [expr {$outcome eq "success"}] -install_is_toplevel $is_toplevel -os $os -arch $arch
+        }
+    }
+    return [::twebserver::build_response 200 text/plain "ok"]
 }

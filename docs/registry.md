@@ -86,6 +86,20 @@ Enable them with `ttrek gen-script -static` or `useFlags: ["+static"]` in the pr
 Without the flag, recipes keep their normal defaults.
 Static Tcl extensions are intended for embedding, not `package require` loading.
 
+## Batch requests
+
+`GET /registry/batch/capabilities` advertises `{"batch":1}`. A client can send up
+to 64 names to `POST /registry/batch/packages` for version maps or existence
+checks. After resolving dependencies, it can send exact name/version pairs and a
+platform to `POST /registry/batch/plan`. Each item selects a build recipe or
+language labels. Missing items have the value `false`. The request schemas are
+in `schemas/registry-packages.json` and `schemas/registry-plan.json`.
+
+A response containing multiple items that exceeds 2 MiB returns HTTP 413 so the
+client can split it. Only successfully served recipes increment download counts.
+`POST /telemetry/collect/batch` accepts up to 64 install outcomes using the same
+environment identification as the individual telemetry endpoint.
+
 ## Recipe search
 
 `GET /registry/search?q=web` returns JSON objects with `name`, `description`, `tags`, `languages`, and

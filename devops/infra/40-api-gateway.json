@@ -142,6 +142,7 @@
         "GetPackagesRoute",
         "GetPackagesTrackerRoute",
         "GetRegistryAutocompleteRoute",
+        "GetRegistryBatchCapabilitiesRoute",
         "GetRegistrySearchRoute",
         "GetRegistryByPackageNameRoute",
         "GetRegistryByPackageNameByPackageVersionLanguagesRoute",
@@ -190,6 +191,7 @@
         "HeadPackagesRoute",
         "HeadPackagesTrackerRoute",
         "HeadRegistryAutocompleteRoute",
+        "HeadRegistryBatchCapabilitiesRoute",
         "HeadRegistrySearchRoute",
         "HeadRegistryByPackageNameRoute",
         "HeadRegistryByPackageNameByPackageVersionLanguagesRoute",
@@ -218,6 +220,9 @@
         "PostForumModerateByKindByIdByActionRoute",
         "PostForumNewRoute",
         "PostForumTopicByIdRoute",
+        "PostRegistryBatchPackagesRoute",
+        "PostRegistryBatchPlanRoute",
+        "PostTelemetryCollectBatchRoute",
         "PostTelemetryCollectByPackageNameByPackageVersionRoute",
         "PostTelemetryRegisterByEnvironmentIdRoute",
         "PostUserChangePasswordRoute",
@@ -772,6 +777,27 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "GET /registry/autocomplete",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "GetRegistryBatchCapabilitiesRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "GET /registry/batch/capabilities",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
@@ -1794,6 +1820,27 @@
         }
       }
     },
+    "HeadRegistryBatchCapabilitiesRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "HEAD /registry/batch/capabilities",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
     "HeadRegistrySearchRoute": {
       "Type": "AWS::ApiGatewayV2::Route",
       "Properties": {
@@ -2368,6 +2415,69 @@
           "Ref": "HttpApi"
         },
         "RouteKey": "POST /forum/topic/{id}",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostRegistryBatchPackagesRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /registry/batch/packages",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostRegistryBatchPlanRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /registry/batch/plan",
+        "AuthorizationType": "NONE",
+        "Target": {
+          "Fn::Join": [
+            "/",
+            [
+              "integrations",
+              {
+                "Ref": "SiteIntegration"
+              }
+            ]
+          ]
+        }
+      }
+    },
+    "PostTelemetryCollectBatchRoute": {
+      "Type": "AWS::ApiGatewayV2::Route",
+      "Properties": {
+        "ApiId": {
+          "Ref": "HttpApi"
+        },
+        "RouteKey": "POST /telemetry/collect/batch",
         "AuthorizationType": "NONE",
         "Target": {
           "Fn::Join": [
