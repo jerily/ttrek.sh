@@ -31,6 +31,7 @@ test gateway-routes {deployed routes cover production paths with stable IDs, pub
     foreach route [dict get $manifest routes] {
         if {[dict exists $route cdn_on_prod] && [dict get $route cdn_on_prod]} continue
         set path [string trimright [dict get $route path] /]
+        if {$path eq "/debug"} continue
         if {$path eq {}} {set path /}
         lappend expected "[dict get $route method] $path"
         if {[dict get $route method] eq "GET"} {lappend expected "HEAD $path"}

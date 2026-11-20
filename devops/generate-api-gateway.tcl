@@ -19,6 +19,7 @@ proc ::site_gateway::production_routes {definitions} {
         }
         set path [string trimright $path /]
         if {$path eq {}} {set path /}
+        if {$path eq "/debug"} {continue}
         dict set route path [list S $path]
         if {![dict exists $route method]} {dict set route method {S ANY}}
         set key "[lindex [dict get $route method] 1] $path"

@@ -3,7 +3,7 @@ namespace import ::tcltest::*
 set root [file dirname [file dirname [file normalize [info script]]]]
 
 # Each case gets a fresh worker so package presence measures actual loading.
-proc worker {{mode lazy}} {
+proc worker {{mode lazy} {environment LOCAL}} {
     set worker [interp create]
     $worker eval [list set auto_path $::auto_path]
     foreach package {jinja2 web-user web-forum web-static-wiki web-static-blog treqmon web-user::routes web-user::config web-forum::routes web-static-wiki::routes web-static-blog::routes treqmon::routes} {
@@ -13,8 +13,8 @@ proc worker {{mode lazy}} {
     }
     $worker eval [list set root $::root]
     $worker eval [list set loading $mode]
+    $worker eval [list set ::env(ENV) $environment]
     $worker eval {
-        set ::env(ENV) LOCAL
         source [file join $root tcl site.tcl]
         source [file join $root tcl config.tcl]
         source [file join $root tcl lambda.tcl]
@@ -58,6 +58,14 @@ test worker-routes {all methods and conditional package routes exist before impl
             $::views::templates [dict exists [::site::config] content_connection] [string match *private-value* [::site::config]]
     }
 } -cleanup {interp delete $w} -result {{200 200 200 200 200 200 200 200 200 200 200 200 200 405} {} {} 0 0}
+
+test worker-debug-prod {production returns 404 for GET and HEAD /debug} -setup {
+    set w [worker lazy PROD]
+} -body {
+    $w eval {
+        list [dict get [request /debug] statusCode] [dict get [request /debug HEAD] statusCode]
+    }
+} -cleanup {interp delete $w} -result {404 404}
 
 test worker-debug {simple requests and unrelated cookies do not load account or rendering services} -setup {
     set w [worker]
