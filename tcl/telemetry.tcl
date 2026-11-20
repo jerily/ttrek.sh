@@ -354,23 +354,32 @@ proc ::telemetry::platform {os arch} {
 # Count a served recipe, including dependencies and clients without telemetry.
 # Identified clients retain the existing request event for windowed uniqueness.
 proc ::telemetry::recipe_download {name version os arch {environment {}}} {
+    set package [lindex [rows [registry_query {pkg_id} $name $version]] 0]
+    if {$package ne {}} {count_recipe_ids [list [dict get $package pkg_id]] $os $arch $environment}
+}
+
+proc ::telemetry::count_recipe_ids {ids os arch environment} {
     variable connection
     lassign [platform $os $arch] os arch
     transaction {
-        set package [lindex [rows [registry_query {pkg_id} $name $version]] 0]
-        if {$package eq {}} {return}
-        set pkg_id [dict get $package pkg_id]
         set platform_id [ensure_row platforms platform_id [dict create \
             os [db_value $os -type text] arch [db_value $arch -type text]]]
-        set params [dict create pkg_id $pkg_id platform_id $platform_id]
-        ::tpersist::_raw $connection {
+        set params [dict create platform_id $platform_id]
+        set counters {}
+        set events {}
+        foreach pkg_id $ids {
+            set key pkg[llength $counters]
+            dict set params $key $pkg_id
+            lappend counters "(:$key, :platform_id, 1)"
+            lappend events "(:timestamp, :env_id, :$key, :platform_id)"
+        }
+        ::tpersist::_raw $connection "
             INSERT INTO package_download_counts (pkg_id, platform_id, downloads)
-            VALUES (:pkg_id, :platform_id, 1)
+            VALUES [join $counters ,]
             ON CONFLICT (pkg_id, platform_id)
             DO UPDATE SET downloads = package_download_counts.downloads + 1
-        } $params
+        " $params
         if {[regexp -nocase {^[0-9a-f]{64}$} $environment]} {
-            # Registration descriptions can change; the hash identifies a machine.
             set found [::tpersist::_raw $connection {
                 SELECT env_id FROM environments WHERE hash = :hash
                 ORDER BY last_seen DESC, env_id DESC LIMIT 1
@@ -378,10 +387,10 @@ proc ::telemetry::recipe_download {name version os arch {environment {}}} {
             if {[llength $found]} {
                 dict set params env_id [dict get [lindex $found 0] env_id]
                 dict set params timestamp [clock seconds]
-                ::tpersist::_raw $connection {
+                ::tpersist::_raw $connection "
                     INSERT INTO req_reg_get_pkg_spec (timestamp, env_id, pkg_id, platform_id)
-                    VALUES (:timestamp, :env_id, :pkg_id, :platform_id)
-                } $params
+                    VALUES [join $events ,]
+                " $params
             }
         }
     }
@@ -481,3 +490,21 @@ proc ::telemetry::stats {package_name {package_version {}}} {
 }
 
 source [file join [file dirname [info script]] search-store.tcl]
+
+# Query only published rows and match the exact requested name/version pairs.
+proc ::telemetry::registry_batch_rows {columns names {pairs {}}} {
+    set query [db_join [db_select packages -columns $columns] package_names \
+        -expr {packages.pkg_name_id = package_names.pkg_name_id}]
+    if {[llength $pairs]} {
+        set predicates {}
+        foreach pair $pairs {
+            lassign $pair name version
+            lappend predicates [db_and [db_eq [db_col name] [db_value $name -type text]] \
+                [db_eq [db_col version] [db_value $version -type text]]]
+        }
+        set filter [db_or {*}$predicates]
+    } else {
+        set filter [db_in [db_col name] [lmap name $names {db_value $name -type text}]]
+    }
+    return [rows [db_where $query [db_and $filter [db_eq [db_col listed] [db_value 1 -type integer]]]]]
+}

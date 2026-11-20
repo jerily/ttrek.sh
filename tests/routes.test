@@ -12,6 +12,8 @@ test routes-covered {The explicit manifest covers main, account, forum, nested c
         GET /search GET /download/example.archive GET /dist/linux-amd64-glibc/ttrek.sha256
         GET /releases/latest/linux-amd64-glibc GET /package/tcl GET /package/tcl/9.1.0
         GET /registry/tcl GET /registry/tcl/9.1.0/languages GET /registry/tcl/9.1.0/Linux/x86_64
+        GET /registry/batch/capabilities HEAD /registry/batch/capabilities
+        POST /registry/batch/packages POST /registry/batch/plan POST /telemetry/collect/batch
         GET /registry/search GET /registry/autocomplete POST /telemetry/register/example
         POST /telemetry/collect/tcl/9.1.0 GET /docs GET /docs/ GET /docs/nested/path GET /blog GET /blog/post
         GET /admin HEAD /admin GET /user GET /user/ GET /user/admin/users GET /user/profile POST /user/profile

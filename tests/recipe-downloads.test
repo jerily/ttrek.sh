@@ -159,6 +159,57 @@ try {
         expr {$before eq $hidden && $before eq [::telemetry::download_stats demo]}
     } -result 1
 
+    proc batch_request {handler body} {
+        $handler {} [dict create httpMethod POST headers {content-type application/json} body $body]
+    }
+
+    test batch-packages {Published versions and explicit misses in one response} -body {
+        set res [batch_request registry_packages_handler {{"names":["demo","absent"],"mode":"versions"}}]
+        set data [::tjson::json_to_simple [dict get $res body]]
+        set exists [batch_request registry_packages_handler {{"names":["absent","demo"],"mode":"exists"}}]
+        list [dict get $res statusCode] [lsort [dict keys [dict get $data demo]]] [dict get $data absent] \
+            [::tjson::json_to_simple [dict get $exists body]]
+    } -result {200 {1.0.0 2.0.0} 0 {absent 0 demo 1}}
+
+    test batch-plan {Mixed fields and exact platform misses count only served recipes} -body {
+        set before [total demo]
+        set res [batch_request registry_plan_handler {{"os":"Darwin","arch":"arm64","items":[
+            {"name":"demo","version":"1.0.0","field":"recipe"},
+            {"name":"demo","version":"2.0.0","field":"languages"},
+            {"name":"restricted","version":"1.0.0","field":"recipe"}]}}]
+        set data [::tjson::json_to_simple [dict get $res body]]
+        list [dict get $res statusCode] [dict get $data demo@1.0.0 version] [dict get $data demo@2.0.0] \
+            [dict get $data restricted@1.0.0] [expr {[total demo] - $before}]
+    } -result {200 1.0.0 {} 0 1}
+
+    test batch-outcomes {A validated batch records only its supplied success and failure} -body {
+        set event {{"name":"demo","version":"1.0.0","os":"Linux","arch":"x86_64",
+            "action":"install","outcome":"success","is_toplevel":false}}
+        set failure [string map {1.0.0 2.0.0 success failure false true} $event]
+        set req [dict create httpMethod POST headers [dict create content-type application/json ttrek-environment-id $identity]]
+        set before [llength [sql {SELECT * FROM req_pkg_install_event}]]
+        set bad [dict replace $req body [format {{"events":[%s,{}]}} $event]]
+        set good [dict replace $req body [format {{"events":[%s,%s]}} $event $failure]]
+        list [dict get [telemetry_batch_handler {} $bad] statusCode] [dict get [telemetry_batch_handler {} $good] statusCode] \
+            [expr {[llength [sql {SELECT * FROM req_pkg_install_event}]] - $before}]
+    } -result {400 200 2}
+
+    test batch-size {Large grouped payloads request a smaller batch} -body {
+        set big [list S [string repeat x 1100000]]
+        dict get [registry_batch_response [dict create first $big second $big]] statusCode
+    } -result 413
+
+    test batch-invalid {Malformed or oversized batches cannot record recipe downloads} -body {
+        set item {{"name":"demo","version":"1.0.0","field":"recipe"}}
+        set before [total demo]
+        set statuses {}
+        foreach items [list {} "$item,$item" [join [lrepeat 65 $item] ,]] {
+            lappend statuses [dict get [batch_request registry_plan_handler \
+                [format {{"os":"Linux","arch":"x86_64","items":[%s]}} $items]] statusCode]
+        }
+        list $statuses [expr {[total demo] - $before}]
+    } -result {{400 400 400} 0}
+
     test downloads-concurrency {Concurrent first inserts and increments do not lose downloads} -body {
         ::telemetry::close
         set workers {}

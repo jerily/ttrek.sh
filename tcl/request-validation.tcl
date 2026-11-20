@@ -26,7 +26,7 @@ proc ::request_validation::check {name request} {
 proc ::request_validation::validator {name} {
     variable validators
     if {![dict exists $validators $name]} {
-        if {$name ni {search telemetry-collect}} {error "Unknown request operation: $name"}
+        if {$name ni {search telemetry-collect registry-packages registry-plan telemetry-batch}} {error "Unknown request operation: $name"}
         package require topenapi 0.2.0
         variable directory
         set channel [open [file join $directory $name.json] r]
