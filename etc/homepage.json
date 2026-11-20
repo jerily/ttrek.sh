@@ -19,7 +19,7 @@
       "label": "Latest blog post",
       "kicker": "From the blog",
       "link_text": "Read the latest post",
-      "path": "/2026-11-19-ttrek-190-batch-package-lookups",
+      "path": "/2026-11-20-ttrek-190-batch-package-lookups",
       "description": "ttrek looks up packages and fetches build recipes in batches, cutting registry round trips before a build.",
       "version": "1.9.0",
       "note": "Fewer requests per install."
