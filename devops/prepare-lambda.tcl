@@ -28,7 +28,8 @@ source [file join $siteRoot tcl site.tcl]
 source [file join $siteRoot tcl config.tcl]
 set releases [::app_config::releases {}]
 set monitor [::app_config::request_monitor {}]
-if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONFIG) ne {}} {
+set production [expr {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONFIG) ne {}}]
+if {$production} {
     ::app_config::validate_lambda_config $::env(TTREK_PRODUCTION_CONFIG)
     file copy -force $::env(TTREK_PRODUCTION_CONFIG) [file join $siteRoot etc config.ini]
     # Validate the staged public settings without decrypting secrets or calling AWS.
@@ -36,7 +37,10 @@ if {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONF
     set images [::app_config::content_images_from_ini [file join $siteRoot etc config.ini] $siteRoot]
     set monitor [::app_config::request_monitor [::tconfig::read_config [file join $siteRoot etc config.ini]]]
     if {[dict get $images bucket] eq {}} {error "Production configuration requires content_images.bucket"}
-    ::content_images::write_snapshot $siteRoot $images
+    if {[info exists ::env(CONTENT_IMAGES_BUCKET)] && $::env(CONTENT_IMAGES_BUCKET) ne [dict get $images bucket]} {
+        error "Upload bucket differs from the production content_images.bucket"
+    }
+    ::content_images::snapshots $siteRoot [dict replace $images cloudfront_enabled false] 0
 }
 file mkdir [file join $siteRoot data]
 ::site::configure [dict create rootdir $siteRoot releases $releases]
@@ -49,6 +53,7 @@ if {[catch {package require tdbc::sqlite3} message options]} {
         return -options $options $message
     }
     puts "Skipping SQLite-backed packaging smoke checks: tdbc::sqlite3 is not installed."
+    if {$production} {file delete -force [file join $siteRoot content]}
     return
 }
 set router [::tpathexp::router]
@@ -88,3 +93,4 @@ try {
     unset ::env(ENV)
     array set ::env $savedEnv
 }
+if {$production} {file delete -force [file join $siteRoot content]}

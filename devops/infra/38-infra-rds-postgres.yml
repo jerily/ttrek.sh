@@ -132,6 +132,10 @@ Resources:
             Principal: '*'
             Action: s3:PutObject
             Resource: !Sub arn:${AWS::Partition}:s3:::${BackupBucket}/telemetry/backups/*
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub arn:${AWS::Partition}:s3:::${ContentImagesBucket}/ttrek/content/latest.zip
           # Explicit website sync tasks publish images and browser assets.
           - Effect: Allow
             Principal: '*'

@@ -236,8 +236,8 @@ An empty bucket disables image hosting locally; production packaging and uploads
 require a bucket. Each worker shares one `awss3` client between the packages.
 Both modes query stored content when requested and generate URLs using the stored image
 paths. LOCAL uses SQLite and PROD uses PostgreSQL. It does not scan directories, render Markdown, or hash images at startup.
-`task_sync_website` uses each package's `sync` proc locally. Production imports
-a build-prepared snapshot instead, without reading or uploading image files.
+`task_sync_website` uses each package's `sync` proc locally. Production downloads the current
+content ZIP from S3 and syncs the images before importing the records.
 The SDK requires `pure-tcl-aws-s3` 1.0.0+; maintenance image hashes use `::twebserver::sha256`.
 
 The local Lambda stack overrides the bucket to `ttrek-local` and uses its loopback
@@ -245,20 +245,11 @@ S3 mock, with dummy credentials. Direct LOCAL runs may set `endpoint` to a loopb
 HTTP mock explicitly. HTTP endpoints are rejected in PROD. No live AWS upload is
 performed by the tests or by the artifact-packaging smoke check.
 
-Deployment runs `devops/upload-content-images.tcl`, which validates both
-collections, stages only recognized images, and calls `aws s3 sync` for docs and
-blog separately. Old keys are retained. Upload errors prevent ZIP finalization
-and deployment. The production ZIP contains `etc/content-snapshot.data` with
-prepared content and image references; finalization removes the image bytes,
-including originals. The ZIP check compares the snapshot with the checkout and
-checks that content images are absent.
-
-Match the CodeBuild, CloudFront and SAM `ContentImagesBucket` and
-`ContentImagesPrefix` parameters to the configuration. Deployment needs
-List/Get/Put access under the image prefix. Run `task_sync_website` after deploying
-to save the prepared references and content in the database. Its production path
-does not upload images or browser assets; local sync still uses the packages'
-normal image upload behavior. The wiki/blog sync_prepared APIs own the database import.
+Deployment uploads the complete `content/` tree to `ttrek/content/latest.zip`
+in the configured image bucket. The production Lambda ZIP excludes this tree.
+For content-only updates, run `ttrek run -script upload-content` and then invoke
+`task_sync_website`. The patch retains older S3 image keys and publishes updated
+images under the configured docs and blog prefixes.
 
 Set `[content_images] cloudfront_enabled=true` to serve production images, CSS,
 JavaScript and favicons through CloudFront (enabled in `devops/config.prod.ini`). SAM imports the CDN stack's `BaseUrl` export into

@@ -18,22 +18,6 @@ proc read_bytes {path} {
     try {read $channel} finally {close $channel}
 }
 
-# Provide the image objects test fixture.
-proc image_objects {directory {relative {}}} {
-    set objects {}
-    foreach path [lsort [glob -nocomplain -directory $directory *]] {
-        set source [file join $relative [file tail $path]]
-        if {[file isdirectory $path]} {
-            set objects [dict merge $objects [image_objects $path $source]]
-        } elseif {[::web::static::wiki::image_type $path] ne {}} {
-            # Read synchronously: Tcllib's event-driven file hashing cannot read
-            # ZIP-backed channels. Exact bytes also detect packaging changes.
-            dict set objects $source [read_bytes $path]
-        }
-    }
-    return $objects
-}
-
 set mount [zipfs mount $archive /ttrek-lambda-package-test]
 try {
     # Local dependencies must never enter the production ZIP.
@@ -75,19 +59,8 @@ try {
             error "Packaged content_images.$key differs from the upload configuration"
         }
     }
-    foreach key {docs_directory blog_directory} {
-        set directory [dict get $images $key]
-        if {![string match "$mount/content/*" "$directory/"] || ![file isdirectory $directory]} {
-            error "Production content_images.$key must be bundled under content/"
-        }
-        if {[dict size [image_objects $directory]]} {
-            error "Content image bytes must not be bundled in the production ZIP"
-        }
-    }
-    source [file join $root tcl content-images.tcl]
-    set snapshot [::content_images::read_snapshot $mount $images]
-    if {$snapshot ne [::content_images::prepare_snapshot $root $buildImages]} {
-        error "Packaged content snapshot differs from the upload sources"
+    foreach excluded {content etc/content-snapshot.data} {
+        if {[file exists [file join $mount $excluded]]} {error "Unexpected $excluded in production ZIP"}
     }
     set assetManifest [read_bytes [file join $mount public asset-manifest.json]]
     if {[read_bytes [file join $mount etc homepage.json]] ne [read_bytes [file join $root etc homepage.json]]} {
@@ -118,7 +91,7 @@ try {
     foreach forbidden {etc/config.local.ini etc/config.enc} {
         if {[file exists [file join $mount $forbidden]]} {error "Unexpected host configuration in ZIP: $forbidden"}
     }
-    puts "PASS packaged release configuration and manifest ([dict size $checksums] production targets), content snapshot and image exclusion"
+    puts "PASS packaged release configuration and manifest ([dict size $checksums] production targets), website content exclusion"
 } finally {
     zipfs unmount $mount
 }

@@ -70,16 +70,12 @@ qualified deletion. It also exercises the API deployment script with fake AWS/Tc
 commands to check name/ARN overrides without deploying. CodeBuild runs this suite
 before deploying.
 `ttrek run tclsh9.1 tests/lambda-package.tcl dist/ttrek-sh.zip` checks a production
-ZIP's release settings, bundled checksum manifest, prepared content snapshot,
-and exclusion of content image bytes and host config.
-CodeBuild runs this after packaging and finalization, before deployment; it needs
-neither decrypted credentials nor running services.
-`tests/test_finalize_lambda.py` checks image pruning and preservation of runtime
-files; `tests/build-lambda.test` checks that upload failures stop finalization.
-`tests/content-images-build.test` stubs AWS CLI sync to check image-only staging,
-collection prefixes, cleanup and failure propagation, and uses a fake S3 client to verify upload
-separate docs/blog paths, repeat-sync change detection, validation before uploads, build failure
-on S3 errors, and production rendering without S3 calls. Config and image tests
+ZIP's release settings, bundled checksum manifest, and exclusion of website content
+and host configuration. CodeBuild runs this after packaging and finalization.
+`tests/test_finalize_lambda.py` checks archive pruning and runtime file preservation.
+`tests/content-images-build.test` uses a fake S3 client to verify archive reads,
+collection prefixes, repeat-sync change detection and upload failure propagation.
+Config and image tests
 cover the PROD-only CloudFront toggle, imported URL validation, path encoding,
 and signed URLs when CDN delivery is disabled. `tests/browser-assets.test` checks
 binary favicon/MIME preservation, the monitor script, configurable prefixes,

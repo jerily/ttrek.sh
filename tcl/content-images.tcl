@@ -21,7 +21,6 @@ proc ::content_images::cdn_url {settings} {
 # The host owns one SDK client per settings dictionary in each worker. Both
 # packages borrow it; credentials come from the SDK's refreshing provider chain.
 proc ::content_images::options {settings kind {uploadMissing {}}} {
-    variable clients
     switch -- $kind {
         wiki {set directoryKey docs_directory; set collection docs}
         blog {set directoryKey blog_directory; set collection blog}
@@ -29,6 +28,16 @@ proc ::content_images::options {settings kind {uploadMissing {}}} {
     }
     if {$settings eq {} || [dict get $settings bucket] eq {}} {return {}}
     if {$uploadMissing eq {}} {set uploadMissing [expr {[::app_config::mode] eq "LOCAL"}]}
+    set s3 [dict create client [client $settings] bucket [dict get $settings bucket] \
+        prefix [dict get $settings prefix]/$collection url_expiry_seconds [dict get $settings url_expiry_seconds] \
+        http_endpoint [dict get $settings endpoint] upload_missing $uploadMissing]
+    set cdn [cdn_url $settings]
+    if {$cdn ne {}} {dict set s3 cdn_url $cdn}
+    return [list -images-directory [dict get $settings $directoryKey] -s3 $s3]
+}
+
+proc ::content_images::client {settings} {
+    variable clients
     package require pure-tcl-aws-s3 1.0.0
     set clientSettings [dict create region [dict get $settings region]]
     set endpoint [dict get $settings endpoint]
@@ -40,12 +49,7 @@ proc ::content_images::options {settings kind {uploadMissing {}}} {
     if {![dict exists $clients $clientSettings]} {
         dict set clients $clientSettings [::aws::s3::create $clientSettings]
     }
-    set s3 [dict create client [dict get $clients $clientSettings] bucket [dict get $settings bucket] \
-        prefix [dict get $settings prefix]/$collection url_expiry_seconds [dict get $settings url_expiry_seconds] \
-        http_endpoint $endpoint upload_missing $uploadMissing]
-    set cdn [cdn_url $settings]
-    if {$cdn ne {}} {dict set s3 cdn_url $cdn}
-    return [list -images-directory [dict get $settings $directoryKey] -s3 $s3]
+    return [dict get $clients $clientSettings]
 }
 
 # Build and runtime use the same directories, image options and navigation rules.
@@ -94,63 +98,37 @@ proc ::content_images::connect {settings args} {
     return $connection
 }
 
-# Upload the selected artifacts to the configured storage service.
-proc ::content_images::upload {root settings} {
+# Mount the latest archive for this invocation. Database rows retain portable
+# source paths after the temporary archive has been released.
+proc ::content_images::archive_items {root settings} {
     if {[dict get $settings bucket] eq {}} {error "Production image uploads require content_images.bucket"}
-    # Validate both collections before uploading from their prepared inventories.
-    set stores [snapshots $root [dict replace $settings cloudfront_enabled false] 0]
-    dict for {kind store} $stores {::web::static::${kind}::sync_images $store}
-    return
-}
-
-# Prepare portable content records while the build still has the image files.
-# This is data, never a sourced Tcl script; Lambda imports it without S3 I/O.
-proc ::content_images::prepare_snapshot {root settings} {
-    set collections {}
-    dict for {kind store} [snapshots $root [dict replace $settings cloudfront_enabled false] 0] {
-        set items {}
-        dict for {path item} [dict get $store items] {
-            # Source paths are metadata; keep them independent of the build host.
-            set source [dict get $item source_path]
-            if {[string first "$root/" $source] == 0} {
-                dict set item source_path [string range $source [string length "$root/"] end]
+    set channel [file tempfile archive]
+    close $channel
+    try {
+        [client $settings] get [dict get $settings bucket] ttrek/content/latest.zip $archive
+        set mount [zipfs mount $archive /[file tail $archive]]
+        try {
+            foreach key {docs_directory blog_directory} {
+                set path [dict get $settings $key]
+                if {[string first "$root/content/" "$path/"] != 0} {
+                    error "Production content_images.$key must be under content/"
+                }
+                dict set settings $key [file join $mount [string range $path [string length "$root/"] end]]
             }
-            dict set items $path $item
-        }
-        dict set collections $kind $items
-    }
-    return [dict create version 1 bucket [dict get $settings bucket] \
-        prefix [dict get $settings prefix] collections $collections]
-}
-
-proc ::content_images::write_snapshot {root settings} {
-    set snapshot [prepare_snapshot $root $settings]
-    set channel [open [file join $root etc content-snapshot.data] w]
-    try {
-        chan configure $channel -encoding utf-8 -translation lf
-        puts $channel $snapshot
-    } finally {close $channel}
-}
-
-proc ::content_images::read_snapshot {root settings} {
-    set channel [open [file join $root etc content-snapshot.data] r]
-    try {
-        chan configure $channel -encoding utf-8
-        set snapshot [string trim [read $channel]]
-    } finally {close $channel}
-    if {[dict get $snapshot version] != 1} {error "Unsupported content snapshot version"}
-    foreach key {bucket prefix} {
-        if {[dict get $snapshot $key] ne [dict get $settings $key]} {
-            error "Content snapshot $key differs from runtime configuration"
-        }
-    }
-    foreach kind {wiki blog} {dict size [dict get $snapshot collections $kind]}
-    return $snapshot
-}
-
-# Production uses build-prepared records instead of package sync, which requires
-# local image files and uploads them. The caller owns the all-content transaction.
-proc ::content_images::import_snapshot {store snapshot kind} {
-    if {$kind ni {wiki blog}} {error "Unknown content collection: $kind"}
-    ::web::static::${kind}::sync_prepared $store [dict get $snapshot collections $kind]
+            set stores [snapshots $mount [dict replace $settings cloudfront_enabled false] 0]
+            set collections {}
+            dict for {kind store} $stores {
+                ::web::static::${kind}::sync_images $store
+                set items [dict get $store items]
+                dict for {path item} $items {
+                    set source [dict get $item source_path]
+                    if {[string first "$mount/" $source] == 0} {
+                        dict set items $path source_path [string range $source [string length "$mount/"] end]
+                    }
+                }
+                dict set collections $kind $items
+            }
+            return $collections
+        } finally {zipfs unmount $mount}
+    } finally {file delete -force $archive}
 }

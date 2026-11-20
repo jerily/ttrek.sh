@@ -41,6 +41,10 @@ proc ::build_images::setup {} {
 # Provide the client test fixture.
 proc ::build_images::client {method bucket key args} {
     variable calls; variable objects; variable failure
+    if {$method eq "get" && $key eq "ttrek/content/latest.zip"} {
+        zipfs mkzip [lindex $args 0] $::build_images::root $::build_images::root
+        return
+    }
     lappend calls [list $method $bucket $key {*}$args]
     if {$method eq $failure} {error "S3 $method failed"}
     switch -- $method {
@@ -61,11 +65,11 @@ proc ::build_images::cleanup {} {
     removeDirectory build-images-fixture
 }
 
-test build-images-upload {build separates both collections and repeats without writes} -setup ::build_images::setup -body {
-    ::content_images::upload $build_images::root $build_images::settings
+test build-images-upload {archive sync separates both collections and repeats without writes} -setup ::build_images::setup -body {
+    ::content_images::archive_items $build_images::root $build_images::settings
     set count [llength [lsearch -all -index 0 $build_images::calls put]]
     set build_images::calls {}
-    ::content_images::upload $build_images::root $build_images::settings
+    ::content_images::archive_items $build_images::root $build_images::settings
     list $count [dict size $build_images::objects] \
         [lsearch -index 0 $build_images::calls put] [lindex [lindex [dict values $build_images::objects] 0] 1]
 } -cleanup ::build_images::cleanup -result {2 2 -1 image/png}
@@ -123,84 +127,37 @@ test build-images-delivery {stored paths switch between signing and CDN without 
 } -cleanup ::build_images::cleanup -result {{1 0 1 0} {}}
 
 test build-images-paths {identical relative names have independent docs and blog objects} -setup ::build_images::setup -body {
-    ::content_images::upload $build_images::root $build_images::settings
+    ::content_images::archive_items $build_images::root $build_images::settings
     list [lsort [dict keys $build_images::objects]] \
         [lindex [dict get $build_images::objects ttrek/content/images/blog/images/pixel.png] 0]
 } -cleanup ::build_images::cleanup -result {{ttrek/content/images/blog/images/pixel.png ttrek/content/images/docs/images/pixel.png} blog-image}
 
 test build-images-blog-root {a missing blog image cannot be satisfied from docs} -setup ::build_images::setup -body {
     file delete [file join $build_images::root content blog images pixel.png]
-    list [catch {::content_images::upload $build_images::root $build_images::settings}] $build_images::calls
+    list [catch {::content_images::archive_items $build_images::root $build_images::settings}] $build_images::calls
 } -cleanup ::build_images::cleanup -result {1 {}}
 
 test build-images-cloudfront {uploads do not need a distribution URL even when PROD delivery enables CDN} -setup ::build_images::setup -body {
-    ::content_images::upload $build_images::root [dict replace $build_images::settings cloudfront_enabled true]
+    ::content_images::archive_items $build_images::root [dict replace $build_images::settings cloudfront_enabled true]
     dict size $build_images::objects
 } -cleanup ::build_images::cleanup -result 2
 
 test build-images-invalid {invalid blog references prevent uploads for both collections} -setup ::build_images::setup -body {
     ::build_images::write [file join $build_images::root content blog 2026-11-11-guide.md] \
         "# Guide\n\n!\[Image\](../secret.png)"
-    list [catch {::content_images::upload $build_images::root $build_images::settings}] $build_images::calls
+    list [catch {::content_images::archive_items $build_images::root $build_images::settings}] $build_images::calls
 } -cleanup ::build_images::cleanup -result {1 {}}
 
 foreach method {ls put} {
-    test build-images-error-$method {S3 failures fail the build} -setup ::build_images::setup -body {
+    test build-images-error-$method {S3 failures fail the sync} -setup ::build_images::setup -body {
         set build_images::failure $method
-        ::content_images::upload $build_images::root $build_images::settings
+        ::content_images::archive_items $build_images::root $build_images::settings
     } -cleanup ::build_images::cleanup -returnCodes error -result "S3 $method failed"
 }
 
 test build-images-bucket {an absent production bucket fails before any uploads} -setup ::build_images::setup -body {
-    ::content_images::upload $build_images::root [dict replace $build_images::settings bucket {}]
+    ::content_images::archive_items $build_images::root [dict replace $build_images::settings bucket {}]
 } -cleanup ::build_images::cleanup -returnCodes error -result {Production image uploads require content_images.bucket}
-
-source [file join $root devops upload-content-images.tcl]
-proc ::build_images::aws_setup {} {
-    setup
-    variable awsCalls {}
-    variable awsFail false
-    variable staging {}
-    rename ::exec ::build_images::real_exec
-    proc ::exec {args} {
-        if {[lrange $args 0 2] ne {aws s3 sync}} {tailcall ::build_images::real_exec {*}$args}
-        set source [lindex $args 3]
-        set ::build_images::staging [file dirname [string trimright $source /]]
-        set channel [open [file join $source images pixel.png] rb]
-        try {set bytes [read $channel]} finally {close $channel}
-        lappend ::build_images::awsCalls [list [lindex $args 4] $bytes \
-            [expr {"--delete" in $args}] [glob -nocomplain -directory $source *.md]]
-        if {$::build_images::awsFail} {error {AWS sync failed}}
-    }
-}
-proc ::build_images::aws_cleanup {} {
-    rename ::exec {}
-    rename ::build_images::real_exec ::exec
-    cleanup
-}
-
-test build-images-aws {Deployment syncs only image bytes under separate collection prefixes} \
-        -setup ::build_images::aws_setup -body {
-    ::content_images::upload_aws $build_images::root $build_images::settings
-    lassign $build_images::awsCalls docs blog
-    list [lindex $docs 0] [binary encode hex [lindex $docs 1]] [lrange $docs 2 end] \
-        $blog [file exists $build_images::staging] $build_images::calls
-} -cleanup ::build_images::aws_cleanup \
-    -result {s3://test-images/ttrek/content/images/docs/ 89504e470d0a00ff {0 {}} {s3://test-images/ttrek/content/images/blog/ blog-image 0 {}} 0 {}}
-
-test build-images-aws-invalid {Invalid references abort before either AWS sync} \
-        -setup ::build_images::aws_setup -body {
-    ::build_images::write [file join $build_images::root content blog 2026-11-11-guide.md] \
-        {![Missing](images/missing.png)}
-    list [catch {::content_images::upload_aws $build_images::root $build_images::settings}] $build_images::awsCalls
-} -cleanup ::build_images::aws_cleanup -result {1 {}}
-
-test build-images-aws-failure {AWS errors propagate and temporary image copies are removed} \
-        -setup ::build_images::aws_setup -body {
-    set build_images::awsFail true
-    set failed [catch {::content_images::upload_aws $build_images::root $build_images::settings} message]
-    list $failed $message [llength $build_images::awsCalls] [file exists $build_images::staging]
-} -cleanup ::build_images::aws_cleanup -result {1 {AWS sync failed} 1 0}
 
 set failed $::tcltest::numTests(Failed)
 cleanupTests

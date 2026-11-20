@@ -53,6 +53,9 @@
       "file": "bin/start-s3.sh",
       "args": []
     },
+    "upload-content": {
+      "file": "bin/upload-content.sh"
+    },
     "package-lambda": {
       "file": "bin/package-lambda.sh",
       "args": []
