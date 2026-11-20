@@ -44,7 +44,7 @@ ttrek install -y -registry ../private-ttrek-registry -add-pubreg
 ```
 
 Use the updated ttrek CLI with unsigned `iuse` arrays and installation USE flags.
-`+local` selects SQLite, its session adapter and the three AWS mocks. Without
+`+local` selects SQLite, its session adapter and the four AWS mocks. Without
 `+local` (or with `-local`), PostgreSQL and its session adapter are selected.
 Settings live in this installation's `ttrek-venv/ttrek-manifest.json`; they do not
 change runtime `ENV=LOCAL`/`ENV=PROD` configuration. Clearing `+local` changes the

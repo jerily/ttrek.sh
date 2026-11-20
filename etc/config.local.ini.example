@@ -49,5 +49,5 @@ collect_username=false
 email_verification_required=true
 verification_emails_enabled=true
 origin=http://localhost:8080
-email_enabled=false
+email_enabled=true
 # Development keys are generated once in the local data directory.

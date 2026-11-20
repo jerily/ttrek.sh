@@ -94,7 +94,7 @@ ZIP. Repackage and restart to pick up new recipes or Markdown, then invoke
 `sync-local` manually. Sync uses the packaged files, not a checkout on the host.
 
 Start your local Valkey service and configure its connection in the required
-`[redis]` section of your local INI, then run the website through all three mocks
+`[redis]` section of your local INI, then run the website through all four mocks
 without AWS:
 
 ```sh
@@ -135,7 +135,21 @@ Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor st
 | --- | --- | --- |
 | mock-proxy-app | 8080 | Routes HTTP requests to the `prod-Api-TtrekWebsite-Function` Lambda function |
 | mock-lambda-app | 3001 | Runs the packaged custom runtime and HTTP event adapter |
+| mock-ses-app | 3016 | Opens each plain-text account email in a Tk window |
 | mock-s3-app | 3015 | Serves public assets and the locally built release executable |
+
+For account previews, set `email_enabled=true` under `[account]` in your local INI.
+Register a local account to see its verification email. The local SES mock needs a
+graphical display when it receives mail. To preview a message directly, run:
+
+```sh
+curl --fail-with-body http://127.0.0.1:3016/ \
+  -d 'Action=SendEmail&Version=2010-12-01' \
+  --data-urlencode 'Source=sender@example.com' \
+  --data-urlencode 'Destination.ToAddresses.member.1=recipient@example.com' \
+  --data-urlencode 'Message.Subject.Data=Hello' \
+  --data-urlencode 'Message.Body.Text.Data=Previewing locally!'
+```
 
 `start-local` and `start-lambda` fail before starting services if the selected
 local INI has no `[redis]` section. They use your configured Valkey service and
@@ -172,7 +186,7 @@ The stopped stack removes its disposable database.
 All services bind to loopback. Custom ports and paths can be passed together:
 
 ```sh
-ttrek run -script start-local -- --port 8081 --lambda-port 3002 --s3-port 3016 \
+ttrek run -script start-local -- --port 8081 --lambda-port 3002 --s3-port 3015 --ses-port 3017 \
     --zip /path/to/ttrek-sh.zip --s3-dir /path/to/s3 --state-dir /tmp/ttrek-local
 ```
 

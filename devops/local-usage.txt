@@ -7,6 +7,7 @@ Usage: start-local.sh [options]
   --state-dir DIR     Disposable service directories (default: var/local)
   --port PORT         Loopback proxy port (default: 8080)
   --lambda-port PORT  Loopback Lambda API port (default: 3001)
+  --ses-port PORT     Local SES preview port (default: 3016).
   --s3-port PORT      Loopback S3 port (default: 3015)
   --lambda-workers N  Lambda processes (default: 4)
   --worker-threads N  Proxy/Lambda HTTP threads (default: 2)
@@ -17,11 +18,11 @@ code. In another terminal, run `ttrek run -script initdb-local`, then
 `ttrek run -script sync-local` to import the packaged content and registry.
 Pass `-- --lambda-port PORT` to these scripts when using a custom port. Runtime state
 and uploaded mock objects are disposable. Stop with Ctrl-C; the supervisor stops
-all three mock services. Your configured Valkey service remains running.
+all four mock services. Your configured Valkey service remains running.
 
 TTREK_SITE_PREFIX selects installed dependencies. TTREK_SITE_ZIP,
 TTREK_SITE_PORT, TTREK_LAMBDA_PORT and TTREK_LOCAL_DIR supply defaults.
-MOCK_LAMBDA_APP, MOCK_PROXY_APP and MOCK_S3_APP can select package directories.
+MOCK_LAMBDA_APP, MOCK_PROXY_APP, MOCK_S3_APP and MOCK_SES_APP can select package directories.
 
 TTREK_LOCAL_CONFIG selects another local INI for releases and monitoring.
 start-local and start-lambda require a [redis] section for your running local

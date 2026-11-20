@@ -422,7 +422,6 @@ proc ::app_config::account {config root {localDirectory {}}} {
         email_queue_enabled false email_queue_url {} google_enabled false google_client_id {} google_redirect_uri {}]
     if {[mode] eq "LOCAL"} {
         dict set display origin http://localhost:8080
-        dict set display email_enabled false
     }
     set policyKeys {tenant collect_names collect_display_name collect_username registration_captcha captcha_length captcha_letters captcha_ttl \
         email_verification_required verification_emails_enabled login_captcha_after login_captcha_window \
@@ -442,6 +441,7 @@ proc ::app_config::account {config root {localDirectory {}}} {
         } else {error "Unknown account setting: $name"}
     }
     if {[mode] eq "LOCAL"} {
+        dict set display deliver ::accounts::send_local_email
         if {$localDirectory eq {}} {set localDirectory [file join $root data]}
         set keys [dict merge [::accounts::local_keys $localDirectory] $keys]
     }
