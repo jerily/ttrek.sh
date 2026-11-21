@@ -86,29 +86,34 @@ proc ::site_patch::task_initdb_website {context} {
 proc ::site_patch::task_sync_website {context} {
     set settings [::site::config]
     set root [dict get $settings rootdir]
-    set registry [file join $root registry]
-    if {![file isdirectory $registry] || ![llength [glob -nocomplain -directory $registry -types f */*/ttrek.json]]} {
-        error "The deployed package has no registry snapshot; rebuild the Lambda ZIP before syncing"
-    }
-    set completed {wiki blog registry}
     set images [dict get $settings content_images]
     set production [expr {[::app_config::mode] eq "PROD"}]
     set stores [::content_images::database_stores $::telemetry::connection $images]
-    ::telemetry::transaction {
-        ::telemetry::lock_search_snapshot
-        if {$production} {set collections [::content_images::archive_items $root $images]}
-        foreach {kind directory} {wiki docs blog blog} {
-            if {$production} {
-                ::web::static::${kind}::sync_prepared [dict get $stores $kind] [dict get $collections $kind]
-            } else {
-                # LOCAL retains package sync for its disposable S3 mock.
-                ::web::static::${kind}::sync [dict get $stores $kind] [file join $root content $directory]
-            }
+    package require tgit2 0.1.0
+    set registry [file tempdir]
+    try {
+        ::tgit2::clone -depth 1 https://github.com/jerily/ttrek-registry.git $registry
+        if {![llength [glob -nocomplain -directory $registry -types f */*/ttrek.json]]} {
+            error "The public registry contains no recipes"
         }
-        ::telemetry::sync_registry_metadata $registry
-        ::telemetry::publish_search_snapshot
+        ::telemetry::transaction {
+            ::telemetry::lock_search_snapshot
+            if {$production} {set collections [::content_images::archive_items $root $images]}
+            foreach {kind directory} {wiki docs blog blog} {
+                if {$production} {
+                    ::web::static::${kind}::sync_prepared [dict get $stores $kind] [dict get $collections $kind]
+                } else {
+                    # LOCAL retains package sync for its disposable S3 mock.
+                    ::web::static::${kind}::sync [dict get $stores $kind] [file join $root content $directory]
+                }
+            }
+            ::telemetry::sync_registry_metadata $registry
+            ::telemetry::publish_search_snapshot
+        }
+    } finally {
+        file delete -force $registry
     }
-    return $completed
+    return {wiki blog registry}
 }
 
 # Publish database edits or restored metadata without reimporting recipe files.

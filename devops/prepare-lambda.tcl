@@ -7,18 +7,13 @@
 package require Tcl 9.1
 source [file join [file dirname [file dirname [info script]]] runtime paths.tcl]
 set siteRoot $::tdevops::runtime::root
-source [file join $siteRoot devops stage-registry.tcl]
-set registrySource {}
-if {[info exists ::env(TTREK_PUBLIC_REGISTRY)]} {
-    set registrySource $::env(TTREK_PUBLIC_REGISTRY)
-}
-::registry_build::stage $siteRoot $registrySource
 foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js public/js/chart.umd.js} {
     if {![file isfile [file join $siteRoot $asset]]} {
         error "Missing browser asset $asset; run ttrek run -script build-assets before packaging"
     }
 }
 package require http
+package require tgit2 0.1.0
 package require web-user 0.7.2
 package require web-forum 0.3.4
 package require pure-tcl-aws-ses 1.0.0
@@ -66,10 +61,11 @@ try {
     # Provision only a disposable in-memory fixture for packaging smoke checks.
     # Runtime startup never initializes or imports a database in either mode.
     set ::env(ENV) LOCAL
-    # Validate every staged recipe in a disposable catalog without contacting
-    # the production database. The deployed database changes only on manual sync.
+    # Exercise the catalog with the build checkout when one is available.
     source [file join $siteRoot tcl telemetry.tcl]
-    ::telemetry::init_local {dialect sqlite database :memory:} [list [file join $siteRoot registry]]
+    set registries {}
+    if {[info exists ::env(TTREK_PUBLIC_REGISTRY)]} {lappend registries $::env(TTREK_PUBLIC_REGISTRY)}
+    ::telemetry::init_local {dialect sqlite database :memory:} $registries
     dict set ::site::settings content_connection $::telemetry::connection
     foreach {kind directory} {wiki docs blog blog} {
         ::web::static::${kind}::initdb $::telemetry::connection

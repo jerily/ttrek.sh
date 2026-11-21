@@ -30,7 +30,6 @@ ttrek run tclsh9.1 "$PWD/tests/telemetry.test"
 ttrek run tclsh9.1 "$PWD/tests/telemetry-dispatch.test"
 ttrek run tclsh9.1 "$PWD/tests/registry-metadata.test"
 ttrek run tclsh9.1 "$PWD/tests/package-tracker.test"
-ttrek run tclsh9.1 "$PWD/tests/stage-registry.test"
 ttrek run tclsh9.1 "$PWD/tests/build-lambda.test"
 ttrek run tclsh9.1 "$PWD/tests/patch.test"
 ttrek run tclsh9.1 "$PWD/tests/invoke-patch-local.test"
@@ -175,10 +174,7 @@ schema upgrades, per-version metadata, imports from multiple registries, repeate
 and concurrent imports, invalid recipes, and preservation of IDs and telemetry. It also covers complete recipe replacement,
 resolved script files, exact patch bytes, withdrawal/republication, and failures
 before writes. Handler tests use fixed fixtures and check that every package page
-and API works after recipe files are removed. `tests/stage-registry.test` checks
-fresh checkouts and reuse of the synced dependency checkout, revision recording,
-exclusion of Git metadata and ignored files, and rejection of missing, modified,
-or empty supplied checkouts without contacting GitHub.
+and API works after recipe files are removed.
 `tests/build-lambda.test` runs the build launcher with isolated command fixtures
 to verify sync-before-install ordering, reuse of the public checkout, private
 registry precedence, and immediate failure when synchronization fails.

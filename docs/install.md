@@ -26,12 +26,9 @@ git clone https://github.com/jerily/ttrek.sh.git
 cd ttrek.sh
 ```
 
-The registry is an independent repository. CodeBuild syncs it before installing
-dependencies and reuses that checkout when packaging recipes, scripts and patches
-in the ZIP. Local packaging fetches its latest default-branch commit unless
-`TTREK_PUBLIC_REGISTRY` selects an existing checkout; see [registry inputs](registry.md).
-Fetching requires Git and HTTPS access to GitHub; Lambda itself needs no public
-internet access. A failed sync or invalid supplied checkout fails the build.
+CodeBuild syncs the public registry before installing dependencies. At runtime,
+website sync clones the current registry using HTTPS access to GitHub.
+See [registry inputs](registry.md).
 
 ## Install dependencies
 
@@ -88,7 +85,7 @@ ttrek run -script sync-local
 ```
 
 Startup only opens database connections. Repeat these tasks after starting a new
-disposable local stack; use `sync-local` to publish the packaged content and registry.
+disposable local stack; use `sync-local` to publish the packaged content and current public registry.
 
 Open <http://127.0.0.1:8080/>. Press Ctrl-C to stop the services.
 The explicit sync task builds and publishes the search indexes. See [local development](local-development.md)

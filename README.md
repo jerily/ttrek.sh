@@ -28,10 +28,10 @@ With the services running, use another terminal to initialize and publish the lo
 ttrek run -script bootstrap-local
 ```
 
-Bootstrap initializes the schema, publishes the packaged content and registry,
+Bootstrap initializes the schema, publishes the packaged content and current public registry,
 then refreshes Package Tracker, stopping if any step fails.
 Startup only opens database connections. Repeat bootstrap after starting a new
-disposable local stack; use `sync-local` to publish the packaged content and registry.
+disposable local stack; use `sync-local` to publish the packaged content and current public registry.
 
 Open <http://127.0.0.1:8080/> to try the website. Press Ctrl-C to stop it.
 

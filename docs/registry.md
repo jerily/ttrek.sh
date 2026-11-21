@@ -6,20 +6,8 @@ The public package catalog lives independently in
 [jerily/ttrek-registry](https://github.com/jerily/ttrek-registry).
 CodeBuild runs `ttrek sync` into `build/public-registry` before installing
 dependencies. The private registry supplies build tools, followed by this public
-checkout for public packages. Packaging reuses that checkout through
-`TTREK_PUBLIC_REGISTRY`, exporting its committed files into the ZIP's `registry/`
-directory without another fetch. Git metadata and ignored files are excluded;
-`etc/registry-revision` records the exact commit. A missing or modified supplied
-checkout fails packaging. There is no registry submodule in the website repository.
-
-Local packaging still makes a fresh shallow checkout of the public registry's
-default branch when `TTREK_PUBLIC_REGISTRY` is unset. To reuse a specific local
-snapshot, sync it first and pass its absolute path when packaging:
-
-```sh
-ttrek sync "$PWD/build/public-registry"
-TTREK_PUBLIC_REGISTRY="$PWD/build/public-registry" ttrek run -script package-lambda -- --local-only
-```
+checkout for public packages. Each website sync uses `tgit2` to clone the public
+registry over HTTPS at depth 1. The temporary checkout is removed after sync.
 
 Recipes carry a top-level `description`, optional `tags`, project `url`, and SPDX `license` string.
 The package overview shows the latest version's description, HTTP(S) project link, and license when present.
@@ -29,7 +17,7 @@ unique recipe-download activity. The
 and Trending rankings at `/packages/tracker`, with a summary on `/packages`.
 
 The manual `task_sync_website` invocation (`sync-local` for the local Lambda)
-imports the bundled registry into the telemetry `packages` table. It stores
+imports the freshly cloned registry into the telemetry `packages` table. It stores
 `description`, `url`, `license`, JSON `tags` and `languages`, the complete recipe JSON with resolved
 scripts, and base64 patch bytes per version. Dependencies, conditional USE flags
 and platform-specific build instructions remain in the stored recipe.
@@ -60,11 +48,8 @@ imported only when their directory is explicitly supplied.
 ## Update package recipes
 
 Make package changes in `jerily/ttrek-registry` and publish them there first.
-Build and deploy the website Lambda to include the latest registry snapshot,
-then manually invoke `task_sync_website` as described in
-[deployment](deployment.md#explicit-website-patch-tasks). CodeBuild does not invoke
-synchronization. Deploying a new ZIP alone does not change the published catalog.
-Reinvoking sync without rebuilding imports the same bundled snapshot.
+Invoke `task_sync_website` to publish the updated recipes with the existing Lambda.
+See [deployment](deployment.md#explicit-website-patch-tasks).
 
 Both modes connect without provisioning or importing data. On upgrade, invoke
 `task_initdb_website` before `task_sync_website` to add and populate the recipe and

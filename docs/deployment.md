@@ -455,14 +455,11 @@ The build:
    is absent. Template validation and deferred-worker tests run independently
    of SQLite availability.
 4. Generates encrypted production config from SSM and packages with tdevops using
-   `--local-only`. `TTREK_PUBLIC_REGISTRY` tells packaging to reuse the synced
-   dependency checkout. It exports that commit into the ZIP, excludes Git metadata
-   and ignored files, and records `etc/registry-revision` without another fetch.
-   The later `task_sync_website` imports this same bundled snapshot.
+   `--local-only`.
    It validates all site/package templates and their composed layouts without
    a database or decrypted secrets. If SQLite is installed, it also validates
-   staged recipes and routes using an in-memory fixture; otherwise those smoke
-   checks remain skipped. It sets executable
+   recipes from the build checkout and staged routes using an in-memory fixture.
+   It sets executable
    ZIP attributes. This skips the numeric
    glibc cutoff that rejects AL2023's backported symbols; architecture,
    dependency resolution, and staged-site checks still run.
@@ -478,7 +475,7 @@ Set `CONTENT_IMAGES_BUCKET` when using a different production bucket.
 Invoke `task_sync_website` to publish the archive. Each invocation downloads
 the current ZIP, validates the docs and blog collections, and uploads changed
 images to the configured image prefix under `docs/` and `blog/`. Old keys
-remain available. The patch then commits the pages, posts, bundled registry
+remain available. The patch then commits the pages, posts, freshly cloned registry
 and search index together. Uploading the archive alone leaves the database
 untouched. LOCAL sync reads its packaged content and uses its configured S3 mock.
 
@@ -870,8 +867,8 @@ The existing website Lambda accepts private direct invocations with
 `{"source":"ttrek.patch","task":"task_initdb_website"}` or
 `{"source":"ttrek.patch","task":"task_sync_website"}`. The first initializes the
 installed packages' schemas; the second imports prepared wiki/blog content and
-image references, plus the bundled registry's complete recipes, then publishes both search indexes
-in the same transaction. The sync is invoked manually after deployment;
+image references and recipes from a fresh shallow clone of the public registry.
+It publishes both search indexes in the same transaction. The sync is invoked manually after deployment;
 CodeBuild never runs it.
 
 Forum and group schemas are included in `task_initdb_website`. After deploying
@@ -964,11 +961,9 @@ cat /tmp/ttrek-sync-response.json
 ```
 
 Use the intended AWS profile and region. Check that the invocation has no
-`FunctionError` and the response contains `"ok":true`. Lambda reads the bundled
-registry; it does not access GitHub. To pick up newer recipes, build/deploy a new
-ZIP before invoking sync. A checkout failure fails packaging. A missing or
-invalid bundled registry fails sync without clearing the published database.
-No new public internet route or S3 registry handoff is needed.
+`FunctionError` and the response contains `"ok":true`. Each sync clones the current
+public registry from GitHub over HTTPS at depth 1. A failed clone or invalid recipe leaves the
+previous publication intact.
 
 Run initialization before the first sync on a new database. Initialization creates
 missing tables/indexes and applies additive schema upgrades; repeated runs preserve

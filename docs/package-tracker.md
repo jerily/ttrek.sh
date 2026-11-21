@@ -166,7 +166,7 @@ Lambda invocation permissions.
 
 1. Deploy the code and scheduler; the five-minute schedule is enabled by default.
 2. Invoke `task_initdb_website` to add fields, indexes and estimated existing dates.
-3. Invoke `task_sync_website` if the packaged registry also needs publication.
+3. Invoke `task_sync_website` if the current public registry also needs publication.
 4. Let the next scheduled refresh populate Valkey, or invoke
    `task_refresh_package_tracker` immediately, then inspect the page and task logs.
 

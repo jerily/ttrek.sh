@@ -8,15 +8,14 @@ Usage: package-lambda.sh --local-only [options]
   --local-only        Package for this Linux host, skipping the AL2023 ABI check
   --help              Show this help
 
-Fetches the latest public registry with Git, bundles its files and commit ID,
-stages Markdown directories and the public RDS CA bundle, validates the staged
+Stages Markdown directories and the public RDS CA bundle, validates the staged
 site, and writes a Lambda custom-runtime archive. Copies public assets and the
 local ttrek executable into mock S3 seed buckets. Host configuration, TLS keys,
 Git metadata and working databases are excluded. No AWS deployment occurs.
 
-Requires Linux, Git with HTTPS access to GitHub, readelf, ldd, ttrek and a Tcl
-interpreter with zipfs. Packaging does not synchronize the deployed database.
+Requires Linux, readelf, ldd, ttrek and a Tcl interpreter with zipfs.
 
 Production packaging excludes content/. Deployment uploads that directory,
 including its images, as ttrek/content/latest.zip. The website sync patch
-downloads the archive and publishes its images. Local packages retain content/.
+clones the current public registry from GitHub, downloads the archive and publishes
+its images. Local packages retain content/.

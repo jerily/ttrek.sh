@@ -7,7 +7,7 @@
 # Application policy; packaging and service mechanics live in tdevops.
 ::tdevops::configure {
     archive ttrek-sh.zip
-    files {tcl sql www schemas public LICENSE etc/rds-global-bundle.pem etc/releases.json etc/homepage.json etc/ratelimits.json devops/prepare-lambda.tcl devops/stage-registry.tcl}
+    files {tcl sql www schemas public LICENSE etc/rds-global-bundle.pem etc/releases.json etc/homepage.json etc/ratelimits.json devops/prepare-lambda.tcl}
     lambda-config etc/lambda.json
     routes etc/routes.json
     content-collections {docs blog}
@@ -42,6 +42,11 @@ proc ::project_devops::local {options work} {
     set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:[dict get $options --s3-port]
     set ::env(TTREK_LOCAL_SES_PORT) [dict get $options --ses-port]
     set ::env(ENV) LOCAL
+    if {![info exists ::env(SSL_CERT_FILE)]} {
+        foreach bundle {/etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt} {
+            if {[file readable $bundle]} {set ::env(SSL_CERT_FILE) $bundle; break}
+        }
+    }
     set releases [::app_config::releases {}]
     if {[file isfile $configPath]} {set releases [::app_config::releases_from_ini $configPath $root]}
     # Seed binaries are only a fallback for targets without uploaded metadata.

@@ -39,12 +39,6 @@ try {
             error "Local executable in production ZIP: $executable"
         }
     }
-    if {![llength [glob -nocomplain -directory [file join $mount registry] -types f */*/ttrek.json]]} {
-        error "Lambda ZIP must include a registry snapshot"
-    }
-    if {[file exists [file join $mount registry .git]]} {error "Registry Git metadata must not be bundled"}
-    set revision [string trim [read_bytes [file join $mount etc registry-revision]]]
-    if {![regexp {^[0-9a-f]{40,64}$} $revision]} {error "Missing registry revision"}
     source [file join $mount tcl config.tcl]
     set releases [::app_config::releases_from_ini [file join $mount etc config.ini] $mount]
     set images [::app_config::content_images_from_ini [file join $mount etc config.ini] $mount]
@@ -59,7 +53,7 @@ try {
             error "Packaged content_images.$key differs from the upload configuration"
         }
     }
-    foreach excluded {content etc/content-snapshot.data} {
+    foreach excluded {content etc/content-snapshot.data registry etc/registry-revision} {
         if {[file exists [file join $mount $excluded]]} {error "Unexpected $excluded in production ZIP"}
     }
     set assetManifest [read_bytes [file join $mount public asset-manifest.json]]
