@@ -9,6 +9,8 @@ BUILD_DIR="$SELF_DIR/build/build"
 
 TCL_VERSION=9.1.0
 CJSON_VERSION=1.7.19
+TJSON_VERSION=1.0.30
+TPERSIST_VERSION=0.1.7
 DEBUG=0
 BUILD_JOBS=${TTREK_MAKE_THREADS:-4}
 
@@ -76,19 +78,19 @@ if [ ! -e "$INSTALL_DIR/lib/jinja20.1.0/pkgIndex.tcl" ]; then
     cmake --install "$BUILD_DIR/jinja2-tcl"
 fi
 
-if [ ! -e "$INSTALL_DIR/lib/tjson1.0.27/pkgIndex.tcl" ]; then
-    echo "Build tjson 1.0.27 ..."
-    if [ ! -d "$SOURCE_DIR/tjson-1.0.27" ]; then
-        curl -fLsS https://github.com/jerily/tjson/archive/refs/tags/v1.0.27.tar.gz -o "$SOURCE_DIR/tjson-1.0.27.tar.gz"
-        tar -xzf "$SOURCE_DIR/tjson-1.0.27.tar.gz" -C "$SOURCE_DIR"
+if [ ! -e "$INSTALL_DIR/lib/tjson$TJSON_VERSION/pkgIndex.tcl" ]; then
+    echo "Build tjson $TJSON_VERSION ..."
+    if [ ! -d "$SOURCE_DIR/tjson-$TJSON_VERSION" ]; then
+        curl -fLsS "https://github.com/jerily/tjson/archive/refs/tags/v$TJSON_VERSION.tar.gz" -o "$SOURCE_DIR/tjson-$TJSON_VERSION.tar.gz"
+        tar -xzf "$SOURCE_DIR/tjson-$TJSON_VERSION.tar.gz" -C "$SOURCE_DIR"
     fi
-    cmake -S "$SOURCE_DIR/tjson-1.0.27" -B "$BUILD_DIR/tjson-1.0.27" \
+    cmake -S "$SOURCE_DIR/tjson-$TJSON_VERSION" -B "$BUILD_DIR/tjson-$TJSON_VERSION" \
         -DTCL_INCLUDE_PATH="$INSTALL_DIR/include" \
         -DTCL_STUB_LIBRARY="$INSTALL_DIR/lib/libtclstub.a" \
         -DTCL_TCLSH="$INSTALL_DIR/bin/tclsh9.1" \
         -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
-    cmake --build "$BUILD_DIR/tjson-1.0.27" --parallel "$BUILD_JOBS"
-    cmake --install "$BUILD_DIR/tjson-1.0.27"
+    cmake --build "$BUILD_DIR/tjson-$TJSON_VERSION" --parallel "$BUILD_JOBS"
+    cmake --install "$BUILD_DIR/tjson-$TJSON_VERSION"
 fi
 
 
@@ -157,6 +159,12 @@ tcl_cmake_install() {
 package_installed() {
     "$INSTALL_DIR/bin/tclsh9.1" "$SELF_DIR/tests/runtime-packages.tcl" "$@" >/dev/null 2>&1
 }
+
+if ! package_installed tpersist; then
+    echo "Build tpersist $TPERSIST_VERSION ..."
+    fetch_source "tpersist-$TPERSIST_VERSION" "https://github.com/jerily/tpersist/archive/refs/tags/v$TPERSIST_VERSION.tar.gz"
+    tcl_cmake_install "tpersist-$TPERSIST_VERSION" -DBUILD_TESTING=OFF
+fi
 
 if ! package_installed topenapi; then
     echo "Build topenapi 0.2.0 ..."

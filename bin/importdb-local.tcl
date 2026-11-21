@@ -23,7 +23,7 @@ proc ::local_import::main {root arguments} {
         }
     }
     if {![file isfile $path]} {error "Backup file does not exist"}
-    package require tpersist 0.1.5
+    package require tpersist 0.1.7
     source [file join $root tcl config.tcl]
     # This command never loads production configuration, regardless of ENV.
     set ::env(ENV) LOCAL

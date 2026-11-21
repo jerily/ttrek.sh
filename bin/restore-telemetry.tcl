@@ -33,7 +33,7 @@ try {
         set format [dict get [::tjson::json_to_simple [gets $channel]] format]
     } finally {close $channel}
     if {$format eq "tpersist"} {
-        package require tpersist 0.1.5
+        package require tpersist 0.1.7
         set options {-autobegin false}
         dict for {key value} [::private_config::password $settings -secret_config $secret] {lappend options -$key $value}
         set connection [::tpersist::db_connect {*}$options]
