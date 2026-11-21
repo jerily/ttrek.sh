@@ -90,17 +90,13 @@ foreach mount {
     } -cleanup {$router destroy} -result {1 404}
 }
 
-# Exercise the actual packaging hook with SQLite unavailable. Only registry
-# staging is replaced: validation must finish before the existing skip/return.
+# Exercise the packaging hook with SQLite unavailable.
 set stage [makeDirectory template-artifact]
 foreach directory {tcl www schemas} {file copy [file join $root $directory] $stage}
 file link -symbolic [file join $stage public] [file join $root public]
 file mkdir [file join $stage runtime] [file join $stage devops] [file join $stage etc]
 foreach name {releases.json homepage.json} {file copy [file join $root etc $name] [file join $stage etc $name]}
 file copy [file join $root devops prepare-lambda.tcl] [file join $stage devops prepare-lambda.tcl]
-set channel [open [file join $stage devops stage-registry.tcl] w]
-puts $channel {namespace eval ::registry_build {}; proc ::registry_build::stage {args} {}}
-close $channel
 set channel [open [file join $stage runtime paths.tcl] w]
 puts $channel [list namespace eval ::tdevops::runtime [list variable root $stage]]
 puts $channel {

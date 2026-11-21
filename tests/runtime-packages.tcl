@@ -13,7 +13,7 @@ if {![llength $packages]} {
         twebserver topenapi jinja2 tjson ttrie ttrigrams valkey tink
         thashlib pure-tcl-oauth2-core pure-tcl-oauth2-client pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
         tratelimit treqmon web-user web-forum tcaptcha tclgd pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda
-        web-static-wiki web-static-blog tpersist tpathexp cmark_gfm
+        web-static-wiki web-static-blog tgit2 tpersist tpathexp cmark_gfm
         trequests
     }
     if {$production} {

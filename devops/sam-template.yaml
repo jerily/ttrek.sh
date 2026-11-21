@@ -258,6 +258,7 @@ Resources:
       Environment:
         Variables:
           ENV: PROD
+          SSL_CERT_FILE: /etc/pki/tls/certs/ca-bundle.crt
           TTREK_LOADING: lazy
           TTREK_PROFILE: !Ref RequestProfiling
           CONTENT_IMAGES_CLOUDFRONT_URL:

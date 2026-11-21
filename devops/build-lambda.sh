@@ -17,12 +17,11 @@ chmod 0755 "$TTREK_BIN_DIR/ttrek"
 export PATH="$TTREK_BIN_DIR:$PATH"
 export JOBS=${TTREK_MAKE_THREADS:-4}
 
-# Resolve dependencies and publish the catalog from one public checkout.
+# Use the public checkout for dependency installation and build-time smoke tests.
 export TTREK_PUBLIC_REGISTRY="$SITE_ROOT/build/public-registry"
 ttrek sync "$TTREK_PUBLIC_REGISTRY"
 
-# The private registry supplies build tools; public packages come from the
-# synced checkout that packaging will reuse for the website's later sync.
+# The private registry supplies build tools before the public package source.
 # Include the failing recipe's log in CodeBuild output for diagnosis.
 # Reusing a local prefix can retain excluded files. CodeBuild must package a
 # fresh production installation.
@@ -91,7 +90,6 @@ fi
 "$TCLSH" tests/telemetry-config.test
 "$TCLSH" tests/email-queue.test
 "$TCLSH" tests/invoke-patch-local.test
-"$TCLSH" tests/stage-registry.test
 "$TCLSH" tests/build-lambda.test
 "$TCLSH" tests/api-gateway.test
 "$TCLSH" tests/telemetry-maintenance.test

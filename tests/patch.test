@@ -17,7 +17,18 @@ source [file join $root tcl patch.tcl]
 source [file join $root tcl lambda.tcl]
 set patchRoot [makeDirectory patch-site]
 file copy [file join $root content] [file join $patchRoot content]
-file copy [file join $root tests fixtures registry] [file join $patchRoot registry]
+set sourceRegistry [makeDirectory patch-registry]
+file copy [file join $root tests fixtures registry] $sourceRegistry
+package require tgit2 0.1.0
+rename ::tgit2::clone ::tgit2::original_clone
+proc ::tgit2::clone {flag depth url directory} {
+    set ::lastClone $directory
+    if {[list $flag $depth $url] ne {-depth 1 https://github.com/jerily/ttrek-registry.git}} {
+        error "Unexpected registry clone arguments"
+    }
+    if {![file isdirectory [file join $::sourceRegistry registry]]} {error "Registry unavailable"}
+    foreach path [glob -nocomplain -directory [file join $::sourceRegistry registry] *] {file copy $path $directory}
+}
 set saved [array get ::env]
 set ::env(ENV) LOCAL
 namespace eval ::site {}
@@ -72,17 +83,16 @@ test patch-sync {sync updates rows through package APIs and preserves the websit
         list [dict get $result completed] \
             [dict get [::web::static::wiki::load [dict get $stores wiki] /getting-started] title] \
             [expr {[llength [::web::static::blog::posts [dict get $stores blog]]] > 0}] \
-            [expr {$connection eq $::telemetry::connection}]
+            [expr {$connection eq $::telemetry::connection}] [file exists $lastClone]
     } finally {
         rename ::telemetry::initdb {}; rename ::telemetry::real_initdb ::telemetry::initdb
     }
-} -result {{wiki blog registry} {Getting started} 1 1}
+} -result {{wiki blog registry} {Getting started} 1 1 0}
 
 test patch-sync-assets {Production fetches the archive, uploads its images and imports the references} -setup {
     source [file join $root tcl browser-assets.tcl]
     set imageFreeRoot [makeDirectory patch-image-free]
     file copy [file join $patchRoot content] [file join $imageFreeRoot content]
-    file copy [file join $patchRoot registry] [file join $imageFreeRoot registry]
     file mkdir [file join $imageFreeRoot etc] [file join $imageFreeRoot content docs images]
     set channel [open [file join $imageFreeRoot content docs images test.png] w]
     puts $channel pixel
@@ -149,7 +159,6 @@ test patch-sync-assets {Production fetches the archive, uploads its images and i
 
 test patch-sync-content {sync publishes body edits and removes deleted docs and posts} -setup {
     set contentRoot [makeDirectory patch-content]
-    file copy [file join $root tests fixtures registry] [file join $contentRoot registry]
     file mkdir [file join $contentRoot content docs] [file join $contentRoot content blog]
     foreach {name markdown} {
         docs/guide.md {# Display guide}
@@ -262,19 +271,31 @@ test patch-initdb-migrates-listing {The pre-tags schema keeps its rows but needs
         [expr {[::telemetry::registry_catalog] eq $published}] [::telemetry::stats initdb-test]
 } -result {{} 1 1 {{{Linux x86_64} 1 1 0}}}
 
-test patch-sync-missing-registry {A missing bundled registry cannot clear the published catalog} -setup {
-    file rename [file join $patchRoot registry] [file join $patchRoot hidden-registry]
+test patch-sync-missing-registry {A failed clone preserves the published catalog and removes the temporary checkout} -setup {
+    file rename [file join $sourceRegistry registry] [file join $sourceRegistry hidden-registry]
 } -body {
     set before [::telemetry::registry_catalog]
     set code [catch {::site_patch::task_sync_website {}} message]
-    list $code [string match {The deployed package has no registry snapshot*} $message] \
+    list $code [file exists $lastClone] \
         [expr {$before eq [::telemetry::registry_catalog]}]
 } -cleanup {
-    file rename [file join $patchRoot hidden-registry] [file join $patchRoot registry]
-} -result {1 1 1}
+    file rename [file join $sourceRegistry hidden-registry] [file join $sourceRegistry registry]
+} -result {1 0 1}
+
+test patch-sync-empty-registry {An empty checkout preserves the published catalog} -setup {
+    file rename [file join $sourceRegistry registry] [file join $sourceRegistry saved-registry]
+    file mkdir [file join $sourceRegistry registry]
+} -body {
+    set before [::telemetry::registry_catalog]
+    set code [catch {::site_patch::task_sync_website {}} message]
+    list $code $message [file exists $lastClone] [expr {$before eq [::telemetry::registry_catalog]}]
+} -cleanup {
+    file delete [file join $sourceRegistry registry]
+    file rename [file join $sourceRegistry saved-registry] [file join $sourceRegistry registry]
+} -result {1 {The public registry contains no recipes} 0 1}
 
 test patch-sync-invalid-registry {A bad recipe rolls back content, recipes and search together} -setup {
-    set invalid [file join $patchRoot registry broken 1.0.0]
+    set invalid [file join $sourceRegistry registry broken 1.0.0]
     file mkdir $invalid
     set channel [open [file join $invalid ttrek.json] w]
     puts $channel {{"scripts":{"broken":{"file":"missing.sh"}}}}
@@ -293,7 +314,7 @@ test patch-sync-invalid-registry {A bad recipe rolls back content, recipes and s
     }
     list $code [string match {Recipe script must be a regular file*} $message]
 } -cleanup {
-    file delete -force [file join $patchRoot registry broken]
+    file delete -force [file join $sourceRegistry registry broken]
 } -result {1 1}
 
 test patch-provider-failure {broken installed schema providers fail the task} -setup {
@@ -358,6 +379,9 @@ if {$schema ne {}} {::tpersist::_raw $::telemetry::connection "DROP SCHEMA $sche
 ::telemetry::close
 array unset ::env
 array set ::env $saved
+rename ::tgit2::clone {}
+rename ::tgit2::original_clone ::tgit2::clone
+removeDirectory patch-registry
 removeDirectory patch-site
 set failed $::tcltest::numTests(Failed)
 cleanupTests

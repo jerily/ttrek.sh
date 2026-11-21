@@ -148,7 +148,7 @@ test build-sqlite-conditional {Only SQLite-backed tests depend on SQLite availab
         }
         set otherTests {}
         foreach name {runtime-packages.tcl content-images.test browser-assets.test config.test lambda-config.test \
-                telemetry-config.test email-queue.test invoke-patch-local.test stage-registry.test \
+                telemetry-config.test email-queue.test invoke-patch-local.test \
                 build-lambda.test telemetry-maintenance.test installer.tcl lambda-package.tcl} {
             lappend otherTests [expr {"tcl tests/$name" in $commands}]
         }
