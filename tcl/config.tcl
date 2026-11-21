@@ -338,19 +338,8 @@ proc ::app_config::release_checksums {path version} {
 
 # Read public settings without loading encrypted secrets or contacting KMS/SSM.
 proc ::app_config::ini_section {path section} {
-    package require inifile
-    set comment [::ini::commentchar]
-    set ini {}
-    try {
-        ::ini::commentchar #
-        set ini [::ini::open $path r]
-        set settings {}
-        if {$section in [::ini::sections $ini]} {set settings [::ini::get $ini $section]}
-    } finally {
-        if {$ini ne {}} {::ini::close $ini}
-        ::ini::commentchar $comment
-    }
-    return $settings
+    package require tconfig::decrypt
+    return [dict getdef [::tconfig::read_config $path] $section {}]
 }
 
 # Read only the public release settings for the local mock stack.

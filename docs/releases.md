@@ -153,8 +153,8 @@ AWS_PROFILE=ttrek-prod-neo bin/upload-archives-to-s3.sh 2>&1 | tee upload-archiv
 
 The shell launcher uses `bin/site-env.sh` to select the local `ttrek-venv` Tcl
 runtime and libraries, just like the other site launchers. The implementation is
-`bin/upload-archives-to-s3.tcl`, using `tjson` for specs and Tcllib's `sha256` for
-URL hashes; curl and the AWS CLI handle transfers. `TTREK_SITE_PREFIX` can select
+`bin/upload-archives-to-s3.tcl`, using `tjson` for specs and `twebserver::sha256` for
+URL hashes. curl and the AWS CLI handle transfers. `TTREK_SITE_PREFIX` can select
 another installation. It defaults to the sibling `ttrek-registry` checkout;
 pass another checkout as a positional argument.
 It uses the normal AWS credential chain, including `AWS_PROFILE`. The region is

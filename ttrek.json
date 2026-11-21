@@ -130,7 +130,6 @@
     "pure-tcl-oauth2-client": "^0.1.0"
   },
   "devDependencies": {
-    "tcllib": "^2.0.0",
     "trequests": "^1.3.0",
     "twebserver": "^1.47.58",
     "tdevops": "^0.2.4"
