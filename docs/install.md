@@ -103,8 +103,8 @@ The older public-only bootstrap requires a C/C++17 toolchain, make, CMake
 release archive and downloads jinja2-tcl from its GitHub repository. It builds
 upstream cJSON separately and links it statically into the template extension;
 tjson's private cJSON implementation is not used by jinja2-tcl. The interpreter
-is `build/install/bin/tclsh9.1`; no sibling repository is needed. The build and
-registry use the published tjson 1.0.27 and twebserver 1.47.54 release tags.
+is `build/install/bin/tclsh9.1`; no sibling repository is needed. The bootstrap
+uses the tjson 1.0.30, tpersist 0.1.7, and twebserver 1.47.54 release tags.
 
 `web-user` selects `tsession-sqlite` for local development and `tsession-postgres`
 for production. The AWS clients use `pure-tcl-aws-*` 1.0.0 with `trequests` 1.3.0, `thashlib` 0.1.0

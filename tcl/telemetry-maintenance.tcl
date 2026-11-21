@@ -33,7 +33,7 @@ proc ::telemetry_maintenance::check_deadline {deadline} {
 # tpersist connection owns the consistent export snapshot.
 proc ::telemetry_maintenance::backup {settings path deadline args} {
     set settings [::private_config::password $settings {*}$args]
-    package require tpersist 0.1.5
+    package require tpersist 0.1.7
     set startup {}
     if {[dict exists $settings options]} {set startup [dict get $settings options]}
     dict set settings options "$startup -c statement_timeout=20000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=60000"

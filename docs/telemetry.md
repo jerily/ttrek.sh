@@ -129,7 +129,7 @@ payload. Complete both updates before the next daily run: the old
 `ttrek.telemetry` / `backup-vacuum` event is no longer accepted. The schedule keeps
 its name, 05:00 timezone-aware cadence, IAM role and retry policy.
 
-The invocation uses tpersist 0.1.5 to export a consistent repeatable-read snapshot
+The invocation uses tpersist 0.1.7 to export a consistent repeatable-read snapshot
 of every application table in the PostgreSQL connection's current schema, uploads
 it, then runs `VACUUM (ANALYZE)` outside the snapshot transaction.
 Autovacuum remains enabled throughout the day. The export is compressed JSONL at
@@ -144,7 +144,10 @@ The first JSONL record identifies format `tpersist`, version `1`, export time,
 and a live JSON schema snapshot. Each following record has `table` and `values`.
 Scalar values are strings to preserve large integers and decimal precision;
 SQL NULL stays null and binary columns use base64. A final `complete` record has
-counts for every table, including empty tables. The embedded schemas include
+counts for every table, including empty tables. Each uncompressed JSON record
+can contain up to 1 MiB of UTF-8 data and 32 levels of nesting. This applies
+to the entire schema header and to each row after base64 encoding.
+The embedded schemas include
 columns, defaults, keys, foreign keys, identity columns and indexes, so restore
 does not depend on schema files in a later package release.
 
