@@ -17,9 +17,9 @@ if {![llength $packages]} {
         trequests
     }
     if {$production} {
-        lappend packages tdbc::postgres tsession-postgres
+        lappend packages tpersist-postgresql tsession-postgres
     } else {
-        lappend packages sqlite3 tdbc::sqlite3 tsession-sqlite mock-proxy-app mock-lambda-app mock-s3-app mock-ses-app
+        lappend packages tpersist-sqlite tsession-sqlite mock-proxy-app mock-lambda-app mock-s3-app mock-ses-app
     }
 }
 set failed 0
@@ -33,7 +33,7 @@ foreach name $packages {
             }
             tink {package require tink 20240704.0.3}
             tjson {package require tjson 1.0.30}
-            tpersist {package require tpersist 0.1.7}
+            tpersist {package require tpersist 0.1.8}
             jinja2 {package require jinja2 0.2.0}
             thashlib {package require thashlib 0.1.1}
             topenapi {package require topenapi 0.2.0}

@@ -6,7 +6,7 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 # validate defaults and the exact package/host layout compositions.
 rename package ::original_package
 proc package {command args} {
-    if {$command eq "require" && [lindex $args 0] in {tdbc::sqlite3 sqlite3 tdbc::postgres valkey}} {
+    if {$command eq "require" && [lindex $args 0] in {tpersist-sqlite tpersist-postgresql sqlite3 tdbc::sqlite3 tdbc::postgres valkey}} {
         error "Template validation must not load a database driver or cache"
     }
     ::original_package $command {*}$args
@@ -102,7 +102,7 @@ puts $channel [list namespace eval ::tdevops::runtime [list variable root $stage
 puts $channel {
     rename package real_package
     proc package {command args} {
-        if {[lindex $args 0] eq "tdbc::sqlite3"} {
+        if {[lindex $args 0] eq "tpersist-sqlite"} {
             if {$command eq "require"} {
                 return -code error -errorcode {TCL PACKAGE UNFOUND} "SQLite deliberately unavailable"
             }

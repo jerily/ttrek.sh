@@ -74,6 +74,7 @@ proc ::site_patch::task_initdb_website {context} {
             # An installed but broken provider must fail the task, not be skipped.
             package require $package
             set args [list $::telemetry::connection]
+            if {$package eq "web-user"} {lappend args [dict get [::site::config] account policy]}
             if {$package eq "tsession::sql"} {lappend args $dialect}
             $command {*}$args
             lappend initialized $command
@@ -134,14 +135,16 @@ proc ::site_patch::task_prune_accounts {context} {
 # another registration. Failed messages stay queued until visibility expires.
 proc ::site_patch::task_process_email_queue {context} {
     set settings [::site::config]
-    if {[::app_config::mode] ne "PROD" || ![dict exists $settings account display]} {return {}}
+    if {![dict exists $settings account display]} {return {}}
     set config [dict get $settings account display]
     if {![dict get $config email_enabled] || ![dict get $config email_queue_enabled]} {return {}}
     package require pure-tcl-aws-sqs 1.0.0
     package require pure-tcl-aws-ses 1.0.0
     set deadline [expr {[clock milliseconds] + 240000}]
     if {[dict exists $context lambda-runtime-deadline-ms]} {
-        set deadline [expr {min($deadline, [dict get $context lambda-runtime-deadline-ms] - 30000)}]
+        set runtimeEnd [dict get $context lambda-runtime-deadline-ms]
+        set reserve [expr {min(30000, max(1000, ($runtimeEnd - [clock milliseconds]) / 4))}]
+        set deadline [expr {min($deadline, $runtimeEnd - $reserve)}]
     }
     set sqs [::aws::sqs::create [dict create region [dict get $config email_region]]]
     set ses {}

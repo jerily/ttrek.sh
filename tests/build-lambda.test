@@ -55,13 +55,13 @@ printf 'tcl %s\n' "$1" >> "$TTREK_TEST_LOG"
 build_write [file join $work sqlite-probe.tcl] {
 rename package real_package
 proc package {command args} {
-    if {$command eq "require" && [lindex $args 0] eq "tdbc::sqlite3"} {
+    if {$command eq "require" && [lindex $args 0] eq "tpersist-sqlite"} {
         switch $::env(TTREK_TEST_SQLITE) {
-            present {return 1.1.8}
+            present {return 0.1.8}
             absent {return -code error -errorcode {TCL PACKAGE UNFOUND} {SQLite unavailable}}
             broken {return -code error -errorcode {TCL LOAD_FAILED} {SQLite load failed}}
             incomplete {
-                real_package ifneeded tdbc::sqlite3 1.1.8 {}
+                real_package ifneeded tpersist-sqlite 0.1.8 {}
                 return -code error -errorcode {TCL PACKAGE UNFOUND} {SQLite dependency missing}
             }
         }

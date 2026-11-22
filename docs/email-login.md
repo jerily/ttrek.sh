@@ -7,12 +7,14 @@ a successful code check also verifies their email. New visitors get a verified,
 passwordless account when they confirm the code. Names can be added later through
 Profile. MFA remains required for users who enabled it.
 
-Both configuration templates enable `account.email_login_enabled=true`.
+Both configuration templates enable `account.email_login_enabled` and
+`account.login_after_email_verification`. Confirming the registration code
+signs the user in and resumes their requested page after any required MFA.
 Production queues all account emails, including new-account codes, in the same
 SQS queue. The existing email worker sends them through SES and handles retries
 and expired codes. Delivery requires
-`account.email_enabled=true`. LOCAL displays a development code without sending
-mail. No additional secrets are needed.
+`account.email_enabled=true`. The LOCAL configuration example displays the
+development code and uses mock SQS, Lambda and SES for the same queued delivery path.
 
 Use `web-user 0.7.0`. Upgrading from 0.6.2 needs no schema change. New accounts
 have no profile row until names are saved; the existing `NOT NULL` name columns

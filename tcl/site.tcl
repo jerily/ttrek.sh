@@ -209,7 +209,7 @@ proc ::site::prewarm {} {
     foreach package {web-static-wiki web-static-blog treqmon tratelimit pure-tcl-aws-s3 ttrie ttrigrams topenapi} {package require $package}
     if {[dict exists [config] account]} {
         foreach package {web-user web-forum bcrypt tmfa tqrcodegen tcaptcha pure-tcl-oauth2-client pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda} {package require $package}
-        ::web::user::session_backend
+        ::web::user::session_backend [dict get [config] account policy]
     }
     ::views::prewarm
 }

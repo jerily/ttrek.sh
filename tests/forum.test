@@ -1,3 +1,4 @@
+package require tconfig::decrypt
 package require tcltest
 package require web-user 0.5.0
 package require web-forum 0.3.0
@@ -11,9 +12,11 @@ source [file join $root tcl lambda.tcl]
 set ::env(ENV) LOCAL
 set work [makeDirectory forum-site]
 set db [::tpersist::db_connect -database :memory: -autobegin false]
-foreach package {user forum} {::web::${package}::initdb $db}
+::web::user::initdb $db {db_dialect sqlite}
+::web::forum::initdb $db
 foreach package {wiki blog} {::web::static::${package}::initdb $db}
 set raw {groups {admin mira@example.com} forum {moderation true posting_captcha true page_size 2}}
+dict set raw account [dict get [::tconfig::read_config [file join $root etc config.local.ini.example]] account]
 set settings [dict create rootdir $root content_connection $db content_images {} \
     account [::app_config::account $raw $root $work] forum [::app_config::forum $raw]]
 set separated [::private_config::partition $settings]

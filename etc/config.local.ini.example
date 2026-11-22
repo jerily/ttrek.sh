@@ -32,6 +32,17 @@ url_expiry_seconds=3600
 cloudfront_enabled=false
 
 [account]
+db_dialect=sqlite
+secure_cookies=false
+require_https_origin=false
+allow_oauth_http=true
+allow_loopback_origin=true
+show_verification_codes=true
+require_email_delivery=false
+aws_email_enabled=true
+email_queue_enabled=true
+# LOCAL SQS queue drained by task_process_email_queue.
+email_queue_url=https://sqs.eu-central-1.amazonaws.com/000000000000/user-emails
 password_min_length=6
 tenant=ttrek.sh
 # Public site name for email subjects and authenticator apps.
@@ -50,4 +61,7 @@ email_verification_required=true
 verification_emails_enabled=true
 origin=http://localhost:8080
 email_enabled=true
+email_login_enabled=true
+# Sign in after the registration email code is verified when email login is enabled.
+login_after_email_verification=true
 # Development keys are generated once in the local data directory.

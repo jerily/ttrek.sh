@@ -27,11 +27,11 @@ test private-account-mount {mount owns keys from secret_config and releases them
     package require web-user 0.6.0
     set ::env(ENV) LOCAL
     set db [::tpersist::db_connect -database :memory: -autobegin false]
-    ::web::user::initdb $db
+    ::web::user::initdb $db {db_dialect sqlite}
     set router [::tpathexp::router]
     set private [dict create aead_keyset [::tink::aead::create_keyset AES256_GCM] mac_keyset [::tink::mac::create_keyset HMAC_SHA256] email_hash_salt private-salt]
 } -body {
-    set mount [::web::user::mount $router -connection $db -policy {tenant test bcrypt_cost 4} -config {origin http://localhost:8080} -secret_config $private]
+    set mount [::web::user::mount $router -connection $db -policy {db_dialect sqlite require_https_origin false require_email_delivery false tenant test bcrypt_cost 4} -config {origin http://localhost:8080} -secret_config $private]
     set handles [dict get $mount -owned-keys]
     set response [$router dispatch {method GET path /user/login headers {}} {}]
     set result [list [dict get $response statusCode] [string match *private-salt* [dict get $response body]] [llength $handles]]

@@ -19,7 +19,7 @@ proc worker {{mode lazy} {environment LOCAL}} {
         source [file join $root tcl config.tcl]
         source [file join $root tcl lambda.tcl]
         set settings [dict create rootdir $root loading $loading content_database {dialect postgresql} \
-            account {display {prefix /user origin https://ttrek.sh google_enabled true email_login_enabled true} policy {collect_names true}}]
+            account {display {prefix /user origin https://ttrek.sh google_enabled true email_login_enabled true} policy {db_dialect sqlite collect_names true}}]
         set ::site_lambda::router [::site::prepare_worker $settings -secret_config {postgres {password private-value}}]
         proc loaded {packages} {
             set result {}
@@ -190,7 +190,7 @@ test worker-mode-parity {both modes retain identical route matching, rendered re
     lsort -unique $checks
 } -cleanup {interp delete $lazy; interp delete $eager} -result 1
 
-testConstraint sqlite [expr {![catch {package require tdbc::sqlite3}]}]
+testConstraint sqlite [expr {![catch {package require tpersist-sqlite}]}]
 test worker-first-docs {a real docs request initializes only wiki and caches its templates and SQL connection} -constraints sqlite -setup {
     package require web-static-wiki
     set fixture [makeDirectory lazy-docs]

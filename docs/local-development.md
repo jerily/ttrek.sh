@@ -93,7 +93,7 @@ Run `sync-local` to clone and publish the latest public registry from GitHub.
 Repackage and restart before syncing changes to local Markdown.
 
 Start your local Valkey service and configure its connection in the required
-`[redis]` section of your local INI, then run the website through all four mocks
+`[redis]` section of your local INI, then run the website through the local mocks
 without AWS:
 
 ```sh
@@ -134,11 +134,12 @@ Open `http://127.0.0.1:8080/` or `http://127.0.0.1:8080/docs`. The supervisor st
 | --- | --- | --- |
 | mock-proxy-app | 8080 | Routes HTTP requests to the `prod-Api-TtrekWebsite-Function` Lambda function |
 | mock-lambda-app | 3001 | Runs the packaged custom runtime and HTTP event adapter |
+| mock-sqs-app | 3017 | Stores account mail until the patch worker sends it or its code expires |
 | mock-ses-app | 3016 | Opens each plain-text account email in a Tk window |
 | mock-s3-app | 3015 | Serves public assets and the locally built release executable |
 
 For account previews, set `email_enabled=true` under `[account]` in your local INI.
-Register a local account to see its verification email. The local SES mock needs a
+Registration queues the verification email and wakes `task_process_email_queue` through mock Lambda. Run `ttrek run -script patch-local -- task_process_email_queue` to retry queued mail after a service failure. The local SES mock needs a
 graphical display when it receives mail. To preview a message directly, run:
 
 ```sh
@@ -185,7 +186,7 @@ The stopped stack removes its disposable database.
 All services bind to loopback. Custom ports and paths can be passed together:
 
 ```sh
-ttrek run -script start-local -- --port 8081 --lambda-port 3002 --s3-port 3015 --ses-port 3017 \
+ttrek run -script start-local -- --port 8081 --lambda-port 3002 --s3-port 3015 --ses-port 3016 --sqs-port 3017 \
     --zip /path/to/ttrek-sh.zip --s3-dir /path/to/s3 --state-dir /tmp/ttrek-local
 ```
 
