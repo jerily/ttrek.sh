@@ -273,7 +273,7 @@ test templates-2 {Index layout and literal clipboard command} -setup {
 } -body {
     set html [body [get_index_page_handler {} {}]]
     list [contains $html {<h1 class="splash-head">Your Tcl project starts here.</h1>}] \
-        [contains $html {data-clipboard-text="curl --proto &#39;=https&#39; --tlsv1.2 -sSf https://ttrek.sh/init | sh"}] \
+        [contains $html {data-clipboard-text="curl -fsS https://ttrek.sh/init | sh"}] \
         [contains $html {<title>ttrek.sh - Package Manager for Tcl</title>}]
 } -cleanup {
     array set ::env $saved_env
