@@ -12,7 +12,8 @@
     routes etc/routes.json
     content-collections {docs blog}
     prepare devops/prepare-lambda.tcl
-    services {ses s3 lambda proxy}
+    services {sqs ses s3 lambda proxy}
+    sqs-queues {user-emails}
     required-files {sql/telemetry.json sql/search-snapshot.json tcl/lambda.tcl content/docs/getting-started.md etc/releases.json etc/homepage.json etc/ratelimits.json}
     environment {TTREK_SITE_ZIP --zip TTREK_SITE_PORT --port
         TTREK_LAMBDA_PORT --lambda-port TTREK_LOCAL_DIR --state-dir}
@@ -40,7 +41,6 @@ proc ::project_devops::local {options work} {
     if {[file isfile $configPath]} {set ::env(TTREK_LOCAL_CONFIG) $configPath}
     set ::env(TTREK_LOCAL_RUNTIME_DATA) [file join $work data]
     set ::env(TTREK_LOCAL_S3_ENDPOINT) http://127.0.0.1:[dict get $options --s3-port]
-    set ::env(TTREK_LOCAL_SES_PORT) [dict get $options --ses-port]
     set ::env(ENV) LOCAL
     if {![info exists ::env(SSL_CERT_FILE)]} {
         foreach bundle {/etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt} {

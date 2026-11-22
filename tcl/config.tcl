@@ -406,13 +406,10 @@ proc ::app_config::account {config root {localDirectory {}}} {
     set policy [dict create tenant ttrek.sh collect_names true password_min_length 6 registration_captcha true \
         email_verification_required true verification_emails_enabled true captcha_length 6 \
         captcha_letters true login_captcha_after 3 login_captcha_window 900 cleanup_grace_period 3600]
-    set display [dict create prefix /user title {Your account} issuer ttrek.sh origin https://ttrek.sh \
-        email_enabled true email_login_enabled true email_from noreply@ttrek.sh email_region eu-central-1 \
+    set display [dict create prefix /user title {Your account} issuer ttrek.sh origin {} \
+        email_enabled true email_login_enabled true login_after_email_verification true email_from noreply@ttrek.sh email_region eu-central-1 \
         email_queue_enabled false email_queue_url {} google_enabled false google_client_id {} google_redirect_uri {}]
-    if {[mode] eq "LOCAL"} {
-        dict set display origin http://localhost:8080
-    }
-    set policyKeys {tenant collect_names collect_display_name collect_username registration_captcha captcha_length captcha_letters captcha_ttl \
+    set policyKeys {db_dialect secure_cookies require_https_origin allow_oauth_http allow_loopback_origin show_verification_codes require_email_delivery aws_email_enabled tenant collect_names collect_display_name collect_username registration_captcha captcha_length captcha_letters captcha_ttl \
         email_verification_required verification_emails_enabled login_captcha_after login_captcha_window \
         bcrypt_cost password_min_length session_ttl persistent_session_ttl code_ttl challenge_ttl cleanup_grace_period throttle_window \
         browse_limit post_limit account_limit challenge_limit resend_cooldown totp_digits totp_period totp_algorithm totp_window form_max_bytes}
@@ -430,7 +427,6 @@ proc ::app_config::account {config root {localDirectory {}}} {
         } else {error "Unknown account setting: $name"}
     }
     if {[mode] eq "LOCAL"} {
-        dict set display deliver ::accounts::send_local_email
         if {$localDirectory eq {}} {set localDirectory [file join $root data]}
         set keys [dict merge [::accounts::local_keys $localDirectory] $keys]
     }

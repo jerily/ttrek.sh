@@ -25,6 +25,7 @@
         "bootstrap-local"
       ]
     },
+    "patch-local": {"file": "bin/invoke-patch-local.sh"},
     "initdb-local": {
       "file": "bin/invoke-patch-local.sh",
       "args": [
@@ -92,10 +93,6 @@
     }
   },
   "dependencies": {
-    "libpq": {
-      "version": "^16.15.0",
-      "if": "-local"
-    },
     "tcl": "^9.1.0",
     "tgit2": "^0.1.0",
     "jinja2-tcl": "^0.2.0",
@@ -106,10 +103,6 @@
     "ttrie": "=0.2.0",
     "ttrigrams": "=0.2.0",
     "valkey-tcl": "^1.0.3",
-    "tdbcpostgres": {
-      "version": ">=1.1.8",
-      "if": "-local"
-    },
     "web-static-blog": "^0.1.12",
     "web-static-wiki": "^0.1.13",
     "tratelimit": "^1.1.1",
@@ -118,20 +111,24 @@
     "pure-tcl-aws-sqs": "^1.0.0",
     "pure-tcl-aws-ses": "^1.0.0",
     "pure-tcl-aws-lambda": "^1.0.0",
-    "tpersist": "^0.1.7",
-    "tconfig": "^1.0.2",
-    "web-user": "=0.7.3",
-    "tcaptcha": "^1.0.0",
-    "web-forum": "=0.3.4",
-    "tdbcsqlite3": {
-      "version": ">=1.1.8",
+    "tpersist": "^0.1.8",
+    "tpersist-sqlite": {
+      "version": "^0.1.8",
       "if": "+local"
     },
+    "tpersist-postgresql": {
+      "version": "^0.1.8",
+      "if": "-local"
+    },
+    "tconfig": "^1.0.2",
+    "web-user": "=0.7.4",
+    "tcaptcha": "^1.0.0",
+    "web-forum": "=0.3.4",
     "pure-tcl-oauth2-client": "^0.1.0"
   },
   "devDependencies": {
     "trequests": "^1.3.0",
     "twebserver": "^1.47.58",
-    "tdevops": "^0.2.4"
+    "tdevops": "^0.2.5"
   }
 }

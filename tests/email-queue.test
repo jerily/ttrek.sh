@@ -138,12 +138,9 @@ test email-queue-malformed {malformed messages are retained and never evaluated 
 } -cleanup {::queuetest::cleanup} \
     -result {1 {Queued email delivery failed for 1 message(s)} {{sqs create} {sqs receive_messages} {sqs receive_messages} {sqs destroy}}}
 
-test email-queue-disabled {LOCAL and either disabled flag avoid all AWS clients} -setup {
+test email-queue-disabled {either disabled flag avoids all AWS clients} -setup {
     ::queuetest::setup
 } -body {
-    set ::env(ENV) LOCAL
-    ::site_patch::task_process_email_queue {}
-    set ::env(ENV) PROD
     foreach key {email_enabled email_queue_enabled} {
         dict set ::queuetest::settings account display $key false
         ::site_patch::task_process_email_queue {}
@@ -188,8 +185,8 @@ test email-queue-http {HTTP envelopes cannot invoke the queue processor} -setup 
 test email-queue-end-to-end {all account emails use the same queue and worker without inline SES or changed contents} -setup {
     ::queuetest::setup
 } -body {
-    set config [dict create -prefix /user -deliver {} \
-        -store {-env PROD -config {verification_emails_enabled true code_ttl 900}} \
+    set config [dict create -prefix /user \
+        -store {-config {aws_email_enabled true verification_emails_enabled true code_ttl 900}} \
         -config [dict merge [dict get $::queuetest::settings account display] \
             {email_from sender@example.com title Garden origin https://garden.test email_queue_callback ::accounts::email_queued}]]
     set results {}

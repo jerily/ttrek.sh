@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT.
 #
 
-# Exercise the packaged site through all four installed mock applications.
+# Exercise the packaged site through the installed local mocks.
 set root [file dirname [file dirname [file normalize [info script]]]]
 source [file join $root tests support.tcl]
 interp alias {} assert {} ::test_support::assert
@@ -12,7 +12,7 @@ interp alias {} read_file {} ::test_support::read_file
 interp alias {} write_file {} ::test_support::write_file
 interp alias {} sha256 {} ::test_support::sha256
 interp alias {} json {} ::test_support::json
-lassign [::test_support::ports 5] port lambdaPort s3Port cachePort sesPort
+lassign [::test_support::ports 6] port lambdaPort s3Port cachePort sesPort sqsPort
 set base http://127.0.0.1:$port
 set s3 http://127.0.0.1:$s3Port
 # Provide the request test fixture.
@@ -52,7 +52,7 @@ try {
     }
     write_file $manifest [::tjson::typed_to_json [list M $data]]
     set config [file join $temporary config.ini]
-    write_file $config "\[releases\]\nversion=1.9.0\nchecksums_file=$manifest\n\n\[redis\]\nport=$cachePort\nssl=false\n"
+    write_file $config "\[releases\]\nversion=1.9.0\nchecksums_file=$manifest\n\n\[account\]\ndb_dialect=sqlite\norigin=http://localhost:$port\nrequire_https_origin=false\nrequire_email_delivery=false\n\n\[redis\]\nport=$cachePort\nssl=false\n"
     # The test owns the cache; application launchers only use its explicit INI settings.
     set server [expr {[info exists ::env(VALKEY_SERVER)] ? $::env(VALKEY_SERVER) : "valkey-server"}]
     set cacheProcess [::test_support::start [list $server --bind 127.0.0.1 --port $cachePort \
@@ -60,8 +60,9 @@ try {
     ::test_support::wait_port $cachePort $cacheProcess
     set log [file join $temporary services.log]
     set process [::test_support::start [list [file join $root bin start-local.sh] --zip $archive \
-        --port $port --lambda-port $lambdaPort --s3-port $s3Port --ses-port $sesPort --state-dir $state \
+        --port $port --lambda-port $lambdaPort --s3-port $s3Port --ses-port $sesPort --sqs-port $sqsPort --state-dir $state \
         --s3-dir $seed --lambda-workers 2] $log [dict create TTREK_LOCAL_CONFIG $config] $root]
+    ::test_support::wait_port $sqsPort $process
     ::test_support::wait_port $sesPort $process
     set deadline [expr {[clock milliseconds] + 180000}]
     while {1} {
@@ -207,7 +208,7 @@ try {
     ::test_support::stop $process
     assert {![llength [glob -nocomplain -directory $state *]]} {temporary service directories were not cleaned}
     assert {[sha256 [read_file $archive]] eq $before} {archive changed during the test}
-    foreach selected [list $port $lambdaPort $s3Port $sesPort] {assert {![::test_support::port_open $selected]} {service left running}}
+    foreach selected [list $port $lambdaPort $s3Port $sesPort $sqsPort] {assert {![::test_support::port_open $selected]} {service left running}}
     assert {[::test_support::running $cacheProcess] && [::test_support::port_open $cachePort]} \
         {the launcher must leave the configured Valkey service running}
     puts {PASS clean shutdown and unchanged archive}

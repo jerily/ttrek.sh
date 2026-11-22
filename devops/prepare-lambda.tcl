@@ -14,7 +14,7 @@ foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js 
 }
 package require http
 package require tgit2 0.1.0
-package require web-user 0.7.2
+package require web-user 0.7.4
 package require web-forum 0.3.4
 package require pure-tcl-aws-ses 1.0.0
 package require pure-tcl-aws-sqs 1.0.0
@@ -25,6 +25,7 @@ set releases [::app_config::releases {}]
 set monitor [::app_config::request_monitor {}]
 set production [expr {[info exists ::env(TTREK_PRODUCTION_CONFIG)] && $::env(TTREK_PRODUCTION_CONFIG) ne {}}]
 if {$production} {
+    package require tpersist-postgresql 0.1.8
     ::app_config::validate_lambda_config $::env(TTREK_PRODUCTION_CONFIG)
     file copy -force $::env(TTREK_PRODUCTION_CONFIG) [file join $siteRoot etc config.ini]
     # Validate the staged public settings without decrypting secrets or calling AWS.
@@ -42,12 +43,12 @@ file mkdir [file join $siteRoot data]
 # This is independent of database fixtures and must run in PostgreSQL-only builds.
 ::views::validate_all [dict get $monitor master_template]
 # Production installations omit SQLite; use only dependencies already present.
-if {[catch {package require tdbc::sqlite3} message options]} {
+if {[catch {package require tpersist-sqlite} message options]} {
     if {[dict get $options -errorcode] ne {TCL PACKAGE UNFOUND} ||
-            [llength [package versions tdbc::sqlite3]]} {
+            [llength [package versions tpersist-sqlite]]} {
         return -options $options $message
     }
-    puts "Skipping SQLite-backed packaging smoke checks: tdbc::sqlite3 is not installed."
+    puts "Skipping SQLite-backed packaging smoke checks: tpersist-sqlite is not installed."
     if {$production} {file delete -force [file join $siteRoot content]}
     return
 }
@@ -72,9 +73,9 @@ try {
         set store [dict get [::content_images::database_stores $::telemetry::connection {}] $kind]
         ::web::static::${kind}::sync $store [file join $siteRoot content $directory]
     }
-    ::web::user::initdb $::telemetry::connection
+    ::web::user::initdb $::telemetry::connection {db_dialect sqlite}
     ::web::forum::initdb $::telemetry::connection
-    dict set ::site::settings account [::app_config::account {} $siteRoot $accountProbeDirectory]
+    dict set ::site::settings account [::app_config::account {account {db_dialect sqlite origin http://localhost:8080 require_https_origin false require_email_delivery false}} $siteRoot $accountProbeDirectory]
     set separated [::private_config::partition $::site::settings]
     set ::site::settings [dict get $separated config]
     ::site::mount $router -secret_config [dict get $separated secret_config]

@@ -55,9 +55,9 @@ python3 -m unittest discover -s tests -p 'test_finalize_lambda.py'
 # Run SQLite-backed tests only when the existing installation provides SQLite.
 # A broken installed driver must still fail the build.
 HAS_SQLITE=$("$TCLSH" <<'TCL'
-if {[catch {package require tdbc::sqlite3} message options]} {
+if {[catch {package require tpersist-sqlite} message options]} {
     if {[dict get $options -errorcode] ne {TCL PACKAGE UNFOUND} ||
-            [llength [package versions tdbc::sqlite3]]} {
+            [llength [package versions tpersist-sqlite]]} {
         puts stderr $message
         exit 1
     }
@@ -81,7 +81,7 @@ if [[ "$HAS_SQLITE" == 1 ]]; then
   "$TCLSH" tests/package-tracker.test
   "$TCLSH" tests/search-store.test
 else
-  echo "Skipping SQLite-backed tests: tdbc::sqlite3 is not installed."
+  echo "Skipping SQLite-backed tests: tpersist-sqlite is not installed."
 fi
 "$TCLSH" tests/content-images.test
 "$TCLSH" tests/browser-assets.test

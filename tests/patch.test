@@ -37,7 +37,7 @@ namespace eval ::accounts {}
 proc ::accounts::ensure {} {}
 # Provide the config test fixture.
 proc ::site::config {} {
-    dict create rootdir $::patchRoot content_images {}
+    dict create rootdir $::patchRoot content_images {} account [dict create policy [dict create db_dialect [expr {$::schema eq "" ? "sqlite" : "postgres"}]]]
 }
 set schema {}
 if {[info exists ::env(TTREK_TEST_POSTGRES)]} {

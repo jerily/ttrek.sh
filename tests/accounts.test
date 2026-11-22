@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: MIT.
 # 
 
+package require tconfig::decrypt
 package require tcltest
 package require web-user
 namespace import ::tcltest::*
@@ -16,7 +17,7 @@ source [file join $root tcl lambda.tcl]
 set ::env(ENV) LOCAL
 set work [makeDirectory account-site]
 set db [::tpersist::db_connect -database :memory: -autobegin false]
-::web::user::initdb $db
+::web::user::initdb $db {db_dialect sqlite}
 package require web-forum
 ::web::forum::initdb $db
 ::web::static::wiki::initdb $db
@@ -24,9 +25,9 @@ package require web-forum
 foreach kind {wiki blog} directory {docs blog} {
     ::web::static::${kind}::sync [dict get [::content_images::database_stores $db {}] $kind] [file join $root content $directory]
 }
-set account [::app_config::account {} $root $work]
+set account [::app_config::account [::tconfig::read_config [file join $root etc config.local.ini.example]] $root $work]
 # The registration tests use the LOCAL verification code in the response.
-# Exercise the actual delivery callback separately with a captured SES client.
+# Exercise the queue transport separately with a captured SQS client.
 dict set account display email_enabled false
 dict set account policy bcrypt_cost 4
 namespace eval ::treqmon::middleware::accountsteststore {
@@ -153,7 +154,7 @@ test accounts-anonymous-query-count {fresh email login creates both throttle buc
 } -cleanup {set ::accountstest::cookie {}; set ::accountstest::csrf {}} -result {200 4}
 
 test accounts-config {site defaults enable CAPTCHA, six-character password minimum, and persistent development keys} -body {
-    set again [::app_config::account {} $root $work]
+    set again [::app_config::account [::tconfig::read_config [file join $root etc config.local.ini.example]] $root $work]
     list [dict get $account policy registration_captcha] [dict get $account policy password_min_length] \
         [expr {[dict get $account secret_config] eq [dict get $again secret_config]}]
 } -result {true 6 1}
@@ -211,7 +212,7 @@ test accounts-local-origins {Browser registration accepts localhost and loopback
     set ::accountstest::csrf {}
 } -result {200 1 200 1 200 1 200 1}
 
-test accounts-lambda-registration {Lambda payloads preserve cookies through registration, verification and login} -body {
+test accounts-lambda-registration {Lambda verification signs in and redirects to the registration destination} -body {
     set result {}
     set number 0
     foreach {version extras} {2.0 {} 2.0 {theme=dark} 1.0 {theme=dark}} {
@@ -229,7 +230,6 @@ test accounts-lambda-registration {Lambda payloads preserve cookies through regi
             captcha_id $id captcha_answer $::accountstest::answer]]
         regexp {id="local-code">([0-9]+)</code>} [dict get $::accountstest::last body] -> code
         lappend result [::accountstest::request POST /user/verify$suffix [dict create code $code]] \
-            [::accountstest::request POST /user/login$suffix [dict create email $email password abcdef]] \
             [dict get $::accountstest::last headers Location]
         lappend result [::accountstest::request GET /user] \
             [string match {*class="pure-menu-link">Account</a>*} [dict get $::accountstest::last body]]
@@ -241,7 +241,7 @@ test accounts-lambda-registration {Lambda payloads preserve cookies through regi
     set ::accountstest::origin http://localhost:8080
     set ::accountstest::cookie {}
     set ::accountstest::csrf {}
-} -result {200 200 302 /docs 200 1 200 200 302 /docs 200 1 200 200 302 /docs 200 1}
+} -result {200 302 /docs 200 1 200 302 /docs 200 1 200 302 /docs 200 1}
 
 test accounts-submit-script {login and registration load the fingerprinted script with CDN permission} -setup {
     set savedCdn $::assets::cdn_origin
@@ -599,26 +599,22 @@ test accounts-close-account {direct and Lambda account closure confirms the pass
     set ::accountstest::csrf {}
 } -result {200 1 200 1 1 1 401 1 200 1 1 1 1 302 200 1 200 1 1 1 401 1 200 1 1 1 1 302 200 1 200 1 1 1 401 1 200 1 1 1 1 302}
 
-test accounts-local-ses {local verification uses the configured loopback service and formatted account email} -setup {
-    package require pure-tcl-aws-ses
-    set localDisplay [dict get [::app_config::account {} $root $work] display]
-    set localMail [dict replace $::accounts::mount -config $localDisplay -deliver [dict get $localDisplay deliver]]
-    set savedPort [array get ::env TTREK_LOCAL_SES_PORT]
-    set ::env(TTREK_LOCAL_SES_PORT) 42345
-    rename ::aws::ses::create ::accountstest::real_ses_create
-    proc ::aws::ses::create {options} {set ::sesOptions $options; return ::accountstest::capture_mail}
-    proc ::accountstest::capture_mail {method args} {if {$method eq "send_email"} {set ::sesMessage [lindex $args 0]}}
+test accounts-local-queue {local mail passes its configured queue URL and region to the SDK} -setup {
+    package require pure-tcl-aws-sqs
+    set localDisplay [dict get [::app_config::account [::tconfig::read_config [file join $root etc config.local.ini.example]] $root $work] display]
+    set localMail [dict replace $::accounts::mount -config $localDisplay]
+    rename ::aws::sqs::create ::accountstest::real_sqs_create
+    proc ::aws::sqs::create {options} {set ::sqsOptions $options; return ::accountstest::capture_queue}
+    proc ::accountstest::capture_queue {method args} {if {$method eq "send_message"} {lassign $args ::queueUrl body; set ::mailBody [::tjson::json_to_simple $body]}}
 } -body {
     ::web::user::deliver $localMail verify member@example.com 012345
-    list [dict get $::sesOptions endpoint] [dict get $::sesOptions aws_access_key_id] \
-        [dict get $::sesMessage to] [string match {*012345*} [dict get $::sesMessage text]]
+    list $::sqsOptions $::queueUrl \
+        [dict get $::mailBody message to] [string match {*012345*} [dict get $::mailBody message text]]
 } -cleanup {
-    rename ::aws::ses::create {}
-    rename ::accountstest::real_ses_create ::aws::ses::create
-    rename ::accountstest::capture_mail {}
-    unset ::env(TTREK_LOCAL_SES_PORT)
-    array set ::env $savedPort
-} -result {http://127.0.0.1:42345 local member@example.com 1}
+    rename ::aws::sqs::create {}
+    rename ::accountstest::real_sqs_create ::aws::sqs::create
+    rename ::accountstest::capture_queue {}
+} -result {{region eu-central-1} https://sqs.eu-central-1.amazonaws.com/000000000000/user-emails member@example.com 1}
 
 test accounts-ses {production configuration sends verification and recovery through the configured SES sender} -setup {
     package require tconfig::decrypt
@@ -641,8 +637,8 @@ test accounts-ses {production configuration sends verification and recovery thro
     dict set input account email_queue_enabled false
     dict for {key value} [dict get $account secret_config] {dict set input account $key $value}
     set production [::app_config::account $input $root]
-    set mail [dict create -store [dict replace $::accounts::store -env PROD] \
-        -config [dict get $production display] -prefix [dict get $production display prefix] -deliver {}]
+    set mail [dict create -store [dict replace $::accounts::store -config [dict merge [dict get $::accounts::store -config] [dict get $production policy]]] \
+        -config [dict get $production display] -prefix [dict get $production display prefix]]
     ::web::user::validate_email_config $mail
     set result [list [dict get $production policy email_verification_required] \
         [dict get $production policy verification_emails_enabled] [dict get $production display email_enabled]]
@@ -699,7 +695,7 @@ test accounts-email-queue-config {SSM String and SecureString queue URLs reach m
         set display [dict get $production display]
         dict set display prefix /queue-$type
         dict set display google_enabled false
-        set mail [::web::user::mount $queueRouter -store [dict replace $::accounts::store -env PROD] -config $display]
+        set mail [::web::user::mount $queueRouter -store [dict replace $::accounts::store -config [dict merge [dict get $::accounts::store -config] [dict get $production policy]]] -config $display]
         ::web::user::deliver $mail verify member@example.com 012345
         lappend result $::accountstest::sqs_region $::accountstest::sqs_url
     }
