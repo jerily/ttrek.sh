@@ -63,8 +63,7 @@ test patch-initdb {direct invocation initializes all installed website schema pr
     set required {::telemetry::initdb ::web::static::wiki::initdb ::web::static::blog::initdb}
     set initialized [dict get $first completed]
     foreach command $required {if {$command ni $initialized} {error "Missing initializer: $command"}}
-    if {[llength [package versions tsession::sql]] &&
-        ("::tsession::sql::initdb" ni $initialized || "tsession_sessions" ni $tables)} {
+    if {"::web::user::initdb" ni $initialized || "tsession_sessions" ni $tables} {
         error "Installed SQL session schema was not initialized"
     }
     list [expr {$first eq $second}] \

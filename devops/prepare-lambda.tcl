@@ -73,6 +73,7 @@ try {
         set store [dict get [::content_images::database_stores $::telemetry::connection {}] $kind]
         ::web::static::${kind}::sync $store [file join $siteRoot content $directory]
     }
+    package require tsession-sqlite 1.0.2
     ::web::user::initdb $::telemetry::connection {db_dialect sqlite}
     ::web::forum::initdb $::telemetry::connection
     dict set ::site::settings account [::app_config::account {account {db_dialect sqlite origin http://localhost:8080 require_https_origin false require_email_delivery false}} $siteRoot $accountProbeDirectory]

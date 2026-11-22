@@ -49,6 +49,7 @@ proc ::accounts::mount {router settings templates args} {
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]
+    ::app_config::load_session_backend [dict get $config policy]
     set display [dict merge [dict get $config display] [dict create \
         validate_templates [::site::validate_templates] \
         master_template [dict get $templates account-master.html.jinja] \
@@ -70,6 +71,7 @@ proc ::accounts::prepare {settings args} {
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]
+    ::app_config::load_session_backend [dict get $config policy]
     set display [dict merge [dict get $config display] [::views::mount_settings account]]
     dict set display assets_url [::assets::base_url /user/_assets]
     dict set display email_queue_callback ::accounts::email_queued
