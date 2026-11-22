@@ -112,6 +112,14 @@
     "pure-tcl-aws-ses": "^1.0.0",
     "pure-tcl-aws-lambda": "^1.0.0",
     "tpersist": "^0.1.8",
+    "tsession-sqlite": {
+      "version": "^1.0.2",
+      "if": "+local"
+    },
+    "tsession-postgres": {
+      "version": "^1.0.2",
+      "if": "-local"
+    },
     "tpersist-sqlite": {
       "version": "^0.1.8",
       "if": "+local"

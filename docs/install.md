@@ -106,10 +106,10 @@ tjson's private cJSON implementation is not used by jinja2-tcl. The interpreter
 is `build/install/bin/tclsh9.1`; no sibling repository is needed. The bootstrap
 uses the tjson 1.0.30, tpersist 0.1.7, and twebserver 1.47.54 release tags.
 
-`web-user` selects `tsession-sqlite` for local development and `tsession-postgres`
+The site selects `tsession-sqlite` for local development and `tsession-postgres`
 for production. The AWS clients use `pure-tcl-aws-*` 1.0.0 with `trequests` 1.3.0, `thashlib` 0.1.0
 and tDOM; the AWS C++ SDK is no longer built. Other native libraries remain
-transitive registry dependencies. Tcl's bundled SQLite package comes with the Tcl runtime.
+transitive registry dependencies.
 
 `build.sh` installs public runtime dependencies, including TLS-enabled Valkey and
 `tink-tcl` 20240704.0.1 with Tcl stubs. Tink and RapidJSON patches live in

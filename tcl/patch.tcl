@@ -55,27 +55,26 @@ proc ::site_patch::task_initdb_website {context} {
         package require web-static-blog 0.1.6
         ::telemetry::initdb
         lappend initialized ::telemetry::initdb
-        set dialect [::tpersist::db_dialect $::telemetry::connection]
         # Requiring tpersist during connection setup indexes the runtime's
         # installed Tcl packages. Explicit providers avoid invoking unrelated
         # development tools with separate databases.
-        foreach {package command backend} {
-            web-static-wiki    ::web::static::wiki::initdb    any
-            web-static-blog    ::web::static::blog::initdb    any
-            tsession::sql      ::tsession::sql::initdb      any
-            tsession-sqlite    ::tsession::sqlite::initdb   sqlite
-            tsession-postgres  ::tsession::postgres::initdb postgresql
-            web-user           ::web::user::initdb           any
-            web-forum          ::web::forum::initdb          any
-            web-wiki           ::web::wiki::initdb           any
-            web-blog           ::web::blog::initdb           any
+        foreach {package command} {
+            web-static-wiki ::web::static::wiki::initdb
+            web-static-blog ::web::static::blog::initdb
+            web-user        ::web::user::initdb
+            web-forum       ::web::forum::initdb
+            web-wiki        ::web::wiki::initdb
+            web-blog        ::web::blog::initdb
         } {
-            if {![llength [package versions $package]] || $backend ni [list any $dialect]} continue
+            if {![llength [package versions $package]]} continue
             # An installed but broken provider must fail the task, not be skipped.
             package require $package
             set args [list $::telemetry::connection]
-            if {$package eq "web-user"} {lappend args [dict get [::site::config] account policy]}
-            if {$package eq "tsession::sql"} {lappend args $dialect}
+            if {$package eq "web-user"} {
+                set policy [dict get [::site::config] account policy]
+                ::app_config::load_session_backend $policy
+                lappend args $policy
+            }
             $command {*}$args
             lappend initialized $command
         }

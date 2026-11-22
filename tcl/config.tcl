@@ -397,6 +397,14 @@ proc ::app_config::content_images {config root} {
     return $settings
 }
 
+proc ::app_config::load_session_backend {policy} {
+    switch -- [dict get $policy db_dialect] {
+        sqlite {package require tsession-sqlite 1.0.2}
+        postgres - postgresql {package require tsession-postgres 1.0.2}
+        default {error "Unsupported account database dialect: [dict get $policy db_dialect]"}
+    }
+}
+
 # Separate account policy, delivery and persistent worker keys from site settings.
 proc ::app_config::account {config root {localDirectory {}}} {
     package require web-user::config 1.0
