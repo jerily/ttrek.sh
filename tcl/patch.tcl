@@ -51,8 +51,8 @@ proc ::site_patch::log {event task {status {}} {elapsed 0}} {
 proc ::site_patch::task_initdb_website {context} {
     set initialized {}
     ::tpersist::db_transaction $::telemetry::connection {
-        package require web-static-wiki 0.1.7
-        package require web-static-blog 0.1.6
+        package require web-static-wiki 1.0.0
+        package require web-static-blog 1.0.0
         ::telemetry::initdb
         lappend initialized ::telemetry::initdb
         # Requiring tpersist during connection setup indexes the runtime's

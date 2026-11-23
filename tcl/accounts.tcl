@@ -45,7 +45,7 @@ proc ::accounts::mount {router settings templates args} {
     set secret [::private_config::option {*}$args]
     variable store
     variable mount
-    package require web-user 0.7.4
+    package require web-user 1.0.0
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]
@@ -62,12 +62,11 @@ proc ::accounts::mount {router settings templates args} {
     return $mount
 }
 
-# Prepare account resources for a route that needs them; route registration has
-# already happened using web-user::routes.
+# Prepare account resources when a registered route or hook needs them.
 proc ::accounts::prepare {settings args} {
     variable store
     variable mount
-    package require web-user 0.7.4
+    package require web-user 1.0.0
     if {$mount ne {}} {::web::user::release $mount}
     set mount {}; set store {}
     set config [dict get $settings account]

@@ -24,7 +24,7 @@ test private-backend {only private credentials reach backend connection options}
         [dict get [::private_config::password {host db} -secret_config {password db-password}] password]
 } -result {0 private-password db-password}
 test private-account-mount {mount owns keys from secret_config and releases them} -setup {
-    package require web-user 0.6.0
+    package require web-user 1.0.0
     set ::env(ENV) LOCAL
     set db [::tpersist::db_connect -database :memory: -autobegin false]
     ::web::user::initdb $db {db_dialect sqlite}

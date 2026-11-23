@@ -102,7 +102,7 @@ try {
         /docs/getting-started {ttrek init -y} /docs/registries private-ttrek-registry
         /docs/_assets/style.css .cards /packages {<article class="package-card">} /search?q=web twebserver
         /registry/autocomplete?q=web twebserver /package/tcl 9.1.0
-        /package/web-static-blog 0.1.0 /registry/web-static-wiki 0.1.0
+        /package/web-static-blog 1.0.0 /registry/web-static-wiki 1.0.0
         /package/treqmon 2.2.0 /registry/treqmon 2.2.0
         /registry/tcl 9.1.0 /registry/search?q=web twebserver
         /init TTREK_UPDATE_ROOT

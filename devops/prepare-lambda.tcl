@@ -14,8 +14,8 @@ foreach asset {public/asset-manifest.json public/css/site.css public/js/site.js 
 }
 package require http
 package require tgit2 0.1.0
-package require web-user 0.7.4
-package require web-forum 0.3.4
+package require web-user 1.0.0
+package require web-forum 1.0.0
 package require pure-tcl-aws-ses 1.0.0
 package require pure-tcl-aws-sqs 1.0.0
 package require pure-tcl-aws-lambda 1.0.0

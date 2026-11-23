@@ -12,7 +12,7 @@ if {![llength $packages]} {
     set packages {
         twebserver topenapi jinja2 tjson ttrie ttrigrams valkey tink
         thashlib pure-tcl-oauth2-core pure-tcl-oauth2-client pure-tcl-aws-s3 pure-tcl-aws-kms pure-tcl-aws-ssm tconfig::decrypt tconfig::encrypt
-        tratelimit treqmon web-user web-forum tcaptcha tclgd pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda
+        tratelimit treqmon web-core web-user web-forum tcaptcha tclgd pure-tcl-aws-ses pure-tcl-aws-sqs pure-tcl-aws-lambda
         web-static-wiki web-static-blog tgit2 tpersist tpathexp cmark_gfm
         trequests
     }
@@ -46,10 +46,11 @@ foreach name $packages {
             tpathexp {package require tpathexp 1.2.0}
             pure-tcl-aws-s3 {package require pure-tcl-aws-s3 1.0.0}
             pure-tcl-aws-kms - pure-tcl-aws-ssm - pure-tcl-aws-ses - pure-tcl-aws-sqs - pure-tcl-aws-lambda {package require $name 1.0.0}
-            web-static-wiki {package require $name 0.1.12}
-            web-static-blog {package require $name 0.1.11}
-            web-user {package require $name 0.7.2}
-            web-forum {package require $name 0.3.4}
+            web-static-wiki {package require $name 1.0.0}
+            web-static-blog {package require $name 1.0.0}
+            web-core {package require $name 0.1.0}
+            web-user {package require $name 1.0.0}
+            web-forum {package require $name 1.0.0}
             tcaptcha {package require $name 1.0.0}
             tconfig::decrypt - tconfig::encrypt {package require $name 1.0.2}
             default {package require $name}

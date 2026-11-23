@@ -12,8 +12,8 @@ namespace eval ::assets {
 
 # Package browser files keep their existing paths under the configured CDN prefix.
 proc ::assets::package_files {} {
-    package require web-user 0.5.4
-    package require web-forum 0.3.0
+    package require web-user 1.0.0
+    package require web-forum 1.0.0
     set result {}
     foreach {path directory name type} [list \
         /user/_assets/admin.css $::web::user::root admin.css text/css \
