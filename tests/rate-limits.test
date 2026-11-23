@@ -85,9 +85,10 @@ test sensitive-lazy-bindings {lazy handler wrappers preserve account and forum w
     ::tratelimit::mount $lazyRouter
     $lazyRouter add_middleware -enter_proc [list ::site::sensitive_enter $lazyRouter]
     rename ::site::package_dispatch ::site::saved_package_dispatch
-    proc ::site::package_dispatch {kind handler request context params} {dict create statusCode 200 headers {} body ok}
-    ::site::bind_routes $lazyRouter account {{{GET POST} /user/login {::web::user::login @mount}}}
-    ::site::bind_routes $lazyRouter forum {{{GET POST} /forum/topic/:id {::web::forum::topic @mount}}}
+    # Return a stable response so only the route budget affects the result.
+    proc ::site::package_dispatch {kind handler bindings request context params} {dict create statusCode 200 headers {} body ok}
+    ::site::mount_package $lazyRouter account /user
+    ::site::mount_package $lazyRouter forum /forum
 } -body {
     ::tratelimit::init_middleware $policy
     for {set i 1} {$i <= 10} {incr i} {

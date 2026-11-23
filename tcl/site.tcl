@@ -9,6 +9,7 @@ package require Tcl 9.1
 package require twebserver
 package require tjson
 package require tpathexp 1.2.0
+package require web-core 0.1.0
 
 namespace eval ::site {
     variable settings
@@ -70,20 +71,6 @@ proc ::site::mount {router args} {
     set tracker {}
     if {[dict exists $settings package_tracker]} {set tracker [dict get $settings package_tracker]}
     ::package_tracker::configure $tracker -secret_config [dict get $private redis]
-    foreach package {web-static-wiki web-static-blog treqmon} {package require ${package}::routes 1.0}
-    if {[dict exists $settings account]} {
-        package require web-user::routes 1.0
-        package require web-forum::routes 1.0
-        set account [dict get $settings account]
-        set display [dict get $account display]
-        bind_routes $router account [::web::user::route_specs [dict get $display prefix] @mount $display [dict get $account policy]]
-        set prefix /forum
-        if {[dict exists $settings forum prefix]} {set prefix [dict get $settings forum prefix]}
-        bind_routes $router forum [::web::forum::route_specs $prefix @mount]
-    }
-    bind_routes $router wiki [::web::static::wiki::route_specs /docs @mount]
-    bind_routes $router blog [::web::static::blog::route_specs /blog @mount]
-    bind_routes $router monitor [::treqmon::route_specs /request-monitor @mount]
     # Collection surrounds authentication and rate limiting, including rejected requests.
     $router add_middleware -enter_proc ::site::middleware_enter
     if {[dict exists $settings treqmon]} {
@@ -97,6 +84,22 @@ proc ::site::mount {router args} {
         $router add_middleware -enter_proc [list ::site::sensitive_enter $router]
     }
     $router add_middleware -enter_proc ::accounts::monitor_authorize
+    if {[dict exists $settings account]} {
+        set account [dict get $settings account]
+        set display [dict get $account display]
+        mount_package $router account [dict get $display prefix] $display [dict get $account policy]
+        set prefix /forum
+        if {[dict exists $settings forum prefix]} {set prefix [dict get $settings forum prefix]}
+        mount_package $router forum $prefix
+    }
+    mount_package $router wiki /docs
+    mount_package $router blog /blog
+    package require treqmon::routes 1.0
+    foreach route [::treqmon::route_specs /request-monitor @mount] {
+        lassign $route methods pattern handler
+        set bindings [lsearch -all -exact $handler @mount]
+        $router add $methods $pattern [defer monitor $handler $bindings] -strict true
+    }
     foreach {method pattern handler name} [source [file join [root] tcl routes.tcl]] {
         set hooks {}
         if {[dict exists $settings tratelimit]} {
@@ -106,11 +109,17 @@ proc ::site::mount {router args} {
     }
 }
 
-proc ::site::bind_routes {router kind routes} {
-    foreach route $routes {
-        lassign $route method pattern handler
-        $router add $method $pattern [list ::site::package_dispatch $kind $handler] -strict true
-    }
+# Register a package manifest while deferring its service until dispatch.
+proc ::site::mount_package {router kind prefix {settings {}} {policy {}}} {
+    lassign [::views::package_info $kind] package
+    set manifest [::web::core::manifest $package]
+    set plan [::web::core::route_plan $manifest $prefix {} $settings $policy [list ::site::defer $kind]]
+    ::web::core::install $router $plan
+}
+
+# Capture the native command and its config argument positions for first use.
+proc ::site::defer {kind handler bindings} {
+    list ::site::package_dispatch $kind $handler $bindings
 }
 
 proc ::site::middleware_enter {context request} {
@@ -134,15 +143,18 @@ proc ::site::middleware_enter {context request} {
     return $request
 }
 
-proc ::site::package_dispatch {kind handler request context params} {
-    # Asset handlers need implementation code, but no database or mount resources.
-    if {"@mount" ni $handler || [lindex $handler end] eq "asset"} {
+# Resolve the mount on first use, then call the native handler or middleware prefix.
+proc ::site::package_dispatch {kind handler bindings args} {
+    set asset [expr {[lindex $handler 2] eq "asset" && [lindex $handler 0] in {
+        ::web::static::wiki::dispatch ::web::static::blog::dispatch ::treqmon::http::dispatch
+    }}]
+    if {![llength $bindings] || $asset} {
         lassign [::views::package_info $kind] package
         package require $package
         set config {}
     } else {set config [service $kind]}
-    set command [lmap argument $handler {expr {$argument eq "@mount" ? $config : $argument}}]
-    {*}$command $request $context $params
+    foreach index $bindings {lset handler $index $config}
+    {*}$handler {*}$args
 }
 
 # Open the SQL connection only for a consumer that actually needs it.

@@ -6,7 +6,7 @@
 
 package require tcltest 2
 package require tjson
-package require web-user 0.5.3
+package require web-user 1.0.0
 package require pure-tcl-aws-sqs 1.0.0
 package require pure-tcl-aws-ses 1.0.0
 package require pure-tcl-aws-lambda 1.0.0

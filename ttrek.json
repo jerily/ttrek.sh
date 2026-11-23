@@ -103,8 +103,8 @@
     "ttrie": "=0.2.0",
     "ttrigrams": "=0.2.0",
     "valkey-tcl": "^1.0.3",
-    "web-static-blog": "^0.1.12",
-    "web-static-wiki": "^0.1.13",
+    "web-static-blog": "^1.0.0",
+    "web-static-wiki": "^1.0.0",
     "tratelimit": "^1.1.1",
     "treqmon": "^2.3.2",
     "pure-tcl-aws-s3": "^1.0.0",
@@ -129,9 +129,10 @@
       "if": "-local"
     },
     "tconfig": "^1.0.2",
-    "web-user": "=0.7.4",
+    "web-core": "^0.1.0",
+    "web-user": "=1.0.0",
     "tcaptcha": "^1.0.0",
-    "web-forum": "=0.3.4",
+    "web-forum": "=1.0.0",
     "pure-tcl-oauth2-client": "^0.1.0"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 # The forum borrows this worker's account store, connection and site layout.
 namespace eval ::site_forum {}
 proc ::site_forum::mount {router settings templates args} {
-    package require web-forum 0.3.4
+    package require web-forum 1.0.0
     set config {}
     if {[dict exists $settings forum]} {set config [dict get $settings forum]}
     dict set config validate_templates [::site::validate_templates]
@@ -13,7 +13,7 @@ proc ::site_forum::mount {router settings templates args} {
 }
 
 proc ::site_forum::prepare {settings} {
-    package require web-forum 0.3.4
+    package require web-forum 1.0.0
     set config {}
     if {[dict exists $settings forum]} {set config [dict get $settings forum]}
     set config [dict merge $config [::views::mount_settings forum]]

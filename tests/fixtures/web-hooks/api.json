@@ -1,0 +1,25 @@
+{
+  "format": "ttrek-web-api/1",
+  "package": "web-hooks",
+  "summary": "Exercise lazy middleware and handler arguments.",
+  "mount": {
+    "command": "::hooktest::mount",
+    "prefix": {"option": "-prefix", "default": "/sample", "allowRoot": false},
+    "docs": "api.json"
+  },
+  "inputs": {},
+  "router": {"engine": "tpathexp", "strict": true},
+  "routerMiddleware": [{
+    "enter_proc": ["::entered", {"bind": "config"}, "global"],
+    "leave_proc": ["::left", {"bind": "config"}, "global"]
+  }],
+  "routes": [{
+    "id": "sample",
+    "summary": "Return bound and literal arguments.",
+    "methods": ["GET"],
+    "path": "/:id",
+    "handler": ["::received", {"bind": "config"}, "@mount"],
+    "enter_proc": ["::entered", {"bind": "config"}, "route"],
+    "leave_proc": ["::left", {"bind": "config"}, "route"]
+  }]
+}

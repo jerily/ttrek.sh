@@ -54,8 +54,8 @@ proc ::content_images::client {settings} {
 
 # Build and runtime use the same directories, image options and navigation rules.
 proc ::content_images::snapshots {root settings {uploadMissing {}}} {
-    package require web-static-wiki 0.1.13
-    package require web-static-blog 0.1.12
+    package require web-static-wiki 1.0.0
+    package require web-static-blog 1.0.0
     set stores {}
     foreach {kind title directory} {wiki Documentation docs blog Blog blog} {
         set imageOptions [options $settings $kind $uploadMissing]

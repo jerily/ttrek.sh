@@ -51,29 +51,39 @@ proc ::views::load {name} {
     return $text
 }
 
+# Return the Tcl package and site layout for a composition.
 proc ::views::package_info {kind} {
     switch -- $kind {
-        account {return {web-user ::web::user account-master.html.jinja}}
-        forum {return {web-forum ::web::forum forum-master.html.jinja}}
-        wiki {return {web-static-wiki ::web::static::wiki docs-master.html.jinja}}
-        blog {return {web-static-blog ::web::static::blog blog-master.html.jinja}}
+        account {return {web-user account-master.html.jinja}}
+        forum {return {web-forum forum-master.html.jinja}}
+        wiki {return {web-static-wiki docs-master.html.jinja}}
+        blog {return {web-static-blog blog-master.html.jinja}}
         monitor {
             set master request-monitor-master.html.jinja
             if {[dict exists [::site::config] request_monitor master_template]} {
                 set master [dict get [::site::config] request_monitor master_template]
             }
-            return [list treqmon ::treqmon $master]
+            return [list treqmon $master]
         }
         default {error "Unknown template composition: $kind"}
     }
 }
 
+# Locate installed templates without initializing the package's service.
+proc ::views::package_templates {package} {
+    if {$package eq "treqmon"} {
+        package require treqmon::routes 1.0
+        return $::treqmon::template_directory
+    }
+    file join [::web::core::directory $package] assets
+}
+
+# Read the host layout or package template for a named composition.
 proc ::views::package_load {kind name} {
-    lassign [package_info $kind] package ns master
+    lassign [package_info $kind] package master
     if {$name eq "page.html.jinja"} {return [load $master]}
     if {$name eq "master.html.jinja"} {return [load $name]}
-    package require ${package}::routes 1.0
-    read_template [set ${ns}::template_directory] $name
+    read_template [package_templates $package] $name
 }
 
 proc ::views::environment {kind {overrides {}}} {
@@ -118,10 +128,9 @@ proc ::views::prewarm {} {
     set kinds {wiki blog monitor}
     if {[dict exists [::site::config] account]} {lappend kinds account forum}
     foreach kind $kinds {
-        lassign [package_info $kind] package ns master
-        package require ${package}::routes 1.0
+        lassign [package_info $kind] package
         set env [environment $kind]
-        foreach name [names [set ${ns}::template_directory]] {$env load $name}
+        foreach name [names [package_templates $package]] {$env load $name}
         $env load master.html.jinja
     }
 }

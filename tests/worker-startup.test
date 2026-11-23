@@ -6,7 +6,7 @@ set root [file dirname [file dirname [file normalize [info script]]]]
 proc worker {{mode lazy} {environment LOCAL}} {
     set worker [interp create]
     $worker eval [list set auto_path $::auto_path]
-    foreach package {jinja2 web-user web-forum web-static-wiki web-static-blog treqmon web-user::routes web-user::config web-forum::routes web-static-wiki::routes web-static-blog::routes treqmon::routes} {
+    foreach package {jinja2 web-user web-forum web-static-wiki web-static-blog treqmon web-core web-user::manifest web-user::config web-forum::manifest web-static-wiki::manifest web-static-blog::manifest treqmon::routes} {
         foreach version [package versions $package] {
             $worker eval [list package ifneeded $package $version [package ifneeded $package $version]]
         }
@@ -58,6 +58,42 @@ test worker-routes {all methods and conditional package routes exist before impl
             $::views::templates [dict exists [::site::config] content_connection] [string match *private-value* [::site::config]]
     }
 } -cleanup {interp delete $w} -result {{200 200 200 200 200 200 200 200 200 200 200 200 200 405} {} {} 0 0}
+
+test worker-plan-hooks {native router and route hooks share one lazily prepared account mount} -setup {
+    set w [worker]
+    fake_database $w
+} -body {
+    $w eval {
+        # Return a recognizable multiword binding in place of account storage.
+        proc ::accounts::prepare {settings args} {return {tenant example}}
+        # Record enter order on the request and check the bound mount value.
+        proc entered {mount name context request} {
+            if {$mount ne {tenant example}} {error "wrong mount"}
+            dict lappend request visited $name
+            return $request
+        }
+        # Record leave order on the outgoing response.
+        proc left {mount name context request response} {
+            dict lappend response visits [list $mount $name]
+            return $response
+        }
+        # Echo the request as seen by the selected handler.
+        proc received {mount literal request context params} {
+            dict create statusCode 200 body [list $mount $literal [dict get $request visited] $context $params]
+        }
+        ::web::core::register web-hooks [file join $root tests fixtures web-hooks]
+        set router [::tpathexp::router]
+        try {
+            set plan [::web::core::route_plan [::web::core::manifest web-hooks] /sample {} {} {} [list ::site::defer account]]
+            ::web::core::install $router $plan
+            set before $::telemetry::connects
+            set res [$router dispatch {method GET path /sample/42} {trace demo}]
+            set missing [$router dispatch {method GET path /missing}]
+            list $before $::telemetry::connects [dict get $res body] [dict get $res visits] \
+                [dict get $missing statusCode] [dict get $missing visits]
+        } finally {$router destroy}
+    }
+} -cleanup {interp delete $w} -result {0 1 {{tenant example} @mount {global route} {trace demo} {id 42}} {{{tenant example} route} {{tenant example} global}} 404 {{{tenant example} global}}}
 
 test worker-debug-prod {production returns 404 for GET and HEAD /debug} -setup {
     set w [worker lazy PROD]
